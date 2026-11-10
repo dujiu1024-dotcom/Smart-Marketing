@@ -19,7 +19,7 @@ function normalize(){
   state.admin.prompts=[...base.admin.prompts.filter(p=>!state.admin.prompts.some(x=>x.id===p.id)),...state.admin.prompts];
   state.stores.forEach(st=>{for(const key of ["products","offers","assets","knowledge","channels","users"])if(!Array.isArray(st[key]))st[key]=clone(base.stores.find(x=>x.id===st.id)?.[key]||[]);});
   for(const key of ["tenants","models","roles","workflows","tickets","workflowConfig","attributionConfig"])delete state.admin[key];
-  state.admin.budgetConfig={...base.admin.budgetConfig,...(state.admin.budgetConfig||{})};
+  delete state.admin.budgetConfig;
   state.admin.systemConfig={...base.admin.systemConfig,...(state.admin.systemConfig||{})};
   state.admin.systemConfig.industryCategories=array(state.admin.systemConfig.industryCategories,base.admin.systemConfig.industryCategories||[]);
   state.admin.selectedStoreId=state.admin.selectedStoreId||state.stores[0]?.id||state.store.id;

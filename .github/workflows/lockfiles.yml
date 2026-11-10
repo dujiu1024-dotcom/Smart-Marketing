@@ -36,18 +36,23 @@ jobs:
       - name: Generate Worker lockfile
         working-directory: apps/worker
         run: uv lock
+      - name: Generate E2E lockfile
+        working-directory: apps/e2e
+        run: uv lock
       - name: Verify frozen dependency resolution
         run: |
           pnpm install --frozen-lockfile
           uv lock --check --directory apps/api
           uv lock --check --directory apps/worker
+          uv lock --check --directory apps/e2e
           uv sync --locked --extra dev --directory apps/api
           uv sync --locked --directory apps/worker
+          uv sync --locked --directory apps/e2e
       - name: Commit lockfiles when changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml apps/api/uv.lock apps/worker/uv.lock
+          git add pnpm-lock.yaml apps/api/uv.lock apps/worker/uv.lock apps/e2e/uv.lock
           if ! git diff --cached --quiet; then
             git commit -m "build: commit generated dependency lockfiles"
             git pull --rebase origin "${GITHUB_REF_NAME}"
@@ -62,5 +67,6 @@ jobs:
             pnpm-lock.yaml
             apps/api/uv.lock
             apps/worker/uv.lock
+            apps/e2e/uv.lock
           if-no-files-found: error
           retention-days: 7

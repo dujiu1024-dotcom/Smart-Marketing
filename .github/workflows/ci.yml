@@ -46,7 +46,7 @@ jobs:
       - run: uv sync --locked --directory apps/worker
       - run: uv run --locked --directory apps/api ruff check ../worker
       - run: |
-          PYTHONPATH=../worker/src uv run --locked --directory apps/api python -c 'from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {"status": "ok"}'
+          PYTHONPATH=apps/worker/src REDIS_URL=redis://localhost:6379/0 uv run --locked --directory apps/worker python -c 'from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {"status": "ok"}'
 
   infrastructure:
     runs-on: ubuntu-latest

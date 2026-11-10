@@ -150,10 +150,10 @@ PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, co
 - Outbox 与业务记录同事务写入；Relay 投递成功后记录 published_at；消费者必须幂等。
 
 ### 唯一 Job 状态枚举（统一 #7/#9）
-`queued, running, retry_wait, succeeded, failed, dead, needs_human, cancelled`。
+`queued, running, retry_wait, succeeded, failed, needs_human, cancelled`（按 PR #20 待评审提案；Job 不使用 dead）。OutboxEvent 可独立使用 dead 表示投递耗尽。
 - 不使用 `needs_attention`；所有发布不确定、需人工核验的情况统一 `needs_human`。
 - TaskStep 与 Job 状态不同；Job succeeded 不自动表示 TaskStep succeeded。
-- Job dead 表示自动重试耗尽/进入死信；needs_human 表示需要人核验或决策；failed 表示本次执行终止但仍允许显式恢复/重试策略。
+- Job 自动重试耗尽进入 failed，并通过 terminal_reason 区分重试耗尽；needs_human 表示需要人工核验或决策。OutboxEvent 可独立进入 dead。该规范待 PR #20 联合评审冻结。
 
 ## 8. AI Gateway / Provider（#9/#10）契约
 

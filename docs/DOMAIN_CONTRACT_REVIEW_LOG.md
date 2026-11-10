@@ -37,7 +37,7 @@
 
 1. 平台管理员主体的存储、初始化和恢复流程。
 2. Session idle/absolute timeout 的最终数值（设计建议 idle 30 分钟、absolute 12 小时）。
-3. owner/member 首期是否保持同等业务能力；如有差异，必须由产品明确。
+3. owner/member 首期能力映射：当前 `IDENTITY_STORE_SECURITY_DESIGN.md` 的能力矩阵采用“业务动作同权、owner 仅作归属/生命周期标识”的默认提案，但 Issue #5 仍标记待决。该提案尚未获得本轮负责人明确确认，实施前必须确认接受或调整；在此之前授权策略应集中封装，避免散落硬编码。
 4. 门店成员邀请/注册/密码重置的交互和邮件交付机制。
 5. Offer 的结构化规则是否覆盖当前所有目标业态；如有缺项先扩 Schema，不允许落回自由文本。
 6. 素材上传签名 URL 的有效期、文件限制、恶意文件扫描和删除/保留策略。
@@ -60,13 +60,13 @@
 - AI Provider 429/超时/无效结构/凭据错误：按错误分类恢复，AIInvocation 与 Job 状态分别记录。
 - 平台管理员访问门店内容：默认拒绝，必要支持访问必须有单独授权和审计。
 
-## 5. 本轮审查范围与验证状态
+## 5. 新增工程化 Schema 草案\n\n已新增 `docs/CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md`，覆盖 Identity/Store、Store Knowledge、Marketing/Content、Job/AI 的逻辑 ERD、API 请求约定、错误 Schema、事件 Envelope、并发/幂等数据库约束和实现前检查项。该文件是评审草案，不替代 Pydantic/OpenAPI/JSON Schema 或 Alembic 迁移。\n\n## 6. 本轮审查范围与验证状态
 
 - 已完成：文档字段归属、状态枚举、接口边界、跨域事件和关键安全规则的静态交叉审查；发现的职责重叠与字段冲突已在权威文档和 Issues 中修订。
 - 已确定的设计选择：门店作用域请求使用服务端验证的 X-Store-Id；Cookie Session 写请求采用 Session 绑定 synchronizer CSRF token + Origin/Referer 校验；Store.timezone 由 #5 独占；Offer 时间以 UTC 存储；Job 人工处理状态统一 needs_human。
 - 未执行：代码级 Schema 校验、OpenAPI 生成、Alembic 迁移测试、PostgreSQL 约束验证、API/Worker 集成测试和浏览器 E2E。当前是文档设计审查，不能把它们标记为通过。
 
-## 6. 开发门禁
+## 7. 开发门禁
 
 在 B/C/D 轨道联合评审记录完成前：
 - 可以继续做接口 Schema、状态图、迁移草案和测试用例准备。

@@ -12,7 +12,7 @@ let route=location.hash.slice(1)||"ai",currentTaskId=(()=>{try{return localStora
 function setCurrentTask(id){currentTaskId=id;try{localStorage.setItem(CURRENT_TASK_KEY,id)}catch{}}
 function go(r){route=r;location.hash=r;render()}
 function toast(msg){const root=$("#toast-root");root.innerHTML='<div class="toast">'+esc(msg)+'</div>';setTimeout(()=>root.innerHTML="",2600)}
-function titleFor(r){return ({ai:"AI 营销",tasks:"营销任务",effects:"经营效果","account-ops":"账号运营监测", "store:profile":"门店档案","store:products":"商品与服务","store:offers":"活动与优惠","store:brand":"品牌规范","store:audience":"客群与经营","store:knowledge":"门店知识库","store:assets":"素材资产库","store:channels":"渠道账号"})[r]||"营销任务详情"}
+function titleFor(r){return ({ai:"AI 营销",create:"按需制作",tasks:"营销任务",effects:"经营效果","account-ops":"账号运营监测", "store:profile":"门店档案","store:products":"商品与服务","store:offers":"活动与优惠","store:brand":"品牌规范","store:audience":"客群与经营","store:knowledge":"门店知识库","store:assets":"素材资产库","store:channels":"渠道账号"})[r]||(r.startsWith("hotspot-detail:")?"热点机会详情":"营销任务详情")}
 const mainNav=[["ai","✳","AI 营销"],["tasks","▤","营销任务"],["effects","◷","经营效果"],["account-ops","▤","账号运营监测"],["store:profile","⌂","门店资料"]];
 const storeNav=[["profile","门店档案"],["products","商品与服务"],["offers","活动与优惠"],["brand","品牌规范"],["audience","客群与经营"],["knowledge","门店知识库"],["assets","素材资产库"],["channels","渠道账号"]];
 function navButton(item,active){return '<button data-nav="'+item[0]+'" class="'+(active===item[0]?"active":"")+'"><span class="ico">'+item[1]+'</span>'+item[2]+'</button>'}
@@ -23,7 +23,7 @@ function textarea(label,name,value="",help=""){return '<div class="field"><label
 function select(label,name,options,value=""){return '<div class="field"><label for="select-'+esc(name)+'">'+label+'</label><select id="select-'+esc(name)+'" name="'+name+'">'+options.map(x=>'<option '+(x===value?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select></div>'}
 function stat(label,value,hint){return '<div class="card stat"><div class="label">'+label+'</div><div class="value">'+value+'</div><div class="hint">'+hint+'</div></div>'}
 function render(){const d=db();let body;if(route.startsWith("store:"))storeTab=route.split(":")[1]||"profile";
-if(route==="ai")body=renderAI();else if(route==="hotspots")body=renderHotspots();else if(route==="hotspot-detail")body=renderHotspotDetail();else if(route==="create")body=renderCreate();else if(route==="tasks")body=renderTasks();else if(route==="task")body=renderTask();else if(route==="effects")body=renderEffects();else if(route==="account-ops")body=renderAccountOps();else if(route.startsWith("store:"))body=renderStore(route.split(":")[1]);else if(route.startsWith("admin:")){adminPage=route.split(":")[1];body=renderAdmin(adminPage)}else if(route.startsWith("store:")){storeTab=route.split(":")[1]||"profile";body=renderStore(storeTab)}else body=renderAI();
+if(route==="ai")body=renderAI();else if(route==="hotspots")body=renderHotspots();else if(route.startsWith("hotspot-detail:")){selectedHotspotId=route.split(":")[1];body=renderHotspotDetail()}else if(route==="create")body=renderCreate();else if(route==="tasks")body=renderTasks();else if(route==="task")body=renderTask();else if(route==="effects")body=renderEffects();else if(route==="account-ops")body=renderAccountOps();else if(route.startsWith("store:"))body=renderStore(route.split(":")[1]);else if(route.startsWith("admin:")){adminPage=route.split(":")[1];body=renderAdmin(adminPage)}else if(route.startsWith("store:")){storeTab=route.split(":")[1]||"profile";body=renderStore(storeTab)}else body=renderAI();
 $("#app").innerHTML=shell(body);
  document.querySelectorAll("#app .field").forEach((field,i)=>{const label=field.querySelector("label"),control=field.querySelector("input,textarea,select");if(label&&control){if(!control.id)control.id="field-auto-"+i;label.htmlFor=control.id}});
  const toastRoot=$("#toast-root");if(toastRoot){toastRoot.setAttribute("role","status");toastRoot.setAttribute("aria-live","polite")}
@@ -95,7 +95,7 @@ function archiveCopy(t,platform,source,note){t.copyHistory=t.copyHistory||[];con
 function mockRevisedCopy(c,instruction,product){const n={...c},i=instruction;if(/缩短|精简|简短/.test(i))n.body=(n.body||"").split(/[。\n]/).filter(Boolean).slice(0,3).join("。")+"。";if(/标题|标题改|吸引/.test(i))n.title=(n.title||product).replace(/[！!。.]?$/,"")+"｜"+i.slice(0,10);if(/价格|优惠|折扣/.test(i))n.body=(n.body||"")+"\n具体价格与优惠以门店已确认活动规则为准。";if(/口语|自然|生活化/.test(i))n.body=(n.body||"").replace(/本店提供/g,"我们店里有").replace(/欢迎到店/g,"路过可以来店里看看");if(n.body===c.body&&n.title===c.title)n.body=(n.body||"")+"\n\n补充表达："+i+"。";return n}
 function handleClick(el){const a=el.dataset.action,id=el.dataset.id;
 if(el.dataset.nav){go(el.dataset.nav);return}
-if(a==="open-hotspot-detail"){selectedHotspotId=id;go("hotspot-detail");return}
+if(a==="open-hotspot-detail"){selectedHotspotId=id;go("hotspot-detail:"+id);return}
 if(el.dataset.storeTab){storeTab=el.dataset.storeTab;go("store:"+storeTab);return}
 if(el.dataset.adminStoreTab){db().admin.selectedStoreTab=el.dataset.adminStoreTab;save();render();return}
 if(el.dataset.taskTab){taskTab=el.dataset.taskTab;render();return}

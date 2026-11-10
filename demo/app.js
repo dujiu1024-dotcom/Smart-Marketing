@@ -77,7 +77,7 @@ function showModal(html){$("#modal-root")?.remove();document.body.insertAdjacent
 
 function table(heads,rows){return '<div class="table-wrap"><table><thead><tr>'+heads.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'}
 function modalForm(title,fields,submitAction,id=''){return renderModal(title,'<form id="modalForm" data-submit="'+submitAction+'" data-id="'+esc(id)+'">'+fields+'<div class="actions mt"><button class="btn primary" type="submit">保存</button><button class="btn" type="button" data-action="close-modal">取消</button></div></form>')}
-function storePath(kind){const d=db(),i=(d.stores||[]).findIndex(x=>x.id===d.admin.selectedStoreId),key={product:"products",offer:"offers",knowledge:"knowledge",asset:"assets",channel:"channels"}[kind];return i>=0?"stores."+i+"."+key:key}
+function storePath(kind){const d=db(),i=(d.stores||[]).findIndex(x=>x.id===d.admin.selectedStoreId),key={product:"products",offer:"offers",knowledge:"knowledge",asset:"assets",channel:"channels"}[kind];if(i>=0&&d.stores[i].id===d.store.id){d[key]=d.stores[i][key]||d[key]}return i>=0?"stores."+i+"."+key:key}
 function storeList(kind){const d=db(),i=(d.stores||[]).findIndex(x=>x.id===d.admin.selectedStoreId),key={product:"products",offer:"offers",knowledge:"knowledge",asset:"assets",channel:"channels"}[kind];if(i<0)return d[key];const st=d.stores[i];if(!Array.isArray(st[key]))st[key]=JSON.parse(JSON.stringify(d[key]||[]));return st[key]}
 function openEditor(kind,id=''){const d=db();let x={};if(id){x=storeList(kind).find(v=>v.id===id)||{}}
 let f='';

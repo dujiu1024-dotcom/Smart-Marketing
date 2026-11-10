@@ -51,7 +51,7 @@
 - status：invited / active / suspended / removed。
 - invited_by_user_id、joined_at、revoked_at、created_at、updated_at。
 - UNIQUE(store_id, user_id)；索引 (user_id, status)、(store_id, status)。
-- owner 可管理成员和门店级敏感设置；member 执行门店营销业务。权限由服务端固定 policy 映射，不开放自定义角色编辑。
+- owner / member 均可执行产品 v1.8 定义的门店营销业务；role 不用于增加营销审批层级。门店成员查看、邀请、移除和角色维护由平台管理员在平台管理端执行，符合 PRODUCT_DESIGN.md 的平台管理员职责。
 - 移除/降级最后一个 active owner 必须事务失败。所有权转移是显式审计动作。
 
 ### Session
@@ -82,7 +82,7 @@ Cookie 名称 __Host-ai_store_session；属性 Secure、HttpOnly、SameSite=Lax�
 
 ### 建议生命周期参数（上线前安全评审）
 
-- 空闲超时 12 小时；绝对寿命 7 天。
+- 暂定评估值：空闲超时 12 小时、绝对寿命 7 天；这两个值不是已批准的安全策略，须在安全评审中 accept/change/defer 后才可写入运行配置。
 - 登录成功签发新 Session，不复用匿名 Session。
 - 登录、密码重置、密码修改、权限提升后轮换 token，旧 token 原子撤销。
 - 登出撤销当前 Session 并清 Cookie。
@@ -96,12 +96,12 @@ Cookie 名称 __Host-ai_store_session；属性 Secure、HttpOnly、SameSite=Lax�
 2. 查询未撤销、未过期 Session 和 User。
 3. 校验 User.status=active，且 Session.auth_version 等于 User.auth_version。
 4. 状态变更请求校验 CSRF 与 Origin。
-5. 门店请求解析 Session.active_store_id；校验 Store.active 和该 User 的 StoreMembership.active。
-6. 建立不可由客户端覆盖的 AuthContext：user_id、session_id、active_store_id、membership_id、role、request_id。
+5. 门店请求必须读取 X-Store-ID 不可信 selector；逐请求校验 Store.status=active 和该 User 的 StoreMembership.status=active。不得使用 Session.active_store_id 替代请求 selector，也不得把它复制到请求授权上下文。
+6. 建立不可由客户端覆盖的 AuthContext：user_id、session_id、request_store_id、membership_id、role、capabilities、authorization_version、request_id。Session.active_store_id 只用于 UI 默认门店选择。
 7. 应用服务执行资源归属和操作权限检查。
 8. 任一授权依赖失败均拒绝，不降级放行。
 
-首期每个门店请求重新校验 membership，不做跨请求长 TTL 权限缓存。
+首期每个门店请求重新校验 membership，不做跨请求长 TTL 权限缓存。若 membership/store 状态读取失败，返回 503 并 fail closed。
 
 ## 5. 门店切换与服务端授权
 
@@ -131,7 +131,7 @@ PostgreSQL RLS 可作为纵深防御但不替代应用层授权。若启用，�
 
 ## 6. 最小角色与错误策略
 
-首期门店角色仅 owner / member，不增加 RBAC 管理 UI。owner 管理成员、邀请、门店级敏感设置和审计；member 执行现有产品定义的门店营销流程。两者均遵循产品 v1.8 的商家审核/发布规则，不新增审批层级。平台管理员单独身份域。
+首期门店角色仅 owner / member，不增加 RBAC 管理 UI。两者均可执行产品 v1.8 定义的门店营销流程，不新增审批层级。成员管理由平台管理员在平台管理端完成；平台管理员可访问管理所需的成员最小字段，但不因此获得门店营销正文、素材、经营资料或任务的读取权限。此职责以 PRODUCT_DESIGN.md 2.2 为准。
 
 | 场景 | HTTP | code |
 |---|---:|---|
@@ -159,4 +159,20 @@ Issue #4 合并并验收工程骨架、CI、PostgreSQL 测试服务、迁移入�
 
 ## 8. 未决项
 
-注册/邀请和邮箱验证供应商、密码重置邮件供应商依部署区域与开户流程确认；是否启用 RLS 在应用层授权完成后评估；12h/7d Session 参数上线前由安全评审确认；平台管理员认证保持独立。本设计不擅自选定云厂商或 OIDC 供应商。
+用户注册/邀请与邮箱验证供应商、密码重置邮件供应商依部署区域与开户流程确认；是否启用 RLS 在应用层授权完成后评估；12h/7d Session 参数上线前由安全评审确认；平台管理员的独立授权记录、初始化和紧急恢复流程必须在实施前定案。本设计不擅自选定云厂商或 OIDC 供应商。
+
+
+## 9. 产品权限基线校正（2026-11-11）
+
+依据 PRODUCT_DESIGN.md v1.8 第 2.2 节，平台管理员负责在门店详情中管理门店用户。因此：
+- 成员列表、邀请、移除、状态变更和角色维护属于平台管理端能力，不归门店 owner/member。
+- owner/member 不因此获得额外成员管理、角色配置或审批能力；两者的营销业务能力按现行产品流程执行。
+- 平台管理员可以读取管理成员关系所需的最小字段，不得由此访问门店任务正文、文案、图片、素材或经营资料。
+- 本节是对本设计原先权限表述的纠偏，API 和安全测试矩阵必须同步遵守。
+
+## 10. 门店上下文一致性补充
+
+- X-Store-ID 是每个门店业务请求的唯一请求级 selector；服务端将其与已认证 User 的 active StoreMembership 逐请求核验。
+- Session.active_store_id 只作为 UI 默认门店选择和恢复提示。切换该字段不得改变其他标签页的请求授权。
+- AuthContext 只暴露 request_store_id，不提供可被业务代码误用的 active_store_id 授权字段。
+- 请求 selector 缺失时返回 400 STORE_CONTEXT_REQUIRED；selector 指向非成员/停用门店时统一 404 STORE_NOT_FOUND。

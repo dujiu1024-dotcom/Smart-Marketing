@@ -75,15 +75,24 @@
 - 契约变更必须同步更新本记录、权威文档、OpenAPI 和相关 Issue，不允许只改代码。
 
 
-## 7. Identity & Store 第二轮修订（PR #23，2026-11-11）
+## 7. Identity & Store 第二轮修订（PR #26，2026-11-11）
 
-本轮审查基于 PRODUCT_DESIGN.md v1.8 与最新 main，确认并记录以下规则；PR #23 尚未合并，因此它们属于待评审契约，不代表已冻结实现：
+本轮审查基于 PRODUCT_DESIGN.md v1.8 与最新 main，确认并记录以下规则；PR #26 尚未合并，因此它们属于待评审契约，不代表已冻结实现：
 
 1. 每个门店业务请求使用 X-Store-ID 作为不可信 request selector；服务端逐请求校验 Store.status 与 StoreMembership.status，并构造 AuthContext.request_store_id。
 2. Session.active_store_id 仅用于 UI 默认选择/恢复提示，不得作为请求授权上下文；多标签页的请求门店互不影响。
 3. 平台管理员按产品文档负责在门店详情管理门店成员。owner/member 不额外获得成员管理权限或新增审批层级。
 4. 平台管理员通过独立 PlatformAdminGrant 获得 platform.store_members.manage；该权限不自动授予 StoreMembership，也不授予门店营销正文、素材或经营资料读取权。
 5. 12h idle / 7d absolute 是待安全评审的建议值；邀请/注册/密码重置流程、管理员 bootstrap/恢复和 RLS 启用策略仍待决议。
-6. PR #22 因基线过期由 PR #23 替代；PR #23 从最新 main 重建，设计和安全测试矩阵仍待审查。
+6. PR #22 因基线过期由 PR #26 替代；PR #26 从最新 main 重建，设计和安全测试矩阵仍待审查。
 
 对营销域的影响：#7/#8/#9 只能消费 AuthContext.request_store_id 与 actor_user_id；不得读取 Session.active_store_id 决定资源归属。营销任务、产物、Job、资产的所有权仍以持久化 store_id + 服务端授权上下文双重校验为准。
+
+
+## 8. B/D 联合授权边界同步（2026-11-11）
+
+- Identity 最新评审入口为 PR #26；此前 PR #22、#23 已关闭，不再作为当前契约依据。
+- Async Runtime 的 PR #20 已按 PR #26 的 AuthorizedStoreContext 字段补充 Worker 映射：user_id、request_store_id、membership_id；Session.active_store_id 仅为 UI 默认选择。
+- 用户触发 Job 的 store_id/created_by_user_id 从可信上下文注入；system Job 使用显式 system scope 与 actor_type=system，不伪造用户。
+- PlatformAdminGrant 的成员管理能力不等于 StoreMembership，也不授予 Job、营销任务、产物或门店资料访问权限。
+- PR #20 与 PR #26 均为待评审设计，未合并前这些映射仍是提案；安全测试全部待执行。

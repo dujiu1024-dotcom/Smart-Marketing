@@ -28,7 +28,7 @@ pnpm dev:web
 ```bash
 cd apps/api
 uv sync --locked --extra dev
-uv run uvicorn store_operator.main:app --reload --app-dir src
+uv run --locked uvicorn store_operator.main:app --reload --app-dir src
 ```
 
 ## 本地运行 Worker
@@ -41,7 +41,7 @@ uv sync --locked && uv run --locked celery -A store_operator_worker.celery_app:c
 ## 测试
 
 ```bash
-cd apps/api && uv run --extra dev pytest
+cd apps/api && uv sync --locked --extra dev && uv run --locked pytest
 cd ../..
 pnpm test
 pnpm typecheck

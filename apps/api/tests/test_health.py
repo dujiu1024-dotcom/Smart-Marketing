@@ -22,3 +22,25 @@ def test_health_response_includes_request_id() -> None:
 
     assert response.status_code == 200
     assert response.headers["X-Request-ID"] == "test-request-123"
+
+import structlog
+
+from store_operator.observability import configure_logging
+
+
+def test_structured_logging_redacts_nested_secrets(capsys) -> None:
+    configure_logging()
+    logger = structlog.get_logger("test.redaction")
+    logger.info(
+        "auth.request",
+        request_id="req-123",
+        password="plain-secret",
+        nested={"api_key": "api-secret", "safe": "visible"},
+    )
+
+    output = capsys.readouterr().out
+    assert "plain-secret" not in output
+    assert "api-secret" not in output
+    assert "[REDACTED]" in output
+    assert "req-123" in output
+    assert "visible" in output

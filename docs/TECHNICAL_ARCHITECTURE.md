@@ -363,3 +363,10 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 - 工程门禁：GitHub Actions、Docker Compose、pytest、Vitest、Playwright、Ruff、TypeScript 检查与构建。
 
 首期不引入 Kubernetes、n8n 核心流程编排、ComfyUI 硬依赖或业务微服务群。生产云厂商、区域、托管对象存储、OIDC/SSO 和错误追踪供应商仍需按真实部署约束决策。
+
+
+## 16. Issue #9 异步任务与 AI Gateway 契约
+
+Job Runtime、Outbox、Celery Worker、租约/重试/恢复规则、AI Provider 接口、API 边界和故障测试矩阵以 [异步任务运行时与 AI Gateway 契约](ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md) 为详细设计基线。关键约束：PostgreSQL 是 Job/Attempt/Event/Outbox 的唯一事实来源；Redis 仅作为 Celery Broker；Outbox 至少一次投递；Worker 通过 PostgreSQL 原子认领和 fencing token 执行；不确定的外部副作用进入人工核验；AI Gateway 只暴露能力接口并记录模型/Prompt 版本与成本。
+
+该文档属于设计契约，不能作为“已实现/已部署/已验收”的证据。Issue #4/#5/#8 的前置契约和工程环境通过后，才进入对应生产实现。

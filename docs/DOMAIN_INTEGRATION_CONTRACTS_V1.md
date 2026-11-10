@@ -15,9 +15,11 @@
 | User、Store 生命周期、StoreUser、Session、AuthorizedStoreContext | #5 Identity & Store | #6–#10 |
 | StoreProfile、Product、Offer、BrandGuideline、KnowledgeItem、MediaAsset | #6 Store Knowledge | #7–#10 |
 | MarketingTask、RequirementSnapshot、StrategySnapshot、TaskStep、DependencyEdge、TaskEvent | #7 Marketing Orchestrator | #8–#10 |
-| CopyArtifact、ImageArtifact、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishConfirmation | #8 Content/Media/Publishing | #7、#9、#10 |
+| CopyArtifact、ImageArtifact、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishConfirmation | #8 Content/Media/Publishing | #7、#9、#10、#12 |
+| ChannelAccount、平台授权凭据、平台能力状态、PublishOperation | #12 Channel Integration | #8 只引用账号/能力，不持有平台凭据 |
 | Job、JobAttempt、JobEvent、OutboxEvent、JobType、lease/retry/recovery | #9 Job Runtime | #7、#8、#10、#11、#12 |
-| AIInvocation、ModelConfig、Provider capability registry、Prompt execution metadata、usage/cost | #9 AI Gateway contract; concrete provider adapters #10 | #7、#8、#11 |
+| AIInvocation、ModelConfig、Provider capability registry、usage/cost | #9 AI Gateway | #7、#8、#10、#11 |
+| PromptTemplate、PromptVersion 生命周期与管理 | #10（实现）/ Platform Admin 产品能力 | #7–#9 消费固定版本引用 |
 | Text/Image/Vision/OCR provider concrete adapters and real integrations | #10 | #9 Gateway |
 | API OpenAPI schema generation | API module owner per endpoint | Web client |
 
@@ -130,6 +132,7 @@ PublishPackage：`id, store_id, task_id, package_version, channel_content_id, co
 PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at`。
 - PublishPackage 冻结后不可变；任何上游变更生成新包。
 - 最终确认必须绑定包 ID + fingerprint；新包不能继承旧确认。
+- #8 负责发布门禁和发布业务意图；#12 执行官方渠道 Adapter/PublishOperation，#9 仅提供异步 Job Runtime。
 
 ## 7. Job Runtime（#9）实体与状态契约
 
@@ -158,6 +161,7 @@ PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, co
 `id, store_id, task_id NULL, job_id NULL, provider_key, model_key, capability(text_generate|text_rewrite|image_generate|image_edit|vision_inspect|ocr_extract), prompt_version_id, request_fingerprint, response_ref, input_units, output_units, cost_amount, currency, duration_ms, status, error_code, created_at, finished_at`。
 - 记录调用元数据和成本；原始敏感 prompt/response 存受控引用或按最小化原则脱敏，不直接写普通日志。
 - AIInvocation 状态：queued/running/succeeded/failed/cancelled；它不是 Job，也不拥有营销业务状态。
+- prompt_version_id 指向 #10 管理的不可变 PromptVersion；AIInvocation 固定记录实际版本、变量 schema 版本、model/provider 选择与参数指纹，历史任务不得动态读取最新 Prompt。
 
 ### Provider 接口（#9 定义，#10 实现）
 - TextProvider.generate(request, context) -> StructuredTextResult
@@ -258,6 +262,8 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 14. 平台管理员访问门店内容：默认拒绝，必要支持访问必须有独立受审计授权。
 
 ## 13. 冻结清单与阻塞项
+
+补充权属边界：#8 仅持有 ChannelContent 对平台账号的引用；#12 是 ChannelAccount、授权凭据、平台能力发现和 PublishOperation 的唯一权威所有者。#8 的发布服务负责校验审核/质检/确认门禁后创建发布命令，不直接调用厂商 SDK。
 
 在 B/C/D 轨道联合评审中必须逐项给出 accept / change / defer：
 - [ ] #5：平台管理员主体存储、Session 时限、CSRF 方案、门店切换上下文策略、成员邀请/注册流程。

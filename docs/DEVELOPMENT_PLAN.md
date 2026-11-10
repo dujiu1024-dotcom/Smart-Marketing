@@ -19,6 +19,7 @@
 - `docs/TECH_STACK_SELECTION.md`
 - `docs/IDENTITY_STORE_SECURITY_DESIGN.md`
 - `docs/DOMAIN_INTEGRATION_CONTRACTS_V1.md`
+- `docs/DOMAIN_CONTRACT_REVIEW_LOG.md`
 
 不做 ERP、CRM、POS、广告投放/预算管理、通用工作流编排。固定营销流程由领域状态机控制；首期采用模块化单体 + 独立 Worker + Provider/Adapter，不拆业务微服务，不将 n8n 或 ComfyUI 设为硬依赖。
 

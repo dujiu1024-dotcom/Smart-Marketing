@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: store_operator
+      POSTGRES_USER: store_operator
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports: ["5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U store_operator -d store_operator"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8.2
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports: ["6379:6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    command: "server -s3 -dir=/data"
+    ports: ["8333:8333", "9333:9333", "8888:8888"]
+    volumes: ["seaweed_data:/data"
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/containers/api.Dockerfile
+    env_file: ../../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
+      REDIS_URL: redis://redis:6379/0
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/containers/worker.Dockerfile
+    env_file: ../../.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis: { condition: service_healthy }
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/containers/web.Dockerfile
+    ports: ["5173:80"]
+    depends_on: [api]
+
+volumes:
+  postgres_data:
+  redis_data:
+  seaweed_data:

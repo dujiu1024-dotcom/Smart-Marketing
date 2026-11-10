@@ -120,7 +120,8 @@ else if(a.startsWith('admin-edit-'))toast('请通过对应模块查看并维护�
 return}
 }
 document.addEventListener('click',ev=>{const x=ev.target.closest('[data-nav],[data-action],[data-task-tab],[data-copy-platform],[data-image-mode],[data-window]');if(x)handleClick(x)});
-document.addEventListener('change',ev=>{if(ev.target.id==='copyFile'&&ev.target.files[0]){ev.target.files[0].text().then(t=>{if($('#merchantCopy'))$('#merchantCopy').value=t;toast('文案文件已读取，请检查内容后采用')}).catch(()=>toast('无法读取该文件，请粘贴文案'))}});\ndocument.addEventListener('submit',ev=>{if(ev.target.id!=='modalForm')return;ev.preventDefault();const f=ev.target,o=formObject(f),a=f.dataset.submit,id=f.dataset.id;
+document.addEventListener('change',ev=>{if(ev.target.id==='copyFile'&&ev.target.files[0]){ev.target.files[0].text().then(t=>{if($('#merchantCopy'))$('#merchantCopy').value=t;toast('文案文件已读取，请检查内容后采用')}).catch(()=>toast('无法读取该文件，请粘贴文案'))}});
+document.addEventListener('submit',ev=>{if(ev.target.id!=='modalForm')return;ev.preventDefault();const f=ev.target,o=formObject(f),a=f.dataset.submit,id=f.dataset.id;
 if(a==='save-product'){o.price=Number(o.price||0);o.confirmed=true;id?update('products',id,o):add('products',o)}
 else if(a==='save-offer')id?update('offers',id,o):add('offers',o);
 else if(a==='save-knowledge')id?update('knowledge',id,o):add('knowledge',o);
@@ -130,7 +131,7 @@ else if(a==='admin-save-tenant')add('admin.tenants',o);
 else if(a==='admin-save-user')add('admin.users',o);
 else if(a==='admin-save-model')add('admin.models',o);
 else if(a==='admin-save-prompt')add('admin.prompts',o);
-else if(a==='admin-save-ticket')add('admin.tickets',{...o,id:'inc-'+Date.now()});
+else if(a==='admin-save-ticket')add('admin.tickets',{...o,id:'inc-'+Date.now()});\nelse if(a==='admin-save-role')add('admin.roles',o);
 audit('保存记录',a,id||'new');$('#modal-root')?.remove();render();toast('记录已保存到本地演示环境')});
 document.addEventListener('input',ev=>{if(['taskSearch','taskFilter','taskType'].includes(ev.target.id)){const q=$('#taskSearch').value.toLowerCase(),f=$('#taskFilter').value,ty=$('#taskType').value,ls=db().tasks.filter(t=>(!q||(t.title+t.product+t.id).toLowerCase().includes(q))&&(!f||t.status===f)&&(!ty||t.type===ty));$('#taskTable').innerHTML=taskTable(ls)}if(ev.target.id==='adminSearch'||ev.target.id==='adminFilter'){const q=$('#adminSearch')?.value.toLowerCase()||'',f=$('#adminFilter')?.value||'';$$('tbody tr').forEach(tr=>tr.style.display=tr.innerText.toLowerCase().includes(q)&&(!f||tr.innerText.includes(f))?'':'none')}});
 window.addEventListener('hashchange',()=>{route=location.hash.slice(1)||'ai';render()});

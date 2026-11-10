@@ -5,11 +5,6 @@ from collections.abc import Mapping
 from typing import Any
 
 import structlog
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor, SpanExporter
 
 _SENSITIVE_KEY_FRAGMENTS = (
     "password",

@@ -49,7 +49,7 @@ export function renderAdmin(page="overview"){
  if(page==="capabilities"){
   const categories=a.systemConfig?.industryCategories||["餐饮","饮品","美容","按摩","健身","零售","生活服务"],prompts=a.prompts||[];
   return header("AI 能力与提示词配置","按门店业态配置共享提示词模板。同一业态使用统一基础模板，门店可叠加自身品牌与经营规则。",btn("新增模板","admin-new-prompt","","primary"))
-   +'<div class="card mb"><h3>门店业态分类</h3><div class="field"><label>分类列表（每行一个）</label><textarea id="industryCategories" rows="3">'+e(categories.join("\\n"))+'</textarea></div>'+btn("保存业态分类","admin-save-industries","","primary")+'</div>'
+   +'<div class="card mb"><h3>门店业态分类</h3><div class="field"><label>分类列表（每行一个）</label><textarea id="industryCategories" rows="3">'+e(categories.join("\n"))+'</textarea></div>'+btn("保存业态分类","admin-save-industries","","primary")+'</div>'
    +'<div class="card"><div class="card-head"><div><h3>提示词模板</h3><div class="small muted">选择模板进入独立编辑页面；编辑会创建新版本，不覆盖历史版本。</div></div><span class="pill blue">'+prompts.length+' 个模板</span></div>'
    +table(["模板","业态","能力","版本","状态","操作"],prompts.map(p=>'<tr><td><strong>'+e(p.name)+'</strong></td><td>'+e(p.industryCategory||"通用")+'</td><td>'+e(p.scope)+'</td><td>'+e(p.version)+'</td><td>'+pill(p.status)+'</td><td>'+btn("编辑","admin-edit-prompt",p.id)+'</td></tr>').join(""))
    +'</div>';

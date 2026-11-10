@@ -107,8 +107,10 @@ jobs:
         with:
           python-version: "3.13"
       - run: pnpm install --frozen-lockfile
-      - name: Install pinned Playwright Chromium runtime
-        run: uv run --with playwright==1.56.1 --python 3.13 --no-project python -m playwright install --with-deps chromium
+      - name: Install locked E2E dependencies
+        run: uv sync --locked --directory apps/e2e
+      - name: Install locked Playwright Chromium runtime
+        run: uv run --locked --directory apps/e2e python -m playwright install --with-deps chromium
       - name: Start Web application
         run: |
           pnpm --filter @store-operator/web dev -- --host 127.0.0.1 > /tmp/store-operator-web.log 2>&1 &
@@ -122,7 +124,7 @@ jobs:
           cat /tmp/store-operator-web.log
           exit 1
       - name: Run browser smoke E2E
-        run: uv run --with playwright==1.56.1 --python 3.13 --no-project python apps/web/e2e/smoke.py
+        run: uv run --locked --directory apps/e2e python ../../apps/web/e2e/smoke.py
       - name: Stop Web application
         if: always()
         run: if [ -f /tmp/store-operator-web.pid ]; then kill "$(cat /tmp/store-operator-web.pid)" || true; fi

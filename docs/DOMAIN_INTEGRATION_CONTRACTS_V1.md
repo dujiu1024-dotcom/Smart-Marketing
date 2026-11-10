@@ -185,8 +185,8 @@ Provider 统一返回：provider_key、model_key、provider_request_id、status�
 
 - API 版本前缀 `/api/v1`；JSON Schema 由 Pydantic 生成 OpenAPI，TypeScript Client 从 OpenAPI 生成。
 - 所有写请求（任务/产物/审核/Job 人工恢复/发布）必须有 Idempotency-Key；更新有 expected_version 或 If-Match。
-- 标准错误：`{code, message, request_id, details?}`。跨门店资源 404；能力不足 403；并发冲突 409；字段校验 422；限流 429。
-- 列表默认按当前 AuthorizedStoreContext 限定，不允许客户端提供任意 store_id 查询全量数据。
+- 标准错误：`{code, message, request_id, details?}`。缺少 `X-Store-Id` 返回 400 `STORE_CONTEXT_REQUIRED`；跨门店/非成员资源 404；能力不足 403；并发冲突 409；字段校验 422；限流 429。
+- 所有门店作用域 API 必须读取并验证 `X-Store-Id`，由 #5 构造 AuthorizedStoreContext；列表默认按该上下文限定，不允许客户端提供任意 store_id 查询全量数据。
 - 对外事件采用 snake_case event_type + schema_version；至少含 event_id、store_id、aggregate_type/id、correlation_id、causation_id、occurred_at。
 - 事件 payload 只传引用、状态和必要摘要；大文件和敏感文本不放事件总线。
 

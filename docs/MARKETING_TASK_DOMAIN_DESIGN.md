@@ -44,7 +44,7 @@
 
 ### 2.1 聚合边界
 
-MarketingTask 是流程协调聚合根，但大文件只保存对象存储引用。文案、图片和审核分别由 Content Studio、Media Studio 管理；营销任务通过应用服务/领域事件协调，不直接修改其内部数据表。
+MarketingTask 是流程协调聚合根，但大文件只保存对象存储引用。文案、图片、审核和发布包由 #8 Content/Media/Publishing 管理；Job/Attempt/Outbox 由 #9 Job Runtime 管理；营销任务只保存其 ID、版本和指纹引用，通过应用服务/领域事件协调，不直接修改其内部数据表。
 
 所有写操作在事务中校验 `store_id`、当前版本、状态迁移和前置条件。跨模块事件通过 Outbox 或等价可靠机制投递。
 

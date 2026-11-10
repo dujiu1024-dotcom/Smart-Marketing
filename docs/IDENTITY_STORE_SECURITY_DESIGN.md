@@ -35,7 +35,6 @@
 - id UUID PK
 - name TEXT NOT NULL
 - status ENUM(active, suspended, archived) NOT NULL
-- timezone TEXT NOT NULL
 - created_at / updated_at timestamptz NOT NULL
 
 Store 的经营资料字段由 #6 Store Knowledge 管理；Identity 域只持有身份与门店生命周期最小字段，不复制 StoreProfile。
@@ -100,7 +99,7 @@ Session 原始 Token 只在创建/轮换时返回一次，以 Secure + HttpOnly 
 - authorization_version（用于缓存失效/变更检测）
 - request_id
 
-业务模块只能接收此上下文，不自行从请求体解析身份或门店权限。当前门店通过显式 API 选择；切换时服务端验证 active membership 和 active Store，切换成功后更新 Session 当前门店上下文或返回新的短期上下文，不接受客户端自行声明 role/capabilities。
+业务模块只能接收此上下文，不自行从请求体解析身份或门店权限。当前门店通过 `X-Store-Id` 请求头表达选择；每个门店作用域请求都必须重新验证 active membership 和 active Store。门店切换 API 只负责验证并返回可用上下文，前端保存的门店选择仅是 UI 状态，不是授权凭据；Session 不保存可绕过成员关系校验的 current_store_id。不得接受客户端声明 role/capabilities。所有门店作用域 API 均要求该请求头，缺失返回 400 STORE_CONTEXT_REQUIRED，非法/非成员门店返回统一 404。
 
 ## 4. 首期能力矩阵
 
@@ -188,10 +187,10 @@ Session 原始 Token 只在创建/轮换时返回一次，以 Secure + HttpOnly 
 ## 10. 待评审事项（冻结前必须决议）
 
 1. 平台管理员主体的存储方式和初始化/恢复流程。
-2. Session idle/absolute timeout 的明确时长。
-3. CSRF 采用 synchronizer token 还是严格 Origin + double-submit 组合。
+2. Session idle/absolute timeout 的明确时长；安全评审前建议 idle 30 分钟、absolute 12 小时，敏感认证事件立即轮换/撤销。
+3. CSRF 已确定采用 Session 绑定 synchronizer token + Origin/Referer 校验，需在实现评审中验证具体轮换和错误处理。
 4. owner/member 两种固定角色是否足够覆盖首期真实门店流程。
-5. 门店切换是写入 Session current_store_id，还是每个请求显式带上下文 header；无论哪种均由服务端校验。
+5. 门店切换采用每个门店作用域请求显式携带 `X-Store-Id`，不写入可作为授权依据的 Session current_store_id；实现时验证所有端点一致执行。
 6. 用户邀请/注册/密码重置的产品交互与邮件交付机制（不擅自接入第三方邮件供应商）。
 
 以上待决项未评审前，文档为设计提案。任何待决项不得通过实现时临时假设解决。

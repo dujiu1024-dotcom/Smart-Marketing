@@ -15,9 +15,11 @@
 | User、Store 生命周期、StoreUser、Session、AuthorizedStoreContext | #5 Identity & Store | #6–#10 |
 | StoreProfile、Product、Offer、BrandGuideline、KnowledgeItem、MediaAsset | #6 Store Knowledge | #7–#10 |
 | MarketingTask、RequirementSnapshot、StrategySnapshot、TaskStep、DependencyEdge、TaskEvent | #7 Marketing Orchestrator | #8–#10 |
-| CopyArtifact、ImageArtifact、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishConfirmation | #8 Content/Media/Publishing | #7、#9、#10 |
+| CopyArtifact、ImageArtifact、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishConfirmation | #8 Content/Media/Publishing | #7、#9、#10、#12 |
+| ChannelAccount、平台授权凭据、平台能力状态、PublishOperation | #12 Channel Integration | #8 只引用账号/能力，不持有平台凭据 |
 | Job、JobAttempt、JobEvent、OutboxEvent、JobType、lease/retry/recovery | #9 Job Runtime | #7、#8、#10、#11、#12 |
-| AIInvocation、ModelConfig、Provider capability registry、Prompt execution metadata、usage/cost | #9 AI Gateway contract; concrete provider adapters #10 | #7、#8、#11 |
+| AIInvocation、ModelConfig、Provider capability registry、usage/cost | #9 AI Gateway | #7、#8、#10、#11 |
+| PromptTemplate、PromptVersion 生命周期与管理 | #10（实现）/ Platform Admin 产品能力 | #7–#9 消费固定版本引用 |
 | Text/Image/Vision/OCR provider concrete adapters and real integrations | #10 | #9 Gateway |
 | API OpenAPI schema generation | API module owner per endpoint | Web client |
 
@@ -49,9 +51,9 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 建议实体字段（字段类型为 PostgreSQL 语义，最终由 SQLAlchemy/Alembic 迁移确认）：
 
 ### StoreProfile
-`id, store_id, display_name, business_type, brand_name, address, phone, timezone, opening_hours_json, service_description, fact_status, source, confirmed_by, confirmed_at, version, created_at, updated_at`
+`id, store_id, display_name, business_type, brand_name, address, phone, opening_hours_json, service_description, fact_status, source, confirmed_by, confirmed_at, version, created_at, updated_at`
 - UNIQUE(store_id, id)；门店一对一档案可 UNIQUE(store_id)。
-- 门店档案只存经营信息；Store.status/timezone 的身份域权威字段不可复制写入。
+- 门店档案只存经营信息；Store.status 与 Store.timezone 的身份域权威字段不可复制写入。营业时间以 Store.timezone 解释，门店可在 Identity 域变更时区并产生审计事件。
 
 ### Product
 `id, store_id, name, category, sku, specification, price_amount, currency, availability_status, capacity_value, capacity_unit, selling_points_json, fact_status, source, confirmed_by, confirmed_at, version, archived_at, created_at, updated_at`
@@ -60,9 +62,9 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 - 库存/产能未知时 NULL；不将 NULL 解释为 0。
 
 ### Offer
-`id, store_id, title, offer_type, terms_json, applicable_product_ids, starts_at, ends_at, timezone, status, fact_status, confirmed_by, confirmed_at, version, created_at, updated_at`
-- 有效期需明确本地时区语义；开始/结束边界使用统一包含规则。
-- 折扣、赠品、门槛、限量和适用商品以结构化 terms 表达，禁止只存不可验证的自由文本。
+`id, store_id, title, offer_type, terms_json, applicable_product_ids, starts_at, ends_at, status, fact_status, confirmed_by, confirmed_at, version, created_at, updated_at`
+- 有效期存 UTC timestamptz；门店本地展示和日期边界统一使用 Identity 域 Store.timezone，避免每个 Offer 自行保存互相冲突的 timezone。
+- terms_json 必须通过 Pydantic discriminated union 校验：discount_percent {percent}; discount_amount {amount,currency}; fixed_price {amount,currency}; buy_x_get_y {buy_quantity,get_quantity,eligible_product_ids}; gift {gift_description,eligible_product_ids}; threshold_discount {minimum_spend,currency,discount_type,discount_value}。适用商品、限制次数/数量、有效期与适用门店事实单独保存并校验，不能只依赖自由文本。
 
 ### BrandGuideline
 `id, store_id, positioning, differentiators, tone_of_voice, prohibited_phrases, visual_rules_json, asset_requirements_json, version, status, created_at, updated_at`
@@ -74,7 +76,8 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 
 ### MediaAsset
 `id, store_id, object_key, sha256, mime_type, byte_size, width, height, source_type, source_ref, license_note, parent_asset_id, version, status, created_by, created_at`
-- 原始素材 immutable；编辑结果使用新 asset/version 并关联 parent_asset_id。
+- MediaAsset 是门店素材库中的来源资产，不等同于 #8 的 ImageArtifact。#8 产物可引用一个或多个 MediaAsset，但不得覆盖它们。
+- 原始素材 immutable；编辑结果若被商家保存回素材库，使用新 asset/version 并关联 parent_asset_id。
 - object_key 不可公开；签名 URL 由已授权服务短时签发。
 
 ## 5. Marketing Orchestrator（#7）实体契约
@@ -129,6 +132,7 @@ PublishPackage：`id, store_id, task_id, package_version, channel_content_id, co
 PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at`。
 - PublishPackage 冻结后不可变；任何上游变更生成新包。
 - 最终确认必须绑定包 ID + fingerprint；新包不能继承旧确认。
+- #8 负责发布门禁和发布业务意图；#12 执行官方渠道 Adapter/PublishOperation，#9 仅提供异步 Job Runtime。
 
 ## 7. Job Runtime（#9）实体与状态契约
 
@@ -157,6 +161,7 @@ PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, co
 `id, store_id, task_id NULL, job_id NULL, provider_key, model_key, capability(text_generate|text_rewrite|image_generate|image_edit|vision_inspect|ocr_extract), prompt_version_id, request_fingerprint, response_ref, input_units, output_units, cost_amount, currency, duration_ms, status, error_code, created_at, finished_at`。
 - 记录调用元数据和成本；原始敏感 prompt/response 存受控引用或按最小化原则脱敏，不直接写普通日志。
 - AIInvocation 状态：queued/running/succeeded/failed/cancelled；它不是 Job，也不拥有营销业务状态。
+- prompt_version_id 指向 #10 管理的不可变 PromptVersion；AIInvocation 固定记录实际版本、变量 schema 版本、model/provider 选择与参数指纹，历史任务不得动态读取最新 Prompt。
 
 ### Provider 接口（#9 定义，#10 实现）
 - TextProvider.generate(request, context) -> StructuredTextResult
@@ -180,8 +185,8 @@ Provider 统一返回：provider_key、model_key、provider_request_id、status�
 
 - API 版本前缀 `/api/v1`；JSON Schema 由 Pydantic 生成 OpenAPI，TypeScript Client 从 OpenAPI 生成。
 - 所有写请求（任务/产物/审核/Job 人工恢复/发布）必须有 Idempotency-Key；更新有 expected_version 或 If-Match。
-- 标准错误：`{code, message, request_id, details?}`。跨门店资源 404；能力不足 403；并发冲突 409；字段校验 422；限流 429。
-- 列表默认按当前 AuthorizedStoreContext 限定，不允许客户端提供任意 store_id 查询全量数据。
+- 标准错误：`{code, message, request_id, details?}`。缺少 `X-Store-Id` 返回 400 `STORE_CONTEXT_REQUIRED`；跨门店/非成员资源 404；能力不足 403；并发冲突 409；字段校验 422；限流 429。
+- 所有门店作用域 API 必须读取并验证 `X-Store-Id`，由 #5 构造 AuthorizedStoreContext；列表默认按该上下文限定，不允许客户端提供任意 store_id 查询全量数据。
 - 对外事件采用 snake_case event_type + schema_version；至少含 event_id、store_id、aggregate_type/id、correlation_id、causation_id、occurred_at。
 - 事件 payload 只传引用、状态和必要摘要；大文件和敏感文本不放事件总线。
 
@@ -257,6 +262,8 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 14. 平台管理员访问门店内容：默认拒绝，必要支持访问必须有独立受审计授权。
 
 ## 13. 冻结清单与阻塞项
+
+补充权属边界：#8 仅持有 ChannelContent 对平台账号的引用；#12 是 ChannelAccount、授权凭据、平台能力发现和 PublishOperation 的唯一权威所有者。#8 的发布服务负责校验审核/质检/确认门禁后创建发布命令，不直接调用厂商 SDK。
 
 在 B/C/D 轨道联合评审中必须逐项给出 accept / change / defer：
 - [ ] #5：平台管理员主体存储、Session 时限、CSRF 方案、门店切换上下文策略、成员邀请/注册流程。

@@ -15,7 +15,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
-          cache: pnpm
       - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @store-operator/web typecheck
       - run: pnpm --filter @store-operator/web test

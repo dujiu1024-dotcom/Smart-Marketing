@@ -49,9 +49,9 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 建议实体字段（字段类型为 PostgreSQL 语义，最终由 SQLAlchemy/Alembic 迁移确认）：
 
 ### StoreProfile
-`id, store_id, display_name, business_type, brand_name, address, phone, timezone, opening_hours_json, service_description, fact_status, source, confirmed_by, confirmed_at, version, created_at, updated_at`
+`id, store_id, display_name, business_type, brand_name, address, phone, opening_hours_json, service_description, fact_status, source, confirmed_by, confirmed_at, version, created_at, updated_at`
 - UNIQUE(store_id, id)；门店一对一档案可 UNIQUE(store_id)。
-- 门店档案只存经营信息；Store.status/timezone 的身份域权威字段不可复制写入。
+- 门店档案只存经营信息；Store.status 与 Store.timezone 的身份域权威字段不可复制写入。营业时间以 Store.timezone 解释，门店可在 Identity 域变更时区并产生审计事件。
 
 ### Product
 `id, store_id, name, category, sku, specification, price_amount, currency, availability_status, capacity_value, capacity_unit, selling_points_json, fact_status, source, confirmed_by, confirmed_at, version, archived_at, created_at, updated_at`
@@ -61,8 +61,8 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 
 ### Offer
 `id, store_id, title, offer_type, terms_json, applicable_product_ids, starts_at, ends_at, timezone, status, fact_status, confirmed_by, confirmed_at, version, created_at, updated_at`
-- 有效期需明确本地时区语义；开始/结束边界使用统一包含规则。
-- 折扣、赠品、门槛、限量和适用商品以结构化 terms 表达，禁止只存不可验证的自由文本。
+- 有效期存 UTC timestamptz；门店本地展示和日期边界统一使用 Identity 域 Store.timezone，避免每个 Offer 自行保存互相冲突的 timezone。
+- terms_json 必须通过 Pydantic discriminated union 校验：discount_percent {percent}; discount_amount {amount,currency}; fixed_price {amount,currency}; buy_x_get_y {buy_quantity,get_quantity,eligible_product_ids}; gift {gift_description,eligible_product_ids}; threshold_discount {minimum_spend,currency,discount_type,discount_value}。适用商品、限制次数/数量、有效期与适用门店事实单独保存并校验，不能只依赖自由文本。
 
 ### BrandGuideline
 `id, store_id, positioning, differentiators, tone_of_voice, prohibited_phrases, visual_rules_json, asset_requirements_json, version, status, created_at, updated_at`
@@ -74,7 +74,8 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 
 ### MediaAsset
 `id, store_id, object_key, sha256, mime_type, byte_size, width, height, source_type, source_ref, license_note, parent_asset_id, version, status, created_by, created_at`
-- 原始素材 immutable；编辑结果使用新 asset/version 并关联 parent_asset_id。
+- MediaAsset 是门店素材库中的来源资产，不等同于 #8 的 ImageArtifact。#8 产物可引用一个或多个 MediaAsset，但不得覆盖它们。
+- 原始素材 immutable；编辑结果若被商家保存回素材库，使用新 asset/version 并关联 parent_asset_id。
 - object_key 不可公开；签名 URL 由已授权服务短时签发。
 
 ## 5. Marketing Orchestrator（#7）实体契约

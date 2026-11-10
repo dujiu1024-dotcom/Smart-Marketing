@@ -72,7 +72,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: touch .env && POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml config --quiet
+      - name: Prepare clean-machine environment from template
+        run: |
+          cp .env.example .env
+          sed -i 's/change-me-locally/ci-only/g' .env
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml config --quiet
       - name: Start complete Compose stack and wait for health
         run: POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml up --build --detach --wait --wait-timeout 180
       - name: Verify API readiness and Web response

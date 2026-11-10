@@ -19,6 +19,7 @@ web-dev:
 test:
 	cd apps/api && uv sync --locked --extra dev
 	cd apps/api && uv run --locked pytest
+	cd apps/worker && uv sync --locked
 	pnpm test
 
 typecheck:

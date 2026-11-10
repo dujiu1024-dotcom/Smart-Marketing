@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @store-operator/web typecheck
       - run: pnpm --filter @store-operator/web test
       - run: pnpm --filter @store-operator/web build
@@ -28,25 +28,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.13"
-      - run: pip install -e "apps/api[dev]"
-      - run: ruff check apps/api
-      - run: pytest apps/api/tests
+          enable-cache: false
+      - run: uv sync --locked --extra dev --directory apps/api
+      - run: uv run --locked --directory apps/api ruff check .
+      - run: uv run --locked --directory apps/api pytest
 
   worker:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.13"
-      - run: pip install -e "apps/api[dev]"
-      - run: pip install -e apps/worker
-      - run: ruff check apps/worker
+          enable-cache: false
+      - run: uv sync --locked --extra dev --directory apps/api
+      - run: uv sync --locked --directory apps/worker
+      - run: uv run --locked --directory apps/api ruff check ../worker
       - run: |
-          REDIS_URL=redis://localhost:6379/0 python -c 'from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {"status": "ok"}'
+          PYTHONPATH=../worker/src uv run --locked --directory apps/api python -c 'from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {"status": "ok"}'
 
   infrastructure:
     runs-on: ubuntu-latest

@@ -1,4 +1,3 @@
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from store_operator.observability import build_tracer_provider, redact_sensitive_fields
@@ -29,7 +28,6 @@ def test_redact_sensitive_fields_recursively() -> None:
 def test_tracer_provider_exports_finished_spans() -> None:
     exporter = InMemorySpanExporter()
     provider = build_tracer_provider(span_exporter=exporter)
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
 
     with provider.get_tracer("observability-test").start_as_current_span("healthcheck") as span:
         span.set_attribute("test.outcome", "ok")

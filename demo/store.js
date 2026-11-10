@@ -2,7 +2,7 @@ import {seed} from "./data.js";
 const KEY="ai-store-ops-storefront-v1";
 const ADMIN_KEY="ai-store-ops-platform-admin-v1";
 const LEGACY_KEY="ai-store-ops-demo-v2";
-const SCHEMA_VERSION=9;
+const SCHEMA_VERSION=10;
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
 let persistedSnapshot=null;
@@ -13,6 +13,7 @@ function normalize(){
   state.store={...base.store,...(state.store||{})};
   state.stores=array(state.stores,base.stores||[]);
   for(const key of ["tasks","products","assets","offers","knowledge","channels","hotspots"])state[key]=array(state[key],base[key]);
+  state.tasks.forEach(t=>{if(!t.storeId)t.storeId=state.store.id;t.hotspotDecision=t.hotspotDecision||(t.hotspotSnapshot?"adopted":"pending");t.hotspotDecisionReason=t.hotspotDecisionReason||""});
   delete state.dataSources;
   state.effects=state.effects||clone(base.effects);
   state.effects.reports=array(state.effects.reports);

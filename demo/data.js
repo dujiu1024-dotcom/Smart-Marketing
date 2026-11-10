@@ -84,3 +84,37 @@ seed.admin.runs.push(
  {id:"run7",task:"t1006",node:"copy_generation_retry",model:"文本模型（模拟）",status:"模拟完成",duration:"2.3s",cost:"未计费",detail:"模拟重试后成功",at:"2026-11-10 13:32"},
  {id:"run8",task:"t1007",node:"publish_package",model:"本地发布包适配器",status:"模拟完成",duration:"0.2s",cost:"未计费",detail:"仅保存待人工发布快照",at:"2026-11-09 18:20"}
 );
+seed.stores[0].products=JSON.parse(JSON.stringify(seed.products));
+seed.stores[0].offers=JSON.parse(JSON.stringify(seed.offers));
+seed.stores[0].assets=JSON.parse(JSON.stringify(seed.assets));
+seed.stores[0].knowledge=JSON.parse(JSON.stringify(seed.knowledge));
+seed.stores[0].channels=JSON.parse(JSON.stringify(seed.channels));
+seed.stores[1].products=JSON.parse(JSON.stringify(seed.products));
+seed.stores[1].offers=JSON.parse(JSON.stringify(seed.offers.slice(0,2)));
+seed.stores[1].assets=JSON.parse(JSON.stringify(seed.assets));
+seed.stores[1].knowledge=JSON.parse(JSON.stringify(seed.knowledge));
+seed.stores[1].channels=JSON.parse(JSON.stringify(seed.channels));
+seed.stores[2].products=[
+ {id:"m1",name:"香煎鸡腿藜麦碗",category:"轻食主餐",sku:"MM-B01",spec:"标准份",price:36,unit:"份",status:"在售",stock:"每日 50 份",selling:"鸡腿肉与时蔬搭配",description:"现制轻食主餐。",ingredients:"鸡腿肉、藜麦、时蔬",allergens:"以实际配方为准",service:"现点现做",delivery:"堂食 / 外卖",priority:"主推",availableHours:"10:00-20:00",assetIds:[],confirmed:true},
+ {id:"m2",name:"牛油果鸡胸沙拉",category:"轻食沙拉",sku:"MM-S02",spec:"标准份",price:32,unit:"份",status:"在售",stock:"每日 40 份",selling:"鸡胸肉与牛油果组合",description:"门店现制沙拉。",ingredients:"鸡胸肉、牛油果、生菜",allergens:"以实际配方为准",service:"现点现做",delivery:"堂食 / 外卖",priority:"主推",availableHours:"10:00-20:00",assetIds:[],confirmed:true}
+ ];
+seed.stores[2].offers=[{id:"mm-o1",name:"工作日轻食午餐组合",type:"套餐优惠",products:"香煎鸡腿藜麦碗 + 饮品",rule:"午餐组合价 42 元",start:"2026-11-01",end:"2026-11-30",audience:"周边办公人群",condition:"工作日 11:00-14:00",stack:"不与其他优惠叠加",quota:"每日 30 份",redemption:"点单时选择套餐",status:"进行中"}];
+seed.stores[2].assets=[];seed.stores[2].knowledge=[];seed.stores[2].channels=JSON.parse(JSON.stringify(seed.channels));
+seed.stores[3].products=[
+ {id:"b1",name:"深层清洁护理",category:"面部护理",sku:"YJ-F01",spec:"60 分钟",price:268,unit:"次",status:"在售",stock:"需预约",selling:"基础清洁与护理流程",description:"具体项目步骤以门店服务单为准。",ingredients:"使用产品以当次服务为准",allergens:"需提前沟通敏感情况",service:"预约到店",delivery:"到店服务",priority:"主推",availableHours:"10:00-20:00",assetIds:[],confirmed:true},
+ {id:"b2",name:"舒缓补水护理",category:"面部护理",sku:"YJ-F02",spec:"75 分钟",price:328,unit:"次",status:"在售",stock:"需预约",selling:"门店护理流程与产品介绍",description:"不承诺医疗或治疗效果。",ingredients:"使用产品以门店实际为准",allergens:"需提前沟通敏感情况",service:"预约到店",delivery:"到店服务",priority:"常规",availableHours:"10:00-20:00",assetIds:[],confirmed:true}
+ ];
+seed.stores[3].offers=[{id:"yj-o1",name:"首次到店体验礼",type:"赠品活动",products:"深层清洁护理",rule:"首次预约赠护理小样一份",start:"2026-11-01",end:"2026-11-30",audience:"首次到店顾客",condition:"提前预约",stack:"不可叠加",quota:"每日 10 份",redemption:"预约时备注活动",status:"待确认"}];
+seed.stores[3].assets=[];seed.stores[3].knowledge=[];seed.stores[3].channels=JSON.parse(JSON.stringify(seed.channels));
+seed.stores[4].products=[
+ {id:"f1",name:"一对一私教体验课",category:"私教课程",sku:"LC-PT01",spec:"50 分钟",price:199,unit:"节",status:"在售",stock:"需预约",selling:"教练评估与基础训练指导",description:"课程内容按教练评估确定。",ingredients:"不适用",allergens:"运动前需确认身体状况",service:"预约到店",delivery:"线下课程",priority:"主推",availableHours:"07:00-22:00",assetIds:[],confirmed:true},
+ {id:"f2",name:"小团体力量训练",category:"团体课程",sku:"LC-G02",spec:"45 分钟",price:99,unit:"人次",status:"在售",stock:"每班 8 人",selling:"小班训练与动作指导",description:"不承诺固定减重或塑形结果。",ingredients:"不适用",allergens:"运动前需确认身体状况",service:"预约课程",delivery:"线下课程",priority:"常规",availableHours:"07:00-22:00",assetIds:[],confirmed:true}
+ ];
+seed.stores[4].offers=[{id:"lc-o1",name:"新客体验课",type:"体验优惠",products:"一对一私教体验课",rule:"首次体验价 199 元",start:"2026-11-01",end:"2026-12-31",audience:"首次到店顾客",condition:"提前预约",stack:"不可叠加",quota:"每人一次",redemption:"预约时登记",status:"进行中"}];
+seed.stores[4].assets=[];seed.stores[4].knowledge=[];seed.stores[4].channels=JSON.parse(JSON.stringify(seed.channels));
+seed.stores.forEach(st=>{st.assets=st.assets||[];st.knowledge=st.knowledge||[];st.channels=st.channels||[];st.products=st.products||[];st.offers=st.offers||[]});
+seed.hotspots.push(
+ {id:"hot-004",title:"本地健身体验课内容主题",category:"消费场景",region:"本地样例 · 待核实",source:"演示样例数据，非实时采集",collectedAt:"2026-11-10 10:00",expiresAt:"2026-11-22",heat:"中",matchScore:84,matchedProducts:["一对一私教体验课"],audience:"周边上班族、健身初学者",scene:"下班后体验训练",reason:"门店业态与体验课程匹配",risk:"需核验教练资质、课程容量和预约安排",angle:"展示真实课程环境与教练指导流程",format:"短视频 / 图文",status:"待处理"},
+ {id:"hot-005",title:"美容门店服务流程透明化",category:"行业内容",region:"行业趋势样例 · 待本地验证",source:"演示样例数据，非实时采集",collectedAt:"2026-11-10 10:00",expiresAt:"2026-11-25",heat:"中",matchScore:79,matchedProducts:["深层清洁护理"],audience:"关注日常皮肤护理的消费者",scene:"预约前了解服务流程",reason:"门店有明确护理服务项目，可展示服务流程",risk:"禁止医疗化功效宣传和未经授权的顾客对比图",angle:"展示环境、服务步骤和预约须知",format:"小红书图文",status:"待处理"},
+ {id:"hot-006",title:"工作日轻食午餐场景",category:"消费场景",region:"商圈场景样例 · 待本地验证",source:"演示样例数据，非实时采集",collectedAt:"2026-11-10 10:00",expiresAt:"2026-11-24",heat:"高",matchScore:87,matchedProducts:["香煎鸡腿藜麦碗"],audience:"周边办公人群",scene:"工作日午餐",reason:"与轻食门店午餐套餐和办公客群匹配",risk:"需核对每日备餐量、实际食材和套餐规则",angle:"用真实备餐与出餐画面介绍午餐组合",format:"短视频 / 图文",status:"待处理"}
+);

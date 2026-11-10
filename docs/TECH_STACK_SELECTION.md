@@ -4,7 +4,7 @@
 > 决策日期：2026-11-11  
 > 产品基线：v1.8  
 > 架构基线：模块化单体 + 独立异步 Worker + Provider / Adapter  
-> 状态：**技术方案已形成，待项目负责人最终确认后锁定**  
+> 状态：**已由项目负责人于 2026-11-11 确认，作为首期技术基线**  
 > 对应：GitHub Issue #3
 
 ## 1. 决策摘要
@@ -222,21 +222,21 @@ Python API 与 Worker 共享一个 Python workspace/package，Worker 不是另�
 ## 9. ADR 记录
 
 ### ADR-001：采用 React SPA + FastAPI 模块化单体
-- 日期：2026-11-11；状态：待项目负责人最终确认。
+- 日期：2026-11-11；状态：已由项目负责人确认。
 - 决策：React + Vite 负责交互工作台；FastAPI 承载模块化业务 API；Worker 与 API 共用 Python 领域包，独立进程运行。
 - 原因：符合登录后高交互工作台形态；复用 IterWave 已有 Python 执行经验；降低跨语言和微服务运维成本。
 - 放弃方案：Next.js SSR、NestJS 全栈、Django 全栈。
 - 影响：前后端分离部署；API 契约由 OpenAPI 维护；领域规则只能在服务端实现。
 
 ### ADR-002：PostgreSQL 为业务事实主库，Celery/Redis 只承担异步投递
-- 日期：2026-11-11；状态：待项目负责人最终确认。
+- 日期：2026-11-11；状态：已由项目负责人确认。
 - 决策：PostgreSQL 保存业务、Job、Attempt、Outbox 和审计；Celery/Redis 执行异步消息投递。
 - 原因：任务状态可审计、可恢复；Broker 故障不导致业务状态丢失。
 - 放弃方案：Redis-only job state、RQ、Dramatiq。
 - 影响：需要 Outbox Relay、Sweeper、幂等和 Worker 恢复机制。
 
 ### ADR-003：本地对象存储改用 SeaweedFS，不使用已归档的 MinIO Community
-- 日期：2026-11-11；状态：待项目负责人最终确认。
+- 日期：2026-11-11；状态：已由项目负责人确认。
 - 决策：本地 SeaweedFS S3 API；生产采用经区域和成本评估的托管 S3 兼容服务。
 - 原因：MinIO Community 上游仓库已归档；SeaweedFS 使用 Apache-2.0 并提供 S3 API。
 - 影响：应用通过 boto3/S3 API 访问，禁止耦合厂商 SDK。

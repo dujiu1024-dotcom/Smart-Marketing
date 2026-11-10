@@ -23,7 +23,7 @@ Response 200：user（id、email）、session（expires_at）、csrf_token；设
 
 ### GET /auth/me
 
-Response 200：user（id、email）、active_store（id、name 或 null）、session（expires_at）。
+Response 200：user（id、email）、active_store（id、name 或 null，仅 UI 默认选择）、session（expires_at）。
 
 ### POST /auth/logout
 
@@ -51,13 +51,13 @@ Response 200：active_store（id、name）、membership（role）。该接口更
 
 ### DELETE /session/active-store
 
-Response 204；清除 active_store_id；后续门店业务 API 返回 400 STORE_CONTEXT_REQUIRED。
+Response 204；清除 active_store_id；后续门店业务 API 必须提供 X-Store-ID；缺失时返回 400 STORE_CONTEXT_REQUIRED。
 
-## 3. 成员管理（owner-only）
+## 3. 成员管理（platform-admin-only）
 
 ### GET /stores/{store_id}/members
 
-返回本门店成员最小必要字段：membership id、user id、email、role、status。路径 store_id 必须等于 AuthContext.active_store_id。
+返回本门店成员最小必要字段：membership id、user id、email、role、status。路径 store_id 必须经平台管理员能力校验；不得要求管理员成为该门店 StoreMembership。
 
 ### POST /stores/{store_id}/members/invitations
 
@@ -68,12 +68,12 @@ Response 202：membership_id、status=invited。
 ### PATCH /stores/{store_id}/members/{membership_id}
 
 Request：role/status。Response 返回更新后的 membership 与 revoked_at。
-仅 owner；禁止移除/降级最后 active owner；权限变更同事务写审计，并使被撤销成员后续请求即时失效。
+仅具备 platform.store_members.manage 能力的平台管理员；owner/member 均不得调用。禁止移除/降级最后 active owner；权限变更同事务写审计，并使被撤销成员后续请求即时失效。
 
 ## 4. 门店业务资源授权约定
 
 营销任务、商品、活动、文案/图片资产、发布包、渠道账号、效果记录等资源 API 均要求 X-Store-ID header；服务端将其作为不可信 selector，验证当前用户对此门店的 active membership 后才建立 AuthContext.request_store_id。遵守：
-- 列表：服务端从 AuthContext 取 request_store_id，SQL 强制 WHERE store_id = authorized_store。
+- 列表：服务端从 AuthContext.request_store_id 取值，SQL 强制 WHERE store_id = authorized_store。
 - 详情：按 id AND store_id 查询；跨店与不存在均 404。
 - 创建：store_id 从 AuthContext 注入；拒绝客户端 body 中的 store_id。
 - 更新/删除：SQL 同时约束资源 id 与 store_id。
@@ -102,3 +102,12 @@ Request：role/status。Response 返回更新后的 membership 与 revoked_at。
 ## 6. 契约门禁
 
 OpenAPI 是最终来源；此文档是语义评审约定。实现 PR 必须更新 OpenAPI 并生成 TypeScript client；CI 检查生成结果无漂移。Contract tests 覆盖状态码、错误 code、Cookie 属性、CSRF 和响应字段。破坏性变更需 ADR。
+
+
+## 7. 成员管理权限与产品边界
+
+PRODUCT_DESIGN.md v1.8 将门店用户管理明确归属平台管理员的门店详情管理能力。故本契约中成员管理接口仅允许具备 platform.store_members.manage 的平台管理员调用。owner/member 不拥有成员邀请、移除或角色管理接口。平台管理员响应仅返回成员管理所需的最小字段，不返回门店业务内容。
+
+## 8. 请求级门店上下文强约束
+
+任何门店业务 API 均以 X-Store-ID 作为不可信 selector；服务端必须用当前 Session 的 user_id 查询 active StoreMembership，并验证 Store.status=active，构造 AuthContext.request_store_id。禁止从 Session.active_store_id 自动授权。Session.active_store_id 只用于 UI 默认选择。跨门店、多标签页请求互不影响。

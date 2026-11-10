@@ -6,13 +6,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   lockfiles:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.8.1
@@ -29,6 +32,17 @@ jobs:
       - name: Generate Worker lockfile
         working-directory: apps/worker
         run: uv lock
+      - name: Commit lockfiles when changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml apps/api/uv.lock apps/worker/uv.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "build: commit generated dependency lockfiles"
+            git push
+          else
+            echo "Lockfiles are already up to date."
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: dependency-lockfiles

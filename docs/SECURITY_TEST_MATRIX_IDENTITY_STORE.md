@@ -36,12 +36,12 @@
 
 | ID | 场景 | 操作 | 预期 |
 |---|---|---|---|
-| STORE-01 | 无当前门店 | 已登录但 active_store 为空访问业务 API | 400 STORE_CONTEXT_REQUIRED |
+| STORE-01 | 无当前门店 | 已登录但缺少 X-Store-ID 访问业务 API | 400 STORE_CONTEXT_REQUIRED |
 | STORE-02 | 合法切换 | A 用户切换到其另一 active membership 门店 | 200，更新 UI 默认选择并审计 |
 | STORE-11 | 请求门店伪造 | A 用户发送 B 的 X-Store-ID | 404；不能仅凭 header 访问 B |
 | STORE-12 | 多标签页独立上下文 | 同一 Session 的 Tab 1 使用 A、Tab 2 使用 B（若用户均为成员） | 每个请求按各自 X-Store-ID 授权；切换默认门店不改变另一标签页上下文 |
-| STORE-13 | 请求缺少门店选择器 | 多门店用户不发送 X-Store-ID 且无明确默认门店 | 400 STORE_CONTEXT_REQUIRED |
-| STORE-14 | 默认选择非授权 | Session.active_store_id 指向已撤销 membership 的门店 | 请求仍需重新验证 membership 并拒绝 |
+| STORE-13 | 请求缺少门店选择器 | 用户不发送 X-Store-ID（即使 Session.active_store_id 有值） | 400 STORE_CONTEXT_REQUIRED |
+| STORE-14 | 默认选择非授权 | Session.active_store_id 指向已撤销 membership 的门店 | X-Store-ID 仍须重新验证 membership 并拒绝；active_store_id 不构成授权 |
 | STORE-03 | 非成员切换 | A 用户切换到 B | 404，原上下文不变 |
 | STORE-04 | 已撤销成员切换 | membership removed 后切换该店 | 404 |
 | STORE-05 | 即时撤销 | 移除当前门店成员后继续请求 | 后续请求拒绝，无长缓存窗口 |
@@ -105,3 +105,16 @@
 - 使用隔离 fixture；禁止在生产数据上执行破坏性测试。
 
 **当前全部用例待执行。** 工程基础未验收前，不记录虚构命令、结果或安全通过结论。
+
+
+## F. 平台管理员与成员管理边界
+
+| ID | 场景 | 操作 | 预期 |
+|---|---|---|---|
+| ADMIN-01 | 合法成员管理 | 有 platform.store_members.manage 的管理员查看门店成员最小字段 | 允许并写审计 |
+| ADMIN-02 | 门店 owner 越权管理成员 | owner 调用邀请/移除/角色变更 API | 403，无数据变化 |
+| ADMIN-03 | 普通 member 越权管理成员 | member 调用成员管理 API | 403，无数据变化 |
+| ADMIN-04 | 平台管理员读取门店内容 | 管理员尝试读取任务正文、文案、图片或经营资料 | 默认拒绝，不因成员管理能力扩权 |
+| ADMIN-05 | 平台管理员跨域操作 | 管理员调用门店营销业务 API 且无 StoreMembership | 404，不因平台管理员身份绕过门店授权 |
+| ADMIN-06 | 最后 owner 保护 | 管理员移除/降级最后 active owner | 409，事务回滚 |
+| ADMIN-07 | 管理字段最小化 | 检查成员管理响应 | 不返回营销内容、素材内容、价格/经营数据或凭据 |

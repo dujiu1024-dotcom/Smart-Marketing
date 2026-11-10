@@ -127,7 +127,7 @@ document.addEventListener('submit',ev=>{if(ev.target.id!=='modalForm')return;ev.
 if(a==='save-product'){o.price=Number(o.price||0);o.confirmed=true;id?update('products',id,o):add('products',o)}
 else if(a==='save-offer')id?update('offers',id,o):add('offers',o);
 else if(a==='save-knowledge')id?update('knowledge',id,o):add('knowledge',o);
-else if(a==='save-asset'){const file=$('#assetFile')?.files[0];delete o.assetFile;if(file){o.name=file.name;o.size=Math.round(file.size/1024)+' KB';o.format=(file.name.split('.').pop()||'FILE').toUpperCase();o.source='商家上传'}id?update('assets',id,o):add('assets',o)}
+else if(a==='save-asset'){const file=$('#assetFile')?.files[0];delete o.assetFile;if(file&&file.size>2*1024*1024){toast('当前原型单个素材最大支持 2 MB');return}const persist=()=>{if(file){o.name=file.name;o.size=Math.round(file.size/1024)+' KB';o.format=(file.name.split('.').pop()||'FILE').toUpperCase();o.source='商家上传'}id?update('assets',id,o):add('assets',o);audit('保存素材资产',a,id||'new');$('#modal-root')?.remove();render();toast('素材资产已保存')};if(file){const reader=new FileReader();reader.onload=()=>{o.dataUrl=reader.result;persist()};reader.readAsDataURL(file);return}else{persist();return}}
 else if(a==='save-data')add('dataSources',{...o,status:'未连接',lastSync:'—'});
 else if(a==='admin-save-tenant')id?update('admin.tenants',id,o):add('admin.tenants',o);
 else if(a==='admin-save-user')id?update('admin.users',id,o):add('admin.users',o);

@@ -132,7 +132,7 @@ if(['add-product','add-offer','add-knowledge','add-asset'].includes(a)){openEdit
 if(a.startsWith('edit-')){openEditor(a.slice(5),id);return}
 if(a.startsWith('delete-')){if(!confirm('确认删除该记录？'))return;const kind=a.slice(7),p=storePath(kind);if(p){remove(p,id);audit('删除记录',id);render();toast('记录已删除')}return}
 if(a==='connect-channel'){const c=storeList('channel').find(x=>x.id===id);if(c){c.status='模拟连接';c.capabilities='仅演示状态，不可真实发布';save();audit('模拟渠道连接',id,'未执行 OAuth');render();toast('已记录模拟连接，未获得真实平台授权')}return}
-if(a==='disconnect-channel'){const c=db().channels.find(x=>x.id===id);if(c){c.status='未连接';c.capabilities='内容预览';save();render();toast('演示连接已断开')}return}
+if(a==='disconnect-channel'){const c=storeList('channel').find(x=>x.id===id);if(c){c.status='未连接';c.capabilities='内容预览';save();render();toast('演示连接已断开')}return}
 if(a==='admin-go'){adminPage=id;go('admin:'+id);return}
 if(a==='admin-open-store'){const msg=handleAdminAction(a,id);storeTab="profile";render();toast(msg||"已打开门店详情");go("admin:store-detail");return}
 if(a==='admin-monitor-detail'){const msg=handleAdminAction(a,id);go("admin:monitor-detail");return}

@@ -1,11 +1,12 @@
 import {seed} from "./data.js";
 const KEY="ai-store-ops-demo-v2";
-const SCHEMA_VERSION=6;
+const SCHEMA_VERSION=7;
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
 let persistedSnapshot=null;
 const array=(v,fallback=[])=>Array.isArray(v)?v:clone(fallback);
 function normalize(){
+  const previousSchema=Number(state.schemaVersion||0);
   const base=clone(seed);
   state.store={...base.store,...(state.store||{})};
   state.stores=array(state.stores,base.stores||[]);
@@ -21,7 +22,7 @@ function normalize(){
   for(const key of ["tenants","models","roles","workflows","tickets","workflowConfig","attributionConfig"])delete state.admin[key];
   delete state.admin.budgetConfig;
   state.admin.systemConfig={...base.admin.systemConfig,...(state.admin.systemConfig||{})};
-  state.admin.systemConfig.industryCategories=[...new Set([...(base.admin.systemConfig.industryCategories||[]),...array(state.admin.systemConfig.industryCategories)])];
+  state.admin.systemConfig.industryCategories=previousSchema<SCHEMA_VERSION?[...new Set([...(base.admin.systemConfig.industryCategories||[]),...array(state.admin.systemConfig.industryCategories)])]:array(state.admin.systemConfig.industryCategories,base.admin.systemConfig.industryCategories||[]);
   state.admin.selectedStoreId=state.admin.selectedStoreId||state.stores[0]?.id||state.store.id;
   state.admin.selectedIndustryCategory=state.admin.selectedIndustryCategory||"饮品";
   state.admin.selectedPromptId=state.admin.selectedPromptId||state.admin.prompts[0]?.id||"";

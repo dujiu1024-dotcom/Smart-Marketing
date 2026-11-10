@@ -42,6 +42,12 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
 
   worker:
     build:
@@ -52,13 +58,31 @@ services:
       REDIS_URL: redis://redis:6379/0
     depends_on:
       redis: { condition: service_healthy }
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "from store_operator_worker.celery_app import celery_app;
+          replies = celery_app.control.ping(timeout=3);
+          raise SystemExit(0 if replies else 1)"
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
 
   web:
     build:
       context: ../..
       dockerfile: infra/containers/web.Dockerfile
     ports: ["5173:80"]
-    depends_on: [api]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   postgres_data:

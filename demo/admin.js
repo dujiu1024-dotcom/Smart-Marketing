@@ -6,7 +6,7 @@ export const adminSections=[
 ];
 const header=(title,desc,action="")=>'<div class="page-head"><div><div class="eyebrow">PLATFORM CONTROL CENTER</div><h1>'+title+'</h1><p>'+desc+'</p></div><div class="actions">'+action+'</div></div>';
 const table=(heads,rows)=>'<div class="table-wrap"><table><thead><tr>'+heads.map(x=>'<th>'+x+'</th>').join("")+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
-const btn=(label,action,id,kind="")=>'<button class="btn '+kind+'" data-action="'+action+'" data-id="'+e(id||"")+'">'+label+'</button>';
+const btn=(label,action,id,kind="")=>'<button type="button" class="btn '+kind+'" data-action="'+action+'" data-id="'+e(id||"")+'">'+label+'</button>';
 export function renderAdmin(page="overview"){
  const d=db(),a=d.admin;
  if(page==="overview")return header("运营总览","平台运行健康度、任务吞吐、模型成本与待处理事项。",btn("刷新指标","admin-refresh","","soft"))+

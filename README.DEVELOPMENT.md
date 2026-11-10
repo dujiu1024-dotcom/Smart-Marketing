@@ -49,3 +49,23 @@ pnpm build
 ```
 
 本 Issue 只交付工程骨架。Worker healthcheck 是基础设施 smoke task，不是具备 PostgreSQL Job/Outbox 持久化和恢复语义的正式 Job Runtime（Issue #9）。登录、门店授权、业务数据模型、真实 AI Provider 和渠道发布尚未实现。
+
+## 浏览器冒烟测试
+
+E2E 环境独立维护在 `apps/e2e`，依赖由 `apps/e2e/uv.lock` 锁定。先启动 Web（终端一）：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm dev:web
+```
+
+再执行浏览器测试（终端二）：
+
+```bash
+cd apps/e2e
+uv sync --locked
+uv run --locked python -m playwright install chromium
+uv run --locked python ../../apps/web/e2e/smoke.py
+```
+
+该测试验证工程应用壳的页面响应、主标题、运行状态和能力边界提示，不代表冻结 Demo 的全部业务页面已完成。

@@ -1,6 +1,6 @@
 # Issue #9 与身份/营销领域跨域集成契约
 
-> 状态：跨域对齐提案，随 PR #17 评审；不是生产实现声明。对齐 Issue #5 Identity & Store、Issue #7 Marketing Task、Issue #9 Async Runtime / AI Gateway。
+> 状态：跨域对齐提案，随 PR #20 评审；不是生产实现声明。对齐 Issue #5 Identity & Store、Issue #7 Marketing Task、Issue #9 Async Runtime / AI Gateway。
 
 ## 1. 模块职责
 

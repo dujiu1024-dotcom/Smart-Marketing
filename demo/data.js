@@ -44,6 +44,9 @@ seed.admin.prompts=[
  {id:"pr-massage",name:"按摩养护内容规范",industryCategory:"按摩",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"描述服务流程、环境、时长、适用场景与预约信息。不得宣称治疗疾病、保证疗效或替代医疗建议。"},
  {id:"pr-fitness",name:"健身课程营销",industryCategory:"健身",scope:"营销策略",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"结合课程类型、教练资质、训练目标、场地容量和体验课规则设计内容。不得承诺固定减重、塑形结果或未经验证的效果。"},
  {id:"pr-retail",name:"零售商品营销",industryCategory:"零售",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕真实商品参数、使用场景、库存和售后规则生成零售内容。不得虚构原价、折扣、库存和用户评价。"},
+ {id:"pr-life-service",name:"生活服务营销",industryCategory:"生活服务",scope:"营销策略",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕服务项目、服务流程、预约方式、服务半径和人员资质设计内容。不得夸大效果、虚构资质或承诺无法保证的结果。"},
+ {id:"pr-pet-service",name:"宠物服务内容规范",industryCategory:"宠物服务",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕宠物服务项目、环境、人员资质、宠物安全和预约须知生成内容。不得作未经证实的医疗诊断或疗效承诺。"},
+ {id:"pr-education",name:"教育培训内容规范",industryCategory:"教育培训",scope:"营销策略",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕课程内容、师资资质、适合人群、课时安排和服务流程制定内容。不得承诺升学、就业、考试通过或其他无法保证的结果。"},
  {id:"pr-general-quality",name:"通用营销事实质检",industryCategory:"通用",scope:"内容质检",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"检查商品、价格、优惠、供应、门店地址、营业时间、健康功效、绝对化用语和版权风险。未确认事实必须标记为待商家核验。"}
 ];
 seed.products.push(

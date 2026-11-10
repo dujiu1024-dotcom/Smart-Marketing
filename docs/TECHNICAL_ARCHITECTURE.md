@@ -372,3 +372,8 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 - 营销任务生命周期、TaskStep、审核依赖和版本失效规则以 [MARKETING_TASK_DOMAIN_DESIGN.md](MARKETING_TASK_DOMAIN_DESIGN.md) 为准。
 - 文档中的状态枚举必须保持唯一：异步 Job 的人工处理状态统一为 `needs_human`，不得另用 `needs_attention`。
 - 以上是设计契约，不代表功能已实现；只有联合评审记录、OpenAPI Schema、迁移和自动化测试齐备后，才允许标记冻结或实现完成。
+
+
+## 17. 异步运行时契约入口（2026-11-11）
+
+Issue #9 的详细实现契约以 [ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md](ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md) 为准；身份、营销领域与 Job Runtime 的跨域边界以 [ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md](ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md) 为准。本文保留目标架构摘要，不重复定义 Job 状态机、Outbox Relay 和 Worker fencing 细节。Job Runtime 是模块化单体中的领域模块，Worker 作为独立进程运行，不构成首期微服务拆分。

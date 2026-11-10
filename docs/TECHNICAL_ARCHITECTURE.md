@@ -175,7 +175,7 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 
 ### 5.3 对象存储
 
-图片、视频、上传文档、生成结果和中间产物存储在 S3 兼容对象存储（开发可用 MinIO，生产可用托管对象存储）。数据库保存对象 key、哈希、MIME、尺寸、来源、版本和访问策略，不把大文件存进关系型数据库。
+图片、视频、上传文档、生成结果和中间产物存储在 S3 兼容对象存储（开发使用 SeaweedFS S3 mini，生产使用经区域评估的托管 S3 兼容对象存储）。数据库保存对象 key、哈希、MIME、尺寸、来源、版本和访问策略，不把大文件存进关系型数据库。
 
 - 原图只读保留，编辑结果另存新对象。
 - 通过短时签名 URL 授权上传/下载。
@@ -347,3 +347,19 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 
 ---
 本方案为目标架构与工程约束。任何真实生产能力仍需通过实现、自动化测试、部署验证和平台联调后，才能标记为已交付。
+
+
+## 15. Stage 1 技术选型对齐（2026-11-11）
+
+本节与 [TECH_STACK_SELECTION.md](TECH_STACK_SELECTION.md) 配套生效；具体版本与框架以技术选型文档为准。
+
+- Web：React + Vite + TypeScript，登录后 SPA；页面与交互继续严格对齐已冻结 Demo。
+- API：Python + FastAPI 模块化单体；API 与 Worker 共用领域代码，独立进程运行。
+- 数据：PostgreSQL 为业务事实主库；SQLAlchemy + Alembic 管理访问与迁移。
+- 异步：Celery + Redis Broker；Job、JobAttempt、JobEvent、Outbox 持久化于 PostgreSQL。Redis 不作为业务状态主存储，Worker 必须幂等并支持重投递恢复。
+- 对象存储：应用只依赖 S3 API。此前“开发可用 MinIO”的建议已废止；MinIO Community 上游仓库已归档。开发环境改用 SeaweedFS S3 mini；生产对象存储供应商待部署区域与预算确认。
+- 身份：应用 Identity / StoreUser / Session 由服务端管理；Argon2id 密码哈希、HttpOnly 安全 Cookie、CSRF 防护和会话撤销；每次请求服务端校验门店归属。
+- 契约：FastAPI OpenAPI 作为 API 契约来源，生成 TypeScript API client/types。
+- 工程门禁：GitHub Actions、Docker Compose、pytest、Vitest、Playwright、Ruff、TypeScript 检查与构建。
+
+首期不引入 Kubernetes、n8n 核心流程编排、ComfyUI 硬依赖或业务微服务群。生产云厂商、区域、托管对象存储、OIDC/SSO 和错误追踪供应商仍需按真实部署约束决策。

@@ -62,7 +62,7 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 - 库存/产能未知时 NULL；不将 NULL 解释为 0。
 
 ### Offer
-`id, store_id, title, offer_type, terms_json, applicable_product_ids, starts_at, ends_at, timezone, status, fact_status, confirmed_by, confirmed_at, version, created_at, updated_at`
+`id, store_id, title, offer_type, terms_json, applicable_product_ids, starts_at, ends_at, status, fact_status, confirmed_by, confirmed_at, version, created_at, updated_at`
 - 有效期存 UTC timestamptz；门店本地展示和日期边界统一使用 Identity 域 Store.timezone，避免每个 Offer 自行保存互相冲突的 timezone。
 - terms_json 必须通过 Pydantic discriminated union 校验：discount_percent {percent}; discount_amount {amount,currency}; fixed_price {amount,currency}; buy_x_get_y {buy_quantity,get_quantity,eligible_product_ids}; gift {gift_description,eligible_product_ids}; threshold_discount {minimum_spend,currency,discount_type,discount_value}。适用商品、限制次数/数量、有效期与适用门店事实单独保存并校验，不能只依赖自由文本。
 

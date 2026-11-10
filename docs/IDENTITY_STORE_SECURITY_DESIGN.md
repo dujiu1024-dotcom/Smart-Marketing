@@ -99,7 +99,7 @@ Session 原始 Token 只在创建/轮换时返回一次，以 Secure + HttpOnly 
 - authorization_version（用于缓存失效/变更检测）
 - request_id
 
-业务模块只能接收此上下文，不自行从请求体解析身份或门店权限。当前门店通过 `X-Store-Id` 请求头表达选择；每个门店作用域请求都必须重新验证 active membership 和 active Store。门店切换 API 只负责验证并返回可用上下文，前端保存的门店选择仅是 UI 状态，不是授权凭据；Session 不保存可绕过成员关系校验的 current_store_id。不得接受客户端声明 role/capabilities。
+业务模块只能接收此上下文，不自行从请求体解析身份或门店权限。当前门店通过 `X-Store-Id` 请求头表达选择；每个门店作用域请求都必须重新验证 active membership 和 active Store。门店切换 API 只负责验证并返回可用上下文，前端保存的门店选择仅是 UI 状态，不是授权凭据；Session 不保存可绕过成员关系校验的 current_store_id。不得接受客户端声明 role/capabilities。所有门店作用域 API 均要求该请求头，缺失返回 400 STORE_CONTEXT_REQUIRED，非法/非成员门店返回统一 404。
 
 ## 4. 首期能力矩阵
 

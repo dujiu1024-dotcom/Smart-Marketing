@@ -2,7 +2,7 @@
 export function createStoreRenderers({db,field,select,textarea,btn,esc,pill,pageHead,table,getStoreTab,getStoreNav}) {
  function renderStore(section){const d=db(),s=d.store,products=d.products,offers=d.offers,assets=d.assets,knowledge=d.knowledge,channels=d.channels;
 let body="";
-if(section==="profile")body='<div class="grid g2"><div class="card"><h3>门店基本信息</h3><form id="storeProfileForm"><div class="field-row">'+field("门店名称","name",s.name)+field("门店编码","code",s.code)+
+if(section==="profile")body='<div class="grid"><div class="card"><h3>门店基本信息</h3><form id="storeProfileForm"><div class="field-row">'+field("门店名称","name",s.name)+field("门店编码","code",s.code)+
 '</div><div class="field-row">'+field("品牌/连锁归属","brand",s.brand)+select("门店类型","type",["直营门店","加盟门店","单体门店","品牌总部"],s.type)+
 '</div><div class="field-row">'+select("门店业态分类","industryCategory",["食品","餐饮","饮品","美容","按摩","健身","零售","生活服务"],s.industryCategory||"饮品")+field("行业说明","industry",s.industry)+field("主营类目","category",s.category)+
 '</div>'+textarea("门店简介","intro",s.intro)+ '<div class="field-row">'+field("联系电话","phone",s.phone)+field("门店联系人","contact",s.contact)+

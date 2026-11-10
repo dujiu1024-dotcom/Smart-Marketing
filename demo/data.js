@@ -20,4 +20,67 @@ export const seed = {
   ],
   effects:{reports:[],sources:[]},
   admin:{users:[{id:"u1",name:"门店店长",email:"manager@example.com",status:"启用"},{id:"u2",name:"品牌运营",email:"ops@example.com",status:"启用"}],prompts:[{id:"pr1",name:"门店营销策略生成",version:"v1.4",scope:"策略",status:"草稿",updated:"2026-11-10"},{id:"pr2",name:"平台文案生成",version:"v2.1",scope:"文案",status:"已发布",updated:"2026-11-08"}],budgetConfig:{limit:"",threshold:"80%"},systemConfig:{name:"AI 门店运营官",timezone:"Asia/Shanghai",retention:"365 天"},audit:[],runs:[{id:"run1",task:"t1001",node:"copy_generation",model:"文本模型（示例）",status:"模拟完成",duration:"2.4s",cost:"模拟成本",at:"2026-11-10 09:40"}]}
+
+seed.store.industryCategory="饮品";
+seed.store.category="现制茶饮";
+seed.products.forEach(p=>{delete p.cost;delete p.margin});
+seed.offers.forEach(o=>{delete o.approvedBy});
+seed.admin.systemConfig.industryCategories=["餐饮","饮品","美容","按摩","健身","零售","生活服务","宠物服务","教育培训"];
+seed.stores=[
+ {...JSON.parse(JSON.stringify(seed.store)),id:"store-001",name:"拾光茶研社（万象城店）",code:"SG-001",industryCategory:"饮品",industry:"餐饮 · 茶饮",category:"现制茶饮",status:"正常",users:[{id:"u1",name:"林店长",email:"manager@example.com",status:"启用"},{id:"u2",name:"周运营",email:"ops@example.com",status:"启用"}],modelConfig:{vendor:"OpenAI 兼容接口",model:"gpt-6-mini",endpoint:"https://api.example.com/v1",keyRef:"vault://store-001/key",textModel:"gpt-6-mini",imageModel:"image-model-demo"}},
+ {...JSON.parse(JSON.stringify(seed.store)),id:"store-002",name:"拾光茶研社（湖滨店）",code:"SG-002",industryCategory:"饮品",industry:"餐饮 · 茶饮",category:"现制茶饮",city:"杭州市",district:"上城区",address:"平海路 124 号",status:"正常",users:[{id:"u3",name:"陈店长",email:"hubin@example.com",status:"启用"}],modelConfig:{vendor:"未配置"}},
+ {...JSON.parse(JSON.stringify(seed.store)),id:"store-003",name:"木棉轻食（滨江店）",code:"MM-003",industryCategory:"餐饮",industry:"餐饮 · 轻食",category:"轻食简餐",city:"杭州市",district:"滨江区",address:"江南大道 188 号",status:"正常",users:[{id:"u4",name:"王店长",email:"binjiang@example.com",status:"启用"}],modelConfig:{vendor:"未配置"}},
+ {...JSON.parse(JSON.stringify(seed.store)),id:"store-004",name:"悦己皮肤管理（城西店）",code:"YJ-004",industryCategory:"美容",industry:"生活服务 · 美容",category:"皮肤管理",city:"杭州市",district:"西湖区",address:"文三路 88 号",status:"试运营",users:[{id:"u5",name:"许店长",email:"beauty@example.com",status:"启用"}],modelConfig:{vendor:"未配置"}},
+ {...JSON.parse(JSON.stringify(seed.store)),id:"store-005",name:"力场健身工作室（钱江店）",code:"LC-005",industryCategory:"健身",industry:"运动健身",category:"私教工作室",city:"杭州市",district:"上城区",address:"钱江路 288 号",status:"正常",users:[{id:"u6",name:"赵店长",email:"fitness@example.com",status:"启用"}],modelConfig:{vendor:"未配置"}}
+];
+seed.admin.prompts=[
+ {id:"pr-food-brief",name:"餐饮需求理解",industryCategory:"餐饮",scope:"需求理解",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"你是餐饮门店营销顾问。识别堂食、外卖、时段、菜品、套餐、产能与食品安全限制。只使用门店确认的价格、原料、供应和优惠事实。输出结构化需求、缺失信息和风险。"},
+ {id:"pr-food-copy",name:"餐饮内容生成",industryCategory:"餐饮",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕已确认菜品、真实制作过程、消费场景和活动规则生成多平台内容。禁止虚构食材来源、功效、价格、销量、奖项和优惠。"},
+ {id:"pr-drink-strategy",name:"饮品营销策略",industryCategory:"饮品",scope:"营销策略",version:"v1.2",status:"已发布",updated:"2026-11-10",template:"你是现制饮品门店营销策略顾问。结合饮品品类、季节、时段、原料供应、制作产能、商圈和客群制定可执行策略。不得虚构热度、库存、价格或优惠。"},
+ {id:"pr-drink-copy",name:"饮品平台文案",industryCategory:"饮品",scope:"文案生成",version:"v1.1",status:"已发布",updated:"2026-11-10",template:"为饮品门店生成小红书、抖音、视频号等独立内容。突出真实口味、原料、制作过程和适用场景。不得编造零添加、健康功效、全天供应或未确认优惠。"},
+ {id:"pr-beauty",name:"美容服务内容规范",industryCategory:"美容",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕已备案服务项目、流程、环境、资质和顾客体验生成内容。严禁医疗化表述、疗效保证、前后对比夸大和绝对化承诺。"},
+ {id:"pr-massage",name:"按摩养护内容规范",industryCategory:"按摩",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"描述服务流程、环境、时长、适用场景与预约信息。不得宣称治疗疾病、保证疗效或替代医疗建议。"},
+ {id:"pr-fitness",name:"健身课程营销",industryCategory:"健身",scope:"营销策略",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"结合课程类型、教练资质、训练目标、场地容量和体验课规则设计内容。不得承诺固定减重、塑形结果或未经验证的效果。"},
+ {id:"pr-retail",name:"零售商品营销",industryCategory:"零售",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕真实商品参数、使用场景、库存和售后规则生成零售内容。不得虚构原价、折扣、库存和用户评价。"},
+ {id:"pr-general-quality",name:"通用营销事实质检",industryCategory:"通用",scope:"内容质检",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"检查商品、价格、优惠、供应、门店地址、营业时间、健康功效、绝对化用语和版权风险。未确认事实必须标记为待商家核验。"}
+];
+seed.products.push(
+ {id:"p4",name:"杨枝甘露",category:"经典甜品饮品",sku:"YG-520",spec:"中杯 520ml",price:23,unit:"杯",status:"在售",stock:"每日限量 80 杯",selling:"芒果果肉与椰乳搭配",description:"现制芒果风味饮品。",ingredients:"芒果、椰乳、西米",allergens:"含椰乳",service:"现点现做",delivery:"到店自取 / 外卖",priority:"常规",availableHours:"10:00-22:00",assetIds:[],confirmed:true},
+ {id:"p5",name:"冬季桂圆红枣茶",category:"季节热饮",sku:"DR-400",spec:"热饮 400ml",price:18,unit:"杯",status:"在售",stock:"每日限量 60 杯",selling:"桂圆与红枣风味热饮",description:"冬季限定热饮。",ingredients:"桂圆、红枣、茶底",allergens:"以实际配方为准",service:"现点现做",delivery:"到店自取",priority:"主推",availableHours:"10:00-22:00",assetIds:[],confirmed:true},
+ {id:"p6",name:"双人下午茶套餐",category:"组合套餐",sku:"AF-002",spec:"饮品 2 杯 + 甜点 1 份",price:48,unit:"套",status:"在售",stock:"常规供应",selling:"适合朋友分享的组合套餐",description:"双人分享套餐。",ingredients:"按所选饮品和甜点",allergens:"需按具体商品核对",service:"现点现做",delivery:"堂食 / 自取",priority:"常规",availableHours:"14:00-18:00",assetIds:[],confirmed:true}
+);
+seed.offers.push(
+ {id:"o2",name:"草莓鲜奶买一赠一",type:"买一赠一",products:"当季草莓鲜奶",rule:"指定时段买一杯赠同规格一杯",start:"2026-11-12",end:"2026-11-20",audience:"全体顾客",condition:"工作日 14:00-17:00；每日限量 30 组",stack:"不可与其他优惠叠加",quota:"每日 30 组",redemption:"点单时告知活动名称",status:"待确认"},
+ {id:"o3",name:"双人下午茶组合",type:"套餐优惠",products:"双人下午茶套餐",rule:"套餐价 48 元",start:"2026-11-01",end:"2026-12-31",audience:"双人到店顾客",condition:"堂食适用",stack:"不与其他优惠同享",quota:"每日 20 套",redemption:"点单选择套餐",status:"进行中"},
+ {id:"o4",name:"第二杯半价",type:"第二件半价",products:"桂花乌龙轻乳茶、青提茉莉冰茶",rule:"同单第二杯指定饮品半价",start:"2026-11-15",end:"2026-11-30",audience:"全体顾客",condition:"同一订单且指定商品",stack:"不可叠加",quota:"不限量，售完即止",redemption:"收银时自动核对",status:"待确认"}
+);
+seed.knowledge.push(
+ {id:"k3",title:"门店服务与退款说明",type:"FAQ",source:"商家录入",version:"v1",owner:"门店维护",valid:"长期有效",effectiveAt:"2026-01-01",expireAt:"",visibility:"门店运营",status:"已确认",body:"外卖、堂食、自取方式以门店当日实际开放服务为准。"},
+ {id:"k4",title:"活动优惠使用规范",type:"活动规则",source:"门店录入",version:"v1",owner:"门店维护",valid:"2026-12-31",effectiveAt:"2026-11-01",expireAt:"2026-12-31",visibility:"门店运营",status:"已确认",body:"所有优惠需明确商品范围、时间、数量限制和叠加规则。"}
+);
+const cloneTask=JSON.parse(JSON.stringify(seed.tasks[0]));
+const extraTasks=[
+ ["t1002","工作日下午茶到店内容","到店引流","双人下午茶套餐","待策略确认","内容制作中","未发布"],
+ ["t1003","桂花乌龙轻乳茶秋冬热饮","新品推广","桂花乌龙轻乳茶","待文案审核","待审核","未发布"],
+ ["t1004","双人下午茶套餐推广","活动促销","双人下午茶套餐","待图片审核","已通过","未发布"],
+ ["t1005","门店真实制作过程内容","品牌内容","当季草莓鲜奶","待发布","已通过","待人工发布"],
+ ["t1006","草莓鲜奶买一赠一活动","活动促销","当季草莓鲜奶","策略确认中","内容制作中","未发布"],
+ ["t1007","青提茉莉冰茶内容更新","新品推广","青提茉莉冰茶","已发布","已通过","已发布"],
+ ["t1008","周末商圈客群内容","到店引流","杨枝甘露","已归档","已通过","已归档"]
+];
+extraTasks.forEach((row,i)=>{const t=JSON.parse(JSON.stringify(cloneTask));Object.assign(t,{id:row[0],title:row[1],goal:row[1]+"，结合门店真实商品与活动规则完成内容制作。",type:row[2],product:row[3],status:row[4],copyStatus:row[5],publishStatus:row[6],createdAt:"2026-11-"+String(3+i).padStart(2,"0")+" 10:00",updatedAt:"2026-11-"+String(8+i%3).padStart(2,"0")+" 15:30",briefConfirmed:i!==1,strategyStatus:i===1?"draft":"confirmed",confirmedStrategySnapshot:null,activityContent:i===4?"买一赠一（待商家确认）":"无额外活动",events:[{time:"2026-11-10 15:30",label:"演示任务节点",detail:"用于检验任务列表、筛选和监控详情",status:"done"}]});if(t.strategyStatus==="confirmed")t.confirmedStrategySnapshot=JSON.stringify(t.strategy);if(i===6){t.publishPackage={snapshotId:"pkg-demo-1007",createdAt:"2026-11-09 18:20",channels:t.channels};t.briefConfirmed=true}if(i===7)t.archived=true;seed.tasks.push(t)});
+seed.effects.reports=[
+ {id:"er1",taskId:"t1007",date:"2026-11-10",title:"青提茉莉冰茶内容表现（演示）",period:"发布后 7 天观察样例",source:"模拟平台数据",metrics:{内容曝光:"12,480",互动:"612",收藏:"148",咨询:"36"},note:"数据完全为演示值，不代表真实平台采集或营销归因。"},
+ {id:"er2",taskId:"t1005",date:"2026-11-09",title:"门店制作过程内容表现（演示）",period:"发布后 3 天观察样例",source:"模拟平台数据",metrics:{视频播放:"8,920",互动:"431",主页访问:"205",私信:"18"},note:"仅用于检验报告列表与指标呈现。"},
+ {id:"er3",taskId:"t1003",date:"2026-11-08",title:"秋冬热饮主题内容（演示）",period:"发布后 2 天观察样例",source:"模拟平台数据",metrics:{内容曝光:"6,240",互动:"288",收藏:"92",咨询:"14"},note:"数据为本地构造样例，未连接真实渠道。"}
+];
+seed.admin.runs.push(
+ {id:"run2",task:"t1002",node:"strategy_generation",model:"策略模型（模拟）",status:"模拟完成",duration:"3.1s",cost:"未计费",detail:"生成门店下午茶策略",at:"2026-11-10 10:02"},
+ {id:"run3",task:"t1003",node:"copy_generation",model:"文本模型（模拟）",status:"模拟完成",duration:"2.8s",cost:"未计费",detail:"生成小红书与抖音文案",at:"2026-11-10 10:15"},
+ {id:"run4",task:"t1004",node:"image_generation",model:"图像适配器（模拟）",status:"模拟完成",duration:"4.2s",cost:"未计费",detail:"生成活动海报示意图",at:"2026-11-10 11:20"},
+ {id:"run5",task:"t1005",node:"quality_check",model:"规则质检（模拟）",status:"模拟完成",duration:"0.6s",cost:"未计费",detail:"完成内容规则检查",at:"2026-11-10 12:10"},
+ {id:"run6",task:"t1006",node:"copy_generation",model:"文本模型（模拟）",status:"失败（模拟）",duration:"1.2s",cost:"未计费",detail:"演示一次生成失败，用于异常列表测试",at:"2026-11-10 13:30"},
+ {id:"run7",task:"t1006",node:"copy_generation_retry",model:"文本模型（模拟）",status:"模拟完成",duration:"2.3s",cost:"未计费",detail:"模拟重试后成功",at:"2026-11-10 13:32"},
+ {id:"run8",task:"t1007",node:"publish_package",model:"本地发布包适配器",status:"模拟完成",duration:"0.2s",cost:"未计费",detail:"仅保存待人工发布快照",at:"2026-11-09 18:20"}
+);
 };

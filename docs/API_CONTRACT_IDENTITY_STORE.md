@@ -55,20 +55,20 @@ Response 204；清除 active_store_id；后续门店业务 API 必须提供 X-St
 
 ## 3. 成员管理（platform-admin-only）
 
-### GET /stores/{store_id}/members
+### GET /admin/stores/{store_id}/members
 
-返回本门店成员最小必要字段：membership id、user id、email、role、status。路径 store_id 必须经平台管理员能力校验；不得要求管理员成为该门店 StoreMembership。
+返回本门店成员最小必要字段：membership id、user id、email、role、status。仅 PlatformAdminGrant.status=active 且具备 platform.store_members.manage；路径 store_id 是管理目标，不要求管理员成为该门店 StoreMembership。
 
-### POST /stores/{store_id}/members/invitations
+### POST /admin/stores/{store_id}/members/invitations
 
 Request：email、role（首期只允许 member）。
 Response 202：membership_id、status=invited。
 邀请 token 一次性、短时有效，数据库仅保存 verifier。若开户/邀请流程未确认，该接口保持 pending，不得先实现不安全邀请链接。
 
-### PATCH /stores/{store_id}/members/{membership_id}
+### PATCH /admin/stores/{store_id}/members/{membership_id}
 
 Request：role/status。Response 返回更新后的 membership 与 revoked_at。
-仅具备 platform.store_members.manage 能力的平台管理员；owner/member 均不得调用。禁止移除/降级最后 active owner；权限变更同事务写审计，并使被撤销成员后续请求即时失效。
+仅具备 platform.store_members.manage 能力且 PlatformAdminGrant.status=active 的平台管理员；owner/member 均不得调用。禁止移除/降级最后 active owner；权限变更同事务写审计，并使被撤销成员后续请求即时失效。
 
 ## 4. 门店业务资源授权约定
 
@@ -111,3 +111,10 @@ PRODUCT_DESIGN.md v1.8 将门店用户管理明确归属平台管理员的门店
 ## 8. 请求级门店上下文强约束
 
 任何门店业务 API 均以 X-Store-ID 作为不可信 selector；服务端必须用当前 Session 的 user_id 查询 active StoreMembership，并验证 Store.status=active，构造 AuthContext.request_store_id。禁止从 Session.active_store_id 自动授权。Session.active_store_id 只用于 UI 默认选择。跨门店、多标签页请求互不影响。
+
+
+## 9. Platform Admin 授权模型
+
+成员管理端点使用独立的 PlatformAdminGrant。请求必须通过正常 User/Session 认证，再验证 PlatformAdminGrant.status=active 与固定能力 platform.store_members.manage。该权限只覆盖门店成员关系管理，不授予 StoreMembership，不允许通过该身份访问门店任务、经营资料、文案、图片或素材内容。成员管理响应严格字段最小化。
+
+成员邀请接口在开户/邀请、邮箱验证、一次性 token、邮件交付与撤销流程未冻结前不得实现；设计端点不构成已批准上线能力。

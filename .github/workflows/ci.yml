@@ -45,7 +45,8 @@ jobs:
       - run: pip install -e "apps/api[dev]"
       - run: pip install -e apps/worker
       - run: ruff check apps/worker
-      - run: REDIS_URL=redis://localhost:6379/0 python -c "from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {'status': 'ok'}"
+      - run: |
+          REDIS_URL=redis://localhost:6379/0 python -c 'from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {"status": "ok"}'
 
   infrastructure:
     runs-on: ubuntu-latest

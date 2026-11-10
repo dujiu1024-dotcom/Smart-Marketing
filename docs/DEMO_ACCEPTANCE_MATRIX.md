@@ -101,7 +101,7 @@
 
 | ID | 验收项 | 当前代码状态 | 浏览器验收状态 | 说明/缺口 |
 |---|---|---|---|---|
-| ENG-01 | 页面渲染模块化 | 部分完成 | 不适用 | 任务工作区已拆至 task-renderers.js；app.js 仍包含大量门店资料、效果和管理页面模板 |
+| ENG-01 | 页面渲染模块化 | 部分完成 | 不适用 | 任务、经营效果、门店资料页面已拆至独立 renderer 模块；AI 首页、热点、账号监测和管理端仍在 app.js/admin.js |
 | ENG-02 | 重复代码清理 | 部分完成 | 不适用 | titleFor 的重复 store:channels 键已清理；仍需逐页清理重复事件监听和模板逻辑 |
 | A11Y-01 | Tab 语义与键盘操作 | 代码已实现 | 待验收 | 任务 Tab 增加 tabpanel 关联、方向键/Home/End；屏幕阅读器待验收 |
 | A11Y-02 | 表单标签与错误提示 | 部分实现 | 待验收 | 通用 field/textarea/select helper 已关联 label/id；手写表单尚未全量审查 |
@@ -152,7 +152,7 @@
 | STATE-01 | 任务工作区渲染和状态规则拆至 task-renderers 模块；热点决策并入策略步骤状态 | 代码已实现 | 完整流程浏览器回归 |
 | STATE-02 | 策略确认前必须选择“使用已关联热点”或“不使用热点”；跳过需记录原因 | 代码已实现 | 刷新恢复、修改决策后下游失效 |
 | STORE-04 | schema v10 为历史任务补充默认门店归属，当前门店列表严格按 storeId 过滤 | 部分实现 | 完整门店资料切换与服务端隔离未实现 |
-| ENG-01 | 任务工作区渲染/校验拆至 task-renderers.js，经营效果页面拆至 effect-renderers.js | 部分完成 | 后续按门店资料/经营效果继续拆分 |
+| ENG-01 | 任务工作区渲染/校验拆至 task-renderers.js，经营效果页面拆至 effect-renderers.js，门店资料页面拆至 store-renderers.js | 部分完成 | 后续按门店资料/经营效果继续拆分 |
 | A11Y-01 | 任务 Tab 增加 tabpanel 关联、方向键/Home/End 键盘切换 | 代码已实现 | 屏幕阅读器与真实浏览器验证 |
 | A11Y-02 | 通用 field/textarea/select helper 增加 label-for/id 关联 | 部分实现 | 手写字段逐页检查 |
 

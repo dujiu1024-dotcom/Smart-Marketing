@@ -73,6 +73,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: touch .env && POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml config --quiet
-      - run: docker build -f infra/containers/api.Dockerfile .
-      - run: docker build -f infra/containers/worker.Dockerfile .
-      - run: docker build -f infra/containers/web.Dockerfile .
+      - name: Start complete Compose stack and wait for health
+        run: POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml up --build --detach --wait --wait-timeout 180
+      - name: Verify API readiness and Web response
+        run: |
+          curl --fail --silent --show-error http://localhost:8000/health/live
+          curl --fail --silent --show-error http://localhost:8000/health/ready
+          curl --fail --silent --show-error http://localhost:5173/ > /dev/null
+      - name: Verify PostgreSQL volume persistence across restart
+        run: |
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml exec -T postgres psql -U store_operator -d store_operator -c "CREATE TABLE ci_persistence_probe (id integer PRIMARY KEY, value text NOT NULL); INSERT INTO ci_persistence_probe (id, value) VALUES (1, 'persisted') ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;"
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml down
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml up --detach --wait --wait-timeout 120
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml exec -T postgres psql -U store_operator -d store_operator -tAc "SELECT value FROM ci_persistence_probe WHERE id = 1" | grep -Fx persisted
+      - name: Clean up Compose stack
+        if: always()
+        run: POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml down --volumes --remove-orphans

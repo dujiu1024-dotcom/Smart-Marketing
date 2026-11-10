@@ -2,8 +2,13 @@ import {seed} from "./data.js";
 const KEY="ai-store-ops-demo-v2";
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
-export function load(){if(state)return state;try{const raw=localStorage.getItem(KEY);state=raw?JSON.parse(raw):clone(seed)}catch{state=clone(seed)}return state}
-export function save(){localStorage.setItem(KEY,JSON.stringify(state));window.dispatchEvent(new CustomEvent("demo:changed"))}
+export function load(){if(state)return state;try{const raw=localStorage.getItem(KEY);state=raw?JSON.parse(raw):clone(seed)}catch{state=clone(seed)}
+state.tasks=Array.isArray(state.tasks)?state.tasks:[];state.products=Array.isArray(state.products)?state.products:[];state.assets=Array.isArray(state.assets)?state.assets:[];
+state.admin=state.admin||clone(seed.admin);state.admin.audit=Array.isArray(state.admin.audit)?state.admin.audit:[];
+state.tasks.forEach(t=>{t.copy=t.copy||{};t.copyStates=t.copyStates||{};t.copyReviews=t.copyReviews||[];t.copyHistory=t.copyHistory||[];t.copyVersionNumbers=t.copyVersionNumbers||{};t.imageVersions=t.imageVersions||[];t.strategyStatus=t.strategyStatus||"draft";t.qualityChecks=t.qualityChecks||null;t.events=t.events||[];});
+state.products.forEach(p=>{p.assetIds=Array.isArray(p.assetIds)?p.assetIds:String(p.assetIds||"").split(",").map(x=>x.trim()).filter(Boolean)});
+return state}
+export function save(){try{localStorage.setItem(KEY,JSON.stringify(state));window.dispatchEvent(new CustomEvent("demo:changed"));return true}catch(error){window.dispatchEvent(new CustomEvent("demo:storage-error",{detail:{name:error?.name||"StorageError"}}));return false}}
 export function db(){return load()}
 export function patch(path,value){const keys=path.split(".");let obj=state;while(keys.length>1)obj=obj[keys.shift()];obj[keys[0]]=value;save();return value}
 export function add(collection,item){let list=pathGet(collection);if(!Array.isArray(list)){patch(collection,[]);list=pathGet(collection)}list.unshift({...item,id:item.id||"id-"+Date.now()});save();return list[0]}

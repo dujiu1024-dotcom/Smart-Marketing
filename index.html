@@ -1,1 +1,11 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0; url=./demo/"><title>AI 门店运营官 Demo</title></head><body><p>正在进入新版 Demo… <a href="./demo/">点击进入</a></p><script>location.replace("./demo/")</script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101827"><title>AI 门店运营官 Demo</title></head>
+<body style="font-family:system-ui,sans-serif;padding:32px;line-height:1.7;color:#24352d">
+<main id="entry"><h2>AI 门店运营官 Demo</h2><p>正在进入新版 Demo…</p><p><a href="./demo/">点击进入</a></p></main>
+<script>
+if(location.protocol==="file:"){
+document.getElementById("entry").innerHTML='<h2>请通过本地服务器启动 Demo</h2><p>此项目使用 JavaScript ES Modules，不能通过双击 HTML 文件（file://）运行。</p><pre>python -m http.server 8080</pre><p>在项目根目录执行命令后，访问 <a href="http://localhost:8080/demo/">http://localhost:8080/demo/</a></p>';
+}else{location.replace("./demo/")}
+</script>
+</body></html>

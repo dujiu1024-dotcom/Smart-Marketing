@@ -1,3 +1,24 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101827"><title>AI 门店运营官 · 产品交互原型</title><link rel="stylesheet" href="./styles.css"></head>
-<body><div id="app"><div class="boot">正在加载 AI 门店运营官…</div></div><div id="toast-root" aria-live="polite"></div><script type="module" src="./app.js"></script></body></html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101827"><title>AI 门店运营官 · 产品交互原型</title><link rel="stylesheet" href="./styles.css"></head>
+<body>
+<div id="app"><div class="boot" style="padding:32px;font-family:system-ui,sans-serif">正在加载 AI 门店运营官…</div></div>
+<div id="toast-root" aria-live="polite"></div>
+<script>
+(function(){
+ const root=document.getElementById("app");
+ function fail(title,detail){
+  if(!root||root.dataset.bootFailed==="1")return;
+  root.dataset.bootFailed="1";
+  root.innerHTML='<div style="max-width:760px;margin:48px auto;padding:28px;font-family:system-ui,sans-serif;color:#26382f"><h2>'+title+'</h2><p style="line-height:1.8">'+detail+'</p><h3>本地启动方式</h3><pre style="padding:14px;background:#f2f5f2;border-radius:8px">python -m http.server 8080</pre><p>请在项目根目录运行命令，然后访问 <a href="http://localhost:8080/demo/">http://localhost:8080/demo/</a></p><p><button onclick="location.reload()">重新加载</button></p></div>';
+ }
+ window.addEventListener("error",function(e){
+  if(e.target&&e.target.tagName==="SCRIPT"){fail("应用脚本加载失败","无法加载 "+(e.target.src||"应用模块")+"。请确认 demo 目录中的 app.js、admin.js、store.js、data.js 均可访问，并通过 HTTP 服务打开。");return}
+  if(e.message)fail("应用初始化出错",e.message+"（可打开浏览器开发者工具查看详细错误。）");
+ },true);
+ window.addEventListener("unhandledrejection",function(e){fail("应用初始化出错",String(e.reason?.message||e.reason||"模块执行失败")+"（可打开浏览器开发者工具查看详细错误。）")});
+ if(location.protocol==="file:"){fail("请通过本地服务器启动 Demo","此项目使用 JavaScript ES Modules，浏览器禁止通过 file:// 直接加载模块。");}
+})();
+</script>
+<script type="module" src="./app.js"></script>
+</body></html>

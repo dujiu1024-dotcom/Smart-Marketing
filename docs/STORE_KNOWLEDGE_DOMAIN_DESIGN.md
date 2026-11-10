@@ -120,7 +120,7 @@
 ### 5.3 Offer
 
 - id、store_id、title、offer_type、terms_json、eligibility_rules_json。
-- starts_at、ends_at（UTC timestamptz）、target_audience_description。
+- starts_at、ends_at（UTC timestamptz）、target_audience_description、audience_profile_id（可空，引用本店客群画像）。
 - stacking_policy、usage_limit、per_customer_limit、quota_value、quota_unit、status、fact_status、current_version。
 - created_by_user_id、updated_by_user_id、created_at、updated_at、archived_at。
 
@@ -162,7 +162,7 @@ Logo 和品牌文件只保存 MediaAsset 引用；视觉规则必须可被 AI/�
 
 - id、store_id、title、category（faq / menu / policy / service_description / brand_story / other）。
 - content_text（短文本可直接存储）、content_ref（大文档/附件对象引用）、content_hash。
-- source_type、source_ref、effective_at、expires_at、related_product_refs。
+- source_type、source_ref、effective_at、expires_at。关联商品通过 KnowledgeItemProduct 关系表维护。
 - fact_status、current_version、created_by_user_id、updated_by_user_id、created_at、updated_at、archived_at。
 
 大文件存对象存储；DB 保存受控对象 key、哈希、MIME、大小和检索元数据。只有 confirmed 且当前有效的知识可作为高风险宣传事实；过期制度/菜单不能进入当前上下文。
@@ -205,6 +205,7 @@ UploadIntent：
 | 方法 | 路径 | 作用 | 关键约束 |
 |---|---|---|---|
 | GET/PATCH | /api/v1/store/profile | 查询/更新门店档案 | 一店一份；PATCH 带 expected_version |
+| POST | /api/v1/store/profile/confirm | 确认门店档案事实 | 确认当前版本 + fingerprint |
 | GET/POST | /api/v1/store/products | 商品列表/创建 | 列表按 store_id 过滤；创建注入 store_id |
 | GET/PATCH/DELETE | /api/v1/store/products/{product_id} | 商品详情/更新/归档 | 复合归属校验；删除默认归档 |
 | POST | /api/v1/store/products/{product_id}/confirm | 确认商品事实 | 确认当前版本 + fingerprint |
@@ -212,6 +213,7 @@ UploadIntent：
 | GET/PATCH/DELETE | /api/v1/store/offers/{offer_id} | 活动详情/更新/归档 | 有效期、商品关联、版本校验 |
 | POST | /api/v1/store/offers/{offer_id}/confirm | 确认优惠事实 | 必须验证 terms/有效期/适用商品 |
 | GET/PATCH | /api/v1/store/brand-guideline | 查询/更新品牌规范 | 一店一份；事实变化产生新版本 |
+| POST | /api/v1/store/brand-guideline/confirm | 确认品牌规范 | 确认当前版本 |
 | GET/POST | /api/v1/store/audience-profiles | 客群列表/创建 | 仅聚合客群，不存个人敏感信息 |
 | GET/PATCH/DELETE | /api/v1/store/audience-profiles/{profile_id} | 客群详情/更新/归档 | source + sampled_at + fact status |
 | POST | /api/v1/store/audience-profiles/{profile_id}/confirm | 确认客群资料 | 确认当前版本 |
@@ -219,10 +221,11 @@ UploadIntent：
 | GET/PATCH/DELETE | /api/v1/store/knowledge-items/{item_id} | 知识详情/更新/归档 | 版本、来源和确认状态 |
 | POST | /api/v1/store/knowledge-items/{item_id}/confirm | 确认知识事实 | 确认当前版本 |
 | POST | /api/v1/store/assets/upload-intents | 创建上传意图 | 限流、MIME/大小白名单 |
-| POST | /api/v1/store/assets/{asset_id}/complete | 完成上传并校验 | 幂等；不可信客户端元数据必须复核 |
+| POST | /api/v1/store/assets/upload-intents/{intent_id}/complete | 完成上传并校验 | 幂等；不可信客户端元数据必须复核 |
 | GET | /api/v1/store/assets | 素材列表 | 仅 ready/允许状态按筛选展示 |
 | GET | /api/v1/store/assets/{asset_id} | 素材详情 | 按 store_id 查询 |
 | POST | /api/v1/store/assets/{asset_id}/download-url | 获取短时下载 URL | 每次重新授权 |
+| POST | /api/v1/store/assets/{asset_id}/confirm-usage-rights | 确认素材使用权 | 绑定 asset_id + hash + 当前版本 |
 | POST | /api/v1/store/assets/{asset_id}/archive | 归档素材 | 检查下游引用与保留规则 |
 | GET | /api/v1/store/records/{record_type}/{record_id}/revisions | 历史版本 | 只读、门店范围内 |
 
@@ -233,13 +236,10 @@ UploadIntent：
 #6 拥有门店事实和素材源资产；下游只读消费，不跨模块写表。
 
 建议版本化事件：
-- store.profile.revised / store.profile.confirmed
-- store.product.revised / store.product.confirmed / store.product.archived
-- store.offer.revised / store.offer.confirmed / store.offer.expired
-- store.brand_guideline.revised / store.brand_guideline.confirmed
-- store.audience_profile.revised / store.audience_profile.confirmed
-- store.knowledge_item.revised / store.knowledge_item.confirmed / store.knowledge_item.expired
-- store.asset.ready / store.asset.versioned / store.asset.archived
+- store.fact.changed：通用事实变化事件，包含 entity_type、record_id、version、fingerprint、change_reason。
+- store.fact.confirmed：通用事实确认事件，包含 entity_type、record_id、version、fingerprint、confirmed_by_user_id、confirmed_at。
+- store.asset.created / store.asset.versioned / store.asset.ready / store.asset.archived：素材生命周期事件。
+- store.offer.expired：活动到期事件；到期判定本身仍以查询时 starts_at/ends_at 为准，事件仅用于下游刷新。
 
 事件 Envelope：event_id、event_type、schema_version、store_id、aggregate_type、aggregate_id、version、fingerprint、actor_type、actor_id、occurred_at、correlation_id。事件不携带密码、Session、Secret、签名 URL 或大段资料正文。
 
@@ -312,3 +312,15 @@ UploadIntent：
 - 事实策略：不同资料的默认有效期/重新确认周期，以及过期事件的调度方式。
 
 实现门禁：#4 工程基础和 #5 身份授权未验收前，不启动生产 CRUD、迁移或文件签名实现。可以先评审 Schema、OpenAPI 示例、Demo 页面字段映射和测试用例。
+
+
+### 5.9 确认粒度补充
+
+事实确认绑定单条记录的完整 revision，而不是由客户端逐字段提交“已确认”标记。记录内未知字段保持 NULL；商家确认当前 revision 时，确认的是该版本所有已填写事实及其来源。重要字段任一变化都会创建新 revision 并将整条记录设为 pending_confirmation，避免同一商品出现“价格来自新版本、过敏原确认来自旧版本”的混合事实。若 UX 后续要求字段级确认，必须另增 StoreFactAssertion 实体并经 ADR 评审，不在首期隐式混用。
+
+### 6.1 API 资源与版本并发补充
+
+- StoreProfile、Product、Offer、BrandGuideline、AudienceProfile、KnowledgeItem 的更新均返回新 version 和 revision_id。
+- 确认端点只允许确认服务端当前版本；请求必须携带 expected_version 或 If-Match。
+- Offer 激活必须要求当前 revision confirmed、商品关联同店、规则 Schema 校验通过且有效期未结束。
+- UploadIntent complete 的目标是 intent_id，不是 asset_id；Asset 只有通过对象校验和扫描后才创建为 ready。

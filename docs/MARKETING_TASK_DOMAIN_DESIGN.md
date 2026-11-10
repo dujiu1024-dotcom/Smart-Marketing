@@ -476,3 +476,50 @@ Job 状态建议：`queued`、`running`、`retry_wait`、`succeeded`、`failed`�
 - [ ] Job/Outbox 表结构与轨道 D/#4 共用实现，不重复造基础设施。
 - [ ] 所有外部发布动作可追溯到唯一发布包、最终确认和发布 attempt。
 - [ ] PostgreSQL Migration 只有在 B、D 契约和工程底座评审通过后才开始。
+
+
+## 16. 核心关系图（逻辑 ERD）
+
+以下图仅展示营销域核心关系，不表示物理建表顺序。所有门店业务关系均需附加 store_id 一致性约束；身份、门店、Job、Outbox 和资产存储的权威关系由对应轨道定义。
+
+```mermaid
+erDiagram
+    MARKETING_TASK ||--o{ REQUIREMENT_SNAPSHOT : captures
+    MARKETING_TASK ||--o{ STRATEGY_SNAPSHOT : plans
+    MARKETING_TASK ||--o{ BUSINESS_FACT_SNAPSHOT : records
+    MARKETING_TASK ||--o{ TASK_STEP : progresses
+    TASK_STEP ||--o{ STEP_DECISION : records
+    MARKETING_TASK ||--o{ ARTIFACT : owns
+    ARTIFACT ||--o{ ARTIFACT_VERSION : versions
+    ARTIFACT_VERSION ||--o{ REVIEW_RECORD : reviewed_by
+    ARTIFACT_VERSION ||--o{ REVISION_REQUEST : revised_from
+    REVIEW_RECORD ||--o{ REVISION_REQUEST : initiates
+    MARKETING_TASK ||--o{ DEPENDENCY_EDGE : depends
+    MARKETING_TASK ||--o{ QUALITY_CHECK : validates
+    MARKETING_TASK ||--o{ PUBLISH_PACKAGE : freezes
+    PUBLISH_PACKAGE ||--o{ PUBLISH_CONFIRMATION : confirmed_by
+    PUBLISH_PACKAGE ||--o{ PUBLISH_ATTEMPT : delivered_by
+    MARKETING_TASK ||--o{ TASK_EVENT : emits
+    MARKETING_TASK ||--o{ AUDIT_EVENT : audited_by
+```
+
+### 16.1 复合外键补充约束
+
+为确保上图关系在数据库层可验证，除通用的 (store_id,id) 唯一键外，以下被引用表必须额外提供对应复合唯一键：
+
+- task 内子资源：父表提供 (store_id, task_id, id)，子表使用 (store_id, task_id, parent_id) 引用。
+- artifact_versions：提供 (store_id, task_id, artifact_id, id)，供 review_records、revision_requests、publish_packages 等引用精确版本。
+- review_records：提供 (store_id, task_id, artifact_id, artifact_version_id, id)，供 revision_requests 证明审核与源版本属于同一产物。
+- publish_packages：提供 (store_id, task_id, id, dependency_fingerprint)，供 publish_confirmations 绑定包及指纹；或使用包 ID 外键并在事务中强校验指纹。
+- 当前版本指针（artifacts.current_version_id）需通过延迟约束触发器或事务内强校验，证明版本属于该 artifact；不得仅以 version_id 全局外键代替归属校验。
+- 依赖图允许同任务内跨产物依赖，但不允许跨 store/task 建边；若未来需要跨任务复用素材，必须通过独立、显式的共享资产授权关系，不得放宽任务外键。
+
+### 16.2 当前 Schema 草案的评审风险
+
+1. 表清单中的 JSONB payload 必须有 schema_version，并在应用层执行结构校验；不能将业务必填字段全部藏入 JSONB。
+2. artifacts 与 artifact_versions 的当前指针形成逻辑循环，迁移顺序和一致性校验必须单独设计。
+3. publish_attempts 的唯一键必须区分一次逻辑发布与平台重试；平台查询/对账不能误创建新的逻辑发布动作。
+4. idempotency_records 的 actor 作用域要兼容轨道 B 最终确认的主体类型；系统触发任务不能伪装成用户 actor。
+5. task_events 与 audit_events 的保留期限、敏感字段脱敏和删除合规要求需在安全/数据治理基线中明确。
+6. business_fact_snapshots 的 source_id/source_version 是来源引用，不保证源资料仍可读取；快照 value_json 与 fingerprint 才是历史还原依据。
+7. 所有唯一索引必须明确 NULL 语义；可空的外部平台 ID 不应意外阻止多个未发布记录并存。

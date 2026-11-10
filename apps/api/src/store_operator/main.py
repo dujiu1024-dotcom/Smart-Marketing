@@ -5,14 +5,16 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from opentelemetry.trace import Status, StatusCode
 from redis import Redis
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from store_operator.config import settings
-from store_operator.observability import configure_logging
+from store_operator.observability import configure_logging, configure_tracing
 
 configure_logging()
+tracer = configure_tracing(settings.otel_exporter_otlp_traces_endpoint)
 logger = structlog.get_logger("http")
 
 app = FastAPI(
@@ -38,28 +40,37 @@ async def request_id_and_logging_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid4())
     request.state.request_id = request_id
     started_at = time.perf_counter()
-    try:
-        response = await call_next(request)
-    except Exception as exc:
-        logger.error(
-            "http.request.failed",
+    with tracer.start_as_current_span("http.server.request") as span:
+        span.set_attribute("http.request.method", request.method)
+        span.set_attribute("url.path", request.url.path)
+        span.set_attribute("app.request_id", request_id)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            span.set_attribute("error.type", type(exc).__name__)
+            span.set_status(Status(StatusCode.ERROR))
+            logger.error(
+                "http.request.failed",
+                request_id=request_id,
+                method=request.method,
+                path=request.url.path,
+                error_type=type(exc).__name__,
+                duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+            )
+            raise
+        span.set_attribute("http.response.status_code", response.status_code)
+        if response.status_code >= 500:
+            span.set_status(Status(StatusCode.ERROR))
+        response.headers["X-Request-ID"] = request_id
+        logger.info(
+            "http.request.completed",
             request_id=request_id,
             method=request.method,
             path=request.url.path,
-            error_type=type(exc).__name__,
+            status_code=response.status_code,
             duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
         )
-        raise
-    response.headers["X-Request-ID"] = request_id
-    logger.info(
-        "http.request.completed",
-        request_id=request_id,
-        method=request.method,
-        path=request.url.path,
-        status_code=response.status_code,
-        duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
-    )
-    return response
+        return response
 
 
 @app.exception_handler(Exception)

@@ -5,6 +5,11 @@ from collections.abc import Mapping
 from typing import Any
 
 import structlog
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor, SpanExporter
 
 _SENSITIVE_KEY_FRAGMENTS = (
     "password",
@@ -15,6 +20,8 @@ _SENSITIVE_KEY_FRAGMENTS = (
     "api_key",
     "apikey",
     "credential",
+    "database_url",
+    "private_key",
 )
 
 
@@ -57,3 +64,27 @@ def configure_logging() -> None:
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,
     )
+
+
+def build_tracer_provider(
+    endpoint: str | None = None,
+    span_exporter: SpanExporter | None = None,
+) -> TracerProvider:
+    """Build a service-scoped provider with OTLP export when an endpoint is configured."""
+    provider = TracerProvider(
+        resource=Resource.create({"service.name": "store-operator-api"})
+    )
+    if span_exporter is not None:
+        provider.add_span_processor(SimpleSpanProcessor(span_exporter))
+    elif endpoint:
+        provider.add_span_processor(
+            BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
+        )
+    return provider
+
+
+def configure_tracing(endpoint: str | None = None):
+    """Configure process-wide tracing and return the API tracer."""
+    provider = build_tracer_provider(endpoint=endpoint)
+    trace.set_tracer_provider(provider)
+    return trace.get_tracer("store_operator.api")

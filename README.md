@@ -5,6 +5,7 @@ AI 门店运营官是一个以经营效果为核心的门店营销执行平台�
 ## 设计文档
 - [产品设计基线 v1.4](docs/PRODUCT_DESIGN.md)
 - [UI/UX 深度审查与重构清单](docs/UX_AUDIT_AND_REDESIGN.md)
+- [Demo 验收追踪矩阵](docs/DEMO_ACCEPTANCE_MATRIX.md)
 
 ## 多文件 Demo
 入口：`demo/index.html`

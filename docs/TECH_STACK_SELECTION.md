@@ -4,7 +4,7 @@
 > 决策日期：2026-11-11  
 > 产品基线：v1.8  
 > 架构基线：模块化单体 + 独立异步 Worker + Provider / Adapter  
-> 状态：**技术方案已形成，待项目负责人最终确认后锁定**  
+> 状态：**已由项目负责人确认并锁定（2026-11-11）**  
 > 对应：GitHub Issue #3
 
 ## 1. 决策摘要
@@ -222,7 +222,7 @@ Python API 与 Worker 共享一个 Python workspace/package，Worker 不是另�
 ## 9. ADR 记录
 
 ### ADR-001：采用 React SPA + FastAPI 模块化单体
-- 日期：2026-11-11；状态：待项目负责人最终确认。
+- 日期：2026-11-11；状态：已确认。
 - 决策：React + Vite 负责交互工作台；FastAPI 承载模块化业务 API；Worker 与 API 共用 Python 领域包，独立进程运行。
 - 原因：符合登录后高交互工作台形态；复用 IterWave 已有 Python 执行经验；降低跨语言和微服务运维成本。
 - 放弃方案：Next.js SSR、NestJS 全栈、Django 全栈。
@@ -266,4 +266,4 @@ Python API 与 Worker 共享一个 Python workspace/package，Worker 不是另�
 
 ---
 
-**最终状态：** 技术栈建议已形成，尚待项目负责人确认。确认后，本文件成为 Issue #4 生产工程骨架的唯一技术选型依据；任何替换必须通过 ADR 和项目宪法规定的重大决策流程。
+**最终状态：** 项目负责人已于 2026-11-11 确认本技术栈，本文件现为 Issue #4 生产工程骨架及后续首期实现的唯一技术选型依据；任何替换必须通过 ADR 和项目宪法规定的重大决策流程。

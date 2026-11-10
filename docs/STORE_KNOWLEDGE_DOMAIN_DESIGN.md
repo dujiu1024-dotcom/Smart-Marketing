@@ -314,11 +314,11 @@ UploadIntent：
 实现门禁：#4 工程基础和 #5 身份授权未验收前，不启动生产 CRUD、迁移或文件签名实现。可以先评审 Schema、OpenAPI 示例、Demo 页面字段映射和测试用例。
 
 
-### 5.9 确认粒度补充
+## 12. 确认粒度与 API 版本并发补充
 
 事实确认绑定单条记录的完整 revision，而不是由客户端逐字段提交“已确认”标记。记录内未知字段保持 NULL；商家确认当前 revision 时，确认的是该版本所有已填写事实及其来源。重要字段任一变化都会创建新 revision 并将整条记录设为 pending_confirmation，避免同一商品出现“价格来自新版本、过敏原确认来自旧版本”的混合事实。若 UX 后续要求字段级确认，必须另增 StoreFactAssertion 实体并经 ADR 评审，不在首期隐式混用。
 
-### 6.1 API 资源与版本并发补充
+### 12.1 API 资源与版本并发补充
 
 - StoreProfile、Product、Offer、BrandGuideline、AudienceProfile、KnowledgeItem 的更新均返回新 version 和 revision_id。
 - 确认端点只允许确认服务端当前版本；请求必须携带 expected_version 或 If-Match。

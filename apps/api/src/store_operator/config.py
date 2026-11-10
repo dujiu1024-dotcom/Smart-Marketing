@@ -10,7 +10,6 @@ class Settings(BaseSettings):
     redis_url: str
     cors_origins: str = "http://localhost:5173"
     otel_exporter_otlp_traces_endpoint: str | None = None
-    otel_exporter_otlp_traces_endpoint: str | None = None
 
 
 settings = Settings()

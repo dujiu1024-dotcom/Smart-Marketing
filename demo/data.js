@@ -21,6 +21,7 @@ export const seed = {
   effects:{reports:[],sources:[]},
   admin:{users:[{id:"u1",name:"门店店长",email:"manager@example.com",status:"启用"},{id:"u2",name:"品牌运营",email:"ops@example.com",status:"启用"}],prompts:[{id:"pr1",name:"门店营销策略生成",version:"v1.4",scope:"策略",status:"草稿",updated:"2026-11-10"},{id:"pr2",name:"平台文案生成",version:"v2.1",scope:"文案",status:"已发布",updated:"2026-11-08"}],budgetConfig:{limit:"",threshold:"80%"},systemConfig:{name:"AI 门店运营官",timezone:"Asia/Shanghai",retention:"365 天"},audit:[],runs:[{id:"run1",task:"t1001",node:"copy_generation",model:"文本模型（示例）",status:"模拟完成",duration:"2.4s",cost:"模拟成本",at:"2026-11-10 09:40"}]}
 
+};
 seed.store.industryCategory="饮品";
 seed.store.category="现制茶饮";
 seed.products.forEach(p=>{delete p.cost;delete p.margin});
@@ -83,4 +84,3 @@ seed.admin.runs.push(
  {id:"run7",task:"t1006",node:"copy_generation_retry",model:"文本模型（模拟）",status:"模拟完成",duration:"2.3s",cost:"未计费",detail:"模拟重试后成功",at:"2026-11-10 13:32"},
  {id:"run8",task:"t1007",node:"publish_package",model:"本地发布包适配器",status:"模拟完成",duration:"0.2s",cost:"未计费",detail:"仅保存待人工发布快照",at:"2026-11-09 18:20"}
 );
-};

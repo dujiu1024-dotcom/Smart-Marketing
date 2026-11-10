@@ -17,3 +17,15 @@
 /* Global usability pass: hierarchy, overflow, focus and mobile action layout */
 .main{min-width:0}.content{width:100%;min-width:0}.topbar{gap:14px;min-width:0}.crumb{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.top-actions{min-width:0;flex-wrap:wrap;justify-content:flex-end}.page-head{min-width:0}.page-head>div:first-child{min-width:0;max-width:760px}.page-head .actions{justify-content:flex-end;align-items:center}.btn{min-height:36px;transition:background .15s ease,border-color .15s ease,transform .15s ease}.btn:active{transform:translateY(1px)}.btn:focus-visible,.nav button:focus-visible,.tabs button:focus-visible{outline:3px solid #9abda7;outline-offset:2px}.card-head{flex-wrap:wrap}.list-item{min-width:0;gap:12px}.list-item>div{min-width:0}.notice{line-height:1.65}.empty{line-height:1.7}.field label{line-height:1.4}.field input,.field select,.field textarea{min-height:40px}.field textarea{min-height:100px}.table-wrap table{white-space:normal}th{white-space:nowrap}td{overflow-wrap:anywhere}
 @media(max-width:760px){.topbar{height:auto;min-height:52px;padding:9px 12px;align-items:flex-start}.crumb{max-width:38%;padding-top:7px}.top-actions{gap:5px}.top-actions .pill{display:none}.top-actions .btn{font-size:11px;padding:8px 9px;min-height:34px}.page-head{display:flex;flex-direction:column;align-items:stretch;gap:10px}.page-head .actions{justify-content:flex-start;margin-top:4px}.page-head h1{font-size:22px}.card{padding:15px}.card-head{align-items:flex-start}.list-item{align-items:flex-start}.stat .value{font-size:22px}}
+
+/* P1/P2: clearer entry hierarchy and accessible task workspace */
+.recommendation-hero{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,.7fr);gap:24px;align-items:center;padding:28px;background:linear-gradient(125deg,#183d32,#285a48);color:#f4f8f4;border:0}
+.recommendation-hero h2{margin:8px 0;font-size:26px;color:#fff}
+.recommendation-hero p{max-width:720px;color:#d6e6dc}
+.recommendation-hero aside{padding:18px;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.07)}
+.recommendation-hero aside p{margin:8px 0 14px}
+#direct-create{scroll-margin-top:24px}
+#task-stage-panel{min-width:0}
+[role=tab]:focus-visible{outline:3px solid #d39b3b;outline-offset:3px}
+.hotspot-decision{border-color:#cbded2;background:#fbfdfb}
+@media(max-width:760px){.recommendation-hero{grid-template-columns:1fr;padding:20px}.recommendation-hero h2{font-size:22px}}

@@ -91,10 +91,56 @@ Issue #7 与 #9 当前唯一范围描述略有差异。建议用户 API 写操�
 
 ## 7. 冻结前待确认
 
-1. Identity & Store 最终 AuthContext 字段名与 X-Store-ID 约定；本提案按 PR #19 的 request-scoped `X-Store-ID` / `AuthorizedStoreContext` 设计使用；Session.active_store_id 仅作为 UI 默认选择，不作为授权上下文。
+1. Identity & Store 最终 AuthContext 字段名与 X-Store-ID 约定；本提案按 PR #26 的 request-scoped `X-Store-ID` / `AuthorizedStoreContext` 设计使用；Session.active_store_id 仅作为 UI 默认选择，不作为授权上下文。
 2. Issue #7/#9 共同确认 Job 是否移除 `dead`，以及 terminal_reason 字段。
 3. Issue #7/#9 共同确认用户 API 幂等键唯一范围。
 4. 发布等外部副作用的最后授权检查与平台操作状态核验接口。
 5. 成员撤销/门店停用后的在途 Job 策略。
 
 本文件不解除 Issue #4/#5/#7/#9 的实现门禁。并发、Broker 故障、成员撤销竞态、Provider 故障注入及端到端测试必须在实现阶段实际执行并记录证据。
+
+
+## 8. Identity contract alignment with PR #26
+
+This section aligns Job Runtime with the current Identity & Store review proposal. PR #26 is pending review and is not yet a frozen implementation contract.
+
+### 8.1 Canonical request context
+
+The HTTP Identity layer authenticates the User through the server-side Session. For every store-scoped request it reads the untrusted X-Store-ID selector and revalidates Store.status=active plus StoreMembership.status=active. The immutable request-scoped AuthorizedStoreContext exposes:
+
+- user_id
+- session_id
+- request_store_id
+- membership_id
+- role
+- capabilities
+- authorization_version
+- request_id
+
+Session.active_store_id is only a UI default-store preference. It MUST NOT be used by Job creation, lookup, execution, or authorization. A request without X-Store-ID fails with STORE_CONTEXT_REQUIRED; a selector for a non-member or inactive Store fails with the uniform 404 policy.
+
+Persisted business attribution maps AuthorizedStoreContext.user_id to created_by_user_id / actor_user_id. Generic audit events may use actor_type + actor_id to represent user, platform_admin, or system; these polymorphic audit references are not authorization credentials.
+
+### 8.2 Platform administrator separation
+
+PlatformAdminGrant is separate from StoreMembership. Its initial fixed capability platform.store_members.manage permits only the platform UI to manage StoreMembership records using the minimum required fields. It does not grant store-scoped task, artifact, asset, Job result, or business-fact access. Worker service identity never inherits PlatformAdminGrant.
+
+### 8.3 Job creation and execution
+
+- User-triggered store Jobs are created only from a validated AuthorizedStoreContext; store_id is injected from request_store_id and created_by_user_id from user_id.
+- System Jobs use a non-null fixed system idempotency scope. A store-scoped system Job still carries its target store_id and must validate that target Store is active; it must not impersonate a user.
+- Broker messages are hints only. Worker reloads Job and all target resources from PostgreSQL, verifies store_id consistency, Job type, input fingerprint, and lease token before work and before result commit.
+- A user-triggered Job whose creator loses StoreMembership is re-evaluated before any external side effect. The system applies the pending-job cancellation / in-flight pure-compute / needs_human rules in section 2; no stale Session or membership snapshot may authorize a new external action.
+- Publishing remains owned by the Publishing/Channel domains. Worker must call the authorized application service; it cannot use platform-admin membership-management privileges or internal service identity to bypass merchant review, quality, confirmation, or channel authorization gates.
+
+### 8.4 Idempotency actor mapping
+
+For user API writes the canonical idempotency scope is store_id + user_id + operation + idempotency_key; persisted actor_id is the authenticated user_id. For system-triggered jobs, use the fixed system scope and explicit actor_type=system, not a fabricated user ID. request_hash mismatch under the same scope/key returns 409.
+
+### 8.5 Required additional cross-domain tests
+
+- B-ASYNC-01: Session.active_store_id points to Store B while request X-Store-ID selects Store A; Job must be created under A only after A membership validation.
+- B-ASYNC-02: PlatformAdminGrant with store_members.manage but no StoreMembership attempts to read Store Job or result; uniform 404.
+- B-ASYNC-03: Platform admin revokes a membership while a user-triggered Job is queued; Worker rechecks current membership before external side effects.
+- B-ASYNC-04: System Job has no user actor; audit records actor_type=system and fixed system scope, never a fake user.
+- B-ASYNC-05: Two tabs share one Session but send different X-Store-ID values; Jobs and results remain scoped to each request context.

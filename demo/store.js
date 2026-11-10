@@ -8,7 +8,7 @@ const array=(v,fallback=[])=>Array.isArray(v)?v:clone(fallback);
 function normalize(){
   const base=clone(seed);
   state.store={...base.store,...(state.store||{})};
-  for(const key of ["tasks","products","assets","offers","knowledge","channels","dataSources"])state[key]=array(state[key],base[key]);
+  for(const key of ["tasks","products","assets","offers","knowledge","channels","dataSources","hotspots"])state[key]=array(state[key],base[key]);
   state.effects=state.effects||clone(base.effects);
   state.effects.reports=array(state.effects.reports);
   state.effects.sources=array(state.effects.sources);

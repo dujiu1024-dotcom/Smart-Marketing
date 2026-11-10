@@ -12,7 +12,7 @@
 
 | 契约/数据 | 权威所有者 | 消费者 |
 |---|---|---|
-| User、Store 生命周期、StoreUser、Session、AuthorizedStoreContext | #5 Identity & Store | #6–#10 |
+| User、Store 生命周期、StoreMembership、Session、AuthorizedStoreContext | #5 Identity & Store | #6–#10 |
 | StoreProfile、Product、Offer、BrandGuideline、KnowledgeItem、MediaAsset | #6 Store Knowledge | #7–#10 |
 | MarketingTask、RequirementSnapshot、StrategySnapshot、TaskStep、DependencyEdge、TaskEvent | #7 Marketing Orchestrator | #8–#10 |
 | CopyArtifact、ImageArtifact、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishConfirmation | #8 Content/Media/Publishing | #7、#9、#10、#12 |
@@ -38,10 +38,10 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 
 ## 3. 身份上下文与门店成员关系（#5）
 
-规范对象：User、Store、StoreUser、Session、AuthorizedStoreContext。字段、Cookie、Session 轮换、撤销、CSRF 和 API 草案以 `IDENTITY_STORE_SECURITY_DESIGN.md` 为准。
+规范对象：User、Store、StoreMembership、Session、AuthorizedStoreContext。字段、Cookie、Session 轮换、撤销、CSRF 和 API 草案以 `IDENTITY_STORE_SECURITY_DESIGN.md` 为准。
 
 模块调用规则：
-- HTTP 层验证 Session，授权服务根据 active StoreUser + active Store 构造上下文。
+- HTTP 层验证 Session，授权服务根据 active StoreMembership + active Store 构造上下文。
 - 应用服务接收 context 参数，不接受 caller 自己组装的 actor/store/role。
 - Worker 不携带用户 Cookie；Job 只保存发起人引用和门店 ID，执行前后按 Job policy 重新验证门店和任务。
 - 平台管理员与门店身份分离，不因平台管理员身份默认可读取商家任务、文案、图片或经营数据。
@@ -150,10 +150,10 @@ PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, co
 - Outbox 与业务记录同事务写入；Relay 投递成功后记录 published_at；消费者必须幂等。
 
 ### 唯一 Job 状态枚举（统一 #7/#9）
-`queued, running, retry_wait, succeeded, failed, dead, needs_human, cancelled`。
+`queued, running, retry_wait, succeeded, failed, needs_human, cancelled`（按 PR #20 待评审提案；Job 不使用 dead）。OutboxEvent 可独立使用 dead 表示投递耗尽。
 - 不使用 `needs_attention`；所有发布不确定、需人工核验的情况统一 `needs_human`。
 - TaskStep 与 Job 状态不同；Job succeeded 不自动表示 TaskStep succeeded。
-- Job dead 表示自动重试耗尽/进入死信；needs_human 表示需要人核验或决策；failed 表示本次执行终止但仍允许显式恢复/重试策略。
+- Job 自动重试耗尽进入 failed，并通过 terminal_reason 区分重试耗尽；needs_human 表示需要人工核验或决策。OutboxEvent 可独立进入 dead。该规范待 PR #20 联合评审冻结。
 
 ## 8. AI Gateway / Provider（#9/#10）契约
 
@@ -276,3 +276,16 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 - [ ] #9/#10：AIInvocation 与 Job 分离、Provider 接口与真实适配器边界、Prompt 版本所有权。
 - [ ] 所有门店资源复合外键、统一错误语义、幂等和乐观锁约定。
 - [ ] API 路径、请求/响应 Schema 和事件 schema_version 进入 OpenAPI/契约测试。
+
+
+## 14. Identity request context and platform-admin boundary alignment
+
+Pending review of Identity PR #26, the canonical request context for store-scoped business APIs is `AuthorizedStoreContext` with `user_id`, `session_id`, `request_store_id`, `membership_id`, `role`, `capabilities`, `authorization_version`, and `request_id`.
+
+- Every store-scoped HTTP request supplies untrusted `X-Store-ID`; Identity validates active Store and active StoreMembership on that request.
+- `Session.active_store_id` is only a UI default preference and is never an authorization source.
+- Persisted `created_by_user_id` / `actor_user_id` maps to `AuthorizedStoreContext.user_id`; generic audit events may use explicit `actor_type` + `actor_id` for user, platform_admin, or system.
+- PlatformAdminGrant is separate from StoreMembership. The initial `platform.store_members.manage` capability is limited to membership administration and does not grant access to store business content, MarketingTask, Artifact, Asset, Job result, or publishing operations.
+- Worker execution must reload Job and resource ownership from PostgreSQL. It does not inherit a user's Session or a platform administrator's grant.
+
+PR #26 and Async Runtime PR #20 are still under review. This section records the cross-domain target contract and does not claim production authorization is implemented.

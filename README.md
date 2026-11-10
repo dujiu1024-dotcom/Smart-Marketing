@@ -16,9 +16,12 @@ AI 门店运营官是面向线下门店的 AI 营销执行平台：商家按需�
 - [技术架构与服务拆分方案](docs/TECHNICAL_ARCHITECTURE.md)：模块化单体决策、业务模块边界、异步任务架构、数据/AI/渠道边界及渐进式微服务拆分路线。
 - [首期技术选型决策](docs/TECH_STACK_SELECTION.md)：已由项目负责人确认的前后端、数据库、队列、对象存储、认证、测试、部署与版本基线。
 - [开发计划与阶段门禁](docs/DEVELOPMENT_PLAN.md)：Issue 阶段映射、并行契约所有权、P0 最小上线子集与统一 DoD。
-- [身份与门店安全设计](docs/IDENTITY_STORE_SECURITY_DESIGN.md)：User、Store、StoreUser、Session、授权上下文和 IDOR 安全矩阵。
+- [身份与门店安全设计](docs/IDENTITY_STORE_SECURITY_DESIGN.md)：User、Store、StoreMembership、Session、授权上下文和 IDOR 安全矩阵。
+- [身份与门店 API 契约](docs/API_CONTRACT_IDENTITY_STORE.md)：Cookie Session、CSRF、X-Store-ID 请求上下文、成员管理 API 与错误语义。
+- [身份与门店安全测试矩阵](docs/SECURITY_TEST_MATRIX_IDENTITY_STORE.md)：认证、Session 撤销、跨店 IDOR、Worker、文件和多标签页隔离测试。
 - [跨领域集成契约 v1](docs/DOMAIN_INTEGRATION_CONTRACTS_V1.md)：#5–#10 实体字段、API、事件、状态、错误和跨域验收契约。
-- [B/C/D 跨领域契约审查记录](docs/DOMAIN_CONTRACT_REVIEW_LOG.md)：已统一的责任边界、冲突修正、待决项和联合验收场景。\n- [核心数据模型、API Schema 与事件 Schema v1](docs/CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md)：跨域逻辑 ERD、数据库约束、API 请求/响应示例、事件 Envelope 与实现前门禁。
+- [B/C/D 跨领域契约审查记录](docs/DOMAIN_CONTRACT_REVIEW_LOG.md)：已统一的责任边界、冲突修正、待决项和联合验收场景。 
+- [核心数据模型、API Schema 与事件 Schema v1](docs/CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md)：跨域逻辑 ERD、数据库约束、API 请求/响应示例、事件 Envelope 与实现前门禁。
 
 三份文档统一采用 v1.8 作为产品基线版本。修订日期和代码提交用于追踪变更，不另行形成产品版本。历史轮次记录不再作为现行验收依据；如历史结论与当前矩阵冲突，以产品基线和最新验收矩阵为准。
 

@@ -318,7 +318,7 @@ Job 状态建议：`queued`、`running`、`retry_wait`、`succeeded`、`failed`�
 5. 将本文件状态从“设计提案”改为“已冻结”前，需产品/技术评审确认；本文件不代表已完成数据库迁移、API 或生产代码。
 6. 实现阶段补齐状态迁移、依赖失效、审核隔离、幂等、并发、权限、Worker 恢复与发布不确定性测试，并更新 Demo 验收矩阵。
 
-## 14. 与 Identity & Store（轨道 B）的集成契约
+## 13. 与 Identity & Store（轨道 B）的集成契约
 
 > 本节依据当前已提交的产品基线与技术架构定义营销任务域必须遵守的消费契约。轨道 B 的独立领域设计尚未出现在当前 docs 目录，因此以下内容是营销任务域的接口要求，不代表身份域实现细节已经最终冻结。轨道 B 后续若确定不同的字段/端点命名，应做映射，不得降低安全语义。
 
@@ -366,9 +366,113 @@ Job 状态建议：`queued`、`running`、`retry_wait`、`succeeded`、`failed`�
 | SEC-MKT-09 | 门店 A 的授权上下文在连接池复用到门店 B | 事务结束清理上下文，RLS/应用层均不串店 |
 | SEC-MKT-10 | 平台管理员访问门店任务 | 仅按产品定义的管理权限允许，不因平台管理员身份默认获得全部经营内容访问权 |
 
-## 13. 与现行基线的关系
+## 14. 与现行基线的关系
 
 - 产品流程与审核门槛遵循 `PRODUCT_DESIGN.md v1.8`，本文件不得与之冲突。
 - 模块边界、异步执行、Outbox、Job 与业务状态分离遵循 `TECHNICAL_ARCHITECTURE.md`。
 - UI 只呈现后端状态、阻断原因和下一步动作；不得在前端自行推导业务迁移。
 - 当前 Demo 的本地状态仅为交互基准，不是服务端领域实现或生产级隔离证明。
+
+
+## 15. 字段级逻辑数据模型（待轨道 B/D 对齐，不是迁移脚本）
+
+> 本节用于冻结营销域的数据语义与引用关系。字段类型采用 PostgreSQL 逻辑类型表达；具体 ORM 命名、UUID 生成策略、JSONB 拆分、Identity 外键目标及 Job/Outbox 物理表归属，须在轨道 B/D 契约评审后确定。不得据此直接生成生产迁移。
+
+### 15.1 通用约定
+
+- 主键统一使用 UUID（逻辑类型 uuid）；所有时间统一 timestamptz UTC。
+- 所有门店业务表包含 store_id uuid NOT NULL；由服务端授权上下文注入，不接受客户端决定。
+- 门店内资源采用 (store_id, id) 复合唯一键；子表优先使用复合外键，保证引用对象属于同一门店。
+- 不可变快照/版本/审核/事件/发布确认采用追加写；修正通过新记录表达。
+- 状态字段使用受约束的 text 或 PostgreSQL enum（二选一由工程底座统一）；状态值必须与本文件状态机一致。
+- JSONB 仅承载有版本号的结构化快照/Provider 原始元数据，不用 JSONB 隐藏需要关联、过滤或唯一约束的核心字段。
+- created_by_actor_id、reviewer_actor_id 等身份引用暂定为 UUID；实际 FK 指向由轨道 B 的权威身份模型确定。若身份主体类型不止用户，需同时保存 actor_type。
+
+### 15.2 核心表清单
+
+| 表 | 关键字段（除通用 id/store_id/created_at 外） | 关键约束 |
+|---|---|---|
+| marketing_tasks | task_type, lifecycle_status, title, current_requirement_snapshot_id, current_strategy_snapshot_id, version, created_by_actor_id, activated_at, completed_at, archived_at | (store_id,id) 唯一；version > 0；当前快照必须属于同一任务/门店 |
+| requirement_snapshots | task_id, snapshot_no, payload_json, confirmed_at, confirmed_by_actor_id, content_fingerprint, schema_version | (store_id,task_id,snapshot_no) 唯一；确认后不可更新 |
+| strategy_snapshots | task_id, snapshot_no, requirement_snapshot_id, payload_json, confirmed_at, confirmed_by_actor_id, content_fingerprint, schema_version | 同任务快照序号唯一；引用需求快照必须同门店同任务 |
+| business_fact_snapshots | task_id, fact_key, source_type, source_id, source_version, value_json, confirmation_status, confirmed_at, confirmed_by_actor_id, fingerprint | 来源及值快照不可覆盖；可追溯原始资料版本 |
+| task_steps | task_id, step_key, status, applicability, skip_reason, input_fingerprint, block_code, block_detail_json, started_at, finished_at, version | (store_id,task_id,step_key) 唯一；不适用节点必须有显式 skipped 决策 |
+| step_decisions | task_id, step_key, decision, reason, actor_id, actor_type, input_snapshot_ref, decided_at, idempotency_record_id | 追加写；决策引用对应 task_step |
+| artifacts | task_id, artifact_type, logical_key, current_version_id, lifecycle_status, created_by_actor_id | (store_id,task_id,artifact_type,logical_key) 唯一；当前版本必须属于该 artifact |
+| artifact_versions | task_id, artifact_id, version_no, source_type, source_instruction, content_text, asset_id, content_hash, dependency_fingerprint, provider_key, model_key, provider_metadata_json, created_by_actor_id | (store_id,artifact_id,version_no) 唯一；版本不可变；文案/图片通过 artifact_type 区分 |
+| review_records | task_id, artifact_id, artifact_version_id, review_type, decision, comment, target_json, reviewer_actor_id, reviewed_at | 必须引用精确 artifact_version；审核记录追加写；类型与产物类型匹配 |
+| revision_requests | task_id, artifact_id, source_artifact_version_id, review_record_id, instruction, target_json, status, resulting_artifact_version_id, created_by_actor_id | 源版本与审核记录一致；结果版本创建后只追加关联 |
+| dependency_edges | task_id, upstream_type, upstream_id, upstream_version_id, upstream_fingerprint, downstream_type, downstream_id, downstream_version_id, impact_policy | 同一上下游版本边唯一；两端属于同任务/门店 |
+| quality_checks | task_id, target_type, target_id, target_version_id, rule_set_version, result, findings_json, input_fingerprint, checked_at | 结果绑定目标精确版本和规则集版本；输入变化后旧结果 stale |
+| publish_packages | task_id, channel_key, package_no, payload_json, copy_version_id, image_version_id, channel_variant_version_id, quality_check_id, dependency_fingerprint, frozen_at, frozen_by_actor_id, status | (store_id,task_id,channel_key,package_no) 唯一；冻结后 payload 不可变 |
+| publish_confirmations | task_id, publish_package_id, package_fingerprint, confirmed_by_actor_id, confirmed_at, confirmation_text | 确认绑定冻结包的精确指纹；新包不得复用旧确认 |
+| publish_attempts | task_id, publish_package_id, channel_account_ref, idempotency_key, status, external_request_ref, external_content_ref, requested_at, completed_at, outcome_evidence_json | 门店/渠道账号/发布包/幂等键组合唯一；不确定结果进入 needs_human |
+| task_events | task_id, aggregate_version, event_type, actor_id, actor_type, correlation_id, causation_id, payload_json, schema_version, occurred_at | 追加写；event_id 唯一 |
+| audit_events | actor_id, actor_type, action, resource_type, resource_id, result, reason, request_id, correlation_id, metadata_json, occurred_at | 追加写；敏感凭据禁止进入 metadata |
+| idempotency_records | actor_id, operation, idempotency_key, request_hash, resource_type, resource_id, response_status, response_json, expires_at | (store_id,actor_id,operation,idempotency_key) 唯一 |
+| outbox_events | event_id, aggregate_type, aggregate_id, event_type, payload_json, occurred_at, published_at, publish_attempts | event_id 唯一；投递失败可重试 |
+
+### 15.3 外键与门店隔离关系
+
+- marketing_tasks 是任务聚合根；requirement_snapshots、strategy_snapshots、business_fact_snapshots、task_steps、artifacts、task_events 等均通过 (store_id, task_id) 引用任务。
+- strategy_snapshots 通过 (store_id, task_id, requirement_snapshot_id) 引用同一任务的需求快照；任务当前快照指针使用延迟约束或应用事务校验，避免循环建表依赖。
+- artifact_versions 通过 (store_id, task_id, artifact_id) 引用产物；artifacts.current_version_id 必须引用同一 artifact 的版本。
+- review_records 与 revision_requests 必须引用同门店、同任务、同产物的精确版本；禁止只保存全局 artifact_version_id 而不验证归属链。
+- dependency_edges 两端都必须归属同门店同任务；若依赖门店资料快照，使用显式 upstream_type/source_ref 与来源版本快照，不建立跨域可写外键。
+- publish_packages 引用同任务的产物版本、渠道变体和质检记录；publish_confirmations 引用冻结发布包；publish_attempts 引用发布包。
+- jobs 属于轨道 D 的异步基础设施模型，但必须携带 store_id、task_id、触发 actor、目标资源引用和输入指纹，并在领取/写回时校验归属。具体 Job 表不在本节重复定义。
+
+### 15.4 必需索引（逻辑要求）
+
+| 表 | 索引 |
+|---|---|
+| marketing_tasks | (store_id,lifecycle_status,updated_at DESC)；(store_id,created_at DESC) |
+| task_steps | (store_id,task_id,status) |
+| artifacts | (store_id,task_id,artifact_type) |
+| artifact_versions | (store_id,artifact_id,version_no DESC) |
+| review_records | (store_id,task_id,artifact_version_id,reviewed_at DESC) |
+| dependency_edges | (store_id,task_id,upstream_type,upstream_id,upstream_version_id)；下游反向索引 |
+| publish_packages | (store_id,task_id,channel_key,package_no DESC) |
+| publish_attempts | (store_id,status,requested_at)；外部引用按渠道范围建立部分唯一索引（若渠道语义支持） |
+| task_events | (store_id,task_id,occurred_at) |
+| audit_events | (store_id,occurred_at DESC)；(actor_id,occurred_at DESC) |
+| idempotency_records | 唯一作用域索引；expires_at 清理索引 |
+| outbox_events | published_at IS NULL 的部分索引 + occurred_at |
+
+### 15.5 数据库级不变量与事务边界
+
+1. 创建任务：在一个事务中写入 task、初始需求草稿/快照（按产品流程确定是否立即快照）、适用步骤、审计事件和 Outbox 事件。
+2. 确认需求/策略：校验任务版本及授权；追加快照；更新当前快照指针与 task.version；写事件和 Outbox。
+3. 生成产物：Job 领取时记录输入指纹；产物版本写入时再次校验 task/version/依赖指纹；不匹配则拒绝成为 current version。
+4. 审核：审核事务锁定或乐观校验 artifact_version；确认该版本仍为允许审核的目标版本；追加 ReviewRecord 和事件。
+5. 冻结发布包：单事务校验所有审核、渠道规格、质检、事实快照均有效；写不可变 PublishPackage。
+6. 最终确认：确认人权限、包状态和 fingerprint 同时校验；写追加式 PublishConfirmation。
+7. 发布：先持久化唯一 publish_attempt/idempotency key，再由 Worker 执行；外部结果不确定时保留 needs_human，不自动创建新 attempt。
+8. 所有聚合根写操作采用 version 乐观锁；不可变记录不允许 UPDATE/DELETE（保留合规删除例外时必须单独定义审计与数据保留政策）。
+9. store_id 一致性由复合外键兜底，授权仍由应用服务执行；RLS 仅作纵深防御。
+10. Outbox 与业务写入同事务；消费者按 event_id 幂等处理。
+
+### 15.6 必须由轨道 B/D 给出答案的字段映射
+
+| 待确认项 | 权威来源 | 营销域暂定处理 |
+|---|---|---|
+| actor/user 主体表与主键类型 | #5 Identity & Store | 只引用 UUID 概念 ID，不绑定具体表名 |
+| Store、Membership 的表名/主键/复合唯一键 | #5 Identity & Store | 只保存 store_id 与授权上下文引用 |
+| 权限能力名称与撤销时效 | #5 Identity & Store | 仅消费能力判定，不自建角色模型 |
+| session_id、membership_id、authorization_version 是否持久化 | #5 Identity & Store | 审计保留可追溯授权引用，字段最终对齐 B |
+| Job、JobAttempt、租约字段、重试策略 | #9 Async Jobs | 营销域只定义业务关联与输入指纹 |
+| Outbox 物理实现与消息发布语义 | #9 Async Jobs / #4 工程底座 | 业务事件语义固定，表结构服从公共实现 |
+| asset_id、对象存储元数据和签名 URL | 媒体资产模块/工程底座 | ArtifactVersion 保存受控资产引用，不保存可公开访问 URL |
+| 渠道账号与发布回执引用 | 渠道集成模块 | 保存 opaque reference，不在营销域复制渠道凭据 |
+
+### 15.7 设计评审检查项
+
+- [ ] 每张门店业务表均有 store_id，所有子资源外键均能证明同门店归属。
+- [ ] 当前版本指针与历史版本的关系无循环 FK 或事务竞态漏洞。
+- [ ] 文案/图片审核通过数据库约束与服务端规则共同保证独立。
+- [ ] 快照、版本、审核、事件、发布包和最终确认没有原地覆盖路径。
+- [ ] 依赖边支持精确失效和反向查询，不依赖全表扫描。
+- [ ] 幂等唯一键的作用域与 actor/session 授权语义经轨道 B 确认。
+- [ ] Job/Outbox 表结构与轨道 D/#4 共用实现，不重复造基础设施。
+- [ ] 所有外部发布动作可追溯到唯一发布包、最终确认和发布 attempt。
+- [ ] PostgreSQL Migration 只有在 B、D 契约和工程底座评审通过后才开始。

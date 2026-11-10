@@ -1,6 +1,8 @@
+import structlog
 from fastapi.testclient import TestClient
 
 from store_operator.main import app
+from store_operator.observability import configure_logging
 
 client = TestClient(app)
 
@@ -22,10 +24,6 @@ def test_health_response_includes_request_id() -> None:
 
     assert response.status_code == 200
     assert response.headers["X-Request-ID"] == "test-request-123"
-
-import structlog
-
-from store_operator.observability import configure_logging
 
 
 def test_structured_logging_redacts_nested_secrets(capsys) -> None:

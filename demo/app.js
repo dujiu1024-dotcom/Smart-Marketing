@@ -133,7 +133,7 @@ else if(a.startsWith('admin-save-')){render();toast('演示配置已保存')}
 else if(a.startsWith('admin-edit-'))openAdminEditor(a,id);
 return}
 }
-window.addEventListener("demo:storage-error",()=>toast("浏览器本地存储空间不足。请删除部分大图片素材后重试。"));
+window.addEventListener("demo:storage-error",()=>setTimeout(()=>toast("浏览器本地存储空间不足。请删除部分大图片素材后重试。"),0));
 document.addEventListener('click',ev=>{const x=ev.target.closest('[data-nav],[data-action],[data-task-tab],[data-copy-platform],[data-image-mode],[data-window]');if(x)handleClick(x)});
 document.addEventListener('change',ev=>{if(ev.target.id==='merchantImageFile'&&ev.target.files[0]){const f=ev.target.files[0],url=URL.createObjectURL(f),p=$('#merchantImagePreview');if(p)p.innerHTML='<img src="'+url+'" alt="本地图片预览" style="max-width:100%;max-height:220px;object-fit:contain">';toast('已选择图片：'+f.name)}if(ev.target.id==='copyFile'&&ev.target.files[0]){ev.target.files[0].text().then(t=>{if($('#merchantCopy'))$('#merchantCopy').value=t;toast('TXT/MD 文案文件已读取，请检查内容后采用')}).catch(()=>toast('无法读取该文件，请粘贴文案'))}});
 document.addEventListener('submit',ev=>{if(ev.target.id!=='modalForm')return;ev.preventDefault();const f=ev.target,o=formObject(f),a=f.dataset.submit,id=f.dataset.id;

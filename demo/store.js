@@ -9,7 +9,8 @@ function normalize(){
   const base=clone(seed);
   state.store={...base.store,...(state.store||{})};
   for(const key of ["tasks","products","assets","offers","knowledge","channels","hotspots"])state[key]=array(state[key],base[key]);
-  delete state.dataSources;\n  state.effects=state.effects||clone(base.effects);
+  delete state.dataSources;
+  state.effects=state.effects||clone(base.effects);
   state.effects.reports=array(state.effects.reports);
   state.effects.sources=array(state.effects.sources);
   state.admin={...base.admin,...(state.admin||{})};

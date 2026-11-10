@@ -13,6 +13,7 @@ AI 门店运营官是面向线下门店的 AI 营销执行平台：商家按需�
 - [UI/UX 审查与整改基线 v1.8](docs/UX_AUDIT_AND_REDESIGN.md)：交互原则、体验问题、整改要求与验证边界。
 - [Demo 验收矩阵 v1.8](docs/DEMO_ACCEPTANCE_MATRIX.md)：逐项实现状态、静态证据、浏览器验收状态及生产缺口。
 - [IterWave 可复用能力审查与整合方案](docs/REUSABLE_CAPABILITIES_FROM_ITERWAVE.md)：跨仓库能力审查、可复用技术底座、产品边界裁剪与 P0–P2 整合路线。
+- [开发实施计划](docs/DEVELOPMENT_PLAN.md)：从 Demo 验收、技术选型到生产闭环、渠道接入和经营效果验证的分阶段路线图。
 - [技术架构与服务拆分方案](docs/TECHNICAL_ARCHITECTURE.md)：模块化单体决策、业务模块边界、异步任务架构、数据/AI/渠道边界及渐进式微服务拆分路线。
 
 三份文档统一采用 v1.8 作为产品基线版本。修订日期和代码提交用于追踪变更，不另行形成产品版本。历史轮次记录不再作为现行验收依据；如历史结论与当前矩阵冲突，以产品基线和最新验收矩阵为准。

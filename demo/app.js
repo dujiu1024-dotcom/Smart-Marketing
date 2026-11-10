@@ -19,7 +19,7 @@ function field(label,name,value="",type="text",help="",required=false){return '<
 function textarea(label,name,value="",help=""){return '<div class="field"><label>'+label+'</label><textarea name="'+name+'">'+esc(value)+'</textarea>'+(help?'<div class="help">'+help+'</div>':"")+'</div>'}
 function select(label,name,options,value=""){return '<div class="field"><label>'+label+'</label><select name="'+name+'">'+options.map(x=>'<option '+(x===value?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select></div>'}
 function stat(label,value,hint){return '<div class="card stat"><div class="label">'+label+'</div><div class="value">'+value+'</div><div class="hint">'+hint+'</div></div>'}
-function render(){const d=db();let body;
+function render(){const d=db();let body;if(route.startsWith("store:"))storeTab=route.split(":")[1]||"profile";
 if(route==="ai")body=renderAI();else if(route==="hotspots")body=renderHotspots();else if(route==="tasks")body=renderTasks();else if(route==="task")body=renderTask();else if(route==="effects")body=renderEffects();else if(route.startsWith("store:"))body=renderStore(route.split(":")[1]);else if(route.startsWith("admin:")){adminPage=route.split(":")[1];body=renderAdmin(adminPage)}else if(route.startsWith("store:")){storeTab=route.split(":")[1]||"profile";body=renderStore(storeTab)}else body=renderAI();
 $("#app").innerHTML=shell(body);
 }

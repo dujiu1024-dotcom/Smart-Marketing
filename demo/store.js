@@ -1,6 +1,6 @@
 import {seed} from "./data.js";
 const KEY="ai-store-ops-demo-v2";
-const SCHEMA_VERSION=7;
+const SCHEMA_VERSION=8;
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
 let persistedSnapshot=null;
@@ -18,7 +18,8 @@ function normalize(){
   state.admin={...base.admin,...(state.admin||{})};
   for(const key of ["users","prompts","audit","runs"])state.admin[key]=array(state.admin[key],base.admin[key]);
   state.admin.prompts=[...base.admin.prompts.filter(p=>!state.admin.prompts.some(x=>x.id===p.id)),...state.admin.prompts];
-  state.stores.forEach(st=>{for(const key of ["products","offers","assets","knowledge","channels","users"])if(!Array.isArray(st[key]))st[key]=clone(base.stores.find(x=>x.id===st.id)?.[key]||[]);st.products.forEach(p=>{delete p.cost;delete p.margin});st.offers.forEach(o=>{delete o.approvedBy})});
+  state.stores=state.stores.map(st=>({id:st.id,name:st.name,code:st.code,brand:st.brand,type:st.type,industryCategory:st.industryCategory,industry:st.industry,category:st.category,status:st.status,province:st.province,city:st.city,district:st.district,address:st.address,users:array(st.users),modelConfig:st.modelConfig||{vendor:"未配置"}}));
+  state.admin.selectedStoreTab=state.admin.selectedStoreTab||"users";
   for(const key of ["tenants","models","roles","workflows","tickets","workflowConfig","attributionConfig"])delete state.admin[key];
   delete state.admin.budgetConfig;
   state.admin.systemConfig={...base.admin.systemConfig,...(state.admin.systemConfig||{})};

@@ -1,17 +1,21 @@
 name: CI
+
 on:
   pull_request:
   push:
     branches: [main]
+
 permissions:
   contents: read
+
 jobs:
   web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with: {version: 10.8.1}
+        with:
+          version: 10.8.1
       - uses: actions/setup-node@v4
         with:
           node-version: 26
@@ -19,12 +23,35 @@ jobs:
       - run: pnpm --filter @store-operator/web typecheck
       - run: pnpm --filter @store-operator/web test
       - run: pnpm --filter @store-operator/web build
+
   api:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.13"}
+        with:
+          python-version: "3.13"
       - run: pip install -e "apps/api[dev]"
       - run: ruff check apps/api
       - run: pytest apps/api/tests
+
+  worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e "apps/api[dev]"
+      - run: pip install -e apps/worker
+      - run: ruff check apps/worker
+      - run: REDIS_URL=redis://localhost:6379/0 python -c "from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {'status': 'ok'}"
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml config --quiet
+      - run: docker build -f infra/containers/api.Dockerfile .
+      - run: docker build -f infra/containers/worker.Dockerfile .
+      - run: docker build -f infra/containers/web.Dockerfile .

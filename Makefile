@@ -11,13 +11,14 @@ logs:
 	docker compose -f $(COMPOSE_FILE) logs -f --tail=200
 
 web-install:
-	pnpm install
+	pnpm install --frozen-lockfile
 
 web-dev:
 	pnpm dev:web
 
 test:
-	cd apps/api && uv run --extra dev pytest
+	cd apps/api && uv sync --locked --extra dev
+	cd apps/api && uv run --locked pytest
 	pnpm test
 
 typecheck:

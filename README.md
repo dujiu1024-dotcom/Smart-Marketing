@@ -22,6 +22,7 @@ AI 门店运营官是面向线下门店的 AI 营销执行平台：商家按需�
 - `demo/store.js`：本地状态、持久化与迁移
 - `demo/app.js`：门店端路由、页面编排与交互
 - `demo/task-renderers.js`：营销任务步骤渲染、状态计算与本地质检规则
+- `demo/effect-renderers.js`：经营效果页面渲染
 - `demo/admin.js`：平台管理端页面与操作
 
 ## 本地运行

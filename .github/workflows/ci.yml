@@ -26,6 +26,22 @@ jobs:
 
   api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: store_operator
+          POSTGRES_USER: store_operator
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U store_operator -d store_operator"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://store_operator:ci-only@localhost:5432/store_operator
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -33,6 +49,9 @@ jobs:
           enable-cache: false
       - run: uv sync --locked --extra dev --directory apps/api
       - run: uv run --locked --directory apps/api ruff check .
+      - run: uv run --locked --directory apps/api alembic upgrade head
+      - run: uv run --locked --directory apps/api alembic downgrade base
+      - run: uv run --locked --directory apps/api alembic upgrade head
       - run: uv run --locked --directory apps/api pytest
 
   worker:

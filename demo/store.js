@@ -2,7 +2,7 @@ import {seed} from "./data.js";
 const KEY="ai-store-ops-storefront-v1";
 const ADMIN_KEY="ai-store-ops-platform-admin-v1";
 const LEGACY_KEY="ai-store-ops-demo-v2";
-const SCHEMA_VERSION=8;
+const SCHEMA_VERSION=9;
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
 let persistedSnapshot=null;
@@ -17,6 +17,7 @@ function normalize(){
   state.effects=state.effects||clone(base.effects);
   state.effects.reports=array(state.effects.reports);
   state.effects.sources=array(state.effects.sources);
+  state.effects.contents=array(state.effects.contents);
   state.admin={...base.admin,...(state.admin||{})};
   for(const key of ["users","prompts","audit","runs"])state.admin[key]=array(state.admin[key],base.admin[key]);
   state.admin.prompts=[...base.admin.prompts.filter(p=>!state.admin.prompts.some(x=>x.id===p.id)),...state.admin.prompts];

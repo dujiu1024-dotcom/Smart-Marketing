@@ -2,6 +2,10 @@ import time
 from uuid import uuid4
 
 import structlog
+from opentelemetry import trace
+from opentelemetry.context import attach, detach
+from opentelemetry.propagate import extract
+from opentelemetry.trace import Status, StatusCode
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -16,6 +20,8 @@ from store_operator.observability import configure_logging, configure_tracing
 configure_logging()
 tracer = configure_tracing(settings.otel_exporter_otlp_traces_endpoint)
 logger = structlog.get_logger("http")
+tracer_provider = configure_tracing(settings.app_name, settings.otel_exporter_otlp_traces_endpoint)
+tracer = trace.get_tracer("store_operator.api")
 
 app = FastAPI(
     title=settings.app_name,
@@ -36,41 +42,51 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def request_id_and_logging_middleware(request: Request, call_next):
+async def request_id_logging_and_tracing_middleware(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID") or str(uuid4())
     request.state.request_id = request_id
     started_at = time.perf_counter()
-    with tracer.start_as_current_span("http.server.request") as span:
-        span.set_attribute("http.request.method", request.method)
-        span.set_attribute("url.path", request.url.path)
-        span.set_attribute("app.request_id", request_id)
-        try:
-            response = await call_next(request)
-        except Exception as exc:
-            span.set_attribute("error.type", type(exc).__name__)
-            span.set_status(Status(StatusCode.ERROR))
-            logger.error(
-                "http.request.failed",
+    parent_context = extract(dict(request.headers))
+    context_token = attach(parent_context)
+    try:
+        with tracer.start_as_current_span("http.server.request") as span:
+            span.set_attribute("http.request.method", request.method)
+            span.set_attribute("url.path", request.url.path)
+            span.set_attribute("request.id", request_id)
+            try:
+                response = await call_next(request)
+            except Exception as exc:
+                span.set_attribute("error.type", type(exc).__name__)
+                span.set_status(Status(StatusCode.ERROR))
+                span_context = span.get_span_context()
+                logger.error(
+                    "http.request.failed",
+                    request_id=request_id,
+                    trace_id=f"{span_context.trace_id:032x}",
+                    method=request.method,
+                    path=request.url.path,
+                    error_type=type(exc).__name__,
+                    duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+                )
+                raise
+            span.set_attribute("http.response.status_code", response.status_code)
+            if response.status_code >= 500:
+                span.set_status(Status(StatusCode.ERROR))
+            span_context = span.get_span_context()
+            response.headers["X-Request-ID"] = request_id
+            logger.info(
+                "http.request.completed",
                 request_id=request_id,
+                trace_id=f"{span_context.trace_id:032x}",
                 method=request.method,
                 path=request.url.path,
-                error_type=type(exc).__name__,
+                status_code=response.status_code,
                 duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
             )
-            raise
-        span.set_attribute("http.response.status_code", response.status_code)
-        if response.status_code >= 500:
-            span.set_status(Status(StatusCode.ERROR))
-        response.headers["X-Request-ID"] = request_id
-        logger.info(
-            "http.request.completed",
-            request_id=request_id,
-            method=request.method,
-            path=request.url.path,
-            status_code=response.status_code,
-            duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
-        )
-        return response
+            return response
+    finally:
+        detach(context_token)
+
 
 
 @app.exception_handler(Exception)
@@ -125,3 +141,6 @@ def system_info():
         "environment": settings.environment,
         "api_version": "v1",
     }
+
+
+app.add_event_handler("shutdown", tracer_provider.shutdown)

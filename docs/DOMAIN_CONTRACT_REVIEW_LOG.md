@@ -9,7 +9,7 @@
 
 | 项目 | 统一结论 | 权威文档 |
 |---|---|---|
-| 身份与门店归属 | User/Store/StoreUser/Session 由 #5 所有；每个门店请求通过 X-Store-Id 表达上下文并由服务端重新验证成员关系；Session 不保存授权性 current_store_id | IDENTITY_STORE_SECURITY_DESIGN.md |
+| 身份与门店归属 | User/Store/StoreMembership/Session 由 #5 所有；每个门店请求通过 X-Store-Id 表达上下文并由服务端重新验证成员关系；Session 不保存授权性 current_store_id | IDENTITY_STORE_SECURITY_DESIGN.md |
 | Store 时区 | Store.status 与 Store.timezone 由 #5 持有；#6 StoreProfile/Offer 不得复制权威 timezone，Offer 时间使用 UTC 并按 Store.timezone 解释 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | 经营资料 | Product/Offer/BrandGuideline/KnowledgeItem/MediaAsset 由 #6 持有；MediaAsset 是素材库源资产，不等于营销 ImageArtifact | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | 营销流程 | MarketingTask/RequirementSnapshot/StrategySnapshot/TaskStep/DependencyEdge 由 #7 持有 | MARKETING_TASK_DOMAIN_DESIGN.md |

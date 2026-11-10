@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml config --quiet
+      - run: touch .env && POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml config --quiet
       - run: docker build -f infra/containers/api.Dockerfile .
       - run: docker build -f infra/containers/worker.Dockerfile .
       - run: docker build -f infra/containers/web.Dockerfile .

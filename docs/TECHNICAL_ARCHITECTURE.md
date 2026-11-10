@@ -349,6 +349,10 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 本方案为目标架构与工程约束。任何真实生产能力仍需通过实现、自动化测试、部署验证和平台联调后，才能标记为已交付。
 
 
+## 15. 异步运行时契约入口
+
+Issue #9 的详细实现契约以 [ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md](ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md) 为准；身份、营销领域与 Job Runtime 的跨域边界以 [ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md](ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md) 为准。本文保留目标架构摘要，不重复定义 Job 状态机、Outbox Relay 和 Worker fencing 细节。Job Runtime 是模块化单体中的领域模块，Worker 作为独立进程运行，不构成首期微服务拆分。
+
 ## 15. Stage 1 技术选型对齐（2026-11-11）
 
 本节与 [TECH_STACK_SELECTION.md](TECH_STACK_SELECTION.md) 配套生效；具体版本与框架以技术选型文档为准。

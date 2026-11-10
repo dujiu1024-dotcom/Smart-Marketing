@@ -134,7 +134,8 @@ else if(a==='admin-save-user')id?update('admin.users',id,o):add('admin.users',o)
 else if(a==='admin-save-model')id?update('admin.models',id,o):add('admin.models',o);
 else if(a==='admin-save-prompt')id?update('admin.prompts',id,o):add('admin.prompts',o);
 else if(a==='admin-save-ticket')add('admin.tickets',{...o,id:'inc-'+Date.now()});
-else if(a==='admin-save-role')add('admin.roles',o);\nelse if(a==='admin-save-workflow')add('admin.workflows',o);
+else if(a==='admin-save-role')add('admin.roles',o);
+else if(a==='admin-save-workflow')add('admin.workflows',o);
 audit('保存记录',a,id||'new');$('#modal-root')?.remove();render();toast('记录已保存到本地演示环境')});
 document.addEventListener('input',ev=>{if(['taskSearch','taskFilter','taskType'].includes(ev.target.id)){const q=$('#taskSearch').value.toLowerCase(),f=$('#taskFilter').value,ty=$('#taskType').value,ls=db().tasks.filter(t=>(!q||(t.title+t.product+t.id).toLowerCase().includes(q))&&(!f||t.status===f)&&(!ty||t.type===ty));$('#taskTable').innerHTML=taskTable(ls)}if(ev.target.id==='adminSearch'||ev.target.id==='adminFilter'){const q=$('#adminSearch')?.value.toLowerCase()||'',f=$('#adminFilter')?.value||'';$$('tbody tr').forEach(tr=>tr.style.display=tr.innerText.toLowerCase().includes(q)&&(!f||tr.innerText.includes(f))?'':'none')}});
 window.addEventListener('hashchange',()=>{route=location.hash.slice(1)||'ai';render()});

@@ -46,13 +46,12 @@ Job succeeded 不代表 TaskStep 自动成功。营销应用服务必须校验�
 
 ### 状态规范化提案
 
-Issue #9 与技术架构采用 Job 状态：`queued`、`running`、`retry_wait`、`succeeded`、`failed`、`cancelled`、`needs_human`。Issue #7 设计稿另出现 `dead`。建议统一为：
-- Job 不新增 `dead`；重试耗尽/超龄进入 `failed`，通过 `terminal_reason` 区分。OutboxEvent 可独立使用 `dead` 表示投递耗尽，不映射为 Job 状态。
+Issue #7 与 Issue #9 统一采用 Job 状态：`queued`、`running`、`retry_wait`、`succeeded`、`failed`、`cancelled`、`needs_human`。Job 不包含 `dead`；
+- 重试耗尽/超龄进入 `failed`，通过 `terminal_reason` 区分；OutboxEvent 可独立使用 `dead` 表示投递耗尽，不映射为 Job 状态。
 - `needs_human` 表示外部副作用不确定或必须人工判断。
-- OutboxEvent 可独立使用 `dead` 表示投递耗尽，不映射为 Job 状态。
 - Job 终态不静默重开；人工恢复创建关联的新 Job，保留原 Job 和审计记录。
 
-该项须由 Issue #7、#9 共同评审确认，并同步两份文档后冻结。
+该项已在当前 Issue #7 与 #9 文档中对齐；联合评审时确认无冲突后冻结。
 
 ## 4. 幂等键统一提案
 
@@ -91,8 +90,8 @@ Issue #7 与 #9 当前唯一范围描述略有差异。建议用户 API 写操�
 
 ## 7. 冻结前待确认
 
-1. Identity & Store 最终 AuthContext 字段名与 X-Store-ID 约定；本提案按 PR #26 的 request-scoped `X-Store-ID` / `AuthorizedStoreContext` 设计使用；Session.active_store_id 仅作为 UI 默认选择，不作为授权上下文。
-2. Issue #7/#9 共同确认 Job 是否移除 `dead`，以及 terminal_reason 字段。
+1. Identity & Store 最终 AuthContext 字段名与 X-Store-ID 约定；本提案按 PR #26 的 request-scoped `X-Store-ID` / `AuthorizedStoreContext.request_store_id` 设计使用；Session.active_store_id 仅作为 UI 默认选择，不作为授权上下文。
+2. Issue #7/#9 确认 Job 不含 `dead`；OutboxEvent 的投递耗尽状态可独立使用 `dead`，Job 终态原因使用 terminal_reason。
 3. Issue #7/#9 共同确认用户 API 幂等键唯一范围。
 4. 发布等外部副作用的最后授权检查与平台操作状态核验接口。
 5. 成员撤销/门店停用后的在途 Job 策略。

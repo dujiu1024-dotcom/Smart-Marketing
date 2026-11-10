@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 门店运营官 · 超级管理员后台</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#202331;--muted:#7c8292;--line:#e9eaf0;--brand:#625ee8;--pale:#f0efff;--green:#16865c;--orange:#b87821;--red:#d84a4a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}button,input,textarea,select{font:inherit}button{cursor:pointer}
+
+/* 登录页 */
+.login-wrap{min-height:100vh;display:grid;place-items:center;background:linear-gradient(140deg,#eef0ff,#f7f7fb)}
+.login-box{background:#fff;border:1px solid var(--line);border-radius:16px;padding:42px 38px;width:380px;box-shadow:0 12px 40px rgba(48,48,100,.06)}
+.login-box h1{margin:0 0 6px;font-size:22px;letter-spacing:-.3px}
+.login-box .sub{color:var(--muted);margin:0 0 26px;font-size:13px}
+.login-box label{display:block;font-size:12px;color:#4a5060;font-weight:600;margin:14px 0 6px}
+.login-box input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;outline:0}
+.login-box input:focus{border-color:var(--brand)}
+.login-box .btn-login{width:100%;margin-top:22px;padding:11px;background:var(--brand);color:#fff;border:0;border-radius:9px;font-weight:650;font-size:14px}
+.login-hint{margin-top:18px;font-size:11px;color:#a4a9b6;text-align:center}
+
+/* 主框架 */
+.shell{display:none;min-height:100vh}.shell.show{display:flex}
+aside{width:220px;background:#fff;border-right:1px solid var(--line);padding:22px 14px;flex-shrink:0;display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:10px;padding:0 10px 18px;border-bottom:1px solid var(--line);font-weight:760;font-size:15px}
+.logo{width:32px;height:32px;border-radius:10px;background:linear-gradient(140deg,#8b88ff,#5551d7);color:white;display:grid;place-items:center;font-size:12px}
+.navtitle{font-size:11px;letter-spacing:1px;color:#a0a4b0;padding:18px 12px 8px}
+nav{flex:1}
+nav button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;text-align:left;color:#656c7a;padding:10px 12px;border-radius:9px;margin:2px 0;font-size:13px}
+nav button.active,nav button:hover{background:var(--pale);color:var(--brand);font-weight:650}
+nav .ic{width:18px;text-align:center;font-size:15px}
+
+.admin-info{margin-top:20px;padding:16px 10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.admin-info .nm{font-weight:650;color:var(--ink)}
+.admin-info button{margin-top:10px;background:transparent;border:1px solid var(--line);border-radius:7px;padding:6px 10px;font-size:12px;color:var(--muted);width:100%}
+
+main{flex:1;padding:28px 40px 70px;min-width:0}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.topbar h1{margin:0;font-size:24px;letter-spacing:-.3px}
+.topbar .sub{color:var(--muted);font-size:13px;margin:4px 0 0}
+
+.view{display:none}.view.active{display:block}
+
+.btn{border:1px solid var(--line);background:#fff;color:#515766;padding:8px 13px;border-radius:8px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:5px}
+.btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+.btn.danger{color:var(--red);border-color:#f1dada}
+.btn.small{padding:5px 10px;font-size:12px}
+.btn.ghost{background:transparent}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+.cardhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cardhead h3{margin:0;font-size:15px}
+.cardhead .muted{font-size:12px}
+
+.metricrow{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.metric{background:#f8f8fb;border-radius:12px;padding:16px 18px}
+.metric strong{font-size:28px;display:block;letter-spacing:-.5px}
+.metric span{font-size:12px;color:var(--muted)}
+.metric .sub{margin-top:4px;font-size:11px;color:#a0a4b0}
+
+.muted{color:var(--muted)}
+.tiny{font-size:11px}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:11px 12px;font-weight:650;color:#5a6170;font-size:12px;border-bottom:1px solid var(--line);background:#fafafc}
+td{padding:12px;border-bottom:1px solid #f0f1f5;color:#3d4250}
+tr:last-child td{border-bottom:0}
+tr:hover td{background:#fafaff}
+
+.tag{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;background:#f0efff;color:#615cda}
+.tag.green{background:#eaf7f1;color:var(--green)}
+.tag.orange{background:#fff4e3;color:#b06510}
+.tag.gray{background:#f0f1f5;color:#7b8190}
+.tag.red{background:#fde8e8;color:var(--red)}
+
+.filters{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filters input,.filters select{padding:8px 12px;border:1px solid var(--line);border-radius:8px;outline:0;background:#fff;font-size:13px}
+.filters input{width:220px}
+.filters input:focus,.filters select:focus{border-color:var(--brand)}
+
+/* 模态框 */
+.modal-mask{position:fixed;inset:0;background:rgba(32,35,49,.4);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-mask.show{display:flex}
+.modal{background:#fff;border-radius:14px;width:520px;max-width:92vw;max-height:88vh;overflow:auto}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1}
+.modal-head h3{margin:0;font-size:16px}
+.modal-head .close{background:transparent;border:0;color:#9aa0ad;font-size:20px;cursor:pointer}
+.modal-body{padding:22px}
+.modal-body label{display:block;font-size:12px;color:#4a5060;font-weight:600;margin:14px 0 6px}
+.modal-body label:first-child{margin-top:0}
+.modal-body input,.modal-body select,.modal-body textarea{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;outline:0;resize:vertical}
+.modal-body input:focus,.modal-body select:focus,.modal-body textarea:focus{border-color:var(--brand)}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
+
+.tag-group{display:flex;flex-wrap:wrap;gap:7px}
+.tag-item{padding:5px 11px;border:1px solid var(--line);border-radius:20px;font-size:12px;cursor:pointer;background:#fff;color:#5a6170}
+.tag-item.on{background:var(--pale);border-color:#a8a4ff;color:var(--brand)}
+
+/* 热点采集 */
+.hot-list{display:grid;gap:12px}
+.hot-item{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:60px 1fr auto;gap:14px;align-items:center}
+.hot-rank{width:40px;height:40px;border-radius:10px;background:linear-gradient(140deg,#ff7a7a,#ff5252);color:#fff;display:grid;place-items:center;font-weight:700;font-size:16px}
+.hot-rank.blue{background:linear-gradient(140deg,#7aa4ff,#527bff)}
+.hot-rank.green{background:linear-gradient(140deg,#7ad4a0,#3fb47a)}
+.hot-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.hot-match{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.hot-score{font-size:22px;font-weight:700;color:var(--brand)}
+.hot-score small{font-size:12px;color:var(--muted);font-weight:500}
+
+.match-reason{background:#fafaff;border:1px solid #e9e8ff;border-radius:10px;padding:12px 14px;margin:8px 0;font-size:12px;color:#515766;line-height:1.8}
+.match-reason strong{color:var(--brand)}
+
+.store-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;background:#f0efff;color:#5e5bca;border-radius:20px;margin:3px 3px 0 0}
+
+/* 大模型配置 */
+.model-card{border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:12px}
+.model-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.model-title{font-size:15px;font-weight:650}
+.model-vendor{font-size:12px;color:var(--muted);margin-top:2px}
+.model-status{display:flex;align-items:center;gap:5px;font-size:12px}
+.model-status .dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
+.model-status.warn .dot{background:var(--orange)}
+.model-status.error .dot{background:var(--red)}
+.model-assigns{margin-top:10px;font-size:12px;color:#5a6170}
+.model-assigns .label{color:var(--muted);font-size:11px;margin-right:6px}
+.model-quota{margin-top:12px}
+.model-quota .bar{height:6px;background:#f0f1f5;border-radius:20px;overflow:hidden}
+.model-quota .bar span{display:block;height:100%;border-radius:20px;background:var(--brand)}
+.model-quota.warn .bar span{background:var(--orange)}
+.model-quota.error .bar span{background:var(--red)}
+.model-quota-text{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:5px}
+.model-actions{margin-top:14px;display:flex;gap:8px}
+
+/* 系统设置 */
+.setting-section{margin-bottom:28px}
+.setting-section h3{margin:0 0 14px;font-size:15px;display:flex;align-items:center;gap:8px}
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.setting-row:last-child{border-bottom:0}
+.setting-row .k{font-weight:600;font-size:13px}
+.setting-row .desc{font-size:11px;color:var(--muted);margin-top:3px}
+.setting-row .v{display:flex;align-items:center;gap:10px}
+.setting-row select,.setting-row input[type="text"],.setting-row input[type="number"]{padding:7px 10px;border:1px solid var(--line);border-radius:7px;outline:0;background:#fff;font-size:13px;min-width:180px}
+.setting-row input[type="number"]{width:100px;text-align:right}
+
+/* Switch */
+.switch{width:42px;height:24px;border-radius:20px;background:#e9eaf0;position:relative;cursor:pointer;transition:background .2s}
+.switch.on{background:var(--brand)}
+.switch:before{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:3px;left:3px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.switch.on:before{transform:translateX(18px)}
+
+/* 门店详情侧栏 */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.detail-block{background:#f8f8fb;border-radius:10px;padding:14px}
+.detail-block h4{margin:0 0 8px;font-size:13px;color:#5a6170}
+.detail-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.detail-row .k{color:var(--muted)}
+
+/* 门店用户内嵌 */
+.usr-inline{display:grid;gap:8px}
+.usr-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f8f8fb;border-radius:8px;font-size:13px}
+.usr-item .nm{font-weight:600}
+.usr-item .ph{color:var(--muted);font-size:11px}
+.usr-add{display:flex;gap:8px;margin-top:10px}
+.usr-add input{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:7px;outline:0;font-size:13px}
+
+/* Toast */
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#242638;color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:200;font-size:13px}
+.toast.show{display:block}
+
+.back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--brand);font-size:13px;font-weight:600;background:transparent;border:0;padding:0;margin-bottom:12px;cursor:pointer}
+
+@media(max-width:900px){main{padding:20px 16px 70px}.metricrow{grid-template-columns:1fr 1fr}.detail-grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+
+<!-- 登录页 -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-box">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><div class="logo">AI</div><div style="font-weight:700">AI 门店运营官</div></div>
+    <h1>超级管理员后台</h1>
+    <p class="sub">管理接入门店、门店用户、热点采集与大模型配置</p>
+    <label>管理员账号</label>
+    <input type="text" id="adminUser" placeholder="admin" value="admin">
+    <label>登录密码</label>
+    <input type="password" id="adminPwd" placeholder="123456" value="123456">
+    <button class="btn-login" onclick="doLogin()">登 录</button>
+    <div class="login-hint">演示环境 · 账号 admin / 密码 123456</div>
+  </div>
+</div>
+
+<!-- 主框架 -->
+<div class="shell" id="app">
+  <aside>
+    <div class="brand"><div class="logo">AI</div>AI 门店运营官</div>
+    <div class="navtitle">管理中心</div>
+    <nav>
+      <button class="active" data-view="dashboard"><span class="ic">📊</span>数据总览</button>
+      <button data-view="stores"><span class="ic">🏪</span>门店管理</button>
+      <button data-view="hotspot"><span class="ic">🔥</span>热点采集与匹配</button>
+      <button data-view="model"><span class="ic">🤖</span>大模型配置</button>
+      <button data-view="settings"><span class="ic">⚙️</span>系统设置</button>
+    </nav>
+    <div class="admin-info">
+      <div class="nm">超级管理员</div>
+      <div>admin@ai-store.com</div>
+      <button onclick="logout()">退出登录</button>
+    </div>
+  </aside>
+
+  <main>
+
+    <!-- ============== 数据总览 ============== -->
+    <section class="view active" id="view-dashboard">
+      <div class="topbar"><div><h1>数据总览</h1><p class="sub">跨门店核心指标概览</p></div><span class="tag">更新 · 2026-11-10</span></div>
+
+      <div class="metricrow" style="margin-bottom:18px">
+        <div class="metric"><strong>12</strong><span>接入门店</span><div class="sub">10 家活跃 · 2 家停用</div></div>
+        <div class="metric"><strong>28</strong><span>门店用户</span><div class="sub">活跃 26 · 停用 2</div></div>
+        <div class="metric"><strong>47</strong><span>进行中营销任务</span><div class="sub">近 7 天新增 19</div></div>
+      </div>
+
+      <div class="card">
+        <div class="cardhead"><h3>各门店 AI 执行概览</h3><button class="btn small">导出</button></div>
+        <table>
+          <thead><tr><th>门店</th><th>行业</th><th>近7天任务</th><th>进行中</th><th>已完成</th><th>经营数据（曝光 / 到店）</th><th>模型</th></tr></thead>
+          <tbody id="storeOverview"></tbody>
+        </table>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card" style="margin-bottom:0">
+          <div class="cardhead"><h3>🔥 热点匹配动态</h3></div>
+          <div id="hotspotFeed"></div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+          <div class="cardhead"><h3>系统使用趋势</h3><span class="tiny muted">近 7 天</span></div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;height:140px;align-items:end">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:100%;background:linear-gradient(180deg,#a8a4ff,#625ee8);border-radius:6px 6px 0 0;height:60%"></div><span class="tiny muted">周一</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:100%;background:linear-gradient(180deg,#a8a4ff,#625ee8);border-radius:6px 6px 0 0;height:82%"></div><span class="tiny muted">周二</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:100%;background:linear-gradient(180deg,#a8a4ff,#625ee8);border-radius:6px 6px 0 0;height:70%"></div><span class="tiny muted">周三</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:100%;background:linear-gradient(180deg,#a8a4ff,#625ee8);border-radius:6px 6px 0 0;height:95%"></div><span class="tiny muted">周四</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:100%;background:linear-gradient(180deg,#a8a4ff,#625ee8);border-radius:6px 6px 0 0;height:88%"></div><span class="tiny muted">周五</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:100%;background:linear-gradient(180deg,#a8a4ff,#625ee8);border-radius:6px 6px 0 0;height:76%"></div><span class="tiny muted">周六</span></div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:100%;background:linear-gradient(180deg,#a8a4ff,#625ee8);border-radius:6px 6px 0 0;height:50%"></div><span class="tiny muted">周日</span></div>
+          </div>
+          <p class="tiny muted" style="margin-top:14px;text-align:center">柱状高度 = AI 任务创建量</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== 门店管理 ============== -->
+    <section class="view" id="view-stores">
+      <div class="topbar"><div><h1>门店管理</h1><p class="sub">管理接入门店、维护门店画像与门店用户</p></div><button class="btn primary" onclick="openStoreModal()">＋ 新建门店</button></div>
+
+      <div class="filters">
+        <input placeholder="搜索门店名称…" id="storeSearch">
+        <select id="storeIndustry"><option value="">全部行业</option><option>咖啡</option><option>奶茶</option><option>餐饮</option><option>甜品</option><option>零售</option></select>
+        <select id="storeStatus"><option value="">全部状态</option><option value="active">启用</option><option value="inactive">停用</option></select>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead><tr><th>门店名称</th><th>行业</th><th>门店用户</th><th>绑定模型</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody id="storeList"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 门店详情（内嵌门店用户 + 模型 + 画像） -->
+    <section class="view" id="view-store-detail">
+      <button class="back-btn" onclick="go('stores')">← 返回门店列表</button>
+      <div class="topbar" style="margin-top:-12px"><div><h1 id="sdTitle">—</h1><p class="sub" id="sdSub">—</p></div><span class="tag" id="sdStatus">—</span></div>
+
+      <div class="detail-grid">
+        <!-- 基本信息 -->
+        <div class="card" style="margin-bottom:0">
+          <div class="cardhead"><h3>门店基本信息</h3><button class="btn small" onclick="toast('编辑功能（演示）')">编辑</button></div>
+          <div class="detail-block" id="sdBasic"></div>
+        </div>
+        <!-- 画像标签 -->
+        <div class="card" style="margin-bottom:0">
+          <div class="cardhead"><h3>门店画像标签</h3><button class="btn small" onclick="toast('编辑标签（演示）')">编辑</button></div>
+          <div class="detail-block" id="sdTags"></div>
+          <p class="tiny muted" style="margin-top:10px">用于后台热点匹配，标签越丰富匹配越精准。</p>
+        </div>
+        <!-- 门店用户（内嵌，不独立成模块） -->
+        <div class="card" style="grid-column:span 2">
+          <div class="cardhead"><h3>👥 门店用户</h3><span class="tiny muted">一个门店用户只属于这家店</span></div>
+          <div id="sdUsers" class="usr-inline"></div>
+          <div class="usr-add">
+            <input placeholder="姓名" style="flex:0 0 110px" id="newUsrName">
+            <input placeholder="手机号" id="newUsrPhone">
+            <button class="btn primary small" onclick="addInlineUser()">＋ 添加</button>
+          </div>
+          <p class="tiny muted" style="margin-top:8px">新门店用户初始密码为 888888，首次登录后建议修改。</p>
+        </div>
+        <!-- 绑定模型 -->
+        <div class="card" style="margin-bottom:0">
+          <div class="cardhead"><h3>🤖 绑定的大模型</h3><button class="btn small" onclick="openModelModal('assign',state.currentStore?.id)">重新分配</button></div>
+          <div id="sdModel" style="font-size:13px"></div>
+        </div>
+        <!-- 已下发热点 -->
+        <div class="card" style="margin-bottom:0">
+          <div class="cardhead"><h3>🔥 已下发热点（最近）</h3></div>
+          <div id="sdHotspots"></div>
+        </div>
+        <!-- 执行历史 -->
+        <div class="card" style="grid-column:span 2;margin-top:0">
+          <div class="cardhead"><h3>AI 执行历史（最近 8 条）</h3></div>
+          <table>
+            <thead><tr><th>任务标题</th><th>来源</th><th>状态</th><th>创建时间</th></tr></thead>
+            <tbody id="sdHistory"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== 热点采集与匹配 ============== -->
+    <section class="view" id="view-hotspot">
+      <div class="topbar"><div><h1>🔥 热点采集与智能匹配</h1><p class="sub">多平台热点采集 → LLM 自动匹配门店画像 → 自动下发（无需审核）</p></div><button class="btn primary" onclick="refreshHotspots()">🔄 立即采集</button></div>
+
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn primary" onclick="switchHotTab('collect')" id="tabCollect">📥 采集列表</button>
+        <button class="btn" onclick="switchHotTab('match')" id="tabMatch">🎯 匹配结果</button>
+        <button class="btn" onclick="switchHotTab('dispatch')" id="tabDispatch">📤 下发记录</button>
+      </div>
+
+      <div class="card" id="hotTab_collect">
+        <div class="cardhead"><h3>📥 多平台热点采集</h3><span class="tiny muted">每 30 分钟自动刷新 · 数据来源模拟</span></div>
+        <div class="hot-list" id="hotCollectList"></div>
+      </div>
+
+      <div id="hotTab_match" style="display:none">
+        <div id="hotMatchList"></div>
+      </div>
+
+      <div class="card" id="hotTab_dispatch" style="display:none">
+        <div class="cardhead"><h3>📤 自动下发记录</h3><span class="tag green">全自动 · 无需审核</span></div>
+        <table>
+          <thead><tr><th>下发时间</th><th>热点标题</th><th>下发到</th><th>匹配度</th><th>门店是否采纳</th><th>后续效果</th></tr></thead>
+          <tbody id="hotDispatchList"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============== 大模型配置 ============== -->
+    <section class="view" id="view-model">
+      <div class="topbar">
+        <div><h1>🤖 大模型配置</h1><p class="sub">管理接入的大模型 API，为不同门店分配不同模型。新增模型 API 以应对额度不足。</p></div>
+        <button class="btn primary" onclick="openModelModal()">＋ 新增模型 API</button>
+      </div>
+
+      <div class="card" style="background:#fafaff;border-color:#e9e8ff;margin-bottom:16px">
+        <div style="display:flex;align-items:flex-start;gap:12px;font-size:12px;color:#515766;line-height:1.7">
+          <span style="font-size:20px">💡</span>
+          <div>
+            <strong>多模型策略</strong>：可为不同门店分配不同模型，避免单一模型额度耗尽时影响全部门店。当下游模型额度不足 <span class="orange-text" style="color:var(--orange)">⚠️ 70%</span> 时会自动告警。
+          </div>
+        </div>
+      </div>
+
+      <div id="modelList"></div>
+    </section>
+
+    <!-- ============== 系统设置 ============== -->
+    <section class="view" id="view-settings">
+      <div class="topbar"><div><h1>⚙️ 系统设置</h1><p class="sub">平台级全局配置</p></div></div>
+
+      <div class="setting-section">
+        <h3>🔥 热点采集配置</h3>
+        <div class="card" style="padding:0">
+          <div class="setting-row">
+            <div><div class="k">微博热搜采集</div><div class="desc">从微博热搜榜实时采集热点词条</div></div>
+            <div class="v"><div class="switch on" onclick="toggleSwitch(this)"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="k">抖音热点采集</div><div class="desc">从抖音热点榜采集短视频热点</div></div>
+            <div class="v"><div class="switch on" onclick="toggleSwitch(this)"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="k">小红书话题采集</div><div class="desc">从小红书话题榜采集种草类热点</div></div>
+            <div class="v"><div class="switch on" onclick="toggleSwitch(this)"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="k">自动采集间隔</div><div class="desc">每隔多久重新采集一次热点</div></div>
+            <div class="v">
+              <select><option>每 30 分钟</option><option>每 1 小时</option><option>每 2 小时</option><option>每 6 小时</option></select>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div><div class="k">自动下发匹配度阈值</div><div class="desc">热点匹配度 ≥ 该阈值时自动下发给门店</div></div>
+            <div class="v">
+              <input type="number" value="70" min="0" max="100" style="width:70px;text-align:right"> <span class="muted">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-section">
+        <h3>🔔 通知与告警</h3>
+        <div class="card" style="padding:0">
+          <div class="setting-row">
+            <div><div class="k">模型额度不足告警</div><div class="desc">当任意模型 API 额度剩余不足 20% 时告警</div></div>
+            <div class="v"><div class="switch on" onclick="toggleSwitch(this)"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="k">热点高优先级推送</div><div class="desc">匹配度 ≥ 90% 的热点单独推送提醒</div></div>
+            <div class="v"><div class="switch on" onclick="toggleSwitch(this)"></div></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="k">告警方式</div><div class="desc">系统告警通过什么方式送达</div></div>
+            <div class="v">
+              <select><option>站内通知 + 邮件</option><option>仅站内通知</option><option>仅邮件</option></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-section">
+        <h3>👤 超级管理员账号</h3>
+        <div class="card" style="padding:0">
+          <div class="setting-row">
+            <div><div class="k">管理员账号</div><div class="desc">当前登录账号：admin</div></div>
+            <div class="v"><span class="muted">admin@ai-store.com</span></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="k">修改登录密码</div><div class="desc">定期修改密码以保障安全</div></div>
+            <div class="v"><button class="btn small" onclick="toast('修改密码弹窗（演示）')">修改密码</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- 模态框：门店 -->
+<div class="modal-mask" id="storeModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="storeModalTitle">新建门店</h3><button class="close" onclick="closeModal('storeModal')">×</button></div>
+    <div class="modal-body">
+      <label>门店名称</label>
+      <input id="f_stName" placeholder="如：山野咖啡">
+      <label>所属行业</label>
+      <select id="f_stIndustry"><option>咖啡</option><option>奶茶</option><option>餐饮</option><option>甜品</option><option>零售</option></select>
+      <label>门店地址</label>
+      <input id="f_stAddr" placeholder="市 / 区 / 街道">
+      <label>联系方式</label>
+      <input id="f_stPhone" placeholder="手机号">
+      <label style="margin-top:18px">门店画像标签（用于热点匹配）</label>
+      <div class="tag-group" id="f_stTags"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('storeModal')">取消</button>
+      <button class="btn primary" onclick="saveStore()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 模态框：大模型 -->
+<div class="modal-mask" id="modelModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modelModalTitle">新增模型 API</h3><button class="close" onclick="closeModal('modelModal')">×</button></div>
+    <div class="modal-body">
+      <label>供应商</label>
+      <select id="f_mVendor"><option>OpenAI</option><option>Anthropic</option><option>字节 / 豆包</option><option>阿里 / 通义</option><option>百度 / 文心</option><option>其他</option></select>
+      <label>模型名称</label>
+      <input id="f_mName" placeholder="如：gpt-4o-mini">
+      <label>API Key</label>
+      <input id="f_mKey" type="password" placeholder="sk-...">
+      <label style="margin-top:18px">适配门店（可多选）</label>
+      <div class="tag-group" id="f_mStores"></div>
+      <p class="tiny muted" style="margin-top:8px">未分配门店的模型 API 可作为备用。勾选门店后，这些门店的 AI 请求将优先使用本模型。</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('modelModal')">取消</button>
+      <button class="btn primary" onclick="saveModel()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============== Mock 数据 ============== */
+const state = {
+  currentStore: null,
+  modalMode: null,
+  stores: [
+    {id:1,name:'山野咖啡',industry:'咖啡',addr:'杭州市西湖区文三路 268 号',phone:'138****1234',status:'active',tags:['精品咖啡','第三空间','年轻化','周末打卡','社区店'],userCount:3,modelId:1},
+    {id:2,name:'转角咖啡',industry:'咖啡',addr:'杭州市拱墅区莫干山路 128 号',phone:'139****5678',status:'active',tags:['精品咖啡','商务','白领','快速便捷'],userCount:2,modelId:1},
+    {id:3,name:'茶颜悦咖啡',industry:'奶茶',addr:'杭州市上城区延安路 58 号',phone:'136****9012',status:'active',tags:['奶茶','年轻潮流','学生','高性价比'],userCount:4,modelId:3},
+    {id:4,name:'烘焙小筑',industry:'甜品',addr:'杭州市滨江区江南大道 200 号',phone:'137****3456',status:'active',tags:['烘焙','甜品','下午茶','拍照打卡'],userCount:2,modelId:2},
+    {id:5,name:'山味家常菜',industry:'餐饮',addr:'杭州市西湖区古墩路 88 号',phone:'135****7890',status:'inactive',tags:['家常菜','社区','家庭客群'],userCount:0,modelId:null},
+  ],
+  users: [
+    {id:1,name:'陈山野',phone:'13800001234',storeId:1,lastLogin:'2026-11-10 09:12',status:'active'},
+    {id:2,name:'李店员',phone:'13800001235',storeId:1,lastLogin:'2026-11-09 18:30',status:'active'},
+    {id:3,name:'王转角',phone:'13900005678',storeId:2,lastLogin:'2026-11-10 08:45',status:'active'},
+    {id:4,name:'张奶茶',phone:'13600009012',storeId:3,lastLogin:'2026-11-10 07:50',status:'active'},
+    {id:5,name:'赵烘焙',phone:'13700003456',storeId:4,lastLogin:'2026-11-08 20:15',status:'active'},
+  ],
+  models: [
+    {id:1,name:'gpt-4o-mini',vendor:'OpenAI',key:'sk-****9832',stores:[1,2],quotaUsed:32,quotaTotal:100,status:'ok'},
+    {id:2,name:'claude-3.5-sonnet',vendor:'Anthropic',key:'sk-****7721',stores:[4],quotaUsed:12,quotaTotal:50,status:'ok'},
+    {id:3,name:'doubao-pro-32k',vendor:'字节',key:'****aabb',stores:[3],quotaUsed:96,quotaTotal:100,status:'warn'},
+    {id:4,name:'gpt-4o-mini (备用)',vendor:'OpenAI',key:'sk-****1155',stores:[],quotaUsed:5,quotaTotal:100,status:'ok'},
+  ],
+  hotspots: [
+    {rank:1,source:'微博热搜',title:'#降温后的第一杯热饮#',heat:'热度 128万',desc:'全国多地降温，热饮话题登上热搜前 10'},
+    {rank:2,source:'抖音热点',title:'#周末去哪儿#',heat:'热度 96万',desc:'周末休闲、探店打卡类内容播放量飙升'},
+    {rank:3,source:'小红书话题',title:'#秋日氛围感#',heat:'热度 84万',desc:'秋日氛围、拍照打卡、探店笔记集中爆发'},
+    {rank:4,source:'微博热搜',title:'#城市第三空间#',heat:'热度 52万',desc:'年轻人热议"第三空间"概念'},
+    {rank:5,source:'抖音热点',title:'#秋冬限定美食#',heat:'热度 78万',desc:'季节限定产品成内容创作热门方向'},
+  ],
+  matches: [
+    {hotId:1,hotTitle:'降温后的第一杯热饮',storeId:1,storeName:'山野咖啡',score:94,reason:'该门店主打精品咖啡 × 有秋日限定拿铁产品 × 近期降温带来真实热饮需求'},
+    {hotId:1,hotTitle:'降温后的第一杯热饮',storeId:2,storeName:'转角咖啡',score:81,reason:'商务咖啡门店 × 白领客群在降温天气有热饮刚需'},
+    {hotId:2,hotTitle:'周末去哪儿',storeId:1,storeName:'山野咖啡',score:88,reason:'门店定位第三空间 × 有周末打卡潜力 × 适合承接周边休闲客流'},
+    {hotId:2,hotTitle:'周末去哪儿',storeId:4,storeName:'烘焙小筑',score:76,reason:'烘焙下午茶场景 × 周末客群适配度高'},
+    {hotId:3,hotTitle:'秋日氛围感',storeId:1,storeName:'山野咖啡',score:91,reason:'精品咖啡 × 秋日限定产品 × 门店空间适合拍照打卡'},
+    {hotId:3,hotTitle:'秋日氛围感',storeId:4,storeName:'烘焙小筑',score:85,reason:'烘焙甜品 × 秋日氛围 × 拍照打卡标签高度匹配'},
+    {hotId:4,hotTitle:'城市第三空间',storeId:1,storeName:'山野咖啡',score:87,reason:'门店画像有"第三空间"标签 × 话题契合度极高'},
+    {hotId:5,hotTitle:'秋冬限定美食',storeId:1,storeName:'山野咖啡',score:92,reason:'秋日限定拿铁产品 × 与话题核心完全对齐'},
+    {hotId:5,hotTitle:'秋冬限定美食',storeId:4,storeName:'烘焙小筑',score:78,reason:'烘焙甜品 × 秋冬限定场景适配'},
+  ],
+  dispatches: [
+    {time:'2026-11-10 14:20',hot:'降温后的第一杯热饮',storeId:1,storeName:'山野咖啡',score:94,adopted:true,effect:'任务进行中 · 已发布 2 条平台内容'},
+    {time:'2026-11-10 14:20',hot:'降温后的第一杯热饮',storeId:2,storeName:'转角咖啡',score:81,adopted:true,effect:'任务进行中 · 执行空间已打开'},
+    {time:'2026-11-10 13:05',hot:'秋日氛围感',storeId:1,storeName:'山野咖啡',score:91,adopted:true,effect:'任务已完成 · 曝光 12.8k · 到店 19'},
+    {time:'2026-11-10 13:05',hot:'秋日氛围感',storeId:4,storeName:'烘焙小筑',score:85,adopted:false,effect:'未采纳（门店暂无对应计划）'},
+    {time:'2026-11-10 12:30',hot:'周末去哪儿',storeId:1,storeName:'山野咖啡',score:88,adopted:true,effect:'任务已完成 · 曝光 8.4k · 到店 12'},
+    {time:'2026-11-10 11:15',hot:'秋冬限定美食',storeId:1,storeName:'山野咖啡',score:92,adopted:true,effect:'任务进行中 · 执行空间已打开'},
+  ]
+};
+
+/* ============== 登录 ============== */
+function doLogin(){
+  let u=document.getElementById('adminUser').value,p=document.getElementById('adminPwd').value;
+  if(u==='admin'&&p==='123456'){
+    document.getElementById('loginWrap').style.display='none';
+    document.getElementById('app').classList.add('show');
+    initAll();
+  }else toast('账号或密码错误');
+}
+function logout(){document.getElementById('app').classList.remove('show');document.getElementById('loginWrap').style.display='grid'}
+
+/* ============== 路由 ============== */
+function go(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  let el=document.getElementById('view-'+v);if(el)el.classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  if(v==='store-detail') renderStoreDetail();
+  if(v==='model') renderModelList();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav [data-view]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.view)));
+
+/* ============== 通用 ============== */
+function toast(t){let x=document.getElementById('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),2200)}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+function openModal(id){document.getElementById(id).classList.add('show')}
+function esc(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function storeName(id){let s=state.stores.find(x=>x.id===id);return s?s.name:'—'}
+function modelName(id){let m=state.models.find(x=>x.id===id);return m?m.name:'未分配'}
+
+/* Switch 开关 */
+function toggleSwitch(el){el.classList.toggle('on')}
+
+/* ============== 初始化 ============== */
+function initAll(){
+  renderStoreOverview();
+  renderStoreList();
+  renderHotCollect();
+  renderHotMatch();
+  renderHotDispatch();
+  renderHotspotFeed();
+  renderStoreTagPicker();
+  renderModelStorePicker();
+}
+
+/* ============== 数据总览 ============== */
+function renderStoreOverview(){
+  let rows=state.stores.filter(s=>s.status==='active').map((s,i)=>{
+    let tasks=[4,6,3,5][i]||2,doing=[1,2,1,2][i]||0,done=[2,3,1,2][i]||1,impr=[12860,8420,6340,4200][i]||2000,visit=[19,12,8,6][i]||2;
+    return `<tr>
+      <td><a href="javascript:void(0)" onclick="openStore(${s.id})" style="color:var(--brand);font-weight:600">${esc(s.name)}</a></td>
+      <td>${esc(s.industry)}</td><td>${tasks}</td><td>${doing}</td><td>${done}</td>
+      <td>${impr.toLocaleString()} / ${visit}</td>
+      <td>${esc(modelName(s.modelId))}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('storeOverview').innerHTML=rows;
+}
+function renderHotspotFeed(){
+  let html=state.matches.slice(0,4).map(m=>`<div style="padding:10px 0;border-bottom:1px solid #f0f1f5;font-size:12px">
+    <div style="font-weight:650;margin-bottom:3px">🔥 ${esc(m.hotTitle)} <span class="tag">匹配 ${m.score}%</span></div>
+    <div class="muted">自动下发至 ${esc(m.storeName)}</div>
+  </div>`).join('');
+  document.getElementById('hotspotFeed').innerHTML=html;
+}
+
+/* ============== 门店管理 ============== */
+function renderStoreList(){
+  let kw=document.getElementById('storeSearch')?.value.toLowerCase()||'';
+  let ind=document.getElementById('storeIndustry')?.value||'';
+  let st=document.getElementById('storeStatus')?.value||'';
+  let rows=state.stores.filter(s=>(!kw||s.name.toLowerCase().includes(kw))&&(!ind||s.industry===ind)&&(!st||s.status===st)).map(s=>`<tr>
+    <td><a href="javascript:void(0)" onclick="openStore(${s.id})" style="color:var(--brand);font-weight:600">${esc(s.name)}</a></td>
+    <td>${esc(s.industry)}</td>
+    <td>${s.userCount}</td>
+    <td>${esc(modelName(s.modelId))}</td>
+    <td>${s.status==='active'?'<span class="tag green">启用</span>':'<span class="tag gray">停用</span>'}</td>
+    <td><button class="btn small" onclick="openStore(${s.id})">详情</button>
+        ${s.status==='active'?`<button class="btn small" onclick="toggleStore(${s.id})">停用</button>`:`<button class="btn small" onclick="toggleStore(${s.id})">启用</button>`}</td>
+  </tr>`).join('');
+  document.getElementById('storeList').innerHTML=rows||`<tr><td colspan="6" style="text-align:center;padding:30px;color:#a0a4b0">没有匹配的门店</td></tr>`;
+}
+['storeSearch'].forEach(id=>document.addEventListener('input',e=>{if(e.target.id===id)renderStoreList()}));
+['storeIndustry','storeStatus'].forEach(id=>document.addEventListener('change',e=>{if(e.target.id===id)renderStoreList()}));
+
+function openStore(id){state.currentStore=state.stores.find(s=>s.id===id);go('store-detail')}
+function toggleStore(id){
+  let s=state.stores.find(x=>x.id===id);
+  s.status=s.status==='active'?'inactive':'active';
+  toast(`已${s.status==='active'?'启用':'停用'}「${s.name}」`);
+  renderStoreList();renderStoreOverview();
+}
+
+/* 门店详情 */
+function renderStoreDetail(){
+  let s=state.currentStore;if(!s)return;
+  document.getElementById('sdTitle').textContent=s.name;
+  document.getElementById('sdSub').textContent=s.industry+' · '+s.addr;
+  document.getElementById('sdStatus').textContent=s.status==='active'?'启用中':'已停用';
+  document.getElementById('sdStatus').className='tag '+(s.status==='active'?'green':'gray');
+  document.getElementById('sdBasic').innerHTML=`
+    <div class="detail-row"><span class="k">门店名称</span><span>${esc(s.name)}</span></div>
+    <div class="detail-row"><span class="k">所属行业</span><span>${esc(s.industry)}</span></div>
+    <div class="detail-row"><span class="k">门店地址</span><span>${esc(s.addr)}</span></div>
+    <div class="detail-row"><span class="k">联系方式</span><span>${esc(s.phone)}</span></div>
+    <div class="detail-row"><span class="k">入驻时间</span><span>2026-09-15</span></div>
+  `;
+  document.getElementById('sdTags').innerHTML=(s.tags||[]).map(t=>`<span class="store-chip">${esc(t)}</span>`).join('')||'<span class="muted">暂无标签</span>';
+
+  // 门店用户（内嵌）
+  let users=state.users.filter(u=>u.storeId===s.id);
+  document.getElementById('sdUsers').innerHTML=users.length?users.map(u=>`<div class="usr-item">
+    <div><div class="nm">${esc(u.name)}</div><div class="ph">${esc(u.phone)} · ${u.lastLogin}</div></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      ${u.status==='active'?'<span class="tag green">启用</span>':'<span class="tag gray">停用</span>'}
+      <button class="btn small ghost" onclick="toast('重置密码（演示）')">重置密码</button>
+      ${u.status==='active'?`<button class="btn small ghost" onclick="toggleUser(${u.id})">停用</button>`:`<button class="btn small ghost" onclick="toggleUser(${u.id})">启用</button>`}
+    </div>
+  </div>`).join(''):'<div class="muted" style="padding:10px">暂无门店用户，可在下方添加</div>';
+
+  // 绑定模型
+  let m=state.models.find(x=>x.id===s.modelId);
+  document.getElementById('sdModel').innerHTML=m?`<div class="detail-row"><span class="k">当前模型</span><span>${esc(m.name)}（${esc(m.vendor)}）</span></div>
+    <div class="detail-row"><span class="k">今日用量</span><span class="${m.quotaUsed/m.quotaTotal>0.8?'muted':''}">${m.quotaUsed}%</span></div>
+    ${m.quotaUsed/m.quotaTotal>0.8?'<div style="color:var(--orange);font-size:12px;margin-top:6px">⚠️ 该模型额度即将耗尽，建议更换</div>':''}`:'<span class="muted">未分配模型</span>';
+
+  // 已下发热点
+  let hots=state.dispatches.filter(d=>d.storeId===s.id);
+  document.getElementById('sdHotspots').innerHTML=hots.length?hots.slice(0,5).map(d=>`<div style="padding:8px 0;border-bottom:1px solid #f0f1f5;font-size:12px">🔥 ${esc(d.hot)} <span class="tag">${d.score}%</span> <span class="muted">· ${d.time}</span><br><span class="muted">→ ${esc(d.effect)}</span></div>`).join(''):'<span class="muted">暂无下发记录</span>';
+
+  // 执行历史
+  document.getElementById('sdHistory').innerHTML=`<tr><td>秋日限定拿铁推广</td><td>热点匹配</td><td><span class="tag orange">执行中</span></td><td>2026-11-10 14:22</td></tr>
+    <tr><td>秋日咖啡打卡活动</td><td>AI 运营官</td><td><span class="tag green">已完成</span></td><td>2026-11-08 10:05</td></tr>
+    <tr><td>会员第二杯半价</td><td>手动创建</td><td><span class="tag green">已完成</span></td><td>2026-11-05 16:30</td></tr>
+    <tr><td>周末氛围感探店</td><td>热点匹配</td><td><span class="tag">待复盘</span></td><td>2026-11-02 09:18</td></tr>`;
+}
+
+/* 门店用户操作 */
+function toggleUser(id){let u=state.users.find(x=>x.id===id);u.status=u.status==='active'?'inactive':'active';toast(`已${u.status==='active'?'启用':'停用'}「${u.name}」`);renderStoreDetail()}
+function addInlineUser(){
+  let s=state.currentStore;if(!s)return;
+  let n=document.getElementById('newUsrName').value.trim();
+  let p=document.getElementById('newUsrPhone').value.trim();
+  if(!n||!p){toast('请填写姓名和手机号');return}
+  state.users.push({id:Date.now(),name:n,phone:p,storeId:s.id,lastLogin:'—',status:'active'});
+  s.userCount++;
+  document.getElementById('newUsrName').value='';document.getElementById('newUsrPhone').value='';
+  toast(`已为「${s.name}」添加门店用户 ${n}`);
+  renderStoreDetail();renderStoreList();renderStoreOverview();
+}
+
+/* 门店标签选择器 */
+let selectedTags=new Set();
+function renderStoreTagPicker(){
+  let all=['精品咖啡','奶茶','烘焙','甜品','第三空间','年轻化','白领','学生','家庭客群','社区店','周末打卡','商务','快速便捷','拍照打卡','高性价比','下午茶','秋日限定','季节限定'];
+  document.getElementById('f_stTags').innerHTML=all.map(t=>`<div class="tag-item ${selectedTags.has(t)?'on':''}" onclick="toggleTag('${t}')">${t}</div>`).join('');
+}
+function toggleTag(t){if(selectedTags.has(t))selectedTags.delete(t);else selectedTags.add(t);renderStoreTagPicker()}
+function openStoreModal(){selectedTags.clear();document.getElementById('storeModalTitle').textContent='新建门店';openModal('storeModal')}
+function saveStore(){
+  let n=document.getElementById('f_stName').value.trim();
+  if(!n){toast('请填写门店名称');return}
+  state.stores.push({id:Date.now(),name:n,industry:document.getElementById('f_stIndustry').value,addr:document.getElementById('f_stAddr').value,phone:document.getElementById('f_stPhone').value,status:'active',tags:[...selectedTags],userCount:0,modelId:null});
+  closeModal('storeModal');toast('门店创建成功');renderStoreList();renderStoreOverview();
+}
+
+/* ============== 大模型配置 ============== */
+function renderModelList(){
+  document.getElementById('modelList').innerHTML=state.models.map(m=>{
+    let assigns=m.stores.map(id=>storeName(id)).join('、');
+    let quotaPct=m.quotaUsed/m.quotaTotal*100;
+    let statusCls=quotaPct>90?'error':quotaPct>70?'warn':'ok';
+    let statusLabel=quotaPct>90?'额度耗尽':quotaPct>70?'额度不足':'正常';
+    return `<div class="model-card">
+      <div class="model-head">
+        <div>
+          <div class="model-title">${esc(m.name)}</div>
+          <div class="model-vendor">${esc(m.vendor)} · API Key 尾号 ${esc(m.key)}</div>
+        </div>
+        <div class="model-status ${statusCls}"><span class="dot"></span>${statusLabel}</div>
+      </div>
+      <div class="model-assigns"><span class="label">适配门店：</span>${assigns||'<span class="muted">（暂未分配 · 作为备用）</span>'}</div>
+      <div class="model-quota ${statusCls}">
+        <div class="bar"><span style="width:${quotaPct}%"></span></div>
+        <div class="model-quota-text"><span>今日用量</span><span>${m.quotaUsed} / ${m.quotaTotal}</span></div>
+      </div>
+      <div class="model-actions">
+        <button class="btn small" onclick="openModelModal('edit',${m.id})">编辑</button>
+        <button class="btn small ghost" onclick="cycleModelStatus(${m.id})">${m.status==='ok'?'停用':'启用'}</button>
+        <button class="btn small danger" onclick="deleteModel(${m.id})">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function cycleModelStatus(id){let m=state.models.find(x=>x.id===id);m.status=m.status==='ok'?'disabled':'ok';toast(`已${m.status==='ok'?'启用':'停用'}模型「${m.name}」`);renderModelList()}
+function deleteModel(id){
+  let idx=state.models.findIndex(x=>x.id===id);
+  let m=state.models[idx];
+  if(confirm(`确定删除模型「${m.name}」？已分配该模型的门店将自动标记为未分配。`)){
+    state.models.splice(idx,1);
+    state.stores.forEach(s=>{if(s.modelId===id)s.modelId=null});
+    toast('已删除模型');renderModelList();renderStoreList();renderStoreOverview();
+  }
+}
+
+/* 大模型门店多选 */
+let selectedModelStores=new Set();
+function renderModelStorePicker(){
+  let m=state.modalMode==='edit'?state.models.find(x=>x.id===state.modalModelId):null;
+  if(m){selectedModelStores=new Set(m.stores)}
+  else {selectedModelStores=new Set()}
+  document.getElementById('f_mStores').innerHTML=state.stores.filter(s=>s.status==='active').map(s=>{
+    let assigned=selectedModelStores.has(s.id);
+    return `<div class="tag-item ${assigned?'on':''}" onclick="toggleModelStore(${s.id})">${esc(s.name)}</div>`;
+  }).join('');
+}
+function toggleModelStore(id){
+  if(selectedModelStores.has(id))selectedModelStores.delete(id);else selectedModelStores.add(id);
+  renderModelStorePicker();
+}
+let modalModelId=null;
+function openModelModal(mode,id){
+  state.modalMode=mode||'add';
+  modalModelId=id||null;
+  document.getElementById('modelModalTitle').textContent=mode==='edit'?'编辑模型 API':mode==='assign'?'分配门店模型':'新增模型 API';
+  // 预填充
+  if(mode==='edit'){
+    let m=state.models.find(x=>x.id===id);
+    document.getElementById('f_mVendor').value=m.vendor;
+    document.getElementById('f_mName').value=m.name;
+    document.getElementById('f_mKey').value=m.key;
+  }else{
+    document.getElementById('f_mVendor').value='OpenAI';
+    document.getElementById('f_mName').value='';
+    document.getElementById('f_mKey').value='';
+  }
+  renderModelStorePicker();
+  openModal('modelModal');
+}
+function saveModel(){
+  let name=document.getElementById('f_mName').value.trim();
+  let vendor=document.getElementById('f_mVendor').value;
+  let key=document.getElementById('f_mKey').value.trim();
+  if(!name){toast('请填写模型名称');return}
+  let stores=[...selectedModelStores];
+  if(state.modalMode==='edit'){
+    let m=state.models.find(x=>x.id===modalModelId);
+    m.name=name;m.vendor=vendor;m.key=key;m.stores=stores;
+  }else{
+    let id=Date.now();
+    state.models.push({id,name,vendor,key,stores,quotaUsed:Math.floor(Math.random()*20),quotaTotal:100,status:'ok'});
+  }
+  closeModal('modelModal');
+  toast('已保存模型配置');
+  renderModelList();renderStoreOverview();
+}
+
+/* ============== 热点采集 ============== */
+function refreshHotspots(){toast('正在从多平台采集热点…（模拟）');setTimeout(()=>toast('采集完成 · 新增 3 条，匹配 5 家门店'),1200)}
+let hotTab='collect';
+function switchHotTab(t){
+  hotTab=t;
+  document.getElementById('hotTab_collect').style.display=t==='collect'?'block':'none';
+  document.getElementById('hotTab_match').style.display=t==='match'?'block':'none';
+  document.getElementById('hotTab_dispatch').style.display=t==='dispatch'?'block':'none';
+  ['tabCollect','tabMatch','tabDispatch'].forEach(id=>document.getElementById(id).classList.remove('primary'));
+  document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.add('primary');
+}
+function renderHotCollect(){
+  let html=state.hotspots.map((h,i)=>{
+    let rankClass='';if(i<3)rankClass='';else if(i<6)rankClass='blue';else rankClass='green';
+    return `<div class="hot-item">
+      <div class="hot-rank ${rankClass}">${h.rank}</div>
+      <div>
+        <div style="font-weight:650;font-size:14px">${esc(h.title)}</div>
+        <div class="hot-meta">${esc(h.source)} · ${esc(h.heat)}</div>
+        <div class="hot-meta muted">${esc(h.desc)}</div>
+      </div>
+      <div class="hot-match">
+        <span class="tag">LLM 匹配中 ✓</span>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('hotCollectList').innerHTML=html;
+}
+function renderHotMatch(){
+  let groups={};
+  state.matches.forEach(m=>{(groups[m.hotId]=groups[m.hotId]||[]).push(m)});
+  let html=state.hotspots.map(h=>{
+    let ms=groups[h.rank]||[];
+    let cards=ms.map(m=>`<div class="card" style="border-color:#e9e8ff">
+      <div class="cardhead"><h3>📍 ${esc(m.storeName)}</h3><span class="hot-score">${m.score}<small>%</small></span></div>
+      <div class="match-reason">${esc(m.reason)}</div>
+      <span class="tag green">已自动下发</span>
+    </div>`).join('');
+    return `<div class="card" style="margin-bottom:14px">
+      <div class="cardhead"><h3>🔥 ${esc(h.title)}</h3><span class="tag">${esc(h.source)}</span></div>
+      <div class="hot-meta muted" style="margin-bottom:12px">${esc(h.heat)} · ${esc(h.desc)}</div>
+      ${cards||'<div class="muted">本次匹配无达到阈值的门店</div>'}
+    </div>`;
+  }).join('');
+  document.getElementById('hotMatchList').innerHTML=html;
+}
+function renderHotDispatch(){
+  let rows=state.dispatches.map(d=>`<tr>
+    <td class="muted">${d.time}</td><td>${esc(d.hot)}</td><td>${esc(d.storeName)}</td>
+    <td><span class="tag">${d.score}%</span></td>
+    <td>${d.adopted?'<span class="tag green">已采纳</span>':'<span class="tag gray">未采纳</span>'}</td>
+    <td class="muted">${esc(d.effect)}</td>
+  </tr>`).join('');
+  document.getElementById('hotDispatchList').innerHTML=rows;
+}
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 # Demo 与产品设计验收追踪矩阵
 
-版本：v1.4  
-对应产品基线：[PRODUCT_DESIGN.md v1.6](PRODUCT_DESIGN.md)  
+版本：v1.5  
+对应产品基线：[PRODUCT_DESIGN.md v1.7](PRODUCT_DESIGN.md)  
 对应 UI/UX 审查：[UX_AUDIT_AND_REDESIGN.md](UX_AUDIT_AND_REDESIGN.md)
 
 > 本矩阵明确区分产品要求、当前 Demo 实现和生产服务边界。未实现的能力必须列为缺口，不得用静态展示或模拟数据宣称已完成。

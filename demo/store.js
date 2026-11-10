@@ -1,5 +1,7 @@
 import {seed} from "./data.js";
-const KEY="ai-store-ops-demo-v2";
+const KEY="ai-store-ops-storefront-v1";
+const ADMIN_KEY="ai-store-ops-platform-admin-v1";
+const LEGACY_KEY="ai-store-ops-demo-v2";
 const SCHEMA_VERSION=8;
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
@@ -47,27 +49,40 @@ function normalize(){
 }
 export function load(){
   if(state)return state;
-  try{const raw=localStorage.getItem(KEY);state=raw?JSON.parse(raw):clone(seed);persistedSnapshot=raw||null}
-  catch{state=clone(seed);persistedSnapshot=null}
+  try{
+    const frontRaw=localStorage.getItem(KEY)||localStorage.getItem(LEGACY_KEY);
+    const adminRaw=localStorage.getItem(ADMIN_KEY);
+    state=frontRaw?JSON.parse(frontRaw):clone(seed);
+    if(adminRaw){const adminState=JSON.parse(adminRaw);state.admin=adminState.admin||state.admin;state.stores=adminState.stores||state.stores}
+    persistedSnapshot={front:frontRaw,admin:adminRaw};
+  }catch{state=clone(seed);persistedSnapshot={front:null,admin:null}}
   if(!state||typeof state!=="object"||Array.isArray(state))state=clone(seed);
   normalize();
   return state;
 }
 function restorePersisted(){
   let restored;
-  try{restored=persistedSnapshot?JSON.parse(persistedSnapshot):clone(seed)}catch{restored=clone(seed)}
+  try{
+    restored=persistedSnapshot?.front?JSON.parse(persistedSnapshot.front):clone(seed);
+    if(persistedSnapshot?.admin){const adminState=JSON.parse(persistedSnapshot.admin);restored.admin=adminState.admin||restored.admin;restored.stores=adminState.stores||restored.stores}
+  }catch{restored=clone(seed)}
   for(const key of Object.keys(state))delete state[key];
   Object.assign(state,restored);
   normalize();
 }
 export function save(){
+  const frontData={...state};delete frontData.admin;delete frontData.stores;
+  const adminData={admin:state.admin,stores:state.stores};
+  const frontSerialized=JSON.stringify(frontData),adminSerialized=JSON.stringify(adminData);
   try{
-    const serialized=JSON.stringify(state);
-    localStorage.setItem(KEY,serialized);
-    persistedSnapshot=serialized;
+    localStorage.setItem(ADMIN_KEY,adminSerialized);
+    localStorage.setItem(KEY,frontSerialized);
+    persistedSnapshot={front:frontSerialized,admin:adminSerialized};
     window.dispatchEvent(new CustomEvent("demo:changed"));
     return true;
   }catch(error){
+    try{if(persistedSnapshot?.admin)localStorage.setItem(ADMIN_KEY,persistedSnapshot.admin);else localStorage.removeItem(ADMIN_KEY)}catch{}
+    try{if(persistedSnapshot?.front)localStorage.setItem(KEY,persistedSnapshot.front);else localStorage.removeItem(KEY)}catch{}
     restorePersisted();
     window.dispatchEvent(new CustomEvent("demo:storage-error",{detail:{name:error?.name||"StorageError"}}));
     return false;

@@ -42,6 +42,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql+psycopg://store_operator:ci-only@localhost:5432/store_operator
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

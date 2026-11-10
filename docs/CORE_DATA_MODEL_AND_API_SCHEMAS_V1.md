@@ -1,0 +1,325 @@
+# 核心数据模型、API Schema 与事件 Schema v1
+
+> 对应 Issue：#5–#10（跨域工程化准备）
+> 状态：实现前评审草案；不是已冻结 OpenAPI、不是 Alembic 迁移，也不是代码实现声明
+> 日期：2026-11-11
+> 权威上位文档：`DOMAIN_INTEGRATION_CONTRACTS_V1.md`、`IDENTITY_STORE_SECURITY_DESIGN.md`、`MARKETING_TASK_DOMAIN_DESIGN.md`
+
+## 1. 本文用途与决策纪律
+
+本文把既有领域文档转成工程评审可以逐项核对的逻辑模型、API Schema 示例和事件 Envelope。不得跳过领域评审直接据此生成生产迁移。发生冲突时，先修订权威领域文档与审查记录，再更新本文。
+
+当前仍未决：平台管理员主体存储/初始化；Session idle/absolute timeout；邀请/注册/密码重置流程；Offer 规则覆盖范围；上传安全策略；Job 调度阈值；Prompt 发布审批；首个渠道选择；owner/member 是否需要不同业务能力。本文不擅自关闭这些决策。
+
+## 2. 全局类型与数据库约定
+
+| 语义 | 逻辑类型 | 约束 |
+|---|---|---|
+| 主键/外键 | UUID | 门店业务表另有 `store_id UUID NOT NULL` |
+| 时间 | TIMESTAMPTZ | 数据库存 UTC；API 使用 RFC 3339 offset-aware 时间 |
+| 金额 | NUMERIC(12,2) + CHAR(3) | 禁止 float；币种不可缺省于金额 |
+| 哈希/指纹 | CHAR(64) 或 BYTEA | SHA-256；编码约定全仓库统一 |
+| 状态 | TEXT + CHECK 或 PostgreSQL ENUM | 全仓库选一种策略；状态值由领域文档定义 |
+| 结构化扩展 | JSONB | 必须有 schema_version；核心关联字段不得藏入 JSONB |
+| 逻辑删除 | archived_at / status | 不以物理删除破坏审计、版本和发布证据 |
+
+所有门店子资源使用 `(store_id, id)` UNIQUE；子资源外键优先使用 `(store_id, parent_id)` 或更完整的复合外键。每条门店请求必须先构造 AuthorizedStoreContext，再访问业务对象。PostgreSQL RLS 是纵深防御，不替代应用授权。
+
+## 3. 跨域逻辑 ERD
+
+### 3.1 Identity 与 Store
+
+```mermaid
+erDiagram
+  USER ||--o{ SESSION : authenticates
+  USER ||--o{ STORE_USER : membership
+  STORE ||--o{ STORE_USER : contains
+  USER ||--o{ AUDIT_EVENT : acts
+  STORE ||--o{ AUDIT_EVENT : scopes
+  STORE_USER ||--o{ AUDIT_EVENT : authorizes
+```
+
+核心约束：
+- `users.email_normalized` UNIQUE；密码只存 Argon2id hash。
+- `store_users(store_id,user_id)` UNIQUE；成员状态为 invited/active/suspended/removed。
+- Session 只存 Token hash/verifier；不保存可绕过成员校验的 current_store_id。
+- `X-Store-Id` 是请求的门店选择，不是授权凭证；每个请求实时验证 active Store + active StoreUser。
+- 平台管理员身份不得混入 StoreUser.role，也不得默认读取门店业务内容。
+
+### 3.2 Store Knowledge
+
+```mermaid
+erDiagram
+  STORE ||--o| STORE_PROFILE : profile
+  STORE ||--o{ PRODUCT : offers
+  STORE ||--o{ OFFER : promotes
+  STORE ||--o| BRAND_GUIDELINE : governs
+  STORE ||--o{ KNOWLEDGE_ITEM : knows
+  STORE ||--o{ MEDIA_ASSET : owns
+  MEDIA_ASSET ||--o{ MEDIA_ASSET : derived_from
+```
+
+- StoreProfile/BrandGuideline 一店一份时使用 UNIQUE(store_id)。
+- Product 的 SKU 可空；非空时 UNIQUE(store_id, sku)。
+- Offer 的有效期为 UTC；适用规则由 discriminated union Schema 校验。
+- MediaAsset 是来源素材；不可被营销生成物覆盖。对象 key 不公开，只由授权服务签发短时 URL。
+
+### 3.3 Marketing Orchestrator 与 Content
+
+```mermaid
+erDiagram
+  STORE ||--o{ MARKETING_TASK : scopes
+  MARKETING_TASK ||--o{ REQUIREMENT_SNAPSHOT : snapshots
+  MARKETING_TASK ||--o{ STRATEGY_SNAPSHOT : snapshots
+  MARKETING_TASK ||--o{ BUSINESS_FACT_SNAPSHOT : captures
+  MARKETING_TASK ||--o{ TASK_STEP : progresses
+  TASK_STEP ||--o{ STEP_DECISION : decides
+  MARKETING_TASK ||--o{ ARTIFACT : produces
+  ARTIFACT ||--o{ ARTIFACT_VERSION : versions
+  ARTIFACT_VERSION ||--o{ REVIEW_RECORD : reviewed
+  ARTIFACT_VERSION ||--o{ REVISION_REQUEST : revised
+  MARKETING_TASK ||--o{ DEPENDENCY_EDGE : links
+  MARKETING_TASK ||--o{ QUALITY_CHECK : validates
+  MARKETING_TASK ||--o{ PUBLISH_PACKAGE : freezes
+  PUBLISH_PACKAGE ||--o{ PUBLISH_CONFIRMATION : confirms
+  PUBLISH_PACKAGE ||--o{ PUBLISH_ATTEMPT : publishes
+  MARKETING_TASK ||--o{ TASK_EVENT : emits
+```
+
+- MarketingTask 是业务聚合根；Artifact/Review/Package 由 #8 持有，Job/Outbox 由 #9 持有。
+- RequirementSnapshot、StrategySnapshot、BusinessFactSnapshot、ArtifactVersion、ReviewRecord、PublishPackage、PublishConfirmation 均按不可变记录处理。
+- 文案与图片审核分别按 artifact_type/version 绑定；审核旧版本不能批准新版本。
+- 依赖边记录上游版本 ID + fingerprint；失效只沿真实依赖闭包传播。
+- 发布确认必须绑定冻结包的确切 fingerprint。
+
+### 3.4 Job Runtime 与 AI
+
+```mermaid
+erDiagram
+  STORE ||--o{ JOB : scopes
+  JOB ||--o{ JOB_ATTEMPT : attempts
+  JOB ||--o{ JOB_EVENT : emits
+  JOB ||--o{ AI_INVOCATION : invokes
+  OUTBOX_EVENT }o..|| JOB : dispatches
+  PROMPT_VERSION ||--o{ AI_INVOCATION : selected
+```
+
+- PostgreSQL 是 Job/Attempt/Outbox 状态事实源；Celery + Redis 仅提供至少一次投递。
+- Job 状态唯一枚举：queued/running/retry_wait/succeeded/failed/dead/needs_human/cancelled。
+- AIInvocation 与 Job 状态独立；PromptVersion 必须固定不可变版本引用。
+- 发布超时等外部副作用结果不确定时进入 needs_human，对账前禁止盲目重发。
+
+## 4. API 通用约定
+
+### 4.1 请求头
+
+| Header | 要求 | 语义 |
+|---|---|---|
+| Cookie | 门店 API 必须 | HttpOnly Session；不允许 localStorage Token |
+| X-Store-Id | 门店作用域 API 必须 | 选择当前门店；服务端校验成员关系 |
+| Idempotency-Key | 所有有副作用 POST 必须 | 同一作用域同一 key + 同一 request hash 返回原结果；不同 hash 返回 409 |
+| If-Match / expected_version | 更新聚合根必须 | 乐观并发控制；过期版本返回 409 |
+| X-CSRF-Token | Cookie Session 写请求必须 | Session 绑定 synchronizer token |
+| X-Request-Id | 可选输入 | 服务端生成或规范化，贯穿日志与事件 |
+
+### 4.2 标准错误响应
+
+```json
+{
+  "code": "VERSION_CONFLICT",
+  "message": "The resource has changed. Reload and retry.",
+  "request_id": "req_01J...",
+  "details": {
+    "expected_version": 4,
+    "current_version": 5
+  }
+}
+```
+
+| HTTP | code 示例 | 规则 |
+|---|---|---|
+| 400 | STORE_CONTEXT_REQUIRED | 缺少 X-Store-Id |
+| 401 | AUTH_REQUIRED / SESSION_EXPIRED | 未认证或 Session 无效 |
+| 403 | ACTION_FORBIDDEN | 已认证但无动作能力 |
+| 404 | RESOURCE_NOT_FOUND | 不存在或不属于当前门店，统一语义 |
+| 409 | VERSION_CONFLICT / IDEMPOTENCY_KEY_REUSED | 并发冲突或幂等键被不同请求复用 |
+| 422 | VALIDATION_ERROR | Schema/业务规则不合法 |
+| 429 | RATE_LIMITED | 触发限流 |
+| 5xx | INTERNAL_ERROR | 不向客户端泄露堆栈、Secret 或厂商原始异常 |
+
+## 5. 核心 API Schema 示例
+
+以下为逻辑 Schema 示例。最终 Pydantic 模型和 OpenAPI 由对应 API 模块生成，不允许人工维护两份互相漂移的事实源。
+
+### 5.1 创建营销任务
+
+```json
+{
+  "task_type": "full_marketing",
+  "title": "周末新品推广",
+  "requirement": {
+    "goal": "提升新品到店体验",
+    "product_ids": ["2f9d6a2e-0000-4000-8000-000000000001"],
+    "audience": "周边家庭客群",
+    "channels": ["wechat_official_account"],
+    "desired_publish_at": "2026-11-14T02:00:00Z"
+  }
+}
+```
+
+规则：
+- 请求体不接受 store_id、created_by、role、capabilities；门店和操作者由 AuthorizedStoreContext 注入。
+- 返回 201，包含 task id、lifecycle_status、version、当前步骤摘要和 created_at。
+- 重复 Idempotency-Key + 相同请求体返回同一资源；相同 key + 不同请求体返回 409。
+
+### 5.2 确认需求/策略（统一并发语义）
+
+```json
+{
+  "expected_version": 3,
+  "decision": "confirm",
+  "payload": {
+    "goal": "提升新品到店体验",
+    "audience": "周边家庭客群",
+    "key_messages": ["新品特点以已确认商品资料为准"]
+  },
+  "reason": null
+}
+```
+
+规则：
+- 服务端校验当前 task.version；确认后追加不可变 Snapshot，不覆盖历史。
+- 若上游资料/版本在确认过程中变化，必须重算 fingerprint 并要求重新确认，不得沿用旧确认。
+- 返回新 task.version 与 snapshot_id。
+
+### 5.3 审核指定产物版本
+
+```json
+{
+  "review_type": "copy",
+  "artifact_version_id": "7e8c9a10-0000-4000-8000-000000000002",
+  "decision": "revision_requested",
+  "comment": "首句需要更明确的新品利益点",
+  "target": {
+    "kind": "text_range",
+    "start": 0,
+    "end": 18
+  }
+}
+```
+
+规则：
+- review_type 必须与 Artifact.artifact_type 一致；copy 与 image 审核独立。
+- ReviewRecord 绑定精确 artifact_version_id；旧版本审核不能作用于新版本。
+- 通过审核的版本一旦生成新版本，新版本必须重新审核。
+
+### 5.4 冻结发布包与最终确认
+
+```json
+{
+  "channel_key": "wechat_official_account",
+  "expected_task_version": 8,
+  "copy_version_id": "7e8c9a10-0000-4000-8000-000000000003",
+  "image_version_ids": ["7e8c9a10-0000-4000-8000-000000000004"],
+  "quality_check_id": "7e8c9a10-0000-4000-8000-000000000005"
+}
+```
+
+规则：
+- Freeze 时重新校验审核、渠道规格、事实快照、质检指纹和所有版本归属。
+- 冻结包不可变；最终确认只接受 package_id + fingerprint。
+- 任一上游变化产生新包，旧确认不继承。
+- 发布请求只接受已确认的包；#12 渠道 Adapter 执行外部副作用。
+
+### 5.5 Job 人工恢复/处理
+
+```json
+{
+  "expected_version": 6,
+  "action": "retry",
+  "reason": "已核实上游服务恢复"
+}
+```
+
+规则：
+- retry/cancel/resolve 均需授权、审计和 Idempotency-Key。
+- resolve 仅适用于 needs_human，必须记录核验结果与操作者。
+- 对外发布不确定结果必须先查证渠道端状态，不得直接 retry。
+
+## 6. 事件 Envelope 与示例
+
+所有跨域事件采用版本化 envelope：
+
+```json
+{
+  "event_id": "0b2f4f2a-0000-4000-8000-000000000001",
+  "event_type": "marketing_task.snapshot_changed",
+  "schema_version": 1,
+  "occurred_at": "2026-11-11T02:30:00Z",
+  "store_id": "2f9d6a2e-0000-4000-8000-000000000001",
+  "aggregate": {
+    "type": "marketing_task",
+    "id": "7e8c9a10-0000-4000-8000-000000000001",
+    "version": 4
+  },
+  "correlation_id": "req_01J...",
+  "causation_id": "0b2f4f2a-0000-4000-8000-000000000000",
+  "actor": {
+    "type": "user",
+    "id": "7e8c9a10-0000-4000-8000-000000000010"
+  },
+  "data": {
+    "snapshot_type": "requirement",
+    "snapshot_id": "7e8c9a10-0000-4000-8000-000000000011",
+    "content_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}
+```
+
+事件规则：
+- Outbox 与业务写入同一数据库事务；投递失败可重试。
+- 消费者按 event_id 幂等；事件重复、乱序均不得导致状态倒退。
+- 消费者处理前校验 aggregate.version 和 fingerprint；旧版本事件不得覆盖新状态。
+- payload 只放必要引用/状态/摘要；不放 Cookie、Token、Secret、原始敏感 Prompt 或大文件。
+- schema_version 变化必须兼容性评审；破坏性变更使用新版本或新 event_type。
+
+## 7. 状态/并发/幂等的数据库约束清单
+
+1. 聚合根 `version > 0`；更新使用 `WHERE id=? AND store_id=? AND version=?`，成功后 version + 1。
+2. 幂等记录唯一键至少包含 `store_id, actor_scope, operation, idempotency_key`；actor_scope 必须允许 user 与 system 分离。
+3. 快照序号唯一：`UNIQUE(store_id, task_id, snapshot_no)`。
+4. 产物版本唯一：`UNIQUE(store_id, artifact_id, version_no)`。
+5. 审核记录只追加；审核必须 FK 到精确 artifact_version。
+6. 依赖边需支持上游与下游两个方向索引；同一版本依赖边唯一。
+7. Job 尝试唯一：`UNIQUE(job_id, attempt_no)`；租约领取用原子 UPDATE/SELECT FOR UPDATE SKIP LOCKED。
+8. Outbox 消费端持久化 event_id 去重；Relay 通过租约/锁避免并发重复 claim。
+9. PublishPackage 冻结后禁止 UPDATE；PublishConfirmation 绑定 package fingerprint。
+10. PublishOperation 对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
+11. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
+12. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
+
+## 8. 必须补齐的实现前 Schema 工件
+
+| 工件 | Owner | 退出条件 |
+|---|---|---|
+| Pydantic request/response models + OpenAPI snapshot | #4/API 各模块 | Schema 可生成、diff 可审查 |
+| SQLAlchemy models + Alembic migrations | #5–#9 各数据 owner | PostgreSQL 干净库 upgrade/downgrade 或明确不可逆策略通过 |
+| Event JSON Schema | #7–#10 | schema_version、兼容策略、契约测试齐全 |
+| Provider request/result Pydantic models | #9/#10 | Text/Image/Vision/OCR 正常与错误响应测试 |
+| DB constraint integration tests | #5–#9 | 复合 FK、唯一键、并发、租约在真实 PostgreSQL 验证 |
+| API contract tests | #4/#5–#10 | OpenAPI snapshot、错误码、幂等、If-Match 语义验证 |
+
+## 9. 评审门禁与当前未完成项
+
+- [ ] B/C/D 联合评审签字：表归属、跨域 FK、状态机和事件消费者。
+- [ ] #5 决议：平台管理员主体、Session timeout、邀请/重置流程、owner/member 能力映射。
+- [ ] #6 决议：Offer union 覆盖面、素材上传限制/扫描/保留。
+- [ ] #7/#8 决议：任务步骤与产物版本的精确依赖关系、审核/质检阻断策略。
+- [ ] #9 决议：Job lease/retry/sweeper 阈值、Outbox relay 调度与告警。
+- [ ] #10 决议：PromptVersion 发布/回滚权限、Provider 错误归一化。
+- [ ] 生成正式 OpenAPI 与 JSON Schema，不以本草案代替。
+- [ ] 生成 ERD 物理表/复合 FK/索引清单，并通过 PostgreSQL 迁移测试。
+- [ ] 自动化契约测试、跨店安全测试、幂等/并发/恢复测试。
+- [ ] 关联 Demo 路由和页面验收矩阵，确保接口与真实产品流程对应。
+
+**状态声明：** 本文完成的是文档层工程化准备。没有修改业务代码，没有生成或执行数据库迁移，没有生成正式 OpenAPI，没有执行测试；因此不代表任何生产能力已实现或测试通过。

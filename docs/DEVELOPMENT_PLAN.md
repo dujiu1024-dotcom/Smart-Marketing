@@ -17,6 +17,8 @@
 - `docs/DEMO_ACCEPTANCE_MATRIX.md`（v1.8）
 - `docs/TECHNICAL_ARCHITECTURE.md`
 - `docs/TECH_STACK_SELECTION.md`
+- `docs/IDENTITY_STORE_SECURITY_DESIGN.md`
+- `docs/DOMAIN_INTEGRATION_CONTRACTS_V1.md`
 
 不做 ERP、CRM、POS、广告投放/预算管理、通用工作流编排。固定营销流程由领域状态机控制；首期采用模块化单体 + 独立 Worker + Provider/Adapter，不拆业务微服务，不将 n8n 或 ComfyUI 设为硬依赖。
 
@@ -56,7 +58,11 @@
 - #8 与 #9 可并行设计：#8 定义业务动作及所需异步能力，#9 定义执行基础设施；双方通过版本化 JobType/command schema 和结果事件对齐。#9 不拥有营销业务状态，#8 不实现第二套队列。
 - #11/#12/#13 均消费上述已冻结契约，不得反向侵入核心状态机。
 
-## 5. 统一交付定义（DoD）
+## 5. 领域契约基线
+
+#5–#10 的跨域实体、字段、API、事件、状态枚举和错误语义统一以 `docs/DOMAIN_INTEGRATION_CONTRACTS_V1.md` 为评审入口；身份域细节以 `docs/IDENTITY_STORE_SECURITY_DESIGN.md` 为准，营销任务状态机以 `docs/MARKETING_TASK_DOMAIN_DESIGN.md` 为准。上述文档目前均为设计提案，只有完成 B/C/D 联合评审并记录决议后才视为冻结契约。
+
+## 6. 统一交付定义（DoD）
 
 每个 Issue 完成前必须逐项勾选：
 - [ ] 范围、非目标、Demo 页面/路由和相关状态已明确。
@@ -72,7 +78,7 @@
 
 建议测试命令以仓库 Makefile 为统一入口；提交前至少核对 `make help`（若存在）、`make test`、`make lint`、`make typecheck`、`make build` 和对应服务的专项测试。若命令尚未实现，应在该 Issue 中补齐并记录实际命令，禁止声称未执行的测试已通过。
 
-## 6. 当前状态解释
+## 7. 当前状态解释
 
 - Issue 状态、PR 状态和验收状态是不同事实。PR 合并不自动关闭所有相关 Issue；Issue 关闭必须有对应验收证据。
 - Stage 0 只有在浏览器验收报告、缺陷清单、矩阵更新和基线证据入库后才可关闭 #2。

@@ -10,7 +10,7 @@ return pageHead("PERFORMANCE CENTER","经营效果","独立评估营销表现。
 '</button>').join("")+
 '</div></div><div class="field-row three"><div class="field"><label>开始日期</label><input id="effectStart" type="date" value="'+range.start+
 '"></div><div class="field"><label>结束日期</label><input id="effectEnd" type="date" value="'+range.end+
-'"></div><div class="field"><label>分析对象</label><select id="effectTask"><option value="">全部营销活动</option>'+d.tasks.map(t=>'<option value="'+esc(t.id)+
+'"></div><div class="field"><label>分析对象</label><select id="effectTask"><option value="">全部营销活动</option>'+d.tasks.filter(t=>t.storeId===d.store.id).map(t=>'<option value="'+esc(t.id)+
 '" '+(effectTask===t.id?'selected':'')+
 '>'+esc(t.title)+
 '</option>').join("")+

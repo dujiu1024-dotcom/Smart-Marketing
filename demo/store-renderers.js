@@ -114,10 +114,10 @@ body='<div class="card"><h3>门店专属模型配置</h3><div class="notice warn
 return pageHead("STORE WORKSPACE",s.name+
 " · 门店资料","门店经营资料由本店在前端维护，与平台管理员后台独立。",btn("返回工作台","nav-ai"))+
 '<div class="tabs store-tabs" role="tablist" aria-label="门店资料分类">'+getStoreNav().map(x=>'<button type="button" role="tab" aria-selected="'+(getStoreTab()===x[0]?"true":"false")+
-'" data-store-tab="'+x[0]+
+'" id="store-tab-'+x[0]+'" aria-controls="store-tab-panel" data-store-tab="'+x[0]+
 '" class="'+(getStoreTab()===x[0]?"active":"")+
 '">'+x[1]+
 '</button>').join("")+
-'</div>'+body}
+'</div><div id="store-tab-panel" role="tabpanel" aria-labelledby="store-tab-'+getStoreTab()+'" tabindex="0">'+body+'</div>'}
  return {renderStore};
 }

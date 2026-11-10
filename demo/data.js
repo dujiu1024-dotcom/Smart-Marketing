@@ -26,7 +26,7 @@ seed.store.industryCategory="饮品";
 seed.store.category="现制茶饮";
 seed.products.forEach(p=>{delete p.cost;delete p.margin});
 seed.offers.forEach(o=>{delete o.approvedBy});
-seed.admin.systemConfig.industryCategories=["餐饮","饮品","美容","按摩","健身","零售","生活服务","宠物服务","教育培训"];
+seed.admin.systemConfig.industryCategories=["食品","餐饮","饮品","美容","按摩","健身","零售","生活服务","宠物服务","教育培训"];
 seed.stores=[
  {...JSON.parse(JSON.stringify(seed.store)),id:"store-001",name:"拾光茶研社（万象城店）",code:"SG-001",industryCategory:"饮品",industry:"餐饮 · 茶饮",category:"现制茶饮",status:"正常",users:[{id:"u1",name:"林店长",email:"manager@example.com",status:"启用"},{id:"u2",name:"周运营",email:"ops@example.com",status:"启用"}],modelConfig:{vendor:"OpenAI 兼容接口",model:"gpt-6-mini",endpoint:"https://api.example.com/v1",keyRef:"vault://store-001/key",textModel:"gpt-6-mini",imageModel:"image-model-demo"}},
  {...JSON.parse(JSON.stringify(seed.store)),id:"store-002",name:"拾光茶研社（湖滨店）",code:"SG-002",industryCategory:"饮品",industry:"餐饮 · 茶饮",category:"现制茶饮",city:"杭州市",district:"上城区",address:"平海路 124 号",status:"正常",users:[{id:"u3",name:"陈店长",email:"hubin@example.com",status:"启用"}],modelConfig:{vendor:"未配置"}},
@@ -35,6 +35,7 @@ seed.stores=[
  {...JSON.parse(JSON.stringify(seed.store)),id:"store-005",name:"力场健身工作室（钱江店）",code:"LC-005",industryCategory:"健身",industry:"运动健身",category:"私教工作室",city:"杭州市",district:"上城区",address:"钱江路 288 号",status:"正常",users:[{id:"u6",name:"赵店长",email:"fitness@example.com",status:"启用"}],modelConfig:{vendor:"未配置"}}
 ];
 seed.admin.prompts=[
+ {id:"pr-food-retail",name:"食品零售内容营销",industryCategory:"食品",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕食品配料、产地、储存方式、保质期、食品标签和真实使用场景生成内容。不得虚构营养、功效、产地、认证、销量或折扣。"},
  {id:"pr-food-brief",name:"餐饮需求理解",industryCategory:"餐饮",scope:"需求理解",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"你是餐饮门店营销顾问。识别堂食、外卖、时段、菜品、套餐、产能与食品安全限制。只使用门店确认的价格、原料、供应和优惠事实。输出结构化需求、缺失信息和风险。"},
  {id:"pr-food-copy",name:"餐饮内容生成",industryCategory:"餐饮",scope:"文案生成",version:"v1.0",status:"已发布",updated:"2026-11-10",template:"围绕已确认菜品、真实制作过程、消费场景和活动规则生成多平台内容。禁止虚构食材来源、功效、价格、销量、奖项和优惠。"},
  {id:"pr-drink-strategy",name:"饮品营销策略",industryCategory:"饮品",scope:"营销策略",version:"v1.2",status:"已发布",updated:"2026-11-10",template:"你是现制饮品门店营销策略顾问。结合饮品品类、季节、时段、原料供应、制作产能、商圈和客群制定可执行策略。不得虚构热度、库存、价格或优惠。"},

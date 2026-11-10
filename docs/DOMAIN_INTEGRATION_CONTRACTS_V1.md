@@ -276,3 +276,16 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 - [ ] #9/#10：AIInvocation 与 Job 分离、Provider 接口与真实适配器边界、Prompt 版本所有权。
 - [ ] 所有门店资源复合外键、统一错误语义、幂等和乐观锁约定。
 - [ ] API 路径、请求/响应 Schema 和事件 schema_version 进入 OpenAPI/契约测试。
+
+
+## 14. Identity request context and platform-admin boundary alignment
+
+Pending review of Identity PR #26, the canonical request context for store-scoped business APIs is `AuthorizedStoreContext` with `user_id`, `session_id`, `request_store_id`, `membership_id`, `role`, `capabilities`, `authorization_version`, and `request_id`.
+
+- Every store-scoped HTTP request supplies untrusted `X-Store-ID`; Identity validates active Store and active StoreMembership on that request.
+- `Session.active_store_id` is only a UI default preference and is never an authorization source.
+- Persisted `created_by_user_id` / `actor_user_id` maps to `AuthorizedStoreContext.user_id`; generic audit events may use explicit `actor_type` + `actor_id` for user, platform_admin, or system.
+- PlatformAdminGrant is separate from StoreMembership. The initial `platform.store_members.manage` capability is limited to membership administration and does not grant access to store business content, MarketingTask, Artifact, Asset, Job result, or publishing operations.
+- Worker execution must reload Job and resource ownership from PostgreSQL. It does not inherit a user's Session or a platform administrator's grant.
+
+PR #26 and Async Runtime PR #20 are still under review. This section records the cross-domain target contract and does not claim production authorization is implemented.

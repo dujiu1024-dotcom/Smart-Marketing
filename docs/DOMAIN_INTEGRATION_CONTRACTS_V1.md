@@ -12,7 +12,7 @@
 
 | 契约/数据 | 权威所有者 | 消费者 |
 |---|---|---|
-| User、Store 生命周期、StoreUser、Session、AuthorizedStoreContext | #5 Identity & Store | #6–#10 |
+| User、Store 生命周期、StoreMembership、Session、AuthorizedStoreContext | #5 Identity & Store | #6–#10 |
 | StoreProfile、Product、Offer、BrandGuideline、KnowledgeItem、MediaAsset | #6 Store Knowledge | #7–#10 |
 | MarketingTask、RequirementSnapshot、StrategySnapshot、TaskStep、DependencyEdge、TaskEvent | #7 Marketing Orchestrator | #8–#10 |
 | CopyArtifact、ImageArtifact、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishConfirmation | #8 Content/Media/Publishing | #7、#9、#10、#12 |
@@ -38,10 +38,10 @@ AI Gateway 与 Provider 的责任必须区分：#9 定义稳定调用接口、�
 
 ## 3. 身份上下文与门店成员关系（#5）
 
-规范对象：User、Store、StoreUser、Session、AuthorizedStoreContext。字段、Cookie、Session 轮换、撤销、CSRF 和 API 草案以 `IDENTITY_STORE_SECURITY_DESIGN.md` 为准。
+规范对象：User、Store、StoreMembership、Session、AuthorizedStoreContext。字段、Cookie、Session 轮换、撤销、CSRF 和 API 草案以 `IDENTITY_STORE_SECURITY_DESIGN.md` 为准。
 
 模块调用规则：
-- HTTP 层验证 Session，授权服务根据 active StoreUser + active Store 构造上下文。
+- HTTP 层验证 Session，授权服务根据 active StoreMembership + active Store 构造上下文。
 - 应用服务接收 context 参数，不接受 caller 自己组装的 actor/store/role。
 - Worker 不携带用户 Cookie；Job 只保存发起人引用和门店 ID，执行前后按 Job policy 重新验证门店和任务。
 - 平台管理员与门店身份分离，不因平台管理员身份默认可读取商家任务、文案、图片或经营数据。

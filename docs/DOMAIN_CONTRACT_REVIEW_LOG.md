@@ -9,13 +9,14 @@
 
 | 项目 | 统一结论 | 权威文档 |
 |---|---|---|
-| 身份与门店归属 | User/Store/StoreUser/Session 由 #5 所有；每个门店请求通过 X-Store-Id 表达上下文并由服务端重新验证成员关系 | IDENTITY_STORE_SECURITY_DESIGN.md |
-| Store 时区 | Store.status 与 Store.timezone 由 #5 持有；#6 StoreProfile 不得复制权威 timezone | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
+| 身份与门店归属 | User/Store/StoreUser/Session 由 #5 所有；每个门店请求通过 X-Store-Id 表达上下文并由服务端重新验证成员关系；Session 不保存授权性 current_store_id | IDENTITY_STORE_SECURITY_DESIGN.md |
+| Store 时区 | Store.status 与 Store.timezone 由 #5 持有；#6 StoreProfile/Offer 不得复制权威 timezone，Offer 时间使用 UTC 并按 Store.timezone 解释 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | 经营资料 | Product/Offer/BrandGuideline/KnowledgeItem/MediaAsset 由 #6 持有；MediaAsset 是素材库源资产，不等于营销 ImageArtifact | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | 营销流程 | MarketingTask/RequirementSnapshot/StrategySnapshot/TaskStep/DependencyEdge 由 #7 持有 | MARKETING_TASK_DOMAIN_DESIGN.md |
 | 内容审核与发布包 | Artifact/ArtifactVersion/ReviewRecord/ChannelContent/QualityReport/PublishPackage/PublishConfirmation 由 #8 持有 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | 渠道账号与发布执行 | ChannelAccount/平台凭据/能力状态/PublishOperation 由 #12 持有；#8 只负责门禁与业务命令 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | Job 状态 | 唯一枚举 queued/running/retry_wait/succeeded/failed/dead/needs_human/cancelled；删除 needs_attention 变体 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
+| CSRF 与门店上下文 | Cookie Session 写请求采用 Session 绑定 synchronizer token + Origin/Referer 校验；所有门店 API 要求服务端校验的 X-Store-Id | IDENTITY_STORE_SECURITY_DESIGN.md |
 | AI Gateway | #9 定义 AIInvocation、调用审计、成本、错误归一化与 Provider 接口；#10 实现真实 Provider 和 PromptVersion 管理 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | 数据库/队列 | PostgreSQL 是 Job/Attempt/Outbox 事实源；Celery + Redis 仅做至少一次投递；必须有 Outbox Relay 与 Sweeper | TECH_STACK_SELECTION.md + DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 

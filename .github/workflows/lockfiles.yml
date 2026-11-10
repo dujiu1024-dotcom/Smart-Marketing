@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: dependency-lockfiles-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   lockfiles:
     runs-on: ubuntu-latest
@@ -46,6 +50,7 @@ jobs:
           git add pnpm-lock.yaml apps/api/uv.lock apps/worker/uv.lock
           if ! git diff --cached --quiet; then
             git commit -m "build: commit generated dependency lockfiles"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
             git push
           else
             echo "Lockfiles are already up to date."

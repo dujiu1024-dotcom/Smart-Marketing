@@ -148,8 +148,8 @@ if(a==='disconnect-channel'){const c=storeList('channel').find(x=>x.id===id);if(
 if(a==='admin-go'){adminPage=id;go('admin:'+id);return}
 if(a==='admin-open-store'){const msg=handleAdminAction(a,id);storeTab="profile";render();toast(msg||"已打开门店详情");go("admin:store-detail");return}
 if(a==='admin-monitor-detail'){const msg=handleAdminAction(a,id);go("admin:monitor-detail");return}
-if(a==='admin-edit-prompt'){const msg=handleAdminAction(a,id);render();return}
-if(a==='admin-new-prompt'){const msg=handleAdminAction(a,id);render();return}
+if(a==='admin-edit-prompt'){handleAdminAction(a,id);go('admin:prompt-detail');return}
+if(a==='admin-new-prompt'){handleAdminAction(a,id);go('admin:prompt-detail');return}
 if(a.startsWith('admin-')){const msg=handleAdminAction(a,id);if(msg){render();toast(msg);return}}
 }
 window.addEventListener("demo:storage-error",()=>setTimeout(()=>toast("浏览器本地存储空间不足。请删除部分大图片素材后重试。"),0));

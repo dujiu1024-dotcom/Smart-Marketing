@@ -318,6 +318,54 @@ Job 状态建议：`queued`、`running`、`retry_wait`、`succeeded`、`failed`�
 5. 将本文件状态从“设计提案”改为“已冻结”前，需产品/技术评审确认；本文件不代表已完成数据库迁移、API 或生产代码。
 6. 实现阶段补齐状态迁移、依赖失效、审核隔离、幂等、并发、权限、Worker 恢复与发布不确定性测试，并更新 Demo 验收矩阵。
 
+## 14. 与 Identity & Store（轨道 B）的集成契约
+
+> 本节依据当前已提交的产品基线与技术架构定义营销任务域必须遵守的消费契约。轨道 B 的独立领域设计尚未出现在当前 docs 目录，因此以下内容是营销任务域的接口要求，不代表身份域实现细节已经最终冻结。轨道 B 后续若确定不同的字段/端点命名，应做映射，不得降低安全语义。
+
+### 14.1 请求身份与门店上下文
+
+- 请求主体由认证中间件解析为可信的 `actor_id`、`session_id`、`actor_type`；不得从请求体或普通 Header 信任 user_id、role、store_id。
+- 当前门店由服务端从已验证 Session + StoreMembership/StoreUser 关系解析。客户端可提交目标门店选择值，但该值仅作为“请求切换到哪个门店”的意图，必须先验证成员关系和门店状态。
+- 营销任务 API 的应用服务接收显式 `AuthorizedStoreContext`（概念契约：store_id、actor_id、membership_id、权限能力/授权版本）；该上下文只能由认证/授权层构造，业务模块不得自行解析客户端身份声明。
+- 创建任务时 `store_id` 从 AuthorizedStoreContext 注入；忽略或拒绝请求体中的 store_id。更新、审核、恢复、归档、发布等动作均再次执行资源门店归属和操作权限校验。
+- 权限至少区分：可查看任务、可编辑需求/策略、可审核文案、可审核图片、可最终确认/发布、可恢复/取消任务。具体角色映射由轨道 B 定义；营销域只依赖能力判定，不创建独立 RBAC 管理后台。
+
+### 14.2 资源归属与数据库约束
+
+- MarketingTask、RequirementSnapshot、StrategySnapshot、TaskStep、Artifact、ArtifactVersion、ReviewRecord、PublishPackage、PublishConfirmation、TaskEvent、AuditEvent、Job 等门店业务记录均保存 `store_id`。
+- 任务内子资源引用使用复合唯一键/外键（如 `(store_id, task_id)`、`(store_id, artifact_id)`），避免跨门店 ID 被合法外键误关联。
+- 读取资源时采用门店范围查询；不能先按全局 ID 读取对象再依赖前端隐藏。资源不存在与资源属于其他门店时按统一安全策略返回 404，避免泄露对象存在性。
+- 对象存储元数据必须保存 store_id、asset_id、version_id 和访问策略；下载/上传签名 URL 只能由已授权服务端短时签发，不能因猜中 object key 获得访问权。
+- PostgreSQL RLS 可作为纵深防御，但不能替代应用层授权；连接池事务必须可靠设置并清理门店上下文，防止上下文串用。
+
+### 14.3 异步 Job 的身份与授权边界
+
+- Job 创建时持久化 `store_id`、`marketing_task_id`、触发者 actor_id、操作类型、输入版本/指纹和 correlation_id；Worker 不接受客户端身份参数。
+- Worker 领取 Job 后，必须重新验证 task、artifact、version、asset 的 store_id 一致性和任务当前状态；执行完成写回前再次检查当前依赖指纹和业务版本。
+- 用户被移出门店、门店停用或权限撤销后，新的用户请求立即按轨道 B 的 Session/成员关系撤销策略拒绝。已排队 Job 的处置策略由动作风险决定：未开始的用户触发 Job 默认取消或转 needs_human；已经开始的只读/可安全计算 Job 可按策略完成但不得产生未经授权的外部副作用；发布类 Job 必须在真正发起外部副作用前重新验证门店状态、渠道授权和发布确认有效性。
+- Job 的 service identity 仅用于执行受托操作，不可扩大为跨门店访问权限；所有读取仍以 Job 绑定的 store_id 限定。
+
+### 14.4 审计与授权撤销
+
+- 营销域记录 task_id、store_id、actor_id、actor_type、membership/authorization reference、动作、目标版本、结果、原因、request_id、时间；密钥、Session Token 和敏感内容不得写入日志。
+- 成员加入/移除、门店停用、角色/能力变更由 Identity & Store 域产生权威审计事件；营销域可消费必要的撤销/失效事件以取消待执行动作，但不复制一套成员关系真相。
+- 审核和最终确认必须记录实际操作者；系统/Worker 代执行不得伪装成商家本人确认。
+
+### 14.5 轨道 B 对齐验收
+
+| ID | 场景 | 营销域预期 |
+|---|---|---|
+| SEC-MKT-01 | 请求体伪造 store_id 创建任务 | 忽略或拒绝伪造值；只写入授权上下文门店 |
+| SEC-MKT-02 | 将 task_id 替换为其他门店任务 | 统一 404/拒绝，不泄露存在性 |
+| SEC-MKT-03 | 将 artifact/version/review/package ID 跨门店替换 | 任何读写/审核/发布均被拒绝 |
+| SEC-MKT-04 | 用户切换到非成员门店 | 门店上下文解析失败，不执行任务操作 |
+| SEC-MKT-05 | 成员被移除后继续审核/恢复任务 | 请求按撤销后的授权状态失败 |
+| SEC-MKT-06 | Job 的 task_id 与 store_id 不匹配 | Worker 拒绝执行并记录安全事件 |
+| SEC-MKT-07 | 任务门店停用时触发发布 | 外部副作用前阻断，进入安全失败/人工处理 |
+| SEC-MKT-08 | 未授权访问对象存储版本 | 不签发可访问 URL；旧 URL 按既定有效期/撤销策略控制 |
+| SEC-MKT-09 | 门店 A 的授权上下文在连接池复用到门店 B | 事务结束清理上下文，RLS/应用层均不串店 |
+| SEC-MKT-10 | 平台管理员访问门店任务 | 仅按产品定义的管理权限允许，不因平台管理员身份默认获得全部经营内容访问权 |
+
 ## 13. 与现行基线的关系
 
 - 产品流程与审核门槛遵循 `PRODUCT_DESIGN.md v1.8`，本文件不得与之冲突。

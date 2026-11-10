@@ -62,8 +62,7 @@ Response 204；清除 active_store_id；后续门店业务 API 必须提供 X-St
 ### POST /admin/stores/{store_id}/members/invitations
 
 Request：email、role（首期只允许 member）。
-Response 202：membership_id、status=invited。
-邀请 token 一次性、短时有效，数据库仅保存 verifier。若开户/邀请流程未确认，该接口保持 pending，不得先实现不安全邀请链接。
+该端点仅为预留契约。只有注册/邀请、邮箱验证、邮件交付、一次性 token 生命周期和撤销流程经产品/安全评审冻结后才可实现；在此之前不得暴露该路由或返回 202 成功。启用后邀请 token 必须一次性、短时有效，数据库仅保存 verifier。
 
 ### PATCH /admin/stores/{store_id}/members/{membership_id}
 

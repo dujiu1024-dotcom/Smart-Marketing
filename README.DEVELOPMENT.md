@@ -69,3 +69,15 @@ uv run --locked python ../../apps/web/e2e/smoke.py
 ```
 
 该测试验证工程应用壳的页面响应、主标题、运行状态和能力边界提示，不代表冻结 Demo 的全部业务页面已完成。
+
+## 可观测性
+
+API 默认向标准输出写 JSON 结构化日志；敏感字段（密码、Token、Cookie、Authorization、API Key、数据库连接串等）会在序列化前递归脱敏。请求日志只记录请求 ID、方法、路径、状态码和耗时，不记录请求头、请求体或查询参数。
+
+如需向 OTLP HTTP Collector 导出 Trace，在 `.env` 中配置：
+
+```bash
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
+```
+
+不配置该变量时，API 仍创建本地 Trace，但不会向外部 Collector 导出。敏感字段脱敏和 SDK Span 导出管线由 API 单元测试覆盖。

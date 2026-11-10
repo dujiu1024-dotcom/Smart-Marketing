@@ -14,9 +14,8 @@ function normalize(){
   state.effects.reports=array(state.effects.reports);
   state.effects.sources=array(state.effects.sources);
   state.admin={...base.admin,...(state.admin||{})};
-  for(const key of ["tenants","users","models","prompts","roles","workflows","tickets","audit","runs"])state.admin[key]=array(state.admin[key],base.admin[key]);
-  state.admin.workflowConfig={...base.admin.workflowConfig,...(state.admin.workflowConfig||{})};
-  state.admin.attributionConfig={...base.admin.attributionConfig,...(state.admin.attributionConfig||{})};
+  for(const key of ["users","prompts","audit","runs"])state.admin[key]=array(state.admin[key],base.admin[key]);
+  for(const key of ["tenants","models","roles","workflows","tickets","workflowConfig","attributionConfig"])delete state.admin[key];
   state.admin.budgetConfig={...base.admin.budgetConfig,...(state.admin.budgetConfig||{})};
   state.admin.systemConfig={...base.admin.systemConfig,...(state.admin.systemConfig||{})};
   state.tasks.forEach(t=>{

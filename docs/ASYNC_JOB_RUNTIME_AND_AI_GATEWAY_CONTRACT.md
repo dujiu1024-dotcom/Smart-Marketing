@@ -364,7 +364,7 @@ Job Runtime API 是平台内部/受权限保护的运维能力，不向普通商
 - `POST /api/v1/admin/jobs/{job_id}/resolve`：提交人工核验结果并按规则创建后续执行。
 
 授权约束：
-- 所有门店任务查询由认证主体和 StoreUser 关系确定 store_id；跨门店 IDOR 测试必须覆盖 Job、Attempt、结果引用和恢复操作。
+- 所有门店任务查询由认证主体和 StoreMembership 关系确定 store_id；跨门店 IDOR 测试必须覆盖 Job、Attempt、结果引用和恢复操作。
 - 平台管理员权限与门店用户权限分离；普通商家不读取内部错误堆栈、Provider 原始响应或其他门店数据。
 - 重试/取消/人工恢复必须审计；不能把客户端传入的 store_id、actor_id 或权限标志当成授权事实。
 - Issue #5 的身份/门店授权契约是实现前置；在其通过前只能进行不依赖认证实现的领域/契约准备。
@@ -426,7 +426,7 @@ Job Runtime API 是平台内部/受权限保护的运维能力，不向普通商
 
 ### 实现前置
 - Issue #4：工程骨架、依赖锁定、配置与 Compose 基础。
-- Issue #5：认证、Session、StoreUser 和服务端门店授权；Job 管理 API 必须复用该授权边界。
+- Issue #5：认证、Session、StoreMembership 和服务端门店授权；Job 管理 API 必须复用该授权边界。
 - Issue #8：营销领域状态机与事件契约；Job payload 只能引用已冻结的领域对象/版本。
 - PostgreSQL、Redis 和对象存储本地环境可运行。
 

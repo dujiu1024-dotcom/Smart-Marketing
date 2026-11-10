@@ -1,6 +1,6 @@
 # Issue #9 与身份/营销领域跨域集成契约
 
-> 状态：跨域对齐提案，随 PR #20 评审；不是生产实现声明。对齐 Issue #5 Identity & Store、Issue #7 Marketing Task、Issue #9 Async Runtime / AI Gateway。
+> 状态：跨域对齐提案，随 PR #24 评审；不是生产实现声明。对齐 Issue #5 Identity & Store、Issue #7 Marketing Task、Issue #9 Async Runtime / AI Gateway。
 
 ## 1. 模块职责
 
@@ -91,7 +91,7 @@ Issue #7 与 #9 当前唯一范围描述略有差异。建议用户 API 写操�
 
 ## 7. 冻结前待确认
 
-1. Identity & Store 最终 AuthContext 字段名与 X-Store-ID 约定；本提案按 PR #19 的 request-scoped `X-Store-ID` / `AuthorizedStoreContext` 设计使用；Session.active_store_id 仅作为 UI 默认选择，不作为授权上下文。
+1. Identity & Store 最终 AuthContext 字段名与 X-Store-ID 约定；本提案按 PR #26 的 request-scoped `X-Store-ID` / `AuthorizedStoreContext` 设计使用；Session.active_store_id 仅作为 UI 默认选择，不作为授权上下文。
 2. Issue #7/#9 共同确认 Job 是否移除 `dead`，以及 terminal_reason 字段。
 3. Issue #7/#9 共同确认用户 API 幂等键唯一范围。
 4. 发布等外部副作用的最后授权检查与平台操作状态核验接口。

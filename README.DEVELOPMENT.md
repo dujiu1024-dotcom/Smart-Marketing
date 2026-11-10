@@ -19,7 +19,7 @@ docker compose -f infra/compose/docker-compose.yml up --build -d
 ## 本地运行 Web
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev:web
 ```
 
@@ -27,7 +27,7 @@ pnpm dev:web
 
 ```bash
 cd apps/api
-uv sync --extra dev
+uv sync --locked --extra dev
 uv run uvicorn store_operator.main:app --reload --app-dir src
 ```
 
@@ -35,7 +35,7 @@ uv run uvicorn store_operator.main:app --reload --app-dir src
 
 ```bash
 cd apps/worker
-uv run --with 'celery[redis]>=5.7,<5.8' celery -A store_operator_worker.celery_app:celery_app worker --loglevel=INFO --app-dir src
+uv sync --locked && uv run --locked celery -A store_operator_worker.celery_app:celery_app worker --loglevel=INFO --app-dir src
 ```
 
 ## 测试

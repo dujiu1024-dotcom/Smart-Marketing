@@ -1,0 +1,40 @@
+name: Generate dependency lockfiles
+
+on:
+  push:
+    branches: ["stage1/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lockfiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: pnpm install --lockfile-only
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - name: Generate API lockfile
+        working-directory: apps/api
+        run: uv lock
+      - name: Generate Worker lockfile
+        working-directory: apps/worker
+        run: uv lock
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dependency-lockfiles
+          path: |
+            pnpm-lock.yaml
+            apps/api/uv.lock
+            apps/worker/uv.lock
+          if-no-files-found: error
+          retention-days: 7

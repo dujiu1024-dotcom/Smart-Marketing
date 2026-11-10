@@ -18,7 +18,7 @@ function normalize(){
   state.admin={...base.admin,...(state.admin||{})};
   for(const key of ["users","prompts","audit","runs"])state.admin[key]=array(state.admin[key],base.admin[key]);
   state.admin.prompts=[...base.admin.prompts.filter(p=>!state.admin.prompts.some(x=>x.id===p.id)),...state.admin.prompts];
-  state.stores.forEach(st=>{for(const key of ["products","offers","assets","knowledge","channels","users"])if(!Array.isArray(st[key]))st[key]=clone(base.stores.find(x=>x.id===st.id)?.[key]||[]);});
+  state.stores.forEach(st=>{for(const key of ["products","offers","assets","knowledge","channels","users"])if(!Array.isArray(st[key]))st[key]=clone(base.stores.find(x=>x.id===st.id)?.[key]||[]);st.products.forEach(p=>{delete p.cost;delete p.margin});st.offers.forEach(o=>{delete o.approvedBy})});
   for(const key of ["tenants","models","roles","workflows","tickets","workflowConfig","attributionConfig"])delete state.admin[key];
   delete state.admin.budgetConfig;
   state.admin.systemConfig={...base.admin.systemConfig,...(state.admin.systemConfig||{})};

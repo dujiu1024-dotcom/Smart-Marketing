@@ -363,3 +363,12 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 - 工程门禁：GitHub Actions、Docker Compose、pytest、Vitest、Playwright、Ruff、TypeScript 检查与构建。
 
 首期不引入 Kubernetes、n8n 核心流程编排、ComfyUI 硬依赖或业务微服务群。生产云厂商、区域、托管对象存储、OIDC/SSO 和错误追踪供应商仍需按真实部署约束决策。
+
+
+## 16. 跨域契约权威文档（2026-11-11）
+
+- 身份与门店授权模型、Session 生命周期和安全测试以 [IDENTITY_STORE_SECURITY_DESIGN.md](IDENTITY_STORE_SECURITY_DESIGN.md) 为准。
+- #5–#10 的实体字段、API、事件、Job/AI 状态和跨域协作以 [DOMAIN_INTEGRATION_CONTRACTS_V1.md](DOMAIN_INTEGRATION_CONTRACTS_V1.md) 为联合评审入口。
+- 营销任务生命周期、TaskStep、审核依赖和版本失效规则以 [MARKETING_TASK_DOMAIN_DESIGN.md](MARKETING_TASK_DOMAIN_DESIGN.md) 为准。
+- 文档中的状态枚举必须保持唯一：异步 Job 的人工处理状态统一为 `needs_human`，不得另用 `needs_attention`。
+- 以上是设计契约，不代表功能已实现；只有联合评审记录、OpenAPI Schema、迁移和自动化测试齐备后，才允许标记冻结或实现完成。

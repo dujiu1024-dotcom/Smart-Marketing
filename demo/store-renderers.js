@@ -8,11 +8,9 @@ if(section==="profile")body='<div class="grid g2"><div class="card"><h3>门店�
 '</div>'+textarea("门店简介","intro",s.intro)+ '<div class="field-row">'+field("联系电话","phone",s.phone)+field("门店联系人","contact",s.contact)+
 '</div><div class="field-row">'+field("联系人电话","contactPhone",s.contactPhone)+field("开业时间","openedAt",s.openedAt,"date")+
 '</div><div class="field-row three">'+field("省份","province",s.province)+field("城市","city",s.city)+field("区县","district",s.district)+
-'</div>'+field("详细地址","address",s.address)+field("营业时间（摘要）","hours",s.hours,"text","详细时段按工作日、周末和节假日分别维护。")+field("工作日营业时间","weekdayHours",s.weekdayHours)+field("周末营业时间","weekendHours",s.weekendHours)+field("节假日营业时间","holidayHours",s.holidayHours)+field("门店面积","storeSize",s.storeSize)+field("座位 / 接待能力","seats",s.seats)+field("服务类型","serviceType",s.serviceType)+field("服务半径 / 配送范围","serviceRadius",s.serviceRadius)+field("门店服务能力","capacity",s.capacity)+field("临时停业日期","closedDates","","text","如有临时歇业，应在营销决策中阻止错误宣传。")+
+'</div>'+field("详细地址","address",s.address)+field("营业时间（摘要）","hours",s.hours,"text","详细时段按工作日、周末和节假日分别维护。")+field("工作日营业时间","weekdayHours",s.weekdayHours)+field("周末营业时间","weekendHours",s.weekendHours)+field("节假日营业时间","holidayHours",s.holidayHours)+field("门店面积","storeSize",s.storeSize)+field("座位 / 接待能力","seats",s.seats)+field("服务类型","serviceType",s.serviceType)+field("临时停业日期","closedDates","","text","如有临时歇业，应在营销决策中阻止错误宣传。")+
 '<div class="actions">'+btn("保存门店档案","save-store","","primary")+
-'</div></form></div><div class="card"><h3>经营画像与门店能力</h3><form id="storeInsightForm">'+textarea("品牌定位","positioning",s.positioning)+textarea("目标客群","audience",s.audience)+textarea("消费场景","scenes",s.scenes)+textarea("核心优势","strengths",s.strengths)+textarea("经营目标","goals",s.goals)+textarea("淡旺季与高峰时段","peak",s.peak)+textarea("产能与经营限制","constraints",s.constraints)+
-'<div class="actions">'+btn("保存经营画像","save-insight","","primary")+
-'</div></form><div class="divider"></div><h3>资料完整度</h3><div class="row between"><strong>基础资料 82%</strong><span class="pill amber">仍有待补充项</span></div><div class="progress mt"><span style="width:82%"></span></div><p class="small muted">建议补充门店坐标、分星期营业时间、节假日例外、服务范围和门店产能。</p></div></div>';
+'</div></form></div></div>';
 if(section==="products")body='<div class="card"><div class="card-head"><div><h3>商品与服务</h3><p class="small muted">商品事实会被 AI 用于策略、文案和图片质检。</p></div>'+btn("新增商品 / 服务","add-product","","primary")+
 '</div>'+table(["商品名称","分类 / SKU","规格","售价","可售状态","库存 / 产能","确认状态","操作"],products.map(p=>'<tr><td><strong>'+esc(p.name)+
 '</strong><div class="mono">'+esc(p.selling)+

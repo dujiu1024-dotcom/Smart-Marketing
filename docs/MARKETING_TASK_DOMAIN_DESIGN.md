@@ -124,13 +124,12 @@ MarketingTask 是流程协调聚合根，但大文件只保存对象存储引用
 | revision_requested | 商家要求修改，当前版本未通过 |
 | revising | 正在根据意见产生新版本 |
 | approved | 当前确切版本已通过 |
-
 | rejected | 当前版本被拒绝，不可进入交付 |
 | stale | 依赖已变化，当前审核结论不能用于当前交付 |
 
 状态规则：
 - AI 生成、商家上传、手动编辑、AI 整改均创建新 ArtifactVersion。
-- 审核通过只对 `artifact_version_id` 有效。新版本创建后，新版本状态为 waiting_for_review 或 replaced_by_merchant；旧版本审核记录保留，但不能替代新版本审核。
+- 审核通过只对 `artifact_version_id` 有效。新版本创建后，新版本状态为 waiting_for_review；旧版本审核记录保留，但不能替代新版本审核。
 - `revision_requested` 不等于 approved。整改失败不改变上一版本的历史审核结果。
 - 图片整改不重置文案审核；文案修改只使真实引用该文案事实/文字的图片变 stale 或待复核。
 - 一组图片按明确的审核单元分别记录；不得用其中一张通过代表整组通过。
@@ -221,7 +220,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 
 | 故障 | 处理 |
 |---|---|
-| Provider 限流/暂时不可用 | 指数退避 + 抖动；超过上限转 failed/dead，保留可恢复上下文 |
+| Provider 限流/暂时不可用 | 指数退避 + 抖动；超过上限转 failed；若副作用结果不确定则转 needs_human，保留可恢复上下文 |
 | 模型输出结构/事实校验失败 | 记录失败原因；按安全策略有限重试或等待人工处理，不写入正式版本 |
 | Worker 进程中断 | 租约过期后重新排队；以幂等键防重复写入 |
 | 对象存储上传失败 | 产物标记未完成，不允许审核/发布；可重传并校验 hash |

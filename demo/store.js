@@ -1,6 +1,6 @@
 import {seed} from "./data.js";
 const KEY="ai-store-ops-demo-v2";
-const SCHEMA_VERSION=4;
+const SCHEMA_VERSION=5;
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
 let persistedSnapshot=null;
@@ -23,7 +23,7 @@ function normalize(){
     t.copyStates=t.copyStates||{};t.copyReviews=array(t.copyReviews);t.copyHistory=array(t.copyHistory);
     t.copyVersionNumbers=t.copyVersionNumbers||{};t.imageVersions=array(t.imageVersions);
     t.channels=array(t.channels);t.events=array(t.events);t.strategy=t.strategy||{};
-    t.strategyStatus=t.strategyStatus||"draft";t.qualityChecks=t.qualityChecks||null;
+    t.strategyStatus=t.strategyStatus||"draft";t.briefConfirmed=!!t.briefConfirmed;t.briefSnapshot=t.briefSnapshot||null;t.confirmedStrategySnapshot=t.confirmedStrategySnapshot||null;t.channelAdaptedPlatforms=array(t.channelAdaptedPlatforms);t.qualityChecks=t.qualityChecks||null;
     t.publishPackage=t.publishPackage||null;
   });
   state.products.forEach(p=>{

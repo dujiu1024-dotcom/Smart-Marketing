@@ -21,7 +21,7 @@
 4. `docs/UX_AUDIT_AND_REDESIGN.md`：UI/UX 原则、体验问题和整改要求。
 5. `docs/DEMO_ACCEPTANCE_MATRIX.md`：功能实现状态、验收证据和生产缺口。
 
-按任务继续阅读 `docs/TECHNICAL_ARCHITECTURE.md`、`docs/REUSABLE_CAPABILITIES_FROM_ITERWAVE.md`、技术选型、API 契约、数据模型和相关模块文档。
+按任务继续阅读 `docs/TECHNICAL_ARCHITECTURE.md`、`docs/REUSABLE_CAPABILITIES_FROM_ITERWAVE.md`、`docs/DEVELOPMENT_PLAN.md`、技术选型、API 契约、数据模型和相关模块文档。
 
 不得假定聊天记录、旧文档、个人记忆或代码注释比仓库现行基线更准确。文档与代码冲突时，先记录差异，确认是否为获批变更；未经确认不得自行选择对产品影响最大的解释。
 
@@ -208,5 +208,6 @@ Demo 可使用明确标记的模拟数据和模拟适配器；生产实现必须
 - [Demo 验收矩阵](DEMO_ACCEPTANCE_MATRIX.md)
 - [技术架构与服务拆分方案](TECHNICAL_ARCHITECTURE.md)
 - [IterWave 可复用能力审查与整合方案](REUSABLE_CAPABILITIES_FROM_ITERWAVE.md)
+- [开发实施计划](DEVELOPMENT_PLAN.md)
 
 **本文件自提交进入仓库默认分支后生效。每次重大产品或架构决策变更，都必须审查并更新本文件。**

@@ -5,3 +5,9 @@
 .side-hint{padding:12px 14px;color:var(--muted);font-size:12px;line-height:1.7;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.45)}
 .store-tabs{margin:0 0 18px;display:flex;gap:6px;overflow-x:auto;white-space:nowrap}
 .store-tabs button{flex:0 0 auto}
+
+/* Stable, independently scrollable tabs */
+.store-tabs{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:thin;scroll-behavior:smooth;max-width:100%;padding-bottom:2px;gap:6px}
+.store-tabs button{flex:0 0 auto;min-height:40px;white-space:nowrap;cursor:pointer;touch-action:pan-x}
+.store-tabs button[aria-selected="true"]{color:var(--green);border-bottom:2px solid var(--green);font-weight:700}
+@media(max-width:760px){.store-tabs{margin-right:-12px;padding-right:12px}.store-tabs button{padding:10px 12px;font-size:12px}}

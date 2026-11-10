@@ -91,3 +91,6 @@ http://localhost:8080/demo/
 当前已完成部分代码逻辑与静态检查，但**尚未完成真实浏览器端到端验收**。没有浏览器实测证据的项目，均不得标记为“浏览器验收通过”或“正式验收通过”。
 
 详细状态、验证范围和待办以 [Demo 验收矩阵 v1.8](docs/DEMO_ACCEPTANCE_MATRIX.md) 为准。
+
+- [异步任务运行时与 AI Gateway 契约](docs/ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md)：Issue #9 的 PostgreSQL Job/Outbox、Celery Worker、租约/重试/恢复及 AI Provider 接口设计。
+- [异步运行时与身份/营销领域集成契约](docs/ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md)：对齐 Issue #5/#7/#9 的请求级门店授权、Worker 执行边界、Job 状态和幂等键。

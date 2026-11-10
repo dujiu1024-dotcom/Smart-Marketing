@@ -16,7 +16,7 @@ AI 门店运营官是面向线下门店的 AI 营销执行平台：商家按需�
 - [技术架构与服务拆分方案](docs/TECHNICAL_ARCHITECTURE.md)：模块化单体决策、业务模块边界、异步任务架构、数据/AI/渠道边界及渐进式微服务拆分路线。
 - [首期技术选型决策](docs/TECH_STACK_SELECTION.md)：前后端、数据库、队列、对象存储、认证、测试、部署与版本策略；技术栈已确认，生产部署环境仍按文档待决项处理。
 - [异步任务运行时与 AI Gateway 契约](docs/ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md)：Issue #9 的 PostgreSQL Job/Outbox、Celery Worker、租约/重试/恢复及 AI Provider 接口设计。
-
+- [异步运行时与身份/营销领域集成契约](docs/ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md)：对齐 Issue #5/#7/#9 的门店授权上下文、Worker 执行边界、Job 状态、幂等键和跨域验收矩阵。
 
 三份文档统一采用 v1.8 作为产品基线版本。修订日期和代码提交用于追踪变更，不另行形成产品版本。历史轮次记录不再作为现行验收依据；如历史结论与当前矩阵冲突，以产品基线和最新验收矩阵为准。
 

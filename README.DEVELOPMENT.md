@@ -3,7 +3,7 @@
 ## 先决条件
 
 - Docker Engine + Docker Compose
-- Node.js 26.x（Corepack + pnpm 10.8.1）
+- Node.js 26.x，并通过 npm 安装 pnpm 10.8.1：`npm install --global pnpm@10.8.1`
 - Python 3.13.x + uv
 
 ## 启动基础设施
@@ -19,8 +19,8 @@ docker compose -f infra/compose/docker-compose.yml up --build -d
 ## 本地运行 Web
 
 ```bash
-corepack pnpm install
-corepack pnpm dev:web
+pnpm install
+pnpm dev:web
 ```
 
 ## 本地运行 API
@@ -42,8 +42,10 @@ uv run --with 'celery[redis]>=5.7,<5.8' celery -A store_operator_worker.celery_a
 
 ```bash
 cd apps/api && uv run --extra dev pytest
-cd ../.. && corepack pnpm test
-corepack pnpm build
+cd ../..
+pnpm test
+pnpm typecheck
+pnpm build
 ```
 
 本 Issue 只交付工程骨架。Worker healthcheck 是基础设施 smoke task，不是具备 PostgreSQL Job/Outbox 持久化和恢复语义的正式 Job Runtime（Issue #9）。登录、门店授权、业务数据模型、真实 AI Provider 和渠道发布尚未实现。

@@ -17,7 +17,7 @@ def test_system_info_exposes_api_version():
     assert response.json()["api_version"] == "v1"
 
 
-def test_health_response_includes_request_id(client) -> None:
+def test_health_response_includes_request_id() -> None:
     response = client.get("/health/live", headers={"X-Request-ID": "test-request-123"})
 
     assert response.status_code == 200

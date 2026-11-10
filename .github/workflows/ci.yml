@@ -89,3 +89,40 @@ jobs:
       - name: Clean up Compose stack
         if: always()
         run: POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml down --volumes --remove-orphans
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pnpm install --frozen-lockfile
+      - name: Install pinned Playwright Chromium runtime
+        run: uv run --with playwright==1.56.1 --python 3.13 --no-project python -m playwright install --with-deps chromium
+      - name: Start Web application
+        run: |
+          pnpm --filter @store-operator/web dev -- --host 127.0.0.1 > /tmp/store-operator-web.log 2>&1 &
+          echo $! > /tmp/store-operator-web.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/store-operator-web.log
+          exit 1
+      - name: Run browser smoke E2E
+        run: uv run --with playwright==1.56.1 --python 3.13 --no-project python apps/web/e2e/smoke.py
+      - name: Stop Web application
+        if: always()
+        run: if [ -f /tmp/store-operator-web.pid ]; then kill "$(cat /tmp/store-operator-web.pid)" || true; fi

@@ -2,14 +2,16 @@
 
 AI 门店运营官是面向线下门店的 AI 营销执行平台：商家按需提出经营目标，AI 协助完成策略、文案、图片、渠道适配与发布准备，并在数据可用后评估经营效果。
 
-## 产品基线与文档
+## 项目宪法与产品基线
+
+本仓库的长期协作规则以 **[AI 门店运营官项目宪法](docs/PROJECT_CONSTITUTION.md)** 为准。所有 AI 和开发人员在开展工作前必须阅读宪法及相关基线文档；严格控制产品范围，按批准的 Demo 和业务流程实现，并以真实测试证据验收。
 
 本仓库以 **[产品设计基线 v1.8](docs/PRODUCT_DESIGN.md)** 为唯一产品范围与业务规则来源。
 
+- [项目宪法](docs/PROJECT_CONSTITUTION.md)：长期产品边界、文档优先、Demo 对齐、业务流程、工程质量门禁与变更纪律。
 - [产品设计基线 v1.8](docs/PRODUCT_DESIGN.md)：定位、业务边界、信息架构、核心流程与生产能力要求。
 - [UI/UX 审查与整改基线 v1.8](docs/UX_AUDIT_AND_REDESIGN.md)：交互原则、体验问题、整改要求与验证边界。
 - [Demo 验收矩阵 v1.8](docs/DEMO_ACCEPTANCE_MATRIX.md)：逐项实现状态、静态证据、浏览器验收状态及生产缺口。
-
 - [IterWave 可复用能力审查与整合方案](docs/REUSABLE_CAPABILITIES_FROM_ITERWAVE.md)：跨仓库能力审查、可复用技术底座、产品边界裁剪与 P0–P2 整合路线。
 - [技术架构与服务拆分方案](docs/TECHNICAL_ARCHITECTURE.md)：模块化单体决策、业务模块边界、异步任务架构、数据/AI/渠道边界及渐进式微服务拆分路线。
 

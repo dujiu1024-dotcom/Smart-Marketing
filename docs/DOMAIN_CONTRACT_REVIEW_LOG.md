@@ -60,7 +60,13 @@
 - AI Provider 429/超时/无效结构/凭据错误：按错误分类恢复，AIInvocation 与 Job 状态分别记录。
 - 平台管理员访问门店内容：默认拒绝，必要支持访问必须有单独授权和审计。
 
-## 5. 开发门禁
+## 5. 本轮审查范围与验证状态
+
+- 已完成：文档字段归属、状态枚举、接口边界、跨域事件和关键安全规则的静态交叉审查；发现的职责重叠与字段冲突已在权威文档和 Issues 中修订。
+- 已确定的设计选择：门店作用域请求使用服务端验证的 X-Store-Id；Cookie Session 写请求采用 Session 绑定 synchronizer CSRF token + Origin/Referer 校验；Store.timezone 由 #5 独占；Offer 时间以 UTC 存储；Job 人工处理状态统一 needs_human。
+- 未执行：代码级 Schema 校验、OpenAPI 生成、Alembic 迁移测试、PostgreSQL 约束验证、API/Worker 集成测试和浏览器 E2E。当前是文档设计审查，不能把它们标记为通过。
+
+## 6. 开发门禁
 
 在 B/C/D 轨道联合评审记录完成前：
 - 可以继续做接口 Schema、状态图、迁移草案和测试用例准备。

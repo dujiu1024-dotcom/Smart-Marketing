@@ -1,6 +1,6 @@
 import {seed} from "./data.js";
 const KEY="ai-store-ops-demo-v2";
-const SCHEMA_VERSION=5;
+const SCHEMA_VERSION=6;
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
 let persistedSnapshot=null;
@@ -8,6 +8,7 @@ const array=(v,fallback=[])=>Array.isArray(v)?v:clone(fallback);
 function normalize(){
   const base=clone(seed);
   state.store={...base.store,...(state.store||{})};
+  state.stores=array(state.stores,base.stores||[]);
   for(const key of ["tasks","products","assets","offers","knowledge","channels","hotspots"])state[key]=array(state[key],base[key]);
   delete state.dataSources;
   state.effects=state.effects||clone(base.effects);
@@ -18,6 +19,13 @@ function normalize(){
   for(const key of ["tenants","models","roles","workflows","tickets","workflowConfig","attributionConfig"])delete state.admin[key];
   state.admin.budgetConfig={...base.admin.budgetConfig,...(state.admin.budgetConfig||{})};
   state.admin.systemConfig={...base.admin.systemConfig,...(state.admin.systemConfig||{})};
+  state.admin.systemConfig.industryCategories=array(state.admin.systemConfig.industryCategories,base.admin.systemConfig.industryCategories||[]);
+  state.admin.selectedStoreId=state.admin.selectedStoreId||state.stores[0]?.id||state.store.id;
+  state.admin.selectedIndustryCategory=state.admin.selectedIndustryCategory||"饮品";
+  state.admin.selectedPromptId=state.admin.selectedPromptId||state.admin.prompts[0]?.id||"";
+  state.admin.selectedMonitorTaskId=state.admin.selectedMonitorTaskId||"";
+  state.products.forEach(p=>{delete p.cost;delete p.margin});
+  state.offers.forEach(o=>{delete o.approvedBy});
   state.tasks.forEach(t=>{
     t.copy=t.copy&&typeof t.copy==="object"?t.copy:{};
     t.copyStates=t.copyStates||{};t.copyReviews=array(t.copyReviews);t.copyHistory=array(t.copyHistory);

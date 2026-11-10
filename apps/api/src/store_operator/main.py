@@ -2,26 +2,25 @@ import time
 from uuid import uuid4
 
 import structlog
-from opentelemetry import trace
-from opentelemetry.context import attach, detach
-from opentelemetry.propagate import extract
-from opentelemetry.trace import Status, StatusCode
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from opentelemetry import trace
+from opentelemetry.context import attach, detach
+from opentelemetry.propagate import extract
 from opentelemetry.trace import Status, StatusCode
 from redis import Redis
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from store_operator.config import settings
-from store_operator.observability import configure_logging, configure_tracing
+from store_operator.observability import configure_logging
+from store_operator.tracing import configure_tracing
 
 configure_logging()
-tracer = configure_tracing(settings.otel_exporter_otlp_traces_endpoint)
-logger = structlog.get_logger("http")
 tracer_provider = configure_tracing(settings.app_name, settings.otel_exporter_otlp_traces_endpoint)
 tracer = trace.get_tracer("store_operator.api")
+logger = structlog.get_logger("http")
 
 app = FastAPI(
     title=settings.app_name,
@@ -86,7 +85,6 @@ async def request_id_logging_and_tracing_middleware(request: Request, call_next)
             return response
     finally:
         detach(context_token)
-
 
 
 @app.exception_handler(Exception)

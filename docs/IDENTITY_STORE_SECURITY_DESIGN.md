@@ -188,9 +188,9 @@ Session 原始 Token 只在创建/轮换时返回一次，以 Secure + HttpOnly 
 
 1. 平台管理员主体的存储方式和初始化/恢复流程。
 2. Session idle/absolute timeout 的明确时长；安全评审前建议 idle 30 分钟、absolute 12 小时，敏感认证事件立即轮换/撤销。
-3. CSRF 采用 synchronizer token 还是严格 Origin + double-submit 组合。
+3. CSRF 已确定采用 Session 绑定 synchronizer token + Origin/Referer 校验，需在实现评审中验证具体轮换和错误处理。
 4. owner/member 两种固定角色是否足够覆盖首期真实门店流程。
-5. 门店切换是写入 Session current_store_id，还是每个请求显式带上下文 header；无论哪种均由服务端校验。
+5. 门店切换采用每个门店作用域请求显式携带 `X-Store-Id`，不写入可作为授权依据的 Session current_store_id；实现时验证所有端点一致执行。
 6. 用户邀请/注册/密码重置的产品交互与邮件交付机制（不擅自接入第三方邮件供应商）。
 
 以上待决项未评审前，文档为设计提案。任何待决项不得通过实现时临时假设解决。

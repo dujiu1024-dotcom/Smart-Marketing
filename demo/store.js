@@ -1,6 +1,6 @@
 import {seed} from "./data.js";
 const KEY="ai-store-ops-demo-v2";
-const SCHEMA_VERSION=3;
+const SCHEMA_VERSION=4;
 const clone=x=>JSON.parse(JSON.stringify(x));
 let state;
 let persistedSnapshot=null;

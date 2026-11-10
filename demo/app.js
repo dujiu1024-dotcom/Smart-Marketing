@@ -3,7 +3,7 @@ import {renderAdmin,handleAdminAction,adminSections} from "./admin.js";
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pill=(v)=>{let c=/通过|已确认|已发布|已连接|可使用|正常|启用/.test(v)?"green":/失败|拒绝|阻断|禁用/.test(v)?"red":/待|未连接|未开始|模拟|草稿|观察中/.test(v)?"amber":"blue";return '<span class="pill '+c+'">'+esc(v)+'</span>'};
-const btn=(label,action,id="",kind="")=>'<button class="btn '+kind+'" data-action="'+action+'" data-id="'+esc(id)+'">'+label+'</button>';
+const btn=(label,action,id="",kind="")=>'<button type="button" class="btn '+kind+'" data-action="'+action+'" data-id="'+esc(id)+'">'+label+'</button>';
 let route=location.hash.slice(1)||"ai",currentTaskId="t1001",taskTab="strategy",storeTab="profile",copyPlatform="xhs",effectWindow="7天",adminPage="overview";
 function go(r){route=r;location.hash=r;render()}
 function toast(msg){const root=$("#toast-root");root.innerHTML='<div class="toast">'+esc(msg)+'</div>';setTimeout(()=>root.innerHTML="",2600)}
@@ -27,7 +27,7 @@ function renderAI(){const d=db(),pending=d.tasks.filter(t=>t.copyStatus!=="appro
 '<div class="grid g2"><section class="card"><div class="card-head"><h3>快速开始</h3><span class="pill green">按需制作</span></div><div class="list">'+[["新品推广","推广新商品或季节限定"],["节日营销","围绕节日/节点策划内容"],["到店引流","吸引周边客群到店"],["活动促销","推广已确认的优惠活动"],["品牌内容","持续输出品牌故事与门店内容"]].map((x,i)=>'<button class="list-item" data-action="quick-goal" data-value="'+x[0]+'"><div><strong>'+x[0]+'</strong><div class="meta">'+x[1]+'</div></div><span>→</span></button>').join("")+'</div></section><section class="card"><div class="card-head"><h3>AI 制定方案会参考</h3><span class="pill blue">门店经营上下文</span></div><div class="list">'+[["门店定位",d.store.positioning],["主推商品",d.products.filter(p=>p.priority==="主推").map(p=>p.name).join("、")],["目标客群",d.store.audience],["品牌语气",d.store.tone],["经营限制",d.store.constraints]].map(x=>'<div class="list-item"><div><strong>'+x[0]+'</strong><div class="meta">'+esc(x[1])+'</div></div><span class="pill green">已录入</span></div>').join("")+'</div><div class="notice info mt">AI 会标注事实来源。价格、优惠、库存、营业时间等事实不会由 AI 自行编造。</div></section></div>'+
 '<section class="card mt"><div class="card-head"><h3>最近的营销任务</h3>'+btn("全部任务","nav-tasks")+'</div>'+taskTable(d.tasks.slice(0,3))+'</section>';
 }
-function taskTable(tasks){return '<div class="table-wrap"><table><thead><tr><th>营销任务</th><th>目标商品</th><th>执行状态</th><th>文案审核</th><th>图片审核</th><th>发布状态</th><th>更新时间</th><th></th></tr></thead><tbody>'+tasks.map(t=>'<tr><td><strong>'+esc(t.title)+'</strong><div class="mono">'+esc(t.id)+' · '+esc(t.type)+'</div></td><td>'+esc(t.product)+'</td><td>'+pill(t.status)+'</td><td>'+pill(t.copyStatus==="approved"?"已通过":t.copyStatus==="pending"?"待审核":"未开始")+'</td><td>'+pill(t.imageStatus==="approved"?"已通过":t.imageStatus==="pending"?"待审核":"未开始")+'</td><td>'+pill(t.publishStatus)+'</td><td>'+esc(t.updatedAt)+'</td><td>'+btn("打开","open-task",t.id)+'</td></tr>').join("")+'</tbody></table></div>'}
+function taskTable(tasks){return '<div class="table-wrap"><table><thead><tr><th>营销任务</th><th>目标商品</th><th>执行状态</th><th>文案审核</th><th>图片审核</th><th>发布状态</th><th>更新时间</th><th></th></tr></thead><tbody>'+tasks.map(t=>'<tr><td><strong>'+esc(t.title)+'</strong><div class="mono">'+esc(t.id)+' · '+esc(t.type)+'</div></td><td>'+esc(t.product)+'</td><td>'+pill(t.status)+'</td><td>'+pill(t.copyStatus==="approved"?"已通过":t.copyStatus==="pending"?"待审核":"未开始")+'</td><td>'+pill(t.imageStatus==="approved"?"已通过":t.imageStatus==="pending"?"待审核":t.imageStatus==="stale"?"需复核":"未开始")+'</td><td>'+pill(t.publishStatus)+'</td><td>'+esc(t.updatedAt)+'</td><td>'+btn("打开","open-task",t.id)+'</td></tr>').join("")+'</tbody></table></div>'}
 function renderTasks(){const d=db();return pageHead("CAMPAIGN TASKS","营销任务","管理从策略、内容审核到渠道发布的执行过程。效果数据不会在任务刚发布时自动生成。",btn("新建营销任务","nav-ai","","primary"))+
 '<div class="grid g4 mb">'+stat("全部任务",d.tasks.length,"当前门店") +stat("待文案审核",d.tasks.filter(t=>t.copyStatus!=="approved").length,"需商家确认") +stat("待图片审核",d.tasks.filter(t=>t.imageStatus!=="approved").length,"需商家确认") +stat("待发布",d.tasks.filter(t=>t.publishStatus==="待人工发布").length,"渠道未连接时保存发布包")+'</div>'+
 '<div class="card"><div class="field-row three"><div class="field"><label>搜索任务</label><input id="taskSearch" placeholder="任务名称 / 商品 / ID"></div><div class="field"><label>执行状态</label><select id="taskFilter"><option value="">全部状态</option><option>待文案审核</option><option>内容制作中</option><option>待发布</option><option>已发布</option><option>已归档</option></select></div><div class="field"><label>任务类型</label><select id="taskType"><option value="">全部类型</option><option>新品推广</option><option>到店引流</option><option>节日营销</option><option>活动促销</option><option>品牌内容</option></select></div></div><div id="taskTable">'+taskTable(d.tasks)+'</div></div>';
@@ -71,6 +71,7 @@ if(kind==='offer')f=field('活动名称','name',x.name,'text','已确认的活�
 if(kind==='knowledge')f=field('标题','title',x.title,'text','菜单、FAQ、SOP、品牌资料等',true)+select('类型','type',['品牌资料','产品规范','服务 SOP','菜单资料','FAQ','活动规则','其他'],x.type||'FAQ')+field('来源','source',x.source||'商家录入')+field('版本','version',x.version||'v1')+field('负责人','owner',x.owner||'门店管理员')+field('有效期','valid',x.valid||'长期有效')+select('审核状态','status',['待确认','已确认','已过期','已归档'],x.status||'待确认')+textarea('知识内容','body',x.body);
 if(kind==='asset')f=field('素材名称','name',x.name)+select('素材类型','type',['产品图','门店环境','制作过程','品牌 Logo','活动海报','视频','其他'],x.type||'产品图')+field('关联商品 / 活动','product',x.product||'全店')+field('文件格式','format',x.format||'JPG')+field('文件大小','size',x.size||'待上传')+field('尺寸 / 时长','dimensions',x.dimensions||'待识别')+field('版权 / 肖像授权','rights',x.rights||'商家自有')+select('审核状态','status',['待审核','可使用','禁止使用'],x.status||'待审核');
 showModal(modalForm((id?'编辑':'新增')+({product:'商品 / 服务',offer:'活动优惠',knowledge:'知识文档',asset:'素材'}[kind]),f,'save-'+kind,id))}
+function openAdminEditor(action,id){const d=db(),map={"admin-edit-tenant":["tenants","编辑租户",field("租户名称","name"),field("门店数量","stores","","number"),field("套餐","plan"),field("状态","status")],"admin-edit-user":["users","编辑用户",field("姓名","name"),field("邮箱","email"),field("角色","role"),field("数据范围","scope"),field("状态","status")],"admin-edit-model":["models","编辑模型",field("供应商","vendor"),field("模型","name"),field("能力","capability"),field("端点","endpoint"),field("超时","timeout"),field("重试","retry","2","number"),field("路由","route"),field("状态","status")],"admin-edit-prompt":["prompts","编辑提示词",field("名称","name"),field("版本","version"),field("适用范围","scope"),field("状态","status")]};const m=map[action];if(!m)return;const x=d.admin[m[0]].find(v=>v.id===id)||{};const fields=m.slice(2).map(f=>f.replace(/value=\"[^\"]*\"/,'value="'+esc(x[(f.match(/name=\"([^\"]+)/)||[])[1]]||"")+'"')).join("");showModal(modalForm(m[1],fields,action.replace("edit-","save-"),id));}
 function createTask(goal){const d=db(),id='t'+Date.now();const t={id,title:goal.slice(0,28),goal,type:'自定义营销',product:d.products[0]?.name||'待选择',audience:d.store.audience,channels:['小红书'],status:'待策略确认',copyStatus:'not_started',copyStates:{},imageStatus:'not_started',publishStatus:'未发布',createdAt:new Date().toLocaleString('zh-CN'),updatedAt:new Date().toLocaleString('zh-CN'),strategy:{objective:'待确认',kpi:'待设置',audience:d.store.audience,scene:'待分析',insight:'基于门店资料与商品信息生成',selling:'待确认',theme:'待生成',channels:'待推荐',offer:'不自动创建优惠',assets:'待选择素材',risks:'待检查',measurement:'发布后等待数据积累'},copy:{xhs:{title:'',body:'',tags:''},douyin:{title:'',body:'',tags:''},video:{title:'',body:'',tags:''},kuaishou:{title:'',body:'',tags:''}},copyReviews:[],copyHistory:[],imageVersions:[],events:[]};d.tasks.unshift(t);save();currentTaskId=id;taskTab='strategy';event(id,'创建营销任务','目标已保存，等待策略理解','pending');go('task')}
 function formObject(form){return Object.fromEntries(new FormData(form).entries())}
 function invalidateImage(t,reason){if(t.imageVersions?.length){t.imageStatus='stale';t.imageVersions[0].status='需复核';event(t.id,'图片需要重新审核',reason,'pending')}}
@@ -116,7 +117,7 @@ if(forms[a])showModal(modalForm(forms[a][0],forms[a][1],forms[a][2]));
 else if(a==='admin-task-events'){const t=db().tasks.find(x=>x.id===id);showModal(renderModal('任务执行事件','<div class="timeline">'+(t?.events||[]).map(x=>'<div class="event"><span class="event-dot"></span><div><b>'+esc(x.label)+'</b><p>'+esc(x.detail)+'</p><time>'+esc(x.time)+'</time></div></div>').join('')+'</div>'))}
 else if(a==='admin-refresh'){render();toast('本地演示数据已刷新')}
 else if(a.startsWith('admin-save-')){render();toast('演示配置已保存')}
-else if(a.startsWith('admin-edit-'))toast('请通过对应模块查看并维护该配置');
+else if(a.startsWith('admin-edit-'))openAdminEditor(a,id);
 return}
 }
 document.addEventListener('click',ev=>{const x=ev.target.closest('[data-nav],[data-action],[data-task-tab],[data-copy-platform],[data-image-mode],[data-window]');if(x)handleClick(x)});
@@ -127,10 +128,10 @@ else if(a==='save-offer')id?update('offers',id,o):add('offers',o);
 else if(a==='save-knowledge')id?update('knowledge',id,o):add('knowledge',o);
 else if(a==='save-asset')id?update('assets',id,o):add('assets',o);
 else if(a==='save-data')add('dataSources',{...o,status:'未连接',lastSync:'—'});
-else if(a==='admin-save-tenant')add('admin.tenants',o);
-else if(a==='admin-save-user')add('admin.users',o);
-else if(a==='admin-save-model')add('admin.models',o);
-else if(a==='admin-save-prompt')add('admin.prompts',o);
+else if(a==='admin-save-tenant')id?update('admin.tenants',id,o):add('admin.tenants',o);
+else if(a==='admin-save-user')id?update('admin.users',id,o):add('admin.users',o);
+else if(a==='admin-save-model')id?update('admin.models',id,o):add('admin.models',o);
+else if(a==='admin-save-prompt')id?update('admin.prompts',id,o):add('admin.prompts',o);
 else if(a==='admin-save-ticket')add('admin.tickets',{...o,id:'inc-'+Date.now()});
 else if(a==='admin-save-role')add('admin.roles',o);
 audit('保存记录',a,id||'new');$('#modal-root')?.remove();render();toast('记录已保存到本地演示环境')});

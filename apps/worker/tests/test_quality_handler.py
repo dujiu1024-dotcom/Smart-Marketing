@@ -6,7 +6,6 @@ from threading import Event
 from uuid import uuid4
 
 import pytest
-
 from store_operator.models import ArtifactVersion, ChannelContent, QualityReport
 from store_operator_worker.handlers import JobExecutionContext, JobExecutionError
 
@@ -56,7 +55,7 @@ def make_context():
 def load_tasks_module(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
-    import store_operator_worker.tasks as tasks
+    from store_operator_worker import tasks
 
     return tasks
 

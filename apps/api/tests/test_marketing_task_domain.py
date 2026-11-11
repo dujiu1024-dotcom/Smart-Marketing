@@ -275,6 +275,8 @@ def test_task_type_applicability_matrix_matches_product_scope() -> None:
         resolve_step_applicability(
             MarketingTaskType.MERCHANT_CONTENT,
             TaskStepKey.COPY_PRODUCTION_REVIEW,
+            includes_copy=True,
+            includes_image=False,
         )
         is StepApplicability.OPTIONAL
     )
@@ -334,6 +336,12 @@ def test_dynamic_applicability_follows_selected_outputs_and_delivery_scope() -> 
 def test_invalid_task_types_and_empty_merchant_content_are_rejected() -> None:
     with pytest.raises(ValueError, match="Unknown marketing task type"):
         resolve_step_applicability("unknown", TaskStepKey.CONTEXT_SNAPSHOT)
+
+    with pytest.raises(ValueError, match="explicit copy and image applicability"):
+        resolve_step_applicability(
+            MarketingTaskType.MERCHANT_CONTENT,
+            TaskStepKey.CONTEXT_SNAPSHOT,
+        )
 
     with pytest.raises(ValueError, match="must include copy, image"):
         resolve_step_applicability(

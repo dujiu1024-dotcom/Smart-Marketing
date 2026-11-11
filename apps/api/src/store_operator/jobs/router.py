@@ -130,10 +130,11 @@ def cancel_job(
             job_id=job_id,
             store_id=_store_id(context),
             actor_user_id=auth.user.id,
+            idempotency_key=_idempotency_key(idempotency_key),
         )
         db.commit()
         db.refresh(job)
-    except (LookupError, InvalidJobTransition) as exc:
+    except (LookupError, InvalidJobTransition, ValueError) as exc:
         db.rollback()
         _raise_job_error(exc)
     return JobRead.model_validate(job)

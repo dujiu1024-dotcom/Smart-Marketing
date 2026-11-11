@@ -44,7 +44,7 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 
 ### 3.1 Artifact / ArtifactVersion
 
-- `Artifact` 是逻辑产物：`id, store_id, task_id, artifact_type(copy|image|channel_content), current_version_id, created_at`。
+- `Artifact` 是逻辑产物：`id, store_id, task_id, artifact_type(copy|image), current_version_id, created_at`。
 - `ArtifactVersion` 是不可变版本：`id, store_id, artifact_id, version_no, source_type(ai_generated|merchant_upload|manual_edit), source_refs_json, instruction, content_ref/content_json, content_hash, provider_id, model_id, prompt_version_id, input_fingerprint, created_by, created_at`。
 - 大图片/二进制放对象存储；DB 只保存受控 object key、hash、MIME、尺寸和版本元数据。不得返回永久公开 URL。
 - `current_version_id` 是展示/业务当前版本指针，不是历史事实；版本内容和来源信息禁止覆盖。
@@ -74,23 +74,29 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 
 ### 3.4 QualityReport
 
-`QualityReport`：`id, store_id, task_id, channel_content_id, rule_version, input_fingerprint, result(pass|fail|needs_human), issues_json, reviewer_id, resolution_reason, created_at`。
+`QualityReport`：`id, store_id, task_id, channel_content_id, rule_version, input_fingerprint, result(pass|fail|needs_human), issues_json, created_at`。
 
 - 质检报告按渠道内容快照生成；每条报告绑定规则版本和精确输入指纹，结果只追加。
 - Hard fail：事实错误、未审核版本、素材无权使用、越权渠道/账号、必要字段缺失等，不可人工绕过。
-- needs_human：软性风险或规则无法自动判断；必须由有权人员复核并记录操作者、理由和结论。
+- needs_human：软性风险或规则无法自动判断；原始 QualityReport 保持不可变，人工结论单独写入 QualityResolution。
 - pass 只代表指定规则版本下的检查通过，不代表法律合规保证或官方渠道已接受。
 - 输入或规则版本变化后旧报告标记 stale，不得用于冻结新包。
+
+`QualityResolution`：`id, store_id, quality_report_id, decision(accepted|rejected), reviewer_user_id, reason, created_at, idempotency_record_id`。
+- 仅允许对 `result=needs_human` 的报告追加 QualityResolution；decision=accepted 才允许该报告参与冻结，rejected 继续阻断。
+- `result=fail` 是 hard fail，不允许通过 QualityResolution 覆盖；必须修正输入并生成新报告。
+- QualityResolution 是追加式记录；不得回写 QualityReport 的 result、reviewer 或 resolution_reason。
 
 ### 3.5 PublishPackage / PublishPackageItem / PublishConfirmation
 
 Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须支持多渠道聚合，而不是把一个 `channel_content_id` 塞进单个包后丢失其他渠道。
 
 - `PublishPackage` 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, package_fingerprint, frozen_at, frozen_by`。事实快照通过 `PublishPackageFactRef` 子表引用，API 可投影为 fact_snapshot_ids[]。
-- `PublishPackageFactRef`：`id, store_id, publish_package_id, business_fact_snapshot_id, position`；通过复合 FK 引用 #6 的已确认 BusinessFactSnapshot。
+- `PublishPackageFactRef`：`id, store_id, publish_package_id, business_fact_snapshot_id, position`；通过复合 FK 引用 #7 的任务级 BusinessFactSnapshot；其 source revision 必须追溯至 #6 已确认的 StoreRecordRevision。
 - `PublishPackageItem` 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。文案/图片版本通过不可变 ChannelContent 间接绑定，避免在 PackageItem 重复存储版本数组。
-- `PublishConfirmation`：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at, confirmation_note`。
-- 一个 PublishPackage 至少包含一个 PackageItem；同一 package 的 channel_key 唯一。PackageItem 精确绑定 ChannelContent、QualityReport 和可选 ChannelAccount；Copy/Image 版本由 ChannelContent 的直接/子表引用间接冻结。
+- `PublishConfirmation`：`id, store_id, publish_package_id, package_fingerprint, confirmed_by_user_id, confirmed_at, confirmation_note`。
+- 一个 PublishPackage 至少包含一个 PackageItem 和一个已确认 BusinessFactSnapshot 引用；同一 package 的 channel_key 唯一。无可引用的已确认事实时不得进入最终发布确认。
+- PublishConfirmation 是不可变确认记录；首期不提供撤销接口。若未来允许撤销，必须新增独立追加式撤销记录，不得更新原确认行。PackageItem 精确绑定 ChannelContent、QualityReport 和可选 ChannelAccount；Copy/Image 版本由 ChannelContent 的直接/子表引用间接冻结。
 - `delivery_mode=official_api` 时必须引用 #12 已授权且支持该渠道动作的 ChannelAccount；`manual_handoff` 不得伪造账号或显示已发布。
 - 冻结包和 PackageItem 冻结后不可 UPDATE；任何上游内容变化创建新 package_version 和新 fingerprint。
 - 最终确认绑定整个 package fingerprint；任一渠道 item 变化都必须重新冻结并重新确认。
@@ -130,6 +136,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 | POST /artifact-versions/{version_id}/reviews | review_type、decision、comment、target、expected_version | ReviewRecord | review_type 不匹配、旧版本/重复提交 |
 | POST /channel-content | channel_key、copy_version_id、image_version_ids、spec_version | ChannelContent + Job 引用 | 版本未审核、渠道不支持、指纹过期 |
 | POST /quality-reports/run | channel_content_id、rule_version、expected_fingerprint | QualityReport + Job 引用 | ChannelContent 不属于当前门店或已 stale |
+| POST /quality-reports/{id}/resolutions | decision、reason、expected_fingerprint | QualityResolution | 非 needs_human、无权复核、fingerprint 已变化 |
 | POST /publish-packages/freeze | task_version、items[]、fact_snapshot_ids、expected_fingerprint | 不可变 PublishPackage + PackageItems | 任一 item 审核/质检不通过、指纹不匹配、版本跨店 |
 | POST /publish-packages/{id}/confirm | package_fingerprint、confirmation_note | PublishConfirmation | 包非当前版本、指纹不符、操作者无权确认 |
 | POST /publish-packages/{id}/publish | package_fingerprint、Idempotency-Key | #12 发布命令引用 + #9 Job 引用 | 未确认、账号未授权、账号能力不支持、重复命令 |
@@ -145,6 +152,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - `content.review_recorded`
 - `content.channel_content_created`
 - `content.quality_report_completed`
+- `content.quality_resolution_recorded`
 - `content.publish_package_frozen`
 - `content.publish_confirmed`
 - `content.publish_command_requested`（每个 official_api PackageItem 一条）
@@ -169,6 +177,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - ReviewRecord 必须 FK 到 (store_id, artifact_id, artifact_version_id)；唯一幂等记录避免重复审核动作。
 - ChannelContent 对 (store_id, channel_key, input_fingerprint) 建议唯一，另提供 (store_id, id, channel_key) 复合唯一键；copy_version_id 使用 store_id 复合 FK。
 - QualityReport FK 到确切 ChannelContent；提供 (store_id, channel_content_id, id) 复合唯一键，同一 channel_content_id + rule_version + input_fingerprint 幂等唯一。
+- QualityResolution 复合 FK 到同店 QualityReport；仅允许 needs_human 报告；decision=accepted/rejected 追加写，同一报告最多一条有效决议。
 - UNIQUE(store_id, task_id, package_version)。
 - UNIQUE(store_id, publish_package_id, channel_key)。
 - ChannelContentArtifactRef 复合 FK 到 ChannelContent 和 ArtifactVersion；UNIQUE(store_id, channel_content_id, position)。
@@ -193,7 +202,8 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 | CNT-11 | channel spec_version 变化 | 旧 ChannelContent stale，必须重新适配 |
 | CNT-12 | QualityReport 规则版本变化 | 旧报告 stale，不能冻结 |
 | CNT-13 | Hard fail 试图人工覆盖 | 拒绝 |
-| CNT-14 | needs_human 无操作者/理由确认 | 拒绝并审计 |
+| CNT-14 | needs_human 未创建 QualityResolution 或缺少操作者/理由 | Freeze 阻断并审计；accepted 决议允许，rejected 决议继续阻断 |
+| CNT-27 | 对 QualityReport hard fail 创建 QualityResolution 试图覆盖 | 拒绝；必须修复输入并重新质检 |
 | CNT-15 | 多渠道包缺少一个目标渠道质量报告 | Freeze 原子失败，不产生半包 |
 | CNT-16 | 同一 package 重复包含 channel_key | 409/422，唯一约束阻断 |
 | CNT-17 | PackageItem 跨店引用 ChannelContent/QualityReport，或图片引用跨店 ArtifactVersion | DB 复合 FK 拒绝 |
@@ -211,11 +221,11 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 
 1. 多渠道发布包采用本稿的 `PublishPackage + PublishPackageItem` 聚合方案，还是每渠道独立包；本稿推荐前者，以匹配 Demo 一次确认多个渠道的交互。
 2. #12 提供的 ChannelCapability/Spec Snapshot 字段、版本发布和失效事件。
-3. needs_human 的人工复核权限、可覆盖规则与审计字段；Hard fail 不允许覆盖。
+3. needs_human 的人工复核权限、QualityResolution 记录字段与审计；Hard fail 不允许覆盖。
 4. manual_handoff 首期仅展示待人工发布，还是需要可下载交付包；未获产品确认前不新增导出/外部协作功能。
 5. 图片 OCR/文字安全、素材恶意文件扫描由 #6/#10/#4 哪个服务提供；#8 只消费扫描/识别结果。
 6. 计划发布时间是否由 #8 仅保存意图，还是由 #12 负责调度；首期不引入独立调度系统。
-7. PublishConfirmation 是否允许撤销；若撤销，必须追加审计并阻止未执行的发布命令。
+7. 首期 PublishConfirmation 不提供撤销；未来若产品要求撤销，必须通过独立追加式撤销记录实现，并定义已提交发布命令的取消/对账边界。
 
 ## 12. 实施门禁
 

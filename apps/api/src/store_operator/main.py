@@ -20,6 +20,7 @@ from starlette.responses import Response
 
 from store_operator.admin_router import router as admin_router
 from store_operator.application.system_info import get_system_info
+from store_operator.auth.dependencies import SESSION_COOKIE_NAME
 from store_operator.auth.errors import ApiError
 from store_operator.auth.router import router as auth_router
 from store_operator.config import settings
@@ -140,9 +141,14 @@ async def http_exception_handler(
             429: ("RATE_LIMITED", "Rate limited"),
             503: ("SERVICE_UNAVAILABLE", "Service unavailable"),
         }.get(exc.status_code, ("HTTP_ERROR", "Request failed"))
-    return _error_response(
+    response = _error_response(
         request, status_code=exc.status_code, code=error[0], message=error[1]
     )
+    if getattr(request.state, "clear_session_cookie", False):
+        response.delete_cookie(
+            SESSION_COOKIE_NAME, path="/", secure=True, httponly=True, samesite="lax"
+        )
+    return response
 
 
 @app.exception_handler(RequestValidationError)

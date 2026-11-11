@@ -29,7 +29,7 @@ celery_app.conf.update(
     },
 )
 
-from store_operator_worker import tasks as _tasks  # noqa: E402,F401
+from store_operator_worker import tasks as _tasks  # noqa: F401
 
 
 @celery_app.task(name="system.healthcheck")  # type: ignore[untyped-decorator]

@@ -69,7 +69,7 @@
 - 门店业务端点从已验证的 request-scoped AuthContext 取得 `store_id`；请求头中的 `X-Store-ID` 仅是不可信 selector。
 - 详情查询同时约束资源 ID 与已授权 `store_id`；创建时由服务端注入 `store_id`。
 - 模块间只通过公开应用服务/API 契约交互，不导入其他模块的 repository、ORM model 或内部实现。
-- OpenAPI 是机器可读契约事实源；契约变更需同步生成客户端类型并在 CI 检查漂移。
+- OpenAPI 是机器可读契约事实源；契约变更需同步生成 `packages/api-client/src/schema.ts`，CI 重新生成并检查漂移。
 
 ## 5. 当前实现状态
 

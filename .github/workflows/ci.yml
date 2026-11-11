@@ -9,6 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --locked --extra dev --directory apps/api
+      - run: pnpm api:generate
+      - name: Check committed OpenAPI and TypeScript client are current
+        run: git diff --exit-code -- packages/api-client/openapi.json packages/api-client/src/schema.ts
+
   web:
     runs-on: ubuntu-latest
     steps:

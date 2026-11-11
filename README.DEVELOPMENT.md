@@ -83,3 +83,16 @@ OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces
 不配置该变量时，API 仍创建本地 Trace，但不会向外部 Collector 导出。敏感字段脱敏和 SDK Span 导出管线由 API 单元测试覆盖。
 
 API 错误结构、请求 ID、游标分页和模块边界约定见 [`docs/API_CONVENTIONS.md`](docs/API_CONVENTIONS.md)。
+
+## API 契约与 TypeScript Client
+
+FastAPI OpenAPI 是 API 契约事实源。修改 API 路由或 Schema 后，在配置好 `.env` 并安装锁定依赖后运行：
+
+```bash
+pnpm install --frozen-lockfile
+cd apps/api && uv sync --locked --extra dev
+cd ../..
+pnpm api:generate
+```
+
+生成文件位于 `packages/api-client/openapi.json` 和 `packages/api-client/src/schema.ts`。CI 会重新生成并检查是否与提交版本一致。

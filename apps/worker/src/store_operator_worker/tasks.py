@@ -68,6 +68,10 @@ HEARTBEAT_INTERVAL_SECONDS = max(1, LEASE_SECONDS // 3)
 OUTBOX_LOCK_SECONDS = 30
 logger = logging.getLogger("store_operator.worker")
 OUTBOX_MAX_ATTEMPTS = 12
+MAX_RUNNING_JOBS_PER_STORE = int(os.environ.get("WORKER_MAX_RUNNING_JOBS_PER_STORE", "3"))
+CONCURRENCY_DEFER_SECONDS = int(os.environ.get("WORKER_CONCURRENCY_DEFER_SECONDS", "10"))
+if MAX_RUNNING_JOBS_PER_STORE < 1 or CONCURRENCY_DEFER_SECONDS < 1:
+    raise RuntimeError("Worker store concurrency settings must be positive")
 
 
 @celery_app.task(name="jobs.relay_outbox", ignore_result=True)  # type: ignore[untyped-decorator]
@@ -181,6 +185,8 @@ def execute_job(job_id: str) -> dict[str, str]:
             job_id=parsed_job_id,
             worker_id=WORKER_ID,
             lease_seconds=LEASE_SECONDS,
+            max_running_per_store=MAX_RUNNING_JOBS_PER_STORE,
+            concurrency_defer_seconds=CONCURRENCY_DEFER_SECONDS,
         )
         if claim is None:
             return {"status": "not_claimed"}

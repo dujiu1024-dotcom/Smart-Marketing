@@ -166,6 +166,8 @@ PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, co
 ### AIInvocation（#9 权威）
 `id, store_id, task_id NULL, job_id NULL, provider_key, model_key, capability(text_generate|text_rewrite|image_generate|image_edit|vision_inspect|ocr_extract), prompt_version_id, request_fingerprint, response_ref, input_units, output_units, cost_amount, currency, duration_ms, status, error_code, created_at, finished_at`。
 - 记录调用元数据和成本；原始敏感 prompt/response 存受控引用或按最小化原则脱敏，不直接写普通日志。
+- request_fingerprint 建议覆盖 capability、prompt_version_id、schema_version、输入快照/素材版本及哈希、用户指令和生成参数；不含 Secret，不替代 Job Idempotency-Key。
+- 待 #9 批准的 AIInvocation 扩展：nullable provider_request_id 与 usage_json，用于供应商任务对账及分项计费；在 #9 联合评审接受前不视为冻结字段。
 - AIInvocation 状态：queued/running/succeeded/failed/cancelled；它不是 Job，也不拥有营销业务状态。
 - prompt_version_id 指向 #10 管理的不可变 PromptVersion；AIInvocation 固定记录实际版本、变量 schema 版本、model/provider 选择与参数指纹，历史任务不得动态读取最新 Prompt。
 - 跨域扩展建议（待 #9 批准）：增加 nullable `provider_request_id` 与 `usage_json`，记录供应商任务对账 ID 和分项 usage；在联合评审通过前不作为冻结字段。
@@ -184,6 +186,7 @@ PromptActivation：`id, prompt_template_id, activated_version_id, previous_versi
 - OCRProvider.extract(request, context) -> OCRResult
 
 Provider 统一返回：provider_key、model_key、provider_request_id、status、normalized_usage、latency_ms、result_ref、retryable、normalized_error。厂商原始异常不能泄漏给业务层或前端。
+ProviderContext 扩展提案：store_id/actor_scope、task_id、job_id、invocation_id、idempotency_key、deadline_at、correlation_id、trace_context、model_config_ref。Secret 仅通过 #9 受控 handle 注入，不得在 context 或日志中出现明文。
 
 ### 错误分类
 - PROVIDER_RATE_LIMITED (429)：可重试，按 Retry-After/退避策略。

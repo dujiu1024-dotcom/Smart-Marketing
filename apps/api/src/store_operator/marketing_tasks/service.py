@@ -19,17 +19,17 @@ from store_operator.domain.marketing_task import (
     resolve_step_applicability,
 )
 from store_operator.idempotency import begin_idempotency, complete_idempotency
-from store_operator.models.marketing_task import (
-    MarketingTask,
-    TaskEvent,
-    TaskStep,
-)
 from store_operator.marketing_tasks.schemas import (
     MarketingTaskCreate,
     MarketingTaskDetail,
     MarketingTaskList,
     MarketingTaskSummary,
     TaskStepRead,
+)
+from store_operator.models.marketing_task import (
+    MarketingTask,
+    TaskEvent,
+    TaskStep,
 )
 
 _PENDING_STEP_STATUSES = {

@@ -119,8 +119,8 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 - Copy 与 Image review 分开保存和查询。
 
 ### ChannelContent
-`id, store_id, task_id, channel_key, channel_account_id, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。每个渠道/输入指纹对应不可变快照；变更创建新记录。
-- 渠道规则与账号能力分开：spec_version 表示适配规格版本；账号授权和支持能力由 Channel Integration 持有。
+`id, store_id, task_id, channel_key, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。每个渠道/输入指纹对应不可变快照；变更创建新记录。
+- 渠道规则与账号能力分开：spec_version 表示 #12 发布的适配规格版本；ChannelContent 不绑定具体账号，目标账号只在 PublishPackageItem 中引用，账号授权和支持能力由 Channel Integration 持有。
 - 变体依赖指纹变化时标 stale。
 
 ### QualityReport

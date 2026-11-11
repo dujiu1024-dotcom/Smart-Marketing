@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
-from store_operator.models import Store, StoreMembership, User
+from store_operator.models import MediaAsset, Store, StoreMembership, User
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -183,3 +183,65 @@ def test_artifact_versions_and_reviews_are_version_bound(
     assert artifacts.status_code == 200, artifacts.text
     assert artifacts.json()[0]["current_version_id"] == second_version_id
     assert [version["version_no"] for version in artifacts.json()[0]["versions"]] == [1, 2]
+
+    media = MediaAsset(
+        id=uuid4(),
+        store_id=store.id,
+        object_key=f"stores/{store.id}/media/test-image.png",
+        sha256="a" * 64,
+        mime_type="image/png",
+        byte_size=2048,
+        asset_type="product_image",
+        source_type="merchant_upload",
+        usage_rights_status="confirmed_allowed",
+        status="ready",
+        created_by_user_id=user.id,
+    )
+    db_session.add(media)
+    db_session.flush()
+    image = identity_client.post(
+        f"/api/v1/marketing-tasks/{task_id}/artifacts",
+        headers={**headers, "Idempotency-Key": "content-image-artifact"},
+        json={
+            "artifact_type": "image",
+            "version": {
+                "source_type": "merchant_upload",
+                "media_asset_id": str(media.id),
+            },
+        },
+    )
+    assert image.status_code == 201, image.text
+    assert image.json()["versions"][0]["content_hash"] == "a" * 64
+    assert image.json()["versions"][0]["source_refs"][-1] == {
+        "type": "media_asset",
+        "id": str(media.id),
+    }
+
+    restricted = MediaAsset(
+        id=uuid4(),
+        store_id=store.id,
+        object_key=f"stores/{store.id}/media/restricted.png",
+        sha256="b" * 64,
+        mime_type="image/png",
+        byte_size=1024,
+        asset_type="product_image",
+        source_type="merchant_upload",
+        usage_rights_status="restricted",
+        status="ready",
+        created_by_user_id=user.id,
+    )
+    db_session.add(restricted)
+    db_session.flush()
+    rejected = identity_client.post(
+        f"/api/v1/marketing-tasks/{task_id}/artifacts",
+        headers={**headers, "Idempotency-Key": "content-image-restricted"},
+        json={
+            "artifact_type": "image",
+            "version": {
+                "source_type": "merchant_upload",
+                "media_asset_id": str(restricted.id),
+            },
+        },
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["error"]["code"] == "MEDIA_ASSET_NOT_USABLE"

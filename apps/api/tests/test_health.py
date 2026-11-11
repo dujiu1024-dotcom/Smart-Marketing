@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from store_operator.main import app
 from store_operator.observability import configure_logging
 
+
 @app.post("/_test/validation")
 def validation_probe(quantity: Annotated[int, Body()]) -> dict[str, int]:
     return {"quantity": quantity}

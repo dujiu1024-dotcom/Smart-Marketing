@@ -482,9 +482,19 @@ def request_job_cancellation(
     job_id: UUID,
     store_id: UUID,
     actor_user_id: UUID,
+    idempotency_key: str | None = None,
     now: datetime | None = None,
 ) -> Job:
     current_time = now or datetime.now(UTC)
+    key_hash = (
+        hashlib.sha256(idempotency_key.strip().encode("utf-8")).hexdigest()
+        if idempotency_key is not None
+        else None
+    )
+    if idempotency_key is not None and (
+        not idempotency_key.strip() or len(idempotency_key.strip()) > 200
+    ):
+        raise ValueError("Idempotency-Key must contain 1-200 characters")
     job = db.scalar(
         select(Job)
         .where(Job.id == job_id, Job.store_id == store_id)
@@ -505,6 +515,7 @@ def request_job_cancellation(
                 "job.cancel_requested",
                 actor_type="user",
                 actor_id=actor_user_id,
+                data={"idempotency_key_hash": key_hash} if key_hash else None,
             )
     else:
         job.status = "cancelled"
@@ -517,6 +528,7 @@ def request_job_cancellation(
             "job.cancelled",
             actor_type="user",
             actor_id=actor_user_id,
+            data={"idempotency_key_hash": key_hash} if key_hash else None,
         )
     db.flush()
     return job

@@ -5,6 +5,7 @@ description = "AI Store Operator modular monolith API"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "fastapi>=0.156,<0.157",
+  "httpx>=0.28,<1",
   "uvicorn[standard]>=0.35",
   "pydantic>=2.14,<3",
   "pydantic-settings>=2.9",
@@ -22,7 +23,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3", "httpx>=0.28", "ruff>=0.11", "mypy>=1.15"]
+dev = ["pytest>=8.3", "ruff>=0.11", "mypy>=1.15"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

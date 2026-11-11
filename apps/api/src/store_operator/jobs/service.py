@@ -38,6 +38,7 @@ def _request_hash(
     *,
     job_type: str,
     payload_ref: dict[str, object],
+    marketing_task_id: UUID | None,
     queue_name: str,
     priority: int,
     max_attempts: int,
@@ -46,6 +47,7 @@ def _request_hash(
     request = {
         "job_type": job_type,
         "payload_ref": payload_ref,
+        "marketing_task_id": str(marketing_task_id) if marketing_task_id else None,
         "queue_name": queue_name,
         "priority": priority,
         "max_attempts": max_attempts,
@@ -140,6 +142,7 @@ def create_job(
     request_hash = _request_hash(
         job_type=job_type,
         payload_ref=payload_ref,
+        marketing_task_id=marketing_task_id,
         queue_name=queue_name,
         priority=priority,
         max_attempts=max_attempts,

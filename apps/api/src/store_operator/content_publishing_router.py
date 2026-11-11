@@ -32,10 +32,10 @@ from store_operator.models import (
     MarketingTask,
     MediaAsset,
     PublishConfirmation,
+    PublishOperation,
     PublishPackage,
     PublishPackageFactRef,
     PublishPackageItem,
-    PublishOperation,
     QualityReport,
     QualityResolution,
     RequirementSnapshot,
@@ -471,7 +471,10 @@ def freeze_publish_package(
                     raise ApiError(
                         422,
                         "DOUYIN_IMAGE_NOT_ELIGIBLE",
-                        "Every frozen Douyin image must be ready, rights-approved, supported, and at most 20 MiB",
+                        (
+                            "Every frozen Douyin image must be ready, rights-approved, "
+                            "supported, and at most 20 MiB"
+                        ),
                     )
         _require_approved_artifacts(db, store_id=store_id, content=content)
 
@@ -856,7 +859,11 @@ def create_douyin_publish_operation(
             "This package item is not frozen for official Douyin delivery",
         )
     if item.channel_account_id is None:
-        raise ApiError(409, "CHANNEL_ACCOUNT_UNAVAILABLE", "No Douyin account is bound to this item")
+        raise ApiError(
+            409,
+            "CHANNEL_ACCOUNT_UNAVAILABLE",
+            "No Douyin account is bound to this item",
+        )
 
     confirmation = db.scalar(
         select(PublishConfirmation).where(

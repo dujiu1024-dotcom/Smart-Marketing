@@ -56,7 +56,7 @@ Demo 的连接、校验和发布目前均为本地演示，不是真实 OAuth �
 **id, store_id, channel_key, external_account_id, display_name, authorization_status(pending|active|reauth_required|revoked|error), granted_scopes_json, access_token_secret_ref, refresh_token_secret_ref, token_expires_at, authorized_by_user_id, authorized_at, last_verified_at, version, created_at, updated_at**
 
 - Token 不落普通数据库明文；只保存 Secret Manager/Vault 的引用。
-- UNIQUE(store_id, channel_key, external_account_id)；同一门店可连接多个账号，同一外部账号是否允许跨门店连接需由平台策略决定。
+- UNIQUE(channel_key, external_account_id)；首期同一外部账号禁止跨 store 绑定，避免账号内容/发布越权；未来如需连锁共享，必须新增显式授权聚合，不得直接放宽唯一约束。
 - access/refresh token 的创建、轮换、撤销由 Secret Manager 完成；DB 只记录引用和状态。
 - external_account_id 是平台返回的稳定主体 ID，不使用昵称作为唯一标识。
 - ChannelAccount 仅属于一个 store；所有读写必须经过 #5 AuthorizedStoreContext。
@@ -70,7 +70,7 @@ Demo 的连接、校验和发布目前均为本地演示，不是真实 OAuth �
 
 - state 原文不存数据库；只保存 hash，单次使用，建议 TTL 5–10 分钟。
 - 支持 PKCE 的平台必须启用；不支持时使用一次性 state + nonce + 严格 redirect URI。
-- callback 必须验证 state hash、TTL、未消费、发起人仍有该 store membership、redirect URI 与预期一致。
+- callback 必须验证 state hash、TTL、未消费、当前 Session user_id 与 requested_by_user_id 一致、发起人仍有该 store membership、redirect URI 与预期一致；无有效 Session 时拒绝并要求重新发起授权。
 - OAuth code 只在服务端交换，不写日志、事件或前端存储。
 - 一次授权 attempt 只能成功消费一次；重复 callback 返回幂等结果，不重复创建账号。
 
@@ -133,7 +133,7 @@ ChannelSpecVersion：**id, channel_spec_id, spec_version, text_constraints_json,
 | build_authorization_url | 生成 OAuth 授权地址 | 明确 unsupported |
 | exchange_code | 服务端授权码交换 | 失败归一化 |
 | refresh_token | 刷新/轮换 Token | 失效转 reauth_required |
-| revoke_token | 撤销授权 | 若平台不支持，明确标注并本地清理 Secret |
+| revoke_token | 撤销授权 | 若平台不支持，明确告知商家需在平台侧手动撤销；本地仍清理 Secret |
 | get_account_profile | 读取外部账号 ID/昵称 | 未验证不标 active |
 | discover_capabilities | 探测账号能力 | 输出 CapabilitySnapshot |
 | validate_content | 官方字段/素材校验 | 不支持时只做本地预检，UI 标明非官方校验 |
@@ -278,7 +278,7 @@ ChannelSpecVersion：**id, channel_spec_id, spec_version, text_constraints_json,
 3. 是否支持异步发布状态查询、Webhook、幂等键；不支持时的人工核验流程。
 4. ChannelSpecVersion 的来源更新频率、版本冻结和过期策略。
 5. Token Secret Manager 的具体实现、加密/轮换/删除 SLA。
-6. 同一外部账号是否允许跨门店绑定；首期建议默认允许由业务授权决定，但数据记录始终按 store 隔离。
+6. 同一外部账号跨门店绑定；首期默认禁止，连锁共享需未来显式授权模型。
 7. 发布后是否支持平台侧删除/撤回；首期不承诺撤回能力。
 8. #13 原始指标读取范围、频率、平台限制和数据保留。
 9. #8 PublishPackageItem 的 channel_account_id 绑定时点：最终确认时绑定，还是发布命令创建时绑定；首期建议确认时冻结账号引用。

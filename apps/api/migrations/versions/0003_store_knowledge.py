@@ -20,6 +20,62 @@ FACT_STATUS = (
     "'needs_review', 'expired'" + ")"
 )
 
+
+def upgrade() -> None:
+    op.create_table(
+        "store_profiles",
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "store_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("stores.id", ondelete="RESTRICT"),
+            nullable=False,
+        ),
+        sa.Column("display_name", sa.String(160), nullable=False),
+        sa.Column("business_type", sa.String(80)),
+        sa.Column("industry_category", sa.String(120)),
+        sa.Column("brand_name", sa.String(160)),
+        sa.Column("introduction", sa.Text()),
+        sa.Column("country_code", sa.String(2)),
+        sa.Column("region", sa.String(120)),
+        sa.Column("province", sa.String(120)),
+        sa.Column("city", sa.String(120)),
+        sa.Column("district", sa.String(120)),
+        sa.Column("address", sa.String(500)),
+        sa.Column("phone", sa.String(40)),
+        sa.Column("opening_hours_json", postgresql.JSONB()),
+        sa.Column("temporary_closures_json", postgresql.JSONB()),
+        sa.Column("service_radius", sa.String(120)),
+        sa.Column("service_capabilities_json", postgresql.JSONB()),
+        sa.Column("fact_status", sa.String(32), server_default="unverified", nullable=False),
+        sa.Column("current_version", sa.Integer(), server_default="1", nullable=False),
+        sa.Column(
+            "created_by_user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+        ),
+        sa.Column(
+            "updated_by_user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.UniqueConstraint("store_id", name="uq_store_profiles_store"),
+        sa.UniqueConstraint("store_id", "id", name="uq_store_profiles_store_id"),
+        sa.CheckConstraint(FACT_STATUS, name="ck_store_profiles_fact_status"),
+    )
+
     op.create_table(
         "products",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),

@@ -92,7 +92,6 @@ def upgrade() -> None:
             name="ck_channel_contents_channel_key_required",
         ),
         sa.CheckConstraint(
-            "input_fingerprint ~ '^[0-9a-f]{64}
         sa.CheckConstraint(
             "input_fingerprint ~ '^[0-9a-f]{64}$'",
             name="ck_channel_contents_input_fingerprint_sha256",
@@ -189,7 +188,6 @@ def upgrade() -> None:
             name="ck_quality_reports_rule_version_required",
         ),
         sa.CheckConstraint(
-            "input_fingerprint ~ '^[0-9a-f]{64}
         sa.CheckConstraint(
             "input_fingerprint ~ '^[0-9a-f]{64}$'",
             name="ck_quality_reports_input_fingerprint_sha256",
@@ -294,7 +292,6 @@ def upgrade() -> None:
             name="ck_publish_packages_package_version_positive",
         ),
         sa.CheckConstraint(
-            "package_fingerprint ~ '^[0-9a-f]{64}
     )
     op.create_index(
         "ix_publish_packages_store_task_frozen",

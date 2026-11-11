@@ -8,6 +8,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0006_ai_invocation_lifecycle"
 down_revision: str | None = "0005_job_runtime"
@@ -26,13 +27,13 @@ def upgrade() -> None:
     )
     op.add_column(
         "ai_invocations",
-        sa.Column("response_ref", sa.dialects.postgresql.JSONB(), nullable=True),
+        sa.Column("response_ref", postgresql.JSONB(), nullable=True),
     )
     op.alter_column(
         "ai_invocations",
         "marketing_task_id",
         new_column_name="task_id",
-        existing_type=sa.dialects.postgresql.UUID(as_uuid=True),
+        existing_type=postgresql.UUID(as_uuid=True),
     )
     op.alter_column(
         "ai_invocations",
@@ -50,7 +51,7 @@ def upgrade() -> None:
         "ai_invocations",
         "prompt_template_id",
         new_column_name="prompt_version_id",
-        existing_type=sa.dialects.postgresql.UUID(as_uuid=True),
+        existing_type=postgresql.UUID(as_uuid=True),
     )
     op.drop_column("ai_invocations", "prompt_version")
     op.drop_constraint(
@@ -107,7 +108,7 @@ def downgrade() -> None:
         "ai_invocations",
         "prompt_version_id",
         new_column_name="prompt_template_id",
-        existing_type=sa.dialects.postgresql.UUID(as_uuid=True),
+        existing_type=postgresql.UUID(as_uuid=True),
     )
     op.alter_column(
         "ai_invocations",
@@ -125,7 +126,7 @@ def downgrade() -> None:
         "ai_invocations",
         "task_id",
         new_column_name="marketing_task_id",
-        existing_type=sa.dialects.postgresql.UUID(as_uuid=True),
+        existing_type=postgresql.UUID(as_uuid=True),
     )
     op.drop_column("ai_invocations", "response_ref")
     op.execute(

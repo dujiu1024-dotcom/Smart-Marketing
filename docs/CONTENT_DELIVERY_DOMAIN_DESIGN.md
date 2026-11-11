@@ -82,7 +82,7 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 - pass 只代表指定规则版本下的检查通过，不代表法律合规保证或官方渠道已接受。
 - 输入或规则版本变化后旧报告标记 stale，不得用于冻结新包。
 
-`QualityResolution`：`id, store_id, quality_report_id, decision(accepted|rejected), reviewer_user_id, reason, created_at, idempotency_record_id`。
+`QualityResolution`：`id, store_id, quality_report_id, quality_report_fingerprint, decision(accepted|rejected), reviewer_user_id, reason, created_at, idempotency_record_id`。
 - 仅允许对 `result=needs_human` 的报告追加 QualityResolution；decision=accepted 才允许该报告参与冻结，rejected 继续阻断。
 - `result=fail` 是 hard fail，不允许通过 QualityResolution 覆盖；必须修正输入并生成新报告。
 - QualityResolution 是追加式记录；不得回写 QualityReport 的 result、reviewer 或 resolution_reason。
@@ -177,7 +177,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - ReviewRecord 必须 FK 到 (store_id, artifact_id, artifact_version_id)；唯一幂等记录避免重复审核动作。
 - ChannelContent 对 (store_id, channel_key, input_fingerprint) 建议唯一，另提供 (store_id, id, channel_key) 复合唯一键；copy_version_id 使用 store_id 复合 FK。
 - QualityReport FK 到确切 ChannelContent；提供 (store_id, channel_content_id, id) 复合唯一键，同一 channel_content_id + rule_version + input_fingerprint 幂等唯一。
-- QualityResolution 复合 FK 到同店 QualityReport；仅允许 needs_human 报告；decision=accepted/rejected 追加写，同一报告最多一条有效决议。
+- QualityResolution 复合 FK 到同店 QualityReport；仅允许 needs_human 报告；必须保存被决议报告的 fingerprint；UNIQUE(store_id, quality_report_id, quality_report_fingerprint)，并按幂等记录去重。
 - UNIQUE(store_id, task_id, package_version)。
 - UNIQUE(store_id, publish_package_id, channel_key)。
 - ChannelContentArtifactRef 复合 FK 到 ChannelContent 和 ArtifactVersion；UNIQUE(store_id, channel_content_id, position)。

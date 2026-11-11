@@ -230,11 +230,11 @@
 
 | 能力 | 生产 API/DB 状态 | Demo/浏览器状态 |
 |---|---|---|
-| 多渠道发布包冻结 | PR #64 开发中；事务创建 Package/Items/FactRefs，覆盖任务/内容/质检/事实指纹 | 发布包页面完整接入未完成 |
+| 多渠道发布包冻结 | PR #64 已合并至 main（57bfff114f6d5c3b043e81bd20ba6640489f33b4）；事务创建 Package/Items/FactRefs，覆盖任务/内容/质检/事实指纹 | 发布包页面完整接入未完成 |
 | 事实门禁 | 要求已确认 BusinessFactSnapshot，追溯到最新有效 StoreRecordRevision | 事实引用与过期提示未接入 |
 | 质检门禁 | hard fail 阻断；needs_human 必须有 accepted QualityResolution | 报告及复核交互未接入 |
 | 商家最终确认 | fingerprint-bound PublishConfirmation，不可变、幂等 | 确认摘要/二次确认 UI 未接入 |
 | 人工交付 | 仅 manual_handoff；确认不等于发布成功 | 下载/交付界面尚未实现 |
 | 官方 API | 暂不支持；等待 #12 ChannelAccount/OAuth/Adapter 实际能力 | 不显示已连接或已发布状态 |
 
-本阶段后端接口不会模拟官方发布，也不会因 Job 成功或商家确认显示“已发布”。PR CI 和 API 测试通过后，只能证明服务端冻结/确认门禁，不代表 Demo 完整流程或真实渠道发布验收通过。
+本阶段后端接口不会模拟官方发布，也不会因 Job 成功或商家确认显示“已发布”。PR #64 CI 已通过（API 119 tests、Worker、Web、Contracts、E2E、Infrastructure 全部成功），证明当前服务端冻结/确认门禁；不代表 Demo 完整流程或真实渠道发布验收通过。

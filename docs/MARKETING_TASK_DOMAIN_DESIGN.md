@@ -124,17 +124,16 @@ MarketingTask 是流程协调聚合根，但大文件只保存对象存储引用
 | revision_requested | 商家要求修改，当前版本未通过 |
 | revising | 正在根据意见产生新版本 |
 | approved | 当前确切版本已通过 |
-| replaced_by_merchant | 商家上传/替换的新版本已建立，仍需审核 |
 | rejected | 当前版本被拒绝，不可进入交付 |
 | stale | 依赖已变化，当前审核结论不能用于当前交付 |
 
 状态规则：
 - AI 生成、商家上传、手动编辑、AI 整改均创建新 ArtifactVersion。
-- 审核通过只对 `artifact_version_id` 有效。新版本创建后，新版本状态为 waiting_for_review 或 replaced_by_merchant；旧版本审核记录保留，但不能替代新版本审核。
+- 审核通过只对 `artifact_version_id` 有效。新版本创建后，新版本状态为 waiting_for_review；旧版本审核记录保留，但不能替代新版本审核。
 - `revision_requested` 不等于 approved。整改失败不改变上一版本的历史审核结果。
 - 图片整改不重置文案审核；文案修改只使真实引用该文案事实/文字的图片变 stale 或待复核。
 - 一组图片按明确的审核单元分别记录；不得用其中一张通过代表整组通过。
-- 商家自有内容同样需要来源记录与适用审核，不因上传而自动通过。
+- 商家自有内容同样需要来源记录与适用审核，不因上传而自动通过；上传来源记录在 ArtifactVersion.source_type，审核生命周期仍从 waiting_for_review 开始。
 
 ## 4. 合法迁移与服务端门禁
 
@@ -193,9 +192,9 @@ MarketingTask 是流程协调聚合根，但大文件只保存对象存储引用
 
 ### 7.1 Job 与业务状态分离
 
-Job 状态建议：`queued`、`running`、`retry_wait`、`succeeded`、`failed`、`dead`、`needs_human`、`cancelled`。
+Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、`retry_wait`、`succeeded`、`failed`、`cancelled`、`needs_human`。营销领域不得定义 `dead` 等第二套 Job 状态；Outbox 投递状态由异步运行时独立管理。
 
-- TaskStep 描述业务节点是否完成；Job 描述某次异步执行尝试。
+- TaskStep 描述业务节点是否完成；Job 描述某次异步执行尝试。Job 状态枚举与迁移只引用 Issue #9 契约，营销域不得复制或扩展。
 - 一个 TaskStep 可以对应多个 Job；一次 Job 成功也必须经过业务结果校验后才能推进 TaskStep。
 - Worker 崩溃或租约过期时，Job 可被重新领取；不可直接把 TaskStep 假定成功。
 - 重试只重跑失败的执行单元；已成功的独立产物不重复生成。
@@ -203,7 +202,7 @@ Job 状态建议：`queued`、`running`、`retry_wait`、`succeeded`、`failed`�
 
 ### 7.2 幂等与重复提交
 
-- 所有写 API 接受 `Idempotency-Key`；唯一范围建议为 `store_id + actor_id + operation + key`。
+- 所有用户写 API 接受 `Idempotency-Key`；唯一范围为 `store_id + actor_id + operation + idempotency_key`，保存 request_hash、结果资源 ID 和响应状态。同一作用域/Key/Hash 重放返回原结果；相同 Key、不同 Hash 返回 409。Job Runtime 使用由应用服务派生的稳定 Job 幂等键，并与内部 event_id/job_id 消费幂等边界区分。
 - 保存请求体 hash、业务对象 ID、处理结果和状态；相同 key + 相同请求返回原结果，相同 key + 不同请求体返回 409。
 - 生成类 Job 的幂等键由 task、stage、输入指纹、操作类型和请求轮次组成。
 - 发布幂等键必须绑定 PublishPackage ID、渠道账号 ID 和发布动作；禁止客户端重试生成新 key 造成重复发布。
@@ -221,7 +220,7 @@ Job 状态建议：`queued`、`running`、`retry_wait`、`succeeded`、`failed`�
 
 | 故障 | 处理 |
 |---|---|
-| Provider 限流/暂时不可用 | 指数退避 + 抖动；超过上限转 failed/dead，保留可恢复上下文 |
+| Provider 限流/暂时不可用 | 指数退避 + 抖动；超过上限转 failed；若副作用结果不确定则转 needs_human，保留可恢复上下文 |
 | 模型输出结构/事实校验失败 | 记录失败原因；按安全策略有限重试或等待人工处理，不写入正式版本 |
 | Worker 进程中断 | 租约过期后重新排队；以幂等键防重复写入 |
 | 对象存储上传失败 | 产物标记未完成，不允许审核/发布；可重传并校验 hash |
@@ -320,12 +319,12 @@ Job 状态建议：`queued`、`running`、`retry_wait`、`succeeded`、`failed`�
 
 ## 13. 与 Identity & Store（轨道 B）的集成契约
 
-> 本节依据当前已提交的产品基线与技术架构定义营销任务域必须遵守的消费契约。轨道 B 的独立领域设计尚未出现在当前 docs 目录，因此以下内容是营销任务域的接口要求，不代表身份域实现细节已经最终冻结。轨道 B 后续若确定不同的字段/端点命名，应做映射，不得降低安全语义。
+> 本节依据产品基线、技术架构和 Issue #5 的身份/门店安全设计定义营销任务域必须遵守的消费契约。Issue #5 的 request-scoped X-Store-ID / AuthorizedStoreContext 契约仍待联合评审冻结；实现时以最终合并版本为准。
 
 ### 14.1 请求身份与门店上下文
 
 - 请求主体由认证中间件解析为可信的 `actor_id`、`session_id`、`actor_type`；不得从请求体或普通 Header 信任 user_id、role、store_id。
-- 当前门店由服务端从已验证 Session + StoreMembership/StoreUser 关系解析。客户端可提交目标门店选择值，但该值仅作为“请求切换到哪个门店”的意图，必须先验证成员关系和门店状态。
+- 每个门店业务请求通过 `X-Store-ID` 提交 request-scoped store selector；它是不可信输入，不是授权凭据。服务端逐请求验证 Session、Store 状态和 StoreMembership，并构造 `AuthorizedStoreContext.request_store_id`。Session.active_store_id 仅作 UI 默认门店提示，不作为请求授权上下文。
 - 营销任务 API 的应用服务接收显式 `AuthorizedStoreContext`（概念契约：store_id、actor_id、membership_id、权限能力/授权版本）；该上下文只能由认证/授权层构造，业务模块不得自行解析客户端身份声明。
 - 创建任务时 `store_id` 从 AuthorizedStoreContext 注入；忽略或拒绝请求体中的 store_id。更新、审核、恢复、归档、发布等动作均再次执行资源门店归属和操作权限校验。
 - 权限至少区分：可查看任务、可编辑需求/策略、可审核文案、可审核图片、可最终确认/发布、可恢复/取消任务。具体角色映射由轨道 B 定义；营销域只依赖能力判定，不创建独立 RBAC 管理后台。

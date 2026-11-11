@@ -298,7 +298,7 @@ def create_artifact(
     _enqueue_content_event(
         db,
         event_type="content.artifact_version_created",
-        aggregate_type="artifact",
+        aggregate_type="artifact_version",
         aggregate_id=version.id,
         store_id=store_id,
         task_id=task_id,
@@ -436,7 +436,7 @@ def create_artifact_version(
     _enqueue_content_event(
         db,
         event_type="content.artifact_version_created",
-        aggregate_type="artifact",
+        aggregate_type="artifact_version",
         aggregate_id=version.id,
         store_id=store_id,
         task_id=task_id,
@@ -567,7 +567,7 @@ def create_review_record(
     _enqueue_content_event(
         db,
         event_type="content.review_recorded",
-        aggregate_type="artifact",
+        aggregate_type="review_record",
         aggregate_id=review.id,
         store_id=store_id,
         task_id=task_id,

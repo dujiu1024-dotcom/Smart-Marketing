@@ -20,17 +20,37 @@ from store_operator.auth.dependencies import (
 from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
+from store_operator.jobs.service import JobIdempotencyConflict, create_job
 from store_operator.models.content_delivery import (
     Artifact,
     ArtifactVersion,
     ChannelContent,
     ChannelContentArtifactRef,
     QualityReport,
+    QualityResolution,
     ReviewRecord,
 )
 from store_operator.models.marketing_task import MarketingTask
 
 router = APIRouter(prefix="/marketing-tasks", tags=["content-quality"])
+
+
+class QualityReportRun(BaseModel):
+    rule_version: str = Field(min_length=1, max_length=80)
+    expected_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class QualityReportRunIdempotency(BaseModel):
+    task_id: UUID
+    content_id: UUID
+    rule_version: str
+    expected_fingerprint: str
+
+
+class QualityResolutionCreate(BaseModel):
+    decision: str = Field(pattern=r"^(accepted|rejected)$")
+    reason: str = Field(min_length=1, max_length=5000)
+    expected_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class ChannelContentCreate(BaseModel):
@@ -52,6 +72,7 @@ def _content_payload(
     content: ChannelContent,
     refs: list[ChannelContentArtifactRef],
     reports: list[QualityReport],
+    resolutions: list[QualityResolution] | None = None,
 ) -> dict[str, object]:
     return {
         "id": str(content.id),
@@ -71,6 +92,16 @@ def _content_payload(
                 "result": item.result,
                 "issues": item.issues_json,
                 "created_at": item.created_at.isoformat(),
+                "resolutions": [
+                    {
+                        "id": str(resolution.id),
+                        "decision": resolution.decision,
+                        "reason": resolution.reason,
+                        "created_at": resolution.created_at.isoformat(),
+                    }
+                    for resolution in resolutions or []
+                    if resolution.quality_report_id == item.id
+                ],
             }
             for item in reports
         ],
@@ -214,7 +245,20 @@ def create_channel_content(
                 )
             ).all()
         )
-        response = _content_payload(existing, existing_refs, reports)
+        report_ids = [item.id for item in reports]
+        resolutions = (
+            list(
+                db.scalars(
+                    select(QualityResolution).where(
+                        QualityResolution.store_id == store_id,
+                        QualityResolution.quality_report_id.in_(report_ids),
+                    )
+                ).all()
+            )
+            if report_ids
+            else []
+        )
+        response = _content_payload(existing, existing_refs, reports, resolutions)
         complete_idempotency(
             idempotency,
             response=response,
@@ -322,5 +366,228 @@ def list_channel_contents(
                 .order_by(QualityReport.created_at, QualityReport.id)
             ).all()
         )
-        result.append(_content_payload(content, refs, reports))
+        report_ids = [item.id for item in reports]
+        resolutions = (
+            list(
+                db.scalars(
+                    select(QualityResolution).where(
+                        QualityResolution.store_id == store_id,
+                        QualityResolution.quality_report_id.in_(report_ids),
+                    )
+                ).all()
+            )
+            if report_ids
+            else []
+        )
+        result.append(_content_payload(content, refs, reports, resolutions))
     return result
+
+
+@router.post("/{task_id}/channel-contents/{content_id}/quality-reports/run", status_code=202)
+def run_quality_report(
+    task_id: UUID,
+    content_id: UUID,
+    payload: QualityReportRun,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> dict[str, object]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+
+    idempotency, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="content.quality_report.run",
+        payload=QualityReportRunIdempotency(
+            task_id=task_id,
+            content_id=content_id,
+            **payload.model_dump(),
+        ),
+    )
+    if replay is not None:
+        return replay
+
+    content = db.scalar(
+        select(ChannelContent).where(
+            ChannelContent.id == content_id,
+            ChannelContent.task_id == task_id,
+            ChannelContent.store_id == store_id,
+        )
+    )
+    if content is None:
+        raise ApiError(404, "CHANNEL_CONTENT_NOT_FOUND", "Channel content not found")
+    if content.input_fingerprint != payload.expected_fingerprint:
+        raise ApiError(409, "CHANNEL_CONTENT_STALE", "Channel content fingerprint has changed")
+    if payload.rule_version != "content-structure-v1":
+        raise ApiError(
+            422,
+            "QUALITY_RULE_VERSION_UNSUPPORTED",
+            "Quality rule version is not installed",
+        )
+
+    request_key = hashlib.sha256(
+        f"{store_id}:{auth.user.id}:content.quality_report.run:{idempotency_key}".encode()
+    ).hexdigest()
+    try:
+        job = create_job(
+            db,
+            job_type="content.quality_check",
+            payload_ref={
+                "schema_version": 1,
+                "channel_content_id": str(content.id),
+                "expected_fingerprint": content.input_fingerprint,
+                "rule_version": payload.rule_version,
+            },
+            idempotency_key=request_key,
+            store_id=store_id,
+            actor_type="user",
+            actor_user_id=auth.user.id,
+            marketing_task_id=task_id,
+            timeout_seconds=120,
+        )
+    except (JobIdempotencyConflict, ValueError) as exc:
+        raise ApiError(
+            409,
+            "QUALITY_JOB_CONFLICT",
+            "Quality check request conflicts with an existing job",
+        ) from exc
+
+    response: dict[str, object] = {
+        "job_id": str(job.id),
+        "job_status": job.status,
+        "channel_content_id": str(content.id),
+        "expected_fingerprint": content.input_fingerprint,
+        "rule_version": payload.rule_version,
+    }
+    complete_idempotency(
+        idempotency,
+        response=response,
+        resource_type="job",
+        resource_id=job.id,
+    )
+    record_audit(
+        db,
+        request,
+        action="content.quality_report.requested",
+        target_type="channel_content",
+        target_id=content.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "job_id": str(job.id),
+            "rule_version": payload.rule_version,
+            "input_fingerprint": content.input_fingerprint,
+        },
+    )
+    db.commit()
+    return response
+
+
+
+@router.post("/quality-reports/{report_id}/resolutions", status_code=201)
+def create_quality_resolution(
+    report_id: UUID,
+    payload: QualityResolutionCreate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> dict[str, object]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+
+    idempotency, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="content.quality_resolution.create",
+        payload=payload,
+    )
+    if replay is not None:
+        return replay
+
+    report = db.scalar(
+        select(QualityReport)
+        .where(
+            QualityReport.id == report_id,
+            QualityReport.store_id == store_id,
+        )
+        .with_for_update()
+    )
+    if report is None:
+        raise ApiError(404, "QUALITY_REPORT_NOT_FOUND", "Quality report not found")
+    if report.input_fingerprint != payload.expected_fingerprint:
+        raise ApiError(409, "QUALITY_REPORT_STALE", "Quality report fingerprint has changed")
+    if report.result != "needs_human":
+        raise ApiError(
+            422,
+            "QUALITY_RESOLUTION_NOT_ALLOWED",
+            "Only needs_human quality reports can receive a human resolution",
+        )
+    if not payload.reason.strip():
+        raise ApiError(422, "QUALITY_RESOLUTION_REASON_REQUIRED", "A resolution reason is required")
+
+    existing = db.scalar(
+        select(QualityResolution).where(
+            QualityResolution.store_id == store_id,
+            QualityResolution.quality_report_id == report.id,
+            QualityResolution.quality_report_fingerprint == report.input_fingerprint,
+        )
+    )
+    if existing is not None:
+        raise ApiError(
+            409,
+            "QUALITY_REPORT_ALREADY_RESOLVED",
+            "A resolution already exists for this quality report",
+        )
+
+    resolution = QualityResolution(
+        id=uuid4(),
+        store_id=store_id,
+        quality_report_id=report.id,
+        quality_report_fingerprint=report.input_fingerprint,
+        decision=payload.decision,
+        reviewer_user_id=auth.user.id,
+        reason=payload.reason.strip(),
+    )
+    db.add(resolution)
+    db.flush()
+    response: dict[str, object] = {
+        "id": str(resolution.id),
+        "quality_report_id": str(report.id),
+        "quality_report_fingerprint": resolution.quality_report_fingerprint,
+        "decision": resolution.decision,
+        "reason": resolution.reason,
+        "created_at": resolution.created_at.isoformat(),
+    }
+    complete_idempotency(
+        idempotency,
+        response=response,
+        resource_type="quality_resolution",
+        resource_id=resolution.id,
+    )
+    record_audit(
+        db,
+        request,
+        action="content.quality_resolution.recorded",
+        target_type="quality_report",
+        target_id=report.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "resolution_id": str(resolution.id),
+            "decision": resolution.decision,
+            "report_fingerprint": report.input_fingerprint,
+        },
+    )
+    db.commit()
+    return response

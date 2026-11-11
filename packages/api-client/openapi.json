@@ -4304,6 +4304,54 @@
         "title": "PromptVersionCreate",
         "type": "object"
       },
+      "QualityReportRun": {
+        "properties": {
+          "expected_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Fingerprint",
+            "type": "string"
+          },
+          "rule_version": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Rule Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_version",
+          "expected_fingerprint"
+        ],
+        "title": "QualityReportRun",
+        "type": "object"
+      },
+      "QualityResolutionCreate": {
+        "properties": {
+          "decision": {
+            "pattern": "^(accepted|rejected)$",
+            "title": "Decision",
+            "type": "string"
+          },
+          "expected_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Fingerprint",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "reason",
+          "expected_fingerprint"
+        ],
+        "title": "QualityResolutionCreate",
+        "type": "object"
+      },
       "ReviewCreate": {
         "properties": {
           "comment": {
@@ -6538,6 +6586,86 @@
         ]
       }
     },
+    "/api/v1/marketing-tasks/quality-reports/{report_id}/resolutions": {
+      "post": {
+        "operationId": "create_quality_resolution_api_v1_marketing_tasks_quality_reports__report_id__resolutions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QualityResolutionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Quality Resolution Api V1 Marketing Tasks Quality Reports  Report Id  Resolutions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Quality Resolution",
+        "tags": [
+          "content-quality"
+        ]
+      }
+    },
     "/api/v1/marketing-tasks/{task_id}": {
       "get": {
         "operationId": "get_task_api_v1_marketing_tasks__task_id__get",
@@ -7222,6 +7350,96 @@
           }
         },
         "summary": "Create Channel Content",
+        "tags": [
+          "content-quality"
+        ]
+      }
+    },
+    "/api/v1/marketing-tasks/{task_id}/channel-contents/{content_id}/quality-reports/run": {
+      "post": {
+        "operationId": "run_quality_report_api_v1_marketing_tasks__task_id__channel_contents__content_id__quality_reports_run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "content_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Content Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QualityReportRun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Run Quality Report Api V1 Marketing Tasks  Task Id  Channel Contents  Content Id  Quality Reports Run Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Quality Report",
         "tags": [
           "content-quality"
         ]

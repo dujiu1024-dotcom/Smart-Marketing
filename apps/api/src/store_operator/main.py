@@ -12,8 +12,7 @@ from opentelemetry import trace
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract
 from opentelemetry.trace import Status, StatusCode
-from redis import Redis
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint

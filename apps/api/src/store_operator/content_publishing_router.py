@@ -27,6 +27,7 @@ from store_operator.models import (
     BusinessFactSnapshot,
     ChannelContent,
     ChannelContentArtifactRef,
+    MarketingTask,
     PublishConfirmation,
     PublishPackage,
     PublishPackageFactRef,
@@ -37,7 +38,6 @@ from store_operator.models import (
     ReviewRecord,
     StoreRecordRevision,
     StrategySnapshot,
-    MarketingTask,
 )
 
 router = APIRouter(prefix="/marketing-tasks", tags=["content-publishing"])
@@ -142,7 +142,11 @@ def _require_approved_artifacts(
             )
         )
         if image_version is None:
-            raise ApiError(409, "IMAGE_VERSION_STALE", "A channel image version is no longer current")
+            raise ApiError(
+                409,
+                "IMAGE_VERSION_STALE",
+                "A channel image version is no longer current",
+            )
         image_review = db.scalar(
             select(ReviewRecord.id).where(
                 ReviewRecord.store_id == store_id,
@@ -359,7 +363,11 @@ def freeze_publish_package(
         if content.status != "ready":
             raise ApiError(409, "CHANNEL_CONTENT_NOT_READY", "Channel content is not ready")
         if content.channel_key in channel_keys:
-            raise ApiError(409, "DUPLICATE_PACKAGE_CHANNEL", "A package can contain one item per channel")
+            raise ApiError(
+                409,
+                "DUPLICATE_PACKAGE_CHANNEL",
+                "A package can contain one item per channel",
+            )
         channel_keys.add(content.channel_key)
         _require_approved_artifacts(db, store_id=store_id, content=content)
 
@@ -376,7 +384,11 @@ def freeze_publish_package(
         if report.input_fingerprint != _quality_report_fingerprint(content, report):
             raise ApiError(409, "QUALITY_REPORT_STALE", "Quality report fingerprint is stale")
         if report.result == "fail":
-            raise ApiError(422, "QUALITY_BLOCKED", "A hard-fail quality report blocks package freeze")
+            raise ApiError(
+                422,
+                "QUALITY_BLOCKED",
+                "A hard-fail quality report blocks package freeze",
+            )
         if report.result == "needs_human":
             resolution = db.scalar(
                 select(QualityResolution).where(

@@ -111,7 +111,7 @@ async def main() -> None:
         # Browser history restores the previous route and its rendered page.
         await route_to("tasks", "营销任务")
         await page.locator('[data-action="open-task"]').first.click()
-        await route_to("task", "营销任务")
+        await route_to("task", "当季草莓鲜奶新品推广")
         await page.go_back(wait_until="networkidle")
         await route_to("tasks", "营销任务")
 

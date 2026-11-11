@@ -55,10 +55,9 @@ All three Douyin OAuth settings must be supplied together. The Secret Manager re
 
 ## Remaining integration work
 
-- Add a secure channel-account listing/revoke endpoint and token refresh worker.
-- Extend the package freeze contract to bind an official-API delivery mode to a selected active channel account.
-- Add the merchant-confirmed publish-operation creation endpoint and transactional Job/Outbox enqueue.
+- Add an account revoke/disconnect endpoint and a scheduled token-refresh Worker; the account-list and server-side refresh endpoints are implemented.
+- Add the merchant-confirmed PublishOperation creation endpoint and transactional Job/Outbox enqueue.
 - Implement a registered Worker handler with upload, submit, readback, lease recovery and needs-human reconciliation. An uncertain create-video result must never trigger a blind second create call.
 - Add full DB/API tests and browser acceptance, then execute a real test-account OAuth/upload/create/readback flow after platform credentials, scopes and account are supplied.
 
-The current PR adds the persistence migration, models, state-consumption primitive, Secret Manager adapter and OAuth routes. It does not complete the remaining list above.
+This change adds the persistence migration, models, one-time OAuth state consumption, Secret Manager adapter, OAuth routes, account listing/refresh, and official-API package/account binding. It does not complete publishing or prove a real OAuth grant.

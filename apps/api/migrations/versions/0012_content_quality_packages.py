@@ -449,9 +449,9 @@ def upgrade() -> None:
         $$ LANGUAGE plpgsql;
         """
     )
+    # ArtifactVersion and ReviewRecord are already protected by migration 0010.
+    # Recreating their triggers here fails on a clean upgrade from the current main.
     append_only_tables = (
-        "artifact_versions",
-        "review_records",
         "channel_content_artifact_refs",
         "quality_reports",
         "quality_resolutions",

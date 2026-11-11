@@ -1,3 +1,4 @@
+import hashlib
 from typing import Any
 
 import boto3
@@ -64,3 +65,20 @@ def create_download_url(*, object_key: str, expires_in: int | None = None) -> st
         ExpiresIn=expires_in or settings.object_storage_download_ttl_seconds,
         HttpMethod="GET",
     )
+
+
+
+def calculate_object_sha256(*, object_key: str) -> str:
+    response = _client().get_object(
+        Bucket=settings.object_storage_bucket,
+        Key=object_key,
+    )
+    body = response["Body"]
+    digest = hashlib.sha256()
+    try:
+        for chunk in body.iter_chunks(chunk_size=1024 * 1024):
+            if chunk:
+                digest.update(chunk)
+    finally:
+        body.close()
+    return digest.hexdigest()

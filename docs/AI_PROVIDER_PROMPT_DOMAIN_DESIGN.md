@@ -67,6 +67,7 @@ Prompt 是平台级共享配置，不是门店经营资料。首期 PromptTempla
 - `template_key` 在 (industry_key, task_type, capability) 范围唯一。
 - 一份模板对应一个明确能力与任务类型；不要把需求理解、文案生成、图片编辑和 OCR 混成一个万能 Prompt。
 - `current_published_version_id` 仅是当前生效指针；历史版本由 PromptVersion/PromptActivation 保留。
+- archived 模板不再用于新 AIInvocation；历史 invocation 仍可追溯其 PromptVersion。
 - 业态分类沿用平台现有业态字典；不在 #10 创建第二套业态字典。
 
 ### 4.2 PromptVersion
@@ -126,6 +127,8 @@ Prompt 是平台级共享配置，不是门店经营资料。首期 PromptTempla
 
 `provider_key, model_key, provider_request_id, status, normalized_usage, latency_ms, result_ref, retryable, normalized_error`
 
+ProviderContext 至少包含 `store_id / actor_scope, task_id?, job_id?, invocation_id, idempotency_key, deadline_at, correlation_id, trace_context, model_config_ref`。凭据只通过 #9 受控 Secret handle 注入 Adapter，不传递明文 Secret；context 不得原样写日志。
+
 - 原始厂商异常必须映射到 #9 错误分类；不得把厂商堆栈、原始响应或 Secret 暴露给业务层。
 - 适配器必须声明支持的 capability、输入格式、最大尺寸/长度、结构化输出能力、编辑能力和已知限制。
 - 不支持某能力时明确返回 `PROVIDER_CAPABILITY_UNSUPPORTED`；不得用另一种能力伪装成功。
@@ -156,6 +159,7 @@ AIInvocation 由 #9 持有。每次调用必须关联：
 - capability、实际 provider_key/model_key
 - 精确 prompt_version_id（适用时）
 - request_fingerprint、response_ref
+- request_fingerprint 规范化覆盖 capability、prompt_version_id、schema_version、输入快照/素材版本及哈希、用户编辑指令和生成参数；不包含 Secret。该指纹用于结果追溯，不替代 Job Idempotency-Key。
 - normalized usage、cost、duration、status、error_code
 - correlation_id / trace_id（通过统一可观测性上下文关联）
 

@@ -126,7 +126,7 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 ### QualityReport
 `id, store_id, task_id, channel_content_id, rule_version, input_fingerprint, result(pass|fail|needs_human), issues_json, created_at`。
 
-QualityResolution：`id, store_id, quality_report_id, decision(accepted|rejected), reviewer_user_id, reason, created_at, idempotency_record_id`。仅对 needs_human 报告追加；hard fail 不可覆盖。
+QualityResolution：`id, store_id, quality_report_id, quality_report_fingerprint, decision(accepted|rejected), reviewer_user_id, reason, created_at, idempotency_record_id`。仅对 needs_human 报告追加；hard fail 不可覆盖。
 - 硬性问题未解决不能冻结发布包；needs_human 必须追加 QualityResolution，accepted 才允许冻结，rejected 继续阻断；hard fail 不允许人工覆盖。原 QualityReport 保持不可变。
 
 ### PublishPackage / PublishPackageItem / PublishConfirmation

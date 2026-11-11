@@ -1,18 +1,47 @@
 from __future__ import annotations
 
+import logging
 import os
 import socket
 from datetime import UTC, datetime, timedelta
+from math import ceil
+from threading import Event, Thread
 from uuid import UUID, uuid4
 
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine, or_, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
-from store_operator.jobs.service import claim_job, fail_job  # type: ignore[import-untyped]
-from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent  # type: ignore[import-untyped]
+from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
+    ProviderError,
+    SideEffectState,
+)
+from store_operator.jobs.service import (  # type: ignore[import-untyped]
+    InvalidJobTransition,
+    LeaseLostError,
+    acknowledge_job_cancellation,
+    claim_job,
+    complete_job,
+    fail_job,
+    heartbeat_job,
+)
+from store_operator.models import (  # type: ignore[import-untyped]
+    Job,
+    JobAttempt,
+    JobEvent,
+    OutboxEvent,
+)
 
 from store_operator_worker.celery_app import celery_app
+from store_operator_worker.handlers import (
+    JobCancelled,
+    JobExecutionContext,
+    JobExecutionError,
+    JobLeaseLost,
+    JobTimedOut,
+    resolve_job_handler,
+)
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
@@ -23,7 +52,12 @@ SessionLocal = sessionmaker(
     bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
 )
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
+LEASE_SECONDS = int(os.environ.get("WORKER_LEASE_SECONDS", "90"))
+if LEASE_SECONDS < 3:
+    raise RuntimeError("WORKER_LEASE_SECONDS must be at least 3")
+HEARTBEAT_INTERVAL_SECONDS = max(1, LEASE_SECONDS // 3)
 OUTBOX_LOCK_SECONDS = 30
+logger = logging.getLogger("store_operator.worker")
 OUTBOX_MAX_ATTEMPTS = 12
 
 
@@ -130,29 +164,234 @@ def relay_outbox(batch_size: int = 50) -> int:
 
 @celery_app.task(name="jobs.execute", acks_late=True)  # type: ignore[untyped-decorator]
 def execute_job(job_id: str) -> dict[str, str]:
-    """Claim a durable Job; domain handlers are registered in a later capability slice."""
+    """Claim, execute and persist a Job under a fenced, renewable Worker lease."""
     parsed_job_id = UUID(job_id)
     with SessionLocal.begin() as db:
         claim = claim_job(
             db,
             job_id=parsed_job_id,
             worker_id=WORKER_ID,
+            lease_seconds=LEASE_SECONDS,
         )
-    if claim is None:
-        return {"status": "not_claimed"}
+        if claim is None:
+            return {"status": "not_claimed"}
+        claimed_job_id = claim.job.id
+        attempt_id = claim.attempt.id
+        lease_token = claim.attempt.lease_token
+        store_id = claim.job.store_id
+        job_type = claim.job.job_type
+        payload_ref = dict(claim.job.payload_ref)
+        timeout_seconds = claim.job.timeout_seconds
 
-    # Never acknowledge work as successful until a domain handler actually runs.
-    with SessionLocal.begin() as db:
-        fail_job(
-            db,
-            job_id=claim.job.id,
-            lease_token=claim.attempt.lease_token,
-            worker_id=WORKER_ID,
-            error_code="JOB_HANDLER_NOT_REGISTERED",
-            error_summary="No domain handler is registered for this job type.",
-            retryable=False,
+    handler = resolve_job_handler(job_type)
+    if handler is None:
+        with SessionLocal.begin() as db:
+            fail_job(
+                db,
+                job_id=claimed_job_id,
+                lease_token=lease_token,
+                worker_id=WORKER_ID,
+                error_code="JOB_HANDLER_NOT_REGISTERED",
+                error_summary="No domain handler is registered for this job type.",
+                retryable=False,
+            )
+        return {"status": "failed", "reason": "handler_not_registered"}
+
+    stop_heartbeat = Event()
+    cancellation_requested = Event()
+    lease_lost = Event()
+    deadline_at = datetime.now(UTC) + timedelta(seconds=timeout_seconds)
+
+    def update_progress(current: int | None, total: int | None) -> None:
+        with SessionLocal.begin() as db:
+            current_job = heartbeat_job(
+                db,
+                job_id=claimed_job_id,
+                lease_token=lease_token,
+                worker_id=WORKER_ID,
+                lease_seconds=LEASE_SECONDS,
+                progress_current=current,
+                progress_total=total,
+            )
+            if current_job.cancel_requested_at is not None:
+                cancellation_requested.set()
+
+    def heartbeat_loop() -> None:
+        while not stop_heartbeat.is_set():
+            remaining = (deadline_at - datetime.now(UTC)).total_seconds()
+            if remaining <= 0:
+                try:
+                    with SessionLocal.begin() as db:
+                        fail_job(
+                            db,
+                            job_id=claimed_job_id,
+                            lease_token=lease_token,
+                            worker_id=WORKER_ID,
+                            error_code="JOB_TIMEOUT",
+                            error_summary=(
+                                "Job exceeded its configured execution timeout."
+                            ),
+                            retryable=False,
+                            side_effect_state=SideEffectState.UNKNOWN,
+                        )
+                except (InvalidJobTransition, LeaseLostError, SQLAlchemyError) as exc:
+                    logger.warning(
+                        "job.timeout.persist_failed",
+                        extra={
+                            "job_id": str(claimed_job_id),
+                            "error_type": type(exc).__name__,
+                        },
+                    )
+                lease_lost.set()
+                return
+            if stop_heartbeat.wait(min(HEARTBEAT_INTERVAL_SECONDS, remaining)):
+                return
+            try:
+                update_progress(None, None)
+            except (LeaseLostError, SQLAlchemyError, ValueError) as exc:
+                lease_lost.set()
+                logger.warning(
+                    "job.heartbeat.lost",
+                    extra={
+                        "job_id": str(claimed_job_id),
+                        "attempt_id": str(attempt_id),
+                        "error_type": type(exc).__name__,
+                    },
+                )
+                return
+
+    heartbeat_thread = Thread(
+        target=heartbeat_loop,
+        name=f"job-heartbeat-{claimed_job_id}",
+        daemon=True,
+    )
+    context = JobExecutionContext(
+        job_id=claimed_job_id,
+        store_id=store_id,
+        attempt_id=attempt_id,
+        lease_token=lease_token,
+        worker_id=WORKER_ID,
+        deadline_at=deadline_at,
+        cancellation_requested=cancellation_requested,
+        lease_lost=lease_lost,
+        update_progress_callback=update_progress,
+    )
+    heartbeat_thread.start()
+    try:
+        update_progress(None, None)
+        context.check_control()
+        result_ref = handler(context, payload_ref)
+        context.check_control()
+        with SessionLocal.begin() as db:
+            complete_job(
+                db,
+                job_id=claimed_job_id,
+                lease_token=lease_token,
+                worker_id=WORKER_ID,
+                result_ref=result_ref,
+            )
+        return {"status": "succeeded"}
+    except JobCancelled:
+        try:
+            with SessionLocal.begin() as db:
+                acknowledge_job_cancellation(
+                    db,
+                    job_id=claimed_job_id,
+                    lease_token=lease_token,
+                    worker_id=WORKER_ID,
+                )
+        except (InvalidJobTransition, LeaseLostError, SQLAlchemyError) as exc:
+            logger.warning(
+                "job.cancel_acknowledgement_failed",
+                extra={
+                    "job_id": str(claimed_job_id),
+                    "error_type": type(exc).__name__,
+                },
+            )
+            return {"status": "lease_lost"}
+        return {"status": "cancelled"}
+    except JobLeaseLost:
+        return {"status": "lease_lost"}
+    except JobTimedOut:
+        with SessionLocal.begin() as db:
+            fail_job(
+                db,
+                job_id=claimed_job_id,
+                lease_token=lease_token,
+                worker_id=WORKER_ID,
+                error_code="JOB_TIMEOUT",
+                error_summary="Job exceeded its configured execution timeout.",
+                retryable=False,
+                side_effect_state=SideEffectState.UNKNOWN,
+            )
+        return {"status": "needs_human", "reason": "timeout"}
+    except JobExecutionError as exc:
+        with SessionLocal.begin() as db:
+            fail_job(
+                db,
+                job_id=claimed_job_id,
+                lease_token=lease_token,
+                worker_id=WORKER_ID,
+                error_code=exc.code,
+                error_summary=exc.safe_summary,
+                retryable=exc.retryable,
+                side_effect_state=exc.side_effect_state,
+                retry_delay_seconds=exc.retry_delay_seconds,
+            )
+        return {"status": "failed", "reason": exc.code}
+    except ProviderError as exc:
+        with SessionLocal.begin() as db:
+            fail_job(
+                db,
+                job_id=claimed_job_id,
+                lease_token=lease_token,
+                worker_id=WORKER_ID,
+                error_code=exc.code.value,
+                error_summary=exc.user_safe_summary,
+                retryable=exc.retryable,
+                side_effect_state=exc.side_effect_state,
+                retry_delay_seconds=(
+                    max(0, ceil(exc.retry_after_seconds))
+                    if exc.retry_after_seconds is not None
+                    else 30
+                ),
+            )
+        return {"status": "failed", "reason": exc.code.value}
+    except Exception as exc:  # noqa: BLE001 - final sanitized execution boundary
+        logger.error(
+            "job.execution.unexpected",
+            extra={
+                "job_id": str(claimed_job_id),
+                "attempt_id": str(attempt_id),
+                "error_type": type(exc).__name__,
+            },
         )
-    return {"status": "failed", "reason": "handler_not_registered"}
+        try:
+            with SessionLocal.begin() as db:
+                fail_job(
+                    db,
+                    job_id=claimed_job_id,
+                    lease_token=lease_token,
+                    worker_id=WORKER_ID,
+                    error_code="WORKER_UNEXPECTED_ERROR",
+                    error_summary=(
+                        "Job failed unexpectedly; external side-effect state requires review."
+                    ),
+                    retryable=False,
+                    side_effect_state=SideEffectState.UNKNOWN,
+                )
+        except (InvalidJobTransition, LeaseLostError, SQLAlchemyError) as persist_exc:
+            logger.error(
+                "job.failure_persist.failed",
+                extra={
+                    "job_id": str(claimed_job_id),
+                    "error_type": type(persist_exc).__name__,
+                },
+            )
+        return {"status": "needs_human", "reason": "unexpected_error"}
+    finally:
+        stop_heartbeat.set()
+        heartbeat_thread.join(timeout=HEARTBEAT_INTERVAL_SECONDS + 1)
 
 
 @celery_app.task(

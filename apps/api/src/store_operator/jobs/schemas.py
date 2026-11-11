@@ -63,15 +63,17 @@ class AIInvocationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    marketing_task_id: UUID | None
+    task_id: UUID | None
     job_id: UUID | None
-    provider: str
-    model: str
+    provider_key: str
+    model_key: str
     capability: str
-    prompt_version: str | None
+    prompt_version_id: UUID | None
     provider_request_id: str | None
+    request_fingerprint: str | None
     status: str
-    latency_ms: int | None
+    duration_ms: int | None
     error_code: str | None
     created_at: datetime
+    finished_at: datetime | None
     usage: AIUsageRead | None

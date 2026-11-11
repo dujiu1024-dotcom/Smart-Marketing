@@ -369,3 +369,7 @@ Pending review of Identity PR #26, the canonical request context for store-scope
 - Worker execution must reload Job and resource ownership from PostgreSQL. It does not inherit a user's Session or a platform administrator's grant.
 
 PR #26 and Async Runtime PR #20 are still under review. This section records the cross-domain target contract and does not claim production authorization is implemented.
+
+
+### #9 AIInvocation 实现对齐记录（2026-11-11）
+PR #48 将 AIInvocation 字段名、状态、完成时间与上文权威契约对齐；provider_request_id 作为 nullable 对账字段正式接受，usage_json 提案由规范化 AIUsageRecord 取代。历史 started 映射为 running，历史 needs_human AIInvocation 映射为 failed；Job 的 needs_human 语义不变。

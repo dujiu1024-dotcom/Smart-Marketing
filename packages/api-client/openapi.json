@@ -12,6 +12,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
           "error_code": {
             "anyOf": [
               {
@@ -22,6 +33,18 @@
               }
             ],
             "title": "Error Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
           },
           "id": {
             "format": "uuid",
@@ -40,18 +63,11 @@
             ],
             "title": "Job Id"
           },
-          "latency_ms": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latency Ms"
+          "model_key": {
+            "title": "Model Key",
+            "type": "string"
           },
-          "marketing_task_id": {
+          "prompt_version_id": {
             "anyOf": [
               {
                 "format": "uuid",
@@ -61,25 +77,10 @@
                 "type": "null"
               }
             ],
-            "title": "Marketing Task Id"
+            "title": "Prompt Version Id"
           },
-          "model": {
-            "title": "Model",
-            "type": "string"
-          },
-          "prompt_version": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Prompt Version"
-          },
-          "provider": {
-            "title": "Provider",
+          "provider_key": {
+            "title": "Provider Key",
             "type": "string"
           },
           "provider_request_id": {
@@ -93,9 +94,32 @@
             ],
             "title": "Provider Request Id"
           },
+          "request_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Fingerprint"
+          },
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
           },
           "usage": {
             "anyOf": [
@@ -110,17 +134,19 @@
         },
         "required": [
           "id",
-          "marketing_task_id",
+          "task_id",
           "job_id",
-          "provider",
-          "model",
+          "provider_key",
+          "model_key",
           "capability",
-          "prompt_version",
+          "prompt_version_id",
           "provider_request_id",
+          "request_fingerprint",
           "status",
-          "latency_ms",
+          "duration_ms",
           "error_code",
           "created_at",
+          "finished_at",
           "usage"
         ],
         "title": "AIInvocationRead",

@@ -510,6 +510,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Duration Ms */
+            duration_ms: number | null;
             /** Error Code */
             error_code: string | null;
             /** Finished At */
@@ -521,22 +523,20 @@ export interface components {
             id: string;
             /** Job Id */
             job_id: string | null;
-            /** Latency Ms */
-            latency_ms: number | null;
-            /** Marketing Task Id */
-            marketing_task_id: string | null;
-            /** Model */
-            model: string;
-            /** Prompt Version */
-            prompt_version: string | null;
-            /** Provider */
-            provider: string;
+            /** Model Key */
+            model_key: string;
+            /** Prompt Version Id */
+            prompt_version_id: string | null;
+            /** Provider Key */
+            provider_key: string;
             /** Provider Request Id */
             provider_request_id: string | null;
             /** Request Fingerprint */
             request_fingerprint: string | null;
             /** Status */
             status: string;
+            /** Task Id */
+            task_id: string | null;
             usage: components["schemas"]["AIUsageRead"] | null;
         };
         /** AIUsageRead */

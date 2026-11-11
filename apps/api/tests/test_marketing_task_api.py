@@ -8,7 +8,9 @@ from store_operator.auth.security import hash_password
 from store_operator.models import (
     BusinessFactSnapshot,
     DependencyEdge,
+    Job,
     MarketingTask,
+    OutboxEvent,
     RequirementSnapshot,
     StepDecision,
     Store,
@@ -473,6 +475,57 @@ def test_requirement_and_strategy_confirmation_freeze_exact_source_versions(
     ).all()
     assert len(fact_edges) == 2
 
+    strategy_step_row = db_session.scalar(
+        select(TaskStep).where(
+            TaskStep.task_id == task_id,
+            TaskStep.step_key == "strategy_confirmation",
+        )
+    )
+    task_row = db_session.get(MarketingTask, task_id)
+    assert strategy_step_row is not None
+    assert task_row is not None
+    task_row.strategy_draft_json = {
+        "positioning": "AI generated weekday convenience",
+        "offer": "Lunch set promotion",
+    }
+    task_row.lifecycle_status = "waiting_for_user"
+    task_row.version = 4
+    strategy_step_row.status = "waiting_for_user"
+    strategy_step_row.version += 1
+    strategy_step_row.finished_at = datetime.now(UTC)
+    strategy_step_row.output_refs_json = [{"type": "strategy_draft", "version": 1}]
+    db_session.add(
+        TaskEvent(
+            id=uuid4(),
+            store_id=store.id,
+            task_id=task_id,
+            event_type="strategy.generated",
+            aggregate_version=4,
+            actor_type="system",
+            payload_json={"strategy_version": 1},
+        )
+    )
+    db_session.flush()
+
+    strategy_update = identity_client.patch(
+        f"/api/v1/marketing-tasks/{task_id}/strategy",
+        headers={
+            **ORIGIN,
+            "X-CSRF-Token": csrf,
+            "X-Store-ID": str(store.id),
+            "Idempotency-Key": "task-strategy-update",
+        },
+        json={
+            "expected_version": 4,
+            "strategy": {
+                "positioning": "Weekday convenience",
+                "offer": "Lunch set promotion",
+            },
+        },
+    )
+    assert strategy_update.status_code == 200, strategy_update.text
+    assert strategy_update.json()["version"] == 5
+
     strategy = identity_client.post(
         f"/api/v1/marketing-tasks/{task_id}/strategy/confirm",
         headers={
@@ -481,16 +534,10 @@ def test_requirement_and_strategy_confirmation_freeze_exact_source_versions(
             "X-Store-ID": str(store.id),
             "Idempotency-Key": "task-strategy-confirm",
         },
-        json={
-            "expected_version": 3,
-            "strategy": {
-                "positioning": "Weekday convenience",
-                "offer": "Lunch set promotion",
-            },
-        },
+        json={"expected_version": 5},
     )
     assert strategy.status_code == 200, strategy.text
-    assert strategy.json()["version"] == 4
+    assert strategy.json()["version"] == 6
     assert strategy.json()["current_strategy_snapshot_id"]
 
     strategy_snapshot = db_session.scalar(
@@ -513,6 +560,26 @@ def test_requirement_and_strategy_confirmation_freeze_exact_source_versions(
         if step["step_key"] == "strategy_confirmation"
     )
     assert strategy_step["status"] == "succeeded"
+    copy_step = next(
+        step
+        for step in strategy.json()["steps"]
+        if step["step_key"] == "copy_production_review"
+    )
+    assert copy_step["status"] == "running"
+
+    jobs = db_session.scalars(
+        select(Job).where(Job.marketing_task_id == task_id)
+    ).all()
+    assert {job.job_type for job in jobs} == {
+        "marketing_task.generate_strategy",
+        "marketing_task.generate_copy",
+    }
+    outbox_events = db_session.scalars(
+        select(OutboxEvent).where(
+            OutboxEvent.aggregate_id.in_([job.id for job in jobs])
+        )
+    ).all()
+    assert len(outbox_events) == 2
 
 
 def test_requirement_confirmation_rejects_unconfirmed_business_facts(

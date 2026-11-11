@@ -295,6 +295,7 @@ def test_dynamic_applicability_follows_selected_outputs_and_delivery_scope() -> 
         resolve_step_applicability(
             MarketingTaskType.MERCHANT_CONTENT,
             TaskStepKey.IMAGE_PRODUCTION_REVIEW,
+            includes_copy=False,
             includes_image=True,
         )
         is StepApplicability.OPTIONAL

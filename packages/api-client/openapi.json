@@ -1620,6 +1620,48 @@
         "title": "BusinessFactReference",
         "type": "object"
       },
+      "ChannelContentCreate": {
+        "properties": {
+          "channel_key": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Channel Key",
+            "type": "string"
+          },
+          "channel_spec_version_id": {
+            "format": "uuid",
+            "title": "Channel Spec Version Id",
+            "type": "string"
+          },
+          "copy_version_id": {
+            "format": "uuid",
+            "title": "Copy Version Id",
+            "type": "string"
+          },
+          "image_version_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Image Version Ids",
+            "type": "array"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          }
+        },
+        "required": [
+          "channel_key",
+          "copy_version_id",
+          "channel_spec_version_id",
+          "payload"
+        ],
+        "title": "ChannelContentCreate",
+        "type": "object"
+      },
       "FactConfirmationRequest": {
         "properties": {
           "confirmation_note": {
@@ -7040,6 +7082,148 @@
         "summary": "Cancel Task",
         "tags": [
           "marketing-tasks"
+        ]
+      }
+    },
+    "/api/v1/marketing-tasks/{task_id}/channel-contents": {
+      "get": {
+        "operationId": "list_channel_contents_api_v1_marketing_tasks__task_id__channel_contents_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Channel Contents Api V1 Marketing Tasks  Task Id  Channel Contents Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Channel Contents",
+        "tags": [
+          "content-quality"
+        ]
+      },
+      "post": {
+        "operationId": "create_channel_content_api_v1_marketing_tasks__task_id__channel_contents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelContentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Channel Content Api V1 Marketing Tasks  Task Id  Channel Contents Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Channel Content",
+        "tags": [
+          "content-quality"
         ]
       }
     },

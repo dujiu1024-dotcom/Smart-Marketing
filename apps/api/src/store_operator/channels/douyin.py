@@ -217,8 +217,8 @@ class DouyinOAuthClient:
                 access_token=access_token, open_id=open_id, cursor=cursor, count=20
             )
             for item in page["items"]:
-                if str(item.get("item_id", "")) == item_id:
-                    return item
+                if isinstance(item, dict) and str(item.get("item_id", "")) == item_id:
+                    return {str(key): value for key, value in item.items()}
             if not page["has_more"]:
                 break
             next_cursor = int(page["cursor"])

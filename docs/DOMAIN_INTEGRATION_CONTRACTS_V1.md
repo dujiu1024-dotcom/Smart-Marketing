@@ -172,7 +172,7 @@ PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, co
 
 ### PromptTemplate / PromptVersion（#10 权威）
 PromptTemplate 是平台级共享模板，不含 store_id：`id, template_key, display_name, industry_key, task_type, capability, status, current_published_version_id, created_at, updated_at`。
-PromptVersion：`id, prompt_template_id, version_no, system_prompt, user_prompt_template, variables_schema_json, output_schema_json, schema_version, input_policy_json, changelog, status(draft|published|retired), created_by_user_id, created_at, published_by_user_id, published_at`。Draft 可编辑；published 后不可变，修改必须新建版本。
+PromptVersion：`id, prompt_template_id, version_no, system_prompt, user_prompt_template, variables_schema_json, output_schema_json, schema_version, input_policy_json, changelog, status(draft|published), created_by_user_id, created_at, published_by_user_id, published_at`。Draft 可编辑；published 后不可变，修改必须新建版本。
 PromptActivation：`id, prompt_template_id, activated_version_id, previous_version_id, action(publish|rollback), reason, actor_user_id, created_at, idempotency_record_id`；发布/回滚均追加记录，不覆盖历史版本。PromptTemplate/Version/Activation 为全局平台配置，平台管理员访问受 #5 能力授权；不得借此读取门店任务或经营数据。
 
 ### Provider 接口（#9 定义，#10 实现）

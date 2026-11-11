@@ -55,6 +55,7 @@ def store_context_probe(
         "store_id": str(context.request_store_id),
         "role": context.role,
         "user_id": str(context.user_id),
+        "capabilities": ",".join(sorted(context.capabilities)),
     }
 
 
@@ -422,3 +423,4 @@ def test_two_tabs_use_their_own_store_selector(identity_client, db_session, monk
     assert tab_a.json()["role"] == "owner"
     assert tab_b.json()["store_id"] == str(store_b.id)
     assert tab_b.json()["role"] == "member"
+    assert tab_a.json()["capabilities"] == tab_b.json()["capabilities"] == "store.business.use"

@@ -1,0 +1,79 @@
+name: Generate dependency lockfiles
+
+on:
+  push:
+    branches: ["stage1/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dependency-lockfiles-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lockfiles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: pnpm install --lockfile-only
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - name: Generate API lockfile
+        working-directory: apps/api
+        run: uv lock
+      - name: Generate Worker lockfile
+        working-directory: apps/worker
+        run: uv lock
+      - name: Generate E2E lockfile
+        working-directory: apps/e2e
+        run: uv lock
+      - name: Verify frozen dependency resolution
+        run: |
+          pnpm install --frozen-lockfile
+          uv lock --check --directory apps/api
+          uv lock --check --directory apps/worker
+          uv lock --check --directory apps/e2e
+          uv sync --locked --extra dev --directory apps/api
+          uv sync --locked --directory apps/worker
+          uv sync --locked --directory apps/e2e
+      - name: Generate OpenAPI and TypeScript client
+        env:
+          DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+          REDIS_URL: redis://localhost:6379/0
+        run: pnpm api:generate
+      - name: Commit lockfiles when changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml apps/api/uv.lock apps/worker/uv.lock apps/e2e/uv.lock packages/api-client/openapi.json packages/api-client/src/schema.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "build: commit generated dependency lockfiles"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push
+          else
+            echo "Lockfiles are already up to date."
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dependency-lockfiles
+          path: |
+            pnpm-lock.yaml
+            apps/api/uv.lock
+            apps/worker/uv.lock
+            apps/e2e/uv.lock
+            packages/api-client/openapi.json
+            packages/api-client/src/schema.ts
+          if-no-files-found: error
+          retention-days: 7

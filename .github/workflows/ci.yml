@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --locked --extra dev --directory apps/api
+      - run: pnpm api:generate
+      - name: Check committed OpenAPI and TypeScript client are current
+        run: git diff --exit-code -- packages/api-client/openapi.json packages/api-client/src/schema.ts
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @store-operator/web typecheck
+      - run: pnpm --filter @store-operator/web test
+      - run: pnpm --filter @store-operator/web build
+
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: store_operator
+          POSTGRES_USER: store_operator
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U store_operator -d store_operator"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://store_operator:ci-only@localhost:5432/store_operator
+      REDIS_URL: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - run: uv sync --locked --extra dev --directory apps/api
+      - run: uv run --locked --directory apps/api ruff check .
+      - run: uv run --locked --directory apps/api mypy src
+      - run: uv run --locked --directory apps/api alembic upgrade head
+      - run: uv run --locked --directory apps/api alembic downgrade base
+      - run: uv run --locked --directory apps/api alembic upgrade head
+      - run: uv run --locked --directory apps/api pytest
+
+  worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - run: uv sync --locked --extra dev --directory apps/api
+      - run: uv sync --locked --directory apps/worker
+      - run: uv run --locked --directory apps/api ruff check ../worker
+      - run: PYTHONPATH="$GITHUB_WORKSPACE/apps/worker/src" uv run --locked --directory apps/api mypy ../worker/src
+      - run: |
+          PYTHONPATH="$GITHUB_WORKSPACE/apps/worker/src" REDIS_URL=redis://localhost:6379/0 uv run --locked --directory apps/worker python -c 'from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {"status": "ok"}'
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare clean-machine environment from template
+        run: |
+          cp .env.example .env
+          sed -i 's/change-me-locally/ci-only/g' .env
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml config --quiet
+      - name: Start complete Compose stack and wait for health
+        run: POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml up --build --detach --wait --wait-timeout 180
+      - name: Verify API readiness and Web response
+        run: |
+          curl --fail --silent --show-error http://localhost:8000/health/live
+          curl --fail --silent --show-error http://localhost:8000/health/ready
+          curl --fail --silent --show-error http://localhost:5173/ > /dev/null
+      - name: Verify PostgreSQL volume persistence across restart
+        run: |
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml exec -T postgres psql -U store_operator -d store_operator -c "CREATE TABLE ci_persistence_probe (id integer PRIMARY KEY, value text NOT NULL); INSERT INTO ci_persistence_probe (id, value) VALUES (1, 'persisted') ON CONFLICT (id) DO UPDATE SET value = EXCLUDED.value;"
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml down
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml up --detach --wait --wait-timeout 120
+          POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml exec -T postgres psql -U store_operator -d store_operator -tAc "SELECT value FROM ci_persistence_probe WHERE id = 1" | grep -Fx persisted
+      - name: Clean up Compose stack
+        if: always()
+        run: POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml down --volumes --remove-orphans
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pnpm install --frozen-lockfile
+      - name: Install locked E2E dependencies
+        run: uv sync --locked --directory apps/e2e
+      - name: Install locked Playwright Chromium runtime
+        run: uv run --locked --directory apps/e2e python -m playwright install --with-deps chromium
+      - name: Start Web application
+        run: |
+          pnpm --filter @store-operator/web dev -- --host 127.0.0.1 > /tmp/store-operator-web.log 2>&1 &
+          echo $! > /tmp/store-operator-web.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5173/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/store-operator-web.log
+          exit 1
+      - name: Run browser smoke E2E
+        run: uv run --locked --directory apps/e2e python ../../apps/web/e2e/smoke.py
+      - name: Stop Web application
+        if: always()
+        run: if [ -f /tmp/store-operator-web.pid ]; then kill "$(cat /tmp/store-operator-web.pid)" || true; fi
+      - name: Start frozen Demo static server
+        run: |
+          python -m http.server 8080 --bind 127.0.0.1 > /tmp/store-operator-demo.log 2>&1 &
+          echo $! > /tmp/store-operator-demo.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/demo/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/store-operator-demo.log
+          exit 1
+      - name: Run frozen Demo route and page-state browser smoke
+        run: uv run --locked --directory apps/e2e python demo_smoke.py
+      - name: Stop frozen Demo static server
+        if: always()
+        run: if [ -f /tmp/store-operator-demo.pid ]; then kill "$(cat /tmp/store-operator-demo.pid)" || true; fi

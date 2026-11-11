@@ -1,0 +1,9 @@
+[project]
+name = "store-operator-e2e"
+version = "0.1.0"
+description = "Browser smoke tests for the AI Store Operator web application"
+requires-python = ">=3.13,<3.14"
+dependencies = ["playwright>=1.56,<2"]
+
+[tool.uv]
+package = false

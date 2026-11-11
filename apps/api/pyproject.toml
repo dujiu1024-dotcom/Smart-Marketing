@@ -1,0 +1,39 @@
+[project]
+name = "store-operator-api"
+version = "0.1.0"
+description = "AI Store Operator modular monolith API"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "fastapi>=0.156,<0.157",
+  "uvicorn[standard]>=0.35",
+  "pydantic>=2.14,<3",
+  "pydantic-settings>=2.9",
+  "sqlalchemy>=2.0,<2.1",
+  "psycopg[binary]>=3.2",
+  "alembic>=1.15",
+  "redis>=6.2",
+  "celery[redis]>=5.7,<5.8",
+  "boto3>=1.38",
+  "structlog>=25.3",
+  "opentelemetry-api>=1.45,<2",
+  "opentelemetry-sdk>=1.45,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.45,<2"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "httpx>=0.28", "ruff>=0.11", "mypy>=1.15"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true

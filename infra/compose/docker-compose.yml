@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: store_operator
+      POSTGRES_USER: store_operator
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports: ["5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U store_operator -d store_operator"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:8.2
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports: ["6379:6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.53
+    command: "server -s3 -dir=/data"
+    ports: ["8333:8333", "9333:9333", "8888:8888"]
+    volumes: ["seaweed_data:/data"]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/containers/api.Dockerfile
+    env_file: ../../.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
+      REDIS_URL: redis://redis:6379/0
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 15s
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/containers/worker.Dockerfile
+    env_file: ../../.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis: { condition: service_healthy }
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          python -c "from store_operator_worker.celery_app import celery_app;
+          replies = celery_app.control.ping(timeout=3);
+          raise SystemExit(0 if replies else 1)"
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/containers/web.Dockerfile
+    ports: ["5173:80"]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data:
+  redis_data:
+  seaweed_data:

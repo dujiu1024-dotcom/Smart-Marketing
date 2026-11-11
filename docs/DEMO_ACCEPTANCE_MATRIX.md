@@ -3,7 +3,7 @@
 > 文档版本：v1.8  
 > 对应唯一产品基线：[PRODUCT_DESIGN.md v1.8](PRODUCT_DESIGN.md)  
 > 对应 UI/UX 基线：[UX_AUDIT_AND_REDESIGN.md v1.8](UX_AUDIT_AND_REDESIGN.md)  
-> 更新日期：2026-11-10  
+> 更新日期：2026-11-11  
 > 当前总状态：**部分代码实现与静态检查完成；真实浏览器 E2E 未完成；不得宣称正式验收通过。**
 
 本矩阵取代此前 v1.5 及历史轮次中的旧状态表。历史缺陷描述仅保留为追溯依据，不作为当前缺陷状态。状态以当前 main 分支代码及本矩阵记录的验证证据为准。
@@ -119,7 +119,7 @@
 以上是静态、mock 或代码路径证据，不得升级表述为真实浏览器测试。
 
 ### 尚未完成
-- 真实浏览器 ESM 启动与全页面导航。
+- 全量业务交互的真实浏览器验收（路由/页面壳冒烟已接入 CI；完整业务流程仍未完成）。
 - 七个任务页签逐一切换、刷新、前进/后退和状态恢复。
 - 从需求创建到发布包冻结的完整端到端流程及各类阻断分支。
 - 文案整改、图片上传/预览、版本恢复和渠道预览的真实浏览器操作。
@@ -180,3 +180,34 @@
 | ACCOUNT-05 | 作品登记独立页面 | 代码已实现 | 待验收 | 账号监测列表不再内嵌长登记表单；登记页独立显示关联任务、平台账号、作品链接与发布时间 |
 | STORE-06 | 商品/活动复杂编辑二级页面 | 代码已实现 | 待验收 | 商品与活动编辑独立于列表；支持保存返回、取消返回和刷新后按路由恢复编辑对象 |
 | HOT-02 | 热点机会与当前门店商品匹配 | 代码已实现 | 待验收 | 热点列表仅展示匹配当前门店商品的机会，避免跨业态样例混入 |
+
+
+## 14. PR #16 工程基础路由映射与浏览器冒烟（2026-11-11）
+
+| ID | 验收项 | 当前状态 | 证据/边界 |
+|---|---|---|---|
+| ENG-DEMO-01 | Demo 页面、hash 路由、页面内 Tab 与二级编辑页映射 | 已形成文档 | 见 [DEMO_ROUTE_STATE_MAP.md](DEMO_ROUTE_STATE_MAP.md)，映射来自 `demo/app.js`、`demo/store-renderers.js`、`demo/admin.js` |
+| ENG-DEMO-02 | 冻结 Demo 路由与页面壳 Chromium 冒烟 | **路由级冒烟已通过** | `apps/e2e/demo_smoke.py`；最新完整 CI Run [42938223781](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42938223781) 6/6 Job 通过；覆盖门店端一级路由、8 个门店资料 Tab、7 个任务步骤、平台管理一级/二级页面、商品/活动编辑和浏览器历史 |
+| ENG-DEMO-03 | 完整业务流程与字段级浏览器验收 | 未完成 | 冒烟不验证完整表单提交、状态机正反路径、异常恢复、所有字段、移动端、可访问性或真实生产服务 |
+| ENG-DEMO-04 | 冻结 Demo 正式验收 | 未通过 | 必须完成本矩阵 P0/P1/P2 适用项和真实浏览器证据；不得因路由冒烟通过而关闭 Issue #4 |
+
+说明：本轮只补齐工程 PR 的 Demo 路由/页面状态对照和可重复的路由级浏览器门禁。生产 React 应用仍为工程壳；本 PR 不声称已将完整 Demo 迁移为生产 Web，也不声称 Demo 正式验收通过。
+
+
+## 15. 最新浏览器路由冒烟结果（2026-11-11）
+
+- CI Run [42937743402](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42937743402)，提交 `cf130673a216367025d840a66d87055f2f9cbe86`：Contracts、Web、API、Worker、Infrastructure 通过；E2E 失败。
+- 失败步骤：`Run frozen Demo route and page-state browser smoke`。日志定位到 `apps/e2e/demo_smoke.py` 的平台管理一级页面循环，在 `#admin:capabilities` 路由等待页面标题超时。
+- 根因：Demo 的管理端导航标签是“AI 能力配置”，但该页面真实 H1 是“AI 能力与提示词配置”；测试错误地将导航标签当作页面标题。不是页面路由无法打开，也不是商品/活动编辑器入口失败。
+- 修复：E2E 标题断言改为页面实际 H1；`DEMO_ROUTE_STATE_MAP.md` 明确区分导航标签与页面标题。
+- 新提交的 CI 结果尚待执行；修复未通过新一轮 CI 前不得标记 ENG-DEMO-02 通过。
+- ENG-DEMO-03 完整业务流程/字段级浏览器验收仍未完成；ENG-DEMO-04 Demo 正式验收仍未通过。
+
+
+## 16. 最新完整 CI 与 Demo 路由冒烟结果（2026-11-11）
+
+- PR CI Run [42938223781](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42938223781)，head `eedbebca7968d12f2d2e20d1194bb7c1a9873e13`：6/6 Job 全部成功（Web、API、Worker、Contracts、Infrastructure、E2E）。
+- Demo E2E 输出：`Frozen Demo Playwright smoke passed: 9 store routes, 8 store tabs, 7 task stages, 7 admin pages, admin detail pages, editors and browser history.`
+- Infrastructure 完成完整 Compose 启动、API readiness、Web HTTP 和 PostgreSQL volume restart persistence 检查。
+- 因此 ENG-DEMO-02 的“路由/页面壳冒烟”子项可标记通过；这不改变 ENG-DEMO-03 和 ENG-DEMO-04 的未完成状态。
+- 完整业务流程、字段级交互、异常恢复、移动端/响应式、可访问性和冻结 Demo 正式验收仍未完成；Issue #4 不关闭。

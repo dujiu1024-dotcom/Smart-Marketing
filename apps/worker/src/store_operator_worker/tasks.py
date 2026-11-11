@@ -1045,13 +1045,11 @@ def _load_douyin_access_token(secret_ref: str) -> str:
     return token
 
 
-async def _douyin_publish_images(
+async def _douyin_upload_images(
     *,
     access_token: str,
-    open_id: str,
     images: list[dict[str, object]],
-    text: str,
-) -> str:
+) -> list[str]:
     if not settings.douyin_client_key or not settings.douyin_client_secret:
         raise ValueError("Douyin application credentials are not configured")
     client = DouyinOAuthClient(
@@ -1077,10 +1075,31 @@ async def _douyin_publish_images(
                 content_type=content_type,
             )
             uploaded_ids.append(str(uploaded["image_id"]))
+        return uploaded_ids
+    finally:
+        await client.aclose()
+
+
+async def _douyin_publish_uploaded_images(
+    *,
+    access_token: str,
+    open_id: str,
+    image_ids: list[str],
+    text: str,
+) -> str:
+    if not settings.douyin_client_key or not settings.douyin_client_secret:
+        raise ValueError("Douyin application credentials are not configured")
+    client = DouyinOAuthClient(
+        DouyinAppCredentials(
+            client_key=settings.douyin_client_key,
+            client_secret=settings.douyin_client_secret,
+        )
+    )
+    try:
         receipt = await client.publish_images(
             access_token=access_token,
             open_id=open_id,
-            image_ids=uploaded_ids,
+            image_ids=image_ids,
             text=text,
             merchant_confirmed=True,
         )
@@ -1130,12 +1149,31 @@ def execute_douyin_publish(
             "Douyin publish job payload is invalid.",
             retryable=False,
         ) from exc
-    data = _load_douyin_publish_context(operation_id=operation_id, store_id=context.store_id)
+    try:
+        data = _load_douyin_publish_context(
+            operation_id=operation_id,
+            store_id=context.store_id,
+        )
+    except JobExecutionError as exc:
+        if exc.code in {
+            "PUBLISH_PREREQUISITE_CHANGED",
+            "PUBLISH_PACKAGE_BINDING_INVALID",
+            "PUBLISH_PACKAGE_SUPERSEDED",
+            "PUBLISH_RESULT_UNKNOWN",
+        }:
+            _mark_douyin_operation(
+                operation_id,
+                status="needs_human",
+                error_code=exc.code,
+                error_summary=exc.safe_summary,
+            )
+        raise
     if data.get("already_published"):
         return {"status": "published", "publish_operation_id": str(operation_id)}
     if data.get("already_submitted"):
         _schedule_douyin_readback(operation_id, readback_attempt=1)
         return {"status": "processing", "publish_operation_id": str(operation_id)}
+
     try:
         access_token = _load_douyin_access_token(str(data["access_token_secret_ref"]))
     except SecretStoreError as exc:
@@ -1147,31 +1185,26 @@ def execute_douyin_publish(
         ) from exc
 
     context.check_control()
-    with SessionLocal.begin() as db:
-        operation = db.scalar(
-            select(PublishOperation)
-            .where(PublishOperation.id == operation_id)
-            .with_for_update()
-        )
-        if operation is None:
-            raise JobExecutionError(
-                "PUBLISH_OPERATION_NOT_FOUND",
-                "The publish operation is no longer available.",
-                retryable=False,
-            )
-        operation.status = "uploading"
-        operation.updated_at = datetime.now(UTC)
     try:
-        item_id = asyncio.run(
-            _douyin_publish_images(
+        uploaded_ids = asyncio.run(
+            _douyin_upload_images(
                 access_token=access_token,
-                open_id=str(data["open_id"]),
                 images=data["images"],  # type: ignore[arg-type]
-                text=str(data["text"]),
             )
         )
-    except (ValueError, DouyinApiError) as exc:
-        # The upload phase is safe to retry; no public item has been submitted yet.
+    except ValueError as exc:
+        _mark_douyin_operation(
+            operation_id,
+            status="needs_human",
+            error_code="DOUYIN_IMAGE_INVALID",
+            error_summary="A frozen image is invalid or unavailable for channel publishing.",
+        )
+        raise JobExecutionError(
+            "DOUYIN_IMAGE_INVALID",
+            "A frozen image is invalid or unavailable for channel publishing.",
+            retryable=False,
+        ) from exc
+    except DouyinApiError as exc:
         raise JobExecutionError(
             "DOUYIN_UPLOAD_FAILED",
             "Douyin image upload failed before public submission.",
@@ -1179,28 +1212,29 @@ def execute_douyin_publish(
             retry_delay_seconds=60,
         ) from exc
     context.check_control()
+
+    # Persist the irreversible boundary before calling the platform create endpoint.
     with SessionLocal.begin() as db:
         operation = db.scalar(
             select(PublishOperation)
             .where(PublishOperation.id == operation_id)
             .with_for_update()
         )
-        if operation is None:
+        if operation is None or operation.status != "uploading":
             raise JobExecutionError(
-                "PUBLISH_OPERATION_NOT_FOUND",
-                "The publish operation is no longer available.",
+                "PUBLISH_OPERATION_CHANGED",
+                "The publish operation changed before platform submission.",
                 retryable=False,
             )
         operation.status = "submitting"
         operation.updated_at = datetime.now(UTC)
+
     try:
-        # This call has an external side effect. Any transport error is treated as
-        # uncertain; never retry create blindly.
         item_id = asyncio.run(
-            _douyin_publish_images(
+            _douyin_publish_uploaded_images(
                 access_token=access_token,
                 open_id=str(data["open_id"]),
-                images=[],  # uploaded IDs are not retained across this boundary
+                image_ids=uploaded_ids,
                 text=str(data["text"]),
             )
         )
@@ -1217,6 +1251,7 @@ def execute_douyin_publish(
             retryable=False,
             side_effect_state=SideEffectState.UNKNOWN,
         ) from exc
+
     _mark_douyin_operation(operation_id, status="processing", platform_item_id=item_id)
     context.check_control()
     try:

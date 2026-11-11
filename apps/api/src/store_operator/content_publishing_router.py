@@ -76,6 +76,16 @@ class PublishPackageConfirmRequest(BaseModel):
     confirmation_note: str | None = Field(default=None, max_length=2000)
 
 
+class PublishPackageFreezeIdempotencyPayload(BaseModel):
+    task_id: UUID
+    request: PublishPackageFreezeRequest
+
+
+class PublishPackageConfirmIdempotencyPayload(BaseModel):
+    package_id: UUID
+    request: PublishPackageConfirmRequest
+
+
 def _fingerprint(value: dict[str, object]) -> str:
     canonical = json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
@@ -280,7 +290,7 @@ def freeze_publish_package(
         actor_user_id=auth.user.id,
         key=idempotency_key,
         operation="content.publish_package.freeze",
-        payload={"task_id": task_id, **payload.model_dump()},
+        payload=PublishPackageFreezeIdempotencyPayload(task_id=task_id, request=payload),
     )
     if replay is not None:
         return replay
@@ -472,7 +482,7 @@ def freeze_publish_package(
         stored_items.append(stored)
     stored_facts: list[PublishPackageFactRef] = []
     for position, fact in enumerate(facts):
-        stored = PublishPackageFactRef(
+        stored_fact = PublishPackageFactRef(
             id=uuid4(),
             store_id=store_id,
             task_id=task.id,
@@ -480,8 +490,8 @@ def freeze_publish_package(
             business_fact_snapshot_id=fact.id,
             position=position,
         )
-        db.add(stored)
-        stored_facts.append(stored)
+        db.add(stored_fact)
+        stored_facts.append(stored_fact)
     db.flush()
 
     response = _package_payload(package, stored_items, stored_facts, None)
@@ -530,7 +540,7 @@ def confirm_publish_package(
         actor_user_id=auth.user.id,
         key=idempotency_key,
         operation="content.publish_package.confirm",
-        payload={"package_id": package_id, **payload.model_dump()},
+        payload=PublishPackageConfirmIdempotencyPayload(package_id=package_id, request=payload),
     )
     if replay is not None:
         return replay

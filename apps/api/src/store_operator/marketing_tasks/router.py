@@ -24,8 +24,8 @@ from store_operator.marketing_tasks.schemas import (
     MarketingTaskRecover,
     MarketingTaskRequirementConfirm,
     MarketingTaskRequirementUpdate,
-    MarketingTaskStrategyConfirm,
     MarketingTaskStepSkip,
+    MarketingTaskStrategyConfirm,
 )
 from store_operator.marketing_tasks.service import (
     archive_marketing_task,

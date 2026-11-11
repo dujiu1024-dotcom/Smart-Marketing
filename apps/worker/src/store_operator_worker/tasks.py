@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import socket
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import create_engine, or_, select
 from sqlalchemy.orm import sessionmaker
@@ -29,6 +29,7 @@ OUTBOX_MAX_ATTEMPTS = 12
 def relay_outbox(batch_size: int = 50) -> int:
     """Publish committed Outbox rows; a crash after publish can cause safe redelivery."""
     now = datetime.now(UTC)
+    relay_id = f"{WORKER_ID}:{uuid4()}"
     with SessionLocal.begin() as db:
         events = db.scalars(
             select(OutboxEvent)
@@ -48,7 +49,7 @@ def relay_outbox(batch_size: int = 50) -> int:
         ).all()
         for event in events:
             event.status = "publishing"
-            event.locked_by = WORKER_ID
+            event.locked_by = relay_id
             event.locked_until = now + timedelta(seconds=OUTBOX_LOCK_SECONDS)
             event.publish_attempts += 1
         event_ids = [event.id for event in events]
@@ -60,7 +61,7 @@ def relay_outbox(batch_size: int = 50) -> int:
             if (
                 event is None
                 or event.status != "publishing"
-                or event.locked_by != WORKER_ID
+                or event.locked_by != relay_id
             ):
                 continue
             event_type = event.event_type
@@ -84,7 +85,7 @@ def relay_outbox(batch_size: int = 50) -> int:
                     .where(OutboxEvent.id == event_id)
                     .with_for_update()
                 )
-                if event is None or event.locked_by != WORKER_ID:
+                if event is None or event.locked_by != relay_id:
                     continue
                 event.last_error = "Outbox dispatch failed; inspect sanitized worker logs"
                 event.locked_by = None

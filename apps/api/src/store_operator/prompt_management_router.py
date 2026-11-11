@@ -175,8 +175,9 @@ def _request_fingerprint(*parts: str) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _idempotency_hash(key: str) -> str:
-    return hashlib.sha256(key.encode()).hexdigest()
+def _idempotency_hash(template_id: UUID, key: str) -> str:
+    scoped_key = f"{template_id}:{key}"
+    return hashlib.sha256(scoped_key.encode()).hexdigest()
 
 
 def _existing_activation(
@@ -335,18 +336,22 @@ def publish_prompt_version(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     _admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
     db: Annotated[Session, Depends(get_db)],
-    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    idempotency_key: Annotated[
+        str, Header(alias="Idempotency-Key", min_length=8, max_length=200)
+    ],
 ) -> dict[str, object]:
-    key_hash = _idempotency_hash(idempotency_key)
+    key_hash = _idempotency_hash(template_id, idempotency_key)
     request_hash = _request_fingerprint(
         str(template_id), str(version_id), "publish", payload.reason
     )
-    replay = _existing_activation(db, key_hash, request_hash)
-    if replay is not None:
-        return _activation_read(replay)
     template = db.scalar(
         select(PromptTemplate).where(PromptTemplate.id == template_id).with_for_update()
     )
+    if template is None:
+        raise ApiError(404, "PROMPT_TEMPLATE_NOT_FOUND", "Prompt template not found")
+    replay = _existing_activation(db, key_hash, request_hash)
+    if replay is not None:
+        return _activation_read(replay)
     version = db.scalar(
         select(PromptVersion)
         .where(
@@ -355,7 +360,7 @@ def publish_prompt_version(
         )
         .with_for_update()
     )
-    if template is None or version is None:
+    if version is None:
         raise ApiError(404, "PROMPT_VERSION_NOT_FOUND", "Prompt version not found")
     if template.status != "active" or version.status != "draft":
         raise ApiError(
@@ -411,16 +416,18 @@ def rollback_prompt_version(
     db: Annotated[Session, Depends(get_db)],
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> dict[str, object]:
-    key_hash = _idempotency_hash(idempotency_key)
+    key_hash = _idempotency_hash(template_id, idempotency_key)
     request_hash = _request_fingerprint(
         str(template_id), str(version_id), "rollback", payload.reason
     )
-    replay = _existing_activation(db, key_hash, request_hash)
-    if replay is not None:
-        return _activation_read(replay)
     template = db.scalar(
         select(PromptTemplate).where(PromptTemplate.id == template_id).with_for_update()
     )
+    if template is None:
+        raise ApiError(404, "PROMPT_TEMPLATE_NOT_FOUND", "Prompt template not found")
+    replay = _existing_activation(db, key_hash, request_hash)
+    if replay is not None:
+        return _activation_read(replay)
     target = db.scalar(
         select(PromptVersion).where(
             PromptVersion.id == version_id,
@@ -428,7 +435,7 @@ def rollback_prompt_version(
             PromptVersion.status == "published",
         )
     )
-    if template is None or target is None:
+    if target is None:
         raise ApiError(404, "PROMPT_VERSION_NOT_FOUND", "Published prompt version not found")
     previous_id = template.current_published_version_id
     if previous_id == target.id:

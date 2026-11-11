@@ -33,7 +33,7 @@
 | BusinessFactSnapshot | 本任务使用的关键事实值、来源对象/版本、商家确认状态、确认人/时间；价格、折扣、库存、有效期等不得由模型臆造 |
 | TaskStep | 固定流程节点实例；step_key、status、applicability、skip_reason、input_fingerprint、output_refs、block_reason、started_at、finished_at |
 | StepDecision | 节点采纳/跳过/继续等决策；决策人、原因、依据快照、时间 |
-| Artifact / ArtifactVersion | 文案、图片、渠道变体等逻辑产物及不可变版本；version_no、source_type、source_refs、instruction、content_hash、provider metadata、created_by |
+| Artifact / ArtifactVersion | 文案、图片逻辑产物及不可变版本；artifact_type 仅 copy/image；渠道适配快照由 #8 ChannelContent 独立持有 |
 | ReviewRecord | 文案或图片的独立审核记录；artifact_type、artifact_version_id、decision、reviewer、comment、target/region、time |
 | RevisionRequest | 针对某一版本的整改意见；目标段落/图片区域、指令、状态、对应新版本 |
 | DependencyEdge | 上游对象版本/指纹到下游产物的依赖边；dependency_type、impact_policy、observed_fingerprint |
@@ -399,18 +399,19 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | business_fact_snapshots | task_id, fact_key, source_type, source_id, source_version, value_json, confirmation_status, confirmed_at, confirmed_by_actor_id, fingerprint | 来源及值快照不可覆盖；可追溯原始资料版本 |
 | task_steps | task_id, step_key, status, applicability, skip_reason, input_fingerprint, block_code, block_detail_json, started_at, finished_at, version | (store_id,task_id,step_key) 唯一；不适用节点必须有显式 skipped 决策 |
 | step_decisions | task_id, step_key, decision, reason, actor_id, actor_type, input_snapshot_ref, decided_at, idempotency_record_id | 追加写；决策引用对应 task_step |
-| artifacts | task_id, artifact_type, logical_key, current_version_id, lifecycle_status, created_by_actor_id | (store_id,task_id,artifact_type,logical_key) 唯一；当前版本必须属于该 artifact |
+| artifacts | task_id, artifact_type(copy/image), logical_key, current_version_id, lifecycle_status, created_by_actor_id | (store_id,task_id,artifact_type,logical_key) 唯一；当前版本必须属于该 artifact；ChannelContent 是 #8 独立实体，不是 Artifact 类型 |
 | artifact_versions | task_id, artifact_id, version_no, source_type, source_instruction, content_text, asset_id, content_hash, dependency_fingerprint, provider_key, model_key, provider_metadata_json, created_by_actor_id | (store_id,artifact_id,version_no) 唯一；版本不可变；文案/图片通过 artifact_type 区分 |
 | review_records | task_id, artifact_id, artifact_version_id, review_type, decision, comment, target_json, reviewer_actor_id, reviewed_at | 必须引用精确 artifact_version；审核记录追加写；类型与产物类型匹配 |
 | revision_requests | task_id, artifact_id, source_artifact_version_id, review_record_id, instruction, target_json, status, resulting_artifact_version_id, created_by_actor_id | 源版本与审核记录一致；结果版本创建后只追加关联 |
 | dependency_edges | task_id, upstream_type, upstream_id, upstream_version_id, upstream_fingerprint, downstream_type, downstream_id, downstream_version_id, impact_policy | 同一上下游版本边唯一；两端属于同任务/门店 |
 | channel_contents | task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status | 每个渠道/输入快照独立；文案版本直接引用，图片版本由关系表引用 |
 | channel_content_artifact_refs | channel_content_id, artifact_version_id, role, position | 只保存图片版本引用；复合 FK 校验同店和精确版本 |
-| quality_reports | task_id, channel_content_id, rule_version, result, issues_json, input_fingerprint, created_at | 结果绑定精确 ChannelContent 与规则版本；输入变化后旧报告 stale |
+| quality_reports | task_id, channel_content_id, rule_version, result(pass/fail/needs_human), issues_json, input_fingerprint, created_at | 结果绑定精确 ChannelContent 与规则版本；输入变化后旧报告 stale，报告不可变 |
+| quality_resolutions | quality_report_id, quality_report_fingerprint, decision(accepted/rejected), reviewer_user_id, reason, idempotency_record_id, created_at | 仅对 needs_human 报告追加；hard fail 不可覆盖；同一报告指纹最多一条决议 |
 | publish_packages | task_id, package_version, package_fingerprint, frozen_at, frozen_by_actor_id | (store_id,task_id,package_version) 唯一；聚合一次多渠道交付并冻结 |
-| publish_package_fact_refs | publish_package_id, business_fact_snapshot_id, position | (store_id,publish_package_id,business_fact_snapshot_id) 唯一；引用已确认事实快照 |
+| publish_package_fact_refs | publish_package_id, business_fact_snapshot_id, position | (store_id,publish_package_id,business_fact_snapshot_id) 唯一；引用 #7 任务级已确认事实快照，其来源追溯 #6 StoreRecordRevision |
 | publish_package_items | task_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode, planned_publish_at, item_fingerprint | (store_id,publish_package_id,channel_key) 唯一；每个渠道一条 |
-| publish_confirmations | task_id, publish_package_id, package_fingerprint, confirmed_by_actor_id, confirmed_at, revoked_at, confirmation_text | 确认绑定整个冻结包的精确指纹；新包不得复用旧确认 |
+| publish_confirmations | task_id, publish_package_id, package_fingerprint, confirmed_by_user_id, confirmed_at, confirmation_text | 不可变确认记录，绑定整个冻结包的精确指纹；首期不提供撤销 |
 | task_events | task_id, aggregate_version, event_type, actor_id, actor_type, correlation_id, causation_id, payload_json, schema_version, occurred_at | 追加写；event_id 唯一 |
 | audit_events | actor_id, actor_type, action, resource_type, resource_id, result, reason, request_id, correlation_id, metadata_json, occurred_at | 追加写；敏感凭据禁止进入 metadata |
 | idempotency_records | actor_id, operation, idempotency_key, request_hash, resource_type, resource_id, response_status, response_json, expires_at | (store_id,actor_id,operation,idempotency_key) 唯一 |

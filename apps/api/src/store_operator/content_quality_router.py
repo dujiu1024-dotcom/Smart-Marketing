@@ -391,7 +391,11 @@ def run_quality_report(
             timeout_seconds=120,
         )
     except (JobIdempotencyConflict, ValueError) as exc:
-        raise ApiError(409, "QUALITY_JOB_CONFLICT", "Quality check request conflicts with an existing job") from exc
+        raise ApiError(
+            409,
+            "QUALITY_JOB_CONFLICT",
+            "Quality check request conflicts with an existing job",
+        ) from exc
 
     response: dict[str, object] = {
         "job_id": str(job.id),

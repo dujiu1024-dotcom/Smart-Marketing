@@ -479,3 +479,80 @@ def test_expired_worker_lease_fences_heartbeat_and_completion(db_session) -> Non
             result_ref={"artifact_id": "late-result"},
             now=expired_at,
         )
+
+
+def test_store_concurrency_limit_defers_without_consuming_attempt_and_requeues(
+    db_session,
+) -> None:
+    user, store = create_actor_and_store(db_session)
+    first = create_store_job(
+        db_session, user, store, idempotency_key="store-capacity-first"
+    )
+    second = create_store_job(
+        db_session, user, store, idempotency_key="store-capacity-second"
+    )
+    now = datetime.now(UTC)
+
+    first_claim = claim_job(
+        db_session,
+        job_id=first.id,
+        worker_id="worker-1",
+        max_running_per_store=1,
+        now=now,
+    )
+    assert first_claim is not None
+
+    deferred = claim_job(
+        db_session,
+        job_id=second.id,
+        worker_id="worker-2",
+        max_running_per_store=1,
+        concurrency_defer_seconds=15,
+        now=now + timedelta(seconds=1),
+    )
+    assert deferred is None
+    db_session.refresh(second)
+    assert second.status == "queued"
+    assert second.attempt_count == 0
+    assert second.available_at == now + timedelta(seconds=16)
+    assert db_session.scalars(
+        select(JobAttempt).where(JobAttempt.job_id == second.id)
+    ).all() == []
+
+    dispatch = db_session.scalar(
+        select(OutboxEvent).where(
+            OutboxEvent.aggregate_id == second.id,
+            OutboxEvent.dedupe_key.like("job.dispatch.defer:%"),
+        )
+    )
+    assert dispatch is not None
+    assert dispatch.status == "pending"
+    assert dispatch.available_at == second.available_at
+
+    deferred_event = db_session.scalar(
+        select(JobEvent).where(
+            JobEvent.job_id == second.id,
+            JobEvent.event_type == "job.deferred_for_concurrency",
+        )
+    )
+    assert deferred_event is not None
+    assert deferred_event.data_json["running_limit"] == 1
+
+    complete_job(
+        db_session,
+        job_id=first.id,
+        lease_token=first_claim.attempt.lease_token,
+        worker_id="worker-1",
+        result_ref={"schema_version": 1},
+        now=now + timedelta(seconds=2),
+    )
+    second_claim = claim_job(
+        db_session,
+        job_id=second.id,
+        worker_id="worker-2",
+        max_running_per_store=1,
+        now=now + timedelta(seconds=16),
+    )
+    assert second_claim is not None
+    assert second_claim.job.status == "running"
+    assert second_claim.attempt.attempt_no == 1

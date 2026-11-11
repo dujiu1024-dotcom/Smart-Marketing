@@ -269,3 +269,14 @@
 ### PR #68 合并状态（2026-11-11）
 
 抖音官方 OAuth/视频 API Adapter 已合并至 main（`9a417f30e4da74496ad8e65d70588d130ac51139`）。CI Run [42998696426](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42998696426) 6/6 jobs 通过，API 129 pytest passed。当前仅为可测试的服务端 Adapter；没有 OAuth state/Secret Manager/ChannelAccount/PublishOperation 的完整生产集成，也未完成真实应用审核、真实账号授权、视频上传/发布和作品读回。Issue #12 继续保持 Open。
+
+
+## 2026-11-11 #9 门店级 Job 并发门禁（PR #69）
+
+| 能力 | 后端状态 | Demo/运维状态 |
+|---|---|---|
+| 门店 running Job 配额 | Worker claim 阶段锁门店行并统计 running Job；默认每店 3 个，可配置 | 尚未提供门店级配置页面 |
+| 容量满时退避 | 保持 queued、不消耗 attempt；同事务创建延迟 Outbox 事件重新投递 | 任务列表暂不展示“等待并发槽位”状态 |
+| Provider/模型并发 | 未实现；ProviderDescriptor.max_concurrency 仍只是声明 | 未接入 |
+
+该能力只完成首期门店级限流；不代表全局/队列/Provider 多维配额、成本预算、公平调度和完整故障注入验收已完成。

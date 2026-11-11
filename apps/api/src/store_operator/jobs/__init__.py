@@ -11,6 +11,8 @@ from store_operator.jobs.service import (
     fail_job,
     heartbeat_job,
     request_job_cancellation,
+    resolve_job,
+    retry_failed_job,
 )
 
 __all__ = [
@@ -26,4 +28,6 @@ __all__ = [
     "fail_job",
     "heartbeat_job",
     "request_job_cancellation",
+    "resolve_job",
+    "retry_failed_job",
 ]

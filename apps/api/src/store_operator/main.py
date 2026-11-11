@@ -11,6 +11,8 @@ from opentelemetry import trace
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract
 from opentelemetry.trace import Status, StatusCode
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 from redis import Redis
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -52,7 +54,9 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def request_id_logging_and_tracing_middleware(request: Request, call_next):
+async def request_id_logging_and_tracing_middleware(
+    request: Request, call_next: RequestResponseEndpoint
+) -> Response:
     request_id = request.headers.get("X-Request-ID") or str(uuid4())
     request.state.request_id = request_id
     started_at = time.perf_counter()
@@ -99,7 +103,7 @@ async def request_id_logging_and_tracing_middleware(request: Request, call_next)
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unavailable")
     return JSONResponse(
         status_code=500,
@@ -114,12 +118,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health/live", tags=["health"])
-def live():
+def live() -> dict[str, str]:
     return {"status": "alive"}
 
 
 @app.get("/health/ready", tags=["health"])
-def ready():
+def ready() -> JSONResponse:
     dependencies: dict[str, str] = {}
     try:
         with engine.connect() as connection:
@@ -144,7 +148,7 @@ def ready():
 
 
 @app.get("/api/v1/system/info", tags=["system"])
-def system_info():
+def system_info() -> dict[str, str]:
     return {
         "name": settings.app_name,
         "environment": settings.environment,

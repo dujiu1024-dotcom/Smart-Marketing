@@ -36,6 +36,7 @@ def upgrade() -> None:
         "stores",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("name", sa.String(160), nullable=False),
+        sa.Column("timezone", sa.String(64), nullable=False),
         sa.Column("status", sa.String(16), server_default="active", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

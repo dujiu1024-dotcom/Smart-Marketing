@@ -1,4 +1,6 @@
+import hmac
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -29,7 +31,6 @@ from store_operator.auth.security import (
     csrf_token_verifier,
     dummy_password_hash,
     fingerprint,
-    hash_password,
     normalize_email,
     random_token,
     session_token_verifier,
@@ -106,12 +107,18 @@ def login(
             db.commit()
             raise ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password")
 
-        redis_client.delete(rate_key)
+        try:
+            redis_client.delete(rate_key)
+        except RedisError as exc:
+            raise ApiError(
+                503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
+            ) from exc
         now = datetime.now(UTC)
         raw_token = random_token()
         csrf_token = random_token()
         expires_at = now + timedelta(seconds=settings.session_absolute_timeout_seconds)
         auth_session = AuthSession(
+            id=uuid4(),
             user_id=user.id,
             token_hash=session_token_verifier(raw_token, settings.session_token_pepper),
             csrf_token_hash=csrf_token_verifier(csrf_token),

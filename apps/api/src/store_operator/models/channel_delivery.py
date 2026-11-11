@@ -210,7 +210,10 @@ class PublishOperationAttempt(Base):
             name="action",
         ),
         CheckConstraint(
-            "normalized_status IN ('started', 'accepted', 'verified', 'not_found', 'failed', 'unknown')",
+            (
+                "normalized_status IN ('started', 'accepted', 'verified', "
+                "'not_found', 'failed', 'unknown')"
+            ),
             name="normalized_status",
         ),
         Index(

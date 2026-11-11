@@ -202,7 +202,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 
 ### 7.2 幂等与重复提交
 
-- 所有用户写 API 接受 `Idempotency-Key`；唯一范围为 `store_id + actor_id + operation + idempotency_key`，保存 request_hash、结果资源 ID 和响应状态。同一作用域/Key/Hash 重放返回原结果；相同 Key、不同 Hash 返回 409。Job Runtime 使用由应用服务派生的稳定 Job 幂等键，并与内部 event_id/job_id 消费幂等边界区分。
+- 所有用户写 API 接受 `Idempotency-Key`；唯一范围为 `store_id + actor_id + operation + idempotency_key`，保存 request_hash、结果资源 ID 和响应状态。用户请求中的 `actor_id` 映射为已认证上下文的 `user_id`；系统任务使用独立 system scope，不伪造用户 ID。同一作用域/Key/Hash 重放返回原结果；相同 Key、不同 Hash 返回 409。Job Runtime 使用由应用服务派生的稳定 Job 幂等键，并与内部 event_id/job_id 消费幂等边界区分。
 - 保存请求体 hash、业务对象 ID、处理结果和状态；相同 key + 相同请求返回原结果，相同 key + 不同请求体返回 409。
 - 生成类 Job 的幂等键由 task、stage、输入指纹、操作类型和请求轮次组成。
 - 发布幂等键必须绑定 PublishPackage ID、渠道账号 ID 和发布动作；禁止客户端重试生成新 key 造成重复发布。
@@ -319,7 +319,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 
 ## 13. 与 Identity & Store（轨道 B）的集成契约
 
-> 本节依据产品基线、技术架构和 Issue #5 的身份/门店安全设计定义营销任务域必须遵守的消费契约。Issue #5 的 request-scoped X-Store-ID / AuthorizedStoreContext 契约仍待联合评审冻结；实现时以最终合并版本为准。
+> 本节依据产品基线、技术架构和已合并的 Issue #5 身份/门店安全设计定义营销任务域必须遵守的消费契约。request-scoped X-Store-ID / AuthorizedStoreContext 以 PR #26 合并版本为准；异步 Job 执行与系统身份边界以 PR #29 合并版本为准。
 
 ### 14.1 请求身份与门店上下文
 
@@ -522,3 +522,12 @@ erDiagram
 5. task_events 与 audit_events 的保留期限、敏感字段脱敏和删除合规要求需在安全/数据治理基线中明确。
 6. business_fact_snapshots 的 source_id/source_version 是来源引用，不保证源资料仍可读取；快照 value_json 与 fingerprint 才是历史还原依据。
 7. 所有唯一索引必须明确 NULL 语义；可空的外部平台 ID 不应意外阻止多个未发布记录并存。
+
+
+## 15. 跨域契约合并状态与最后映射（2026-11-11）
+
+- Identity & Store：PR #26 已合并。营销域使用每请求 X-Store-ID selector；服务端构造 AuthorizedStoreContext.request_store_id。Session.active_store_id 只作 UI 默认选择。
+- Store Knowledge：PR #27 已合并。MarketingTask 的 BusinessFactSnapshot 只引用已确认、不可变的 StoreRecordRevision；不能读取当前可变资料行作为历史任务事实。
+- Async Runtime：PR #29 已合并。Job 状态由 #9 唯一拥有；营销域不得复制 Job 状态机。Worker 只返回执行结果，业务应用服务验证后推进 TaskStep。
+- 幂等映射：用户 API 的 actor_id = AuthorizedStoreContext.user_id，因此用户写请求作用域与 #9 的 store_id + user_id + operation + idempotency_key 对齐；system Job 使用显式 system scope。
+- 仍需在实现前由 #7/#9 联合冻结：Job command/result schema、event_id/job_id 消费幂等边界、terminal_reason、业务步骤与 Job 结果映射。文档合并不代表生产实现或自动化测试已完成。

@@ -20,7 +20,7 @@ DOUYIN_VIDEO_CREATE_URL = f"{DOUYIN_API_BASE}/video/create/"
 DOUYIN_IMAGE_UPLOAD_URL = f"{DOUYIN_API_BASE}/image/upload/"
 DOUYIN_IMAGE_CREATE_URL = f"{DOUYIN_API_BASE}/image_text/create/"
 MAX_SINGLE_VIDEO_UPLOAD_BYTES = 128 * 1024 * 1024
-MAX_DOYIN_IMAGE_BYTES = 20 * 1024 * 1024
+MAX_DOUYIN_IMAGE_BYTES = 20 * 1024 * 1024
 
 
 class DouyinApiError(RuntimeError):
@@ -194,7 +194,7 @@ class DouyinOAuthClient:
     ) -> dict[str, Any]:
         if not content:
             raise ValueError("Image content is required")
-        if len(content) > MAX_DOYIN_IMAGE_BYTES:
+        if len(content) > MAX_DOUYIN_IMAGE_BYTES:
             raise ValueError("Each image in a Douyin image-text post must not exceed 20 MiB")
         if content_type not in {"image/jpeg", "image/png", "image/webp"}:
             raise ValueError("Only JPEG, PNG and WebP images are enabled for the pilot")

@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from store_operator.auth.audit import record_audit
@@ -908,6 +909,21 @@ def create_douyin_publish_operation(
     if content is None:
         raise ApiError(409, "CHANNEL_CONTENT_STALE", "Frozen channel content is no longer ready")
 
+    existing_item_operation = db.scalar(
+        select(PublishOperation)
+        .where(
+            PublishOperation.store_id == store_id,
+            PublishOperation.publish_package_item_id == item.id,
+        )
+        .with_for_update()
+    )
+    if existing_item_operation is not None:
+        raise ApiError(
+            409,
+            "PUBLISH_OPERATION_EXISTS",
+            "This frozen package item already has a publish operation",
+        )
+
     existing = db.scalar(
         select(PublishOperation).where(
             PublishOperation.store_id == store_id,
@@ -947,8 +963,16 @@ def create_douyin_publish_operation(
         confirmed_package_fingerprint=confirmation.package_fingerprint,
         next_attempt_at=datetime.now(UTC),
     )
-    db.add(operation)
-    db.flush()
+    try:
+        with db.begin_nested():
+            db.add(operation)
+            db.flush()
+    except IntegrityError as exc:
+        raise ApiError(
+            409,
+            "PUBLISH_OPERATION_EXISTS",
+            "This frozen package item already has a publish operation",
+        ) from exc
 
     job = create_job(
         db,

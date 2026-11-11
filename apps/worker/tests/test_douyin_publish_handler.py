@@ -77,3 +77,17 @@ def test_uncertain_create_state_is_never_submitted_twice(monkeypatch) -> None:
     assert error.value.code == "DOUYIN_CREATE_RESULT_UNKNOWN"
     assert error.value.side_effect_state is SideEffectState.UNKNOWN
     assert operation.status == "needs_human"
+
+
+def test_downloaded_media_must_match_approved_sha256(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    import hashlib
+
+    from store_operator_worker.tasks import _verify_douyin_media_sha256
+
+    content = b"approved image bytes"
+    _verify_douyin_media_sha256(content, hashlib.sha256(content).hexdigest())
+
+    with pytest.raises(ValueError, match="SHA-256"):
+        _verify_douyin_media_sha256(content, "0" * 64)

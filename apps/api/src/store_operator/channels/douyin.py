@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
-import httpx
+import httpx  # noqa: I001
 
 
 DOUYIN_API_BASE = "https://open.douyin.com"

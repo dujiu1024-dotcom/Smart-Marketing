@@ -5,14 +5,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from store_operator.auth.audit import record_audit
-from store_operator.auth.dependencies import AuthenticatedSession, require_csrf, get_current_session
+from store_operator.auth.dependencies import (
+    AuthenticatedSession,
+    get_current_session,
+    require_csrf,
+)
 from store_operator.auth.errors import ApiError
 from store_operator.auth.schemas import (
     ActiveStoreRequest,
     ActiveStoreResponse,
     StoreMembershipSummary,
-    StoreSummary,
     StoresResponse,
+    StoreSummary,
 )
 from store_operator.db import get_db
 from store_operator.models.identity import Store, StoreMembership

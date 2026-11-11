@@ -467,6 +467,12 @@ def test_password_change_rotates_current_session_and_revokes_other_sessions(
     old_token = identity_client.cookies.get("__Host-ai_store_session")
     assert old_token
     old_verifier = session_token_verifier(old_token, settings.session_token_pepper)
+    active_session = db_session.scalar(
+        select(AuthSession).where(AuthSession.token_hash == old_verifier)
+    )
+    assert active_session is not None
+    active_session.active_store_id = store.id
+    db_session.commit()
 
     changed = identity_client.post(
         "/api/v1/auth/password/change",

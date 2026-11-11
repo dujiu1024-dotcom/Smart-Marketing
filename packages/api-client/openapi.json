@@ -1662,6 +1662,32 @@
         "title": "ChannelContentCreate",
         "type": "object"
       },
+      "DouyinPublishOperationRequest": {
+        "properties": {
+          "package_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Fingerprint",
+            "type": "string"
+          },
+          "publish_package_id": {
+            "format": "uuid",
+            "title": "Publish Package Id",
+            "type": "string"
+          },
+          "publish_package_item_id": {
+            "format": "uuid",
+            "title": "Publish Package Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "publish_package_id",
+          "publish_package_item_id",
+          "package_fingerprint"
+        ],
+        "title": "DouyinPublishOperationRequest",
+        "type": "object"
+      },
       "FactConfirmationRequest": {
         "properties": {
           "confirmation_note": {
@@ -6484,6 +6510,76 @@
           }
         },
         "summary": "Complete Douyin Authorization",
+        "tags": [
+          "channel-accounts"
+        ]
+      }
+    },
+    "/api/v1/channels/douyin/publish-operations": {
+      "post": {
+        "operationId": "create_douyin_publish_operation_api_v1_channels_douyin_publish_operations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DouyinPublishOperationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Douyin Publish Operation Api V1 Channels Douyin Publish Operations Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Douyin Publish Operation",
         "tags": [
           "channel-accounts"
         ]

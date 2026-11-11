@@ -311,6 +311,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/channels/douyin/publish-operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Douyin Publish Operation */
+        post: operations["create_douyin_publish_operation_api_v1_channels_douyin_publish_operations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -1518,6 +1535,21 @@ export interface components {
             payload: {
                 [key: string]: unknown;
             };
+        };
+        /** DouyinPublishOperationRequest */
+        DouyinPublishOperationRequest: {
+            /** Package Fingerprint */
+            package_fingerprint: string;
+            /**
+             * Publish Package Id
+             * Format: uuid
+             */
+            publish_package_id: string;
+            /**
+             * Publish Package Item Id
+             * Format: uuid
+             */
+            publish_package_item_id: string;
         };
         /** FactConfirmationRequest */
         FactConfirmationRequest: {
@@ -3252,6 +3284,44 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_douyin_publish_operation_api_v1_channels_douyin_publish_operations_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DouyinPublishOperationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
                     };
                 };
             };

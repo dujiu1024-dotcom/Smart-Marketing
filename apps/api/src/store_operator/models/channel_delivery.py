@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -185,3 +186,52 @@ class PublishOperation(Base):
     )
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+
+class PublishOperationAttempt(Base):
+    __tablename__ = "publish_operation_attempts"
+    __table_args__ = (
+        UniqueConstraint(
+            "store_id",
+            "publish_operation_id",
+            "attempt_no",
+            name="uq_publish_operation_attempts_operation_no",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "publish_operation_id"],
+            ["publish_operations.store_id", "publish_operations.id"],
+            name="fk_publish_operation_attempts_operation_same_store",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("attempt_no >= 1", name="attempt_no_positive"),
+        CheckConstraint(
+            "action IN ('upload_image', 'publish_image_text', 'readback')",
+            name="action",
+        ),
+        CheckConstraint(
+            "normalized_status IN ('started', 'accepted', 'verified', 'not_found', 'failed', 'unknown')",
+            name="normalized_status",
+        ),
+        Index(
+            "ix_publish_operation_attempts_operation_created",
+            "store_id",
+            "publish_operation_id",
+            "started_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    store_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    publish_operation_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    attempt_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String(40), nullable=False)
+    adapter_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    external_request_id: Mapped[str | None] = mapped_column(String(160))
+    response_evidence_ref: Mapped[str | None] = mapped_column(String(2048))
+    normalized_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(100))
+    retryable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -56,7 +56,7 @@ def _request_hash(
     canonical = json.dumps(
         request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def _append_event(
@@ -487,7 +487,7 @@ def request_job_cancellation(
 ) -> Job:
     current_time = now or datetime.now(UTC)
     key_hash = (
-        hashlib.sha256(idempotency_key.strip().encode("utf-8")).hexdigest()
+        hashlib.sha256(idempotency_key.strip().encode()).hexdigest()
         if idempotency_key is not None
         else None
     )
@@ -586,9 +586,9 @@ def _manual_retry(
     safe_reason = " ".join(reason.split())[:500]
     if not safe_reason:
         raise ValueError("A recovery reason is required")
-    key_hash = hashlib.sha256(normalized_key.encode("utf-8")).hexdigest()
+    key_hash = hashlib.sha256(normalized_key.encode()).hexdigest()
     request_hash = hashlib.sha256(
-        f"{event_type}:{safe_reason}".encode("utf-8")
+        f"{event_type}:{safe_reason}".encode()
     ).hexdigest()
 
     prior_events = db.scalars(
@@ -735,9 +735,9 @@ def resolve_job(
     safe_reason = " ".join(reason.split())[:500]
     if not safe_reason:
         raise ValueError("A resolution reason is required")
-    key_hash = hashlib.sha256(normalized_key.encode("utf-8")).hexdigest()
+    key_hash = hashlib.sha256(normalized_key.encode()).hexdigest()
     request_hash = hashlib.sha256(
-        f"job.manual_resolution_fail:{safe_reason}".encode("utf-8")
+        f"job.manual_resolution_fail:{safe_reason}".encode()
     ).hexdigest()
     prior_events = db.scalars(
         select(JobEvent).where(

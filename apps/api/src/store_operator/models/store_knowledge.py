@@ -16,6 +16,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -96,7 +97,7 @@ class Product(StoreScoped, Base):
             "store_id",
             "sku",
             unique=True,
-            postgresql_where="sku IS NOT NULL",
+            postgresql_where=text("sku IS NOT NULL"),
         ),
         Index("ix_products_store_status", "store_id", "availability_status", "fact_status"),
     )

@@ -4403,14 +4403,29 @@
       },
       "PublishPackageItemInput": {
         "properties": {
+          "channel_account_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Account Id"
+          },
           "channel_content_id": {
             "format": "uuid",
             "title": "Channel Content Id",
             "type": "string"
           },
           "delivery_mode": {
-            "const": "manual_handoff",
             "default": "manual_handoff",
+            "enum": [
+              "manual_handoff",
+              "official_api"
+            ],
             "title": "Delivery Mode",
             "type": "string"
           },
@@ -6244,6 +6259,233 @@
         "summary": "Me",
         "tags": [
           "identity"
+        ]
+      }
+    },
+    "/api/v1/channels/douyin/accounts": {
+      "get": {
+        "operationId": "list_douyin_accounts_api_v1_channels_douyin_accounts_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Douyin Accounts Api V1 Channels Douyin Accounts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Douyin Accounts",
+        "tags": [
+          "channel-accounts"
+        ]
+      }
+    },
+    "/api/v1/channels/douyin/accounts/{account_id}/refresh": {
+      "post": {
+        "operationId": "refresh_douyin_account_token_api_v1_channels_douyin_accounts__account_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Refresh Douyin Account Token Api V1 Channels Douyin Accounts  Account Id  Refresh Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Douyin Account Token",
+        "tags": [
+          "channel-accounts"
+        ]
+      }
+    },
+    "/api/v1/channels/douyin/oauth/authorize": {
+      "post": {
+        "operationId": "begin_douyin_authorization_api_v1_channels_douyin_oauth_authorize_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Begin Douyin Authorization Api V1 Channels Douyin Oauth Authorize Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Begin Douyin Authorization",
+        "tags": [
+          "channel-accounts"
+        ]
+      }
+    },
+    "/api/v1/channels/douyin/oauth/callback": {
+      "get": {
+        "operationId": "complete_douyin_authorization_api_v1_channels_douyin_oauth_callback_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 32,
+              "title": "State",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Complete Douyin Authorization Api V1 Channels Douyin Oauth Callback Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Douyin Authorization",
+        "tags": [
+          "channel-accounts"
         ]
       }
     },

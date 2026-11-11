@@ -368,10 +368,24 @@ def test_requirement_and_strategy_confirmation_freeze_exact_source_versions(
                 "goal": "Increase weekday visits",
                 "audience": "Nearby office workers",
             },
+            "task_options": {
+                "includes_copy": True,
+                "includes_image": False,
+                "opportunity_applicable": False,
+                "selected_channel_keys": ["wechat"],
+                "requires_external_delivery": False,
+            },
         },
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["version"] == 2
+    channel_step = next(
+        step
+        for step in updated.json()["steps"]
+        if step["step_key"] == "channel_adaptation"
+    )
+    assert channel_step["applicability"] == "required"
+    assert channel_step["status"] == "pending"
 
     source_id = uuid4()
     revision = StoreRecordRevision(

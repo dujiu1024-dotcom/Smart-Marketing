@@ -40,72 +40,138 @@ def test_marketing_task_lifecycle_allows_only_documented_transitions() -> None:
         )
 
 
-def test_task_cannot_complete_without_all_applicable_steps() -> None:
-    steps = [
+def completed_copy_only_steps() -> list[TaskStepSnapshot]:
+    return [
         TaskStepSnapshot(
-            key="requirement_understanding",
+            key=TaskStepKey.REQUIREMENT_UNDERSTANDING.value,
             status=TaskStepStatus.SUCCEEDED,
             applicability=StepApplicability.REQUIRED,
         ),
         TaskStepSnapshot(
-            key="image_production_review",
-            status=TaskStepStatus.SKIPPED,
-            applicability=StepApplicability.NOT_APPLICABLE,
-            skip_reason="This is a copy-only task",
+            key=TaskStepKey.CONTEXT_SNAPSHOT.value,
+            status=TaskStepStatus.SUCCEEDED,
+            applicability=StepApplicability.REQUIRED,
         ),
         TaskStepSnapshot(
-            key="channel_adaptation",
+            key=TaskStepKey.OPPORTUNITY_DECISION.value,
+            status=TaskStepStatus.SKIPPED,
+            applicability=StepApplicability.NOT_APPLICABLE,
+            skip_reason="Opportunity discovery is not used for copy-only tasks",
+        ),
+        TaskStepSnapshot(
+            key=TaskStepKey.STRATEGY_CONFIRMATION.value,
+            status=TaskStepStatus.SUCCEEDED,
+            applicability=StepApplicability.REQUIRED,
+        ),
+        TaskStepSnapshot(
+            key=TaskStepKey.COPY_PRODUCTION_REVIEW.value,
+            status=TaskStepStatus.SUCCEEDED,
+            applicability=StepApplicability.REQUIRED,
+        ),
+        TaskStepSnapshot(
+            key=TaskStepKey.IMAGE_PRODUCTION_REVIEW.value,
+            status=TaskStepStatus.SKIPPED,
+            applicability=StepApplicability.NOT_APPLICABLE,
+            skip_reason="Copy-only task has no image artifact",
+        ),
+        TaskStepSnapshot(
+            key=TaskStepKey.CHANNEL_ADAPTATION.value,
             status=TaskStepStatus.SKIPPED,
             applicability=StepApplicability.OPTIONAL,
             skip_reason="No channel selected",
         ),
+        TaskStepSnapshot(
+            key=TaskStepKey.QUALITY_CHECK.value,
+            status=TaskStepStatus.SKIPPED,
+            applicability=StepApplicability.OPTIONAL,
+            skip_reason="No external delivery requested",
+        ),
+        TaskStepSnapshot(
+            key=TaskStepKey.FINAL_CONFIRMATION.value,
+            status=TaskStepStatus.SKIPPED,
+            applicability=StepApplicability.OPTIONAL,
+            skip_reason="No external delivery requested",
+        ),
+        TaskStepSnapshot(
+            key=TaskStepKey.DELIVERY.value,
+            status=TaskStepStatus.SKIPPED,
+            applicability=StepApplicability.OPTIONAL,
+            skip_reason="No external delivery requested",
+        ),
     ]
+
+
+def test_task_cannot_complete_without_all_applicable_steps() -> None:
+    steps = completed_copy_only_steps()
     ensure_task_can_complete(steps)
     ensure_task_transition(
         MarketingTaskStatus.ACTIVE, MarketingTaskStatus.COMPLETED, steps=steps
     )
 
     incomplete = [
-        *steps,
         TaskStepSnapshot(
-            key="copy_production_review",
-            status=TaskStepStatus.WAITING_FOR_USER,
-            applicability=StepApplicability.REQUIRED,
-        ),
+            key=step.key,
+            status=(
+                TaskStepStatus.WAITING_FOR_USER
+                if step.key == TaskStepKey.COPY_PRODUCTION_REVIEW.value
+                else step.status
+            ),
+            applicability=step.applicability,
+            skip_reason=step.skip_reason,
+            approval_required=step.approval_required,
+        )
+        for step in steps
     ]
     with pytest.raises(TaskCompletionBlocked, match="copy_production_review"):
         ensure_task_can_complete(incomplete)
 
-    with pytest.raises(TaskCompletionBlocked, match="step snapshots"):
-        ensure_task_transition(
-            MarketingTaskStatus.ACTIVE, MarketingTaskStatus.COMPLETED
-        )
+    with pytest.raises(TaskCompletionBlocked, match="every task step"):
+        ensure_task_can_complete(steps[:-1])
 
 
 def test_task_completion_rejects_unexplained_or_approval_skips() -> None:
+    steps = completed_copy_only_steps()
+    unexplained = [
+        TaskStepSnapshot(
+            key=step.key,
+            status=step.status,
+            applicability=step.applicability,
+            skip_reason=(
+                None
+                if step.key == TaskStepKey.IMAGE_PRODUCTION_REVIEW.value
+                else step.skip_reason
+            ),
+            approval_required=step.approval_required,
+        )
+        for step in steps
+    ]
     with pytest.raises(TaskCompletionBlocked, match="skip reason"):
-        ensure_task_can_complete(
-            [
-                TaskStepSnapshot(
-                    key="image_production_review",
-                    status=TaskStepStatus.SKIPPED,
-                    applicability=StepApplicability.NOT_APPLICABLE,
-                )
-            ]
-        )
+        ensure_task_can_complete(unexplained)
 
-    with pytest.raises(TaskCompletionBlocked, match="cannot be skipped"):
-        ensure_task_can_complete(
-            [
-                TaskStepSnapshot(
-                    key="copy_production_review",
-                    status=TaskStepStatus.SKIPPED,
-                    applicability=StepApplicability.OPTIONAL,
-                    skip_reason="Not needed",
-                    approval_required=True,
-                )
-            ]
+    approval_skipped = [
+        TaskStepSnapshot(
+            key=step.key,
+            status=(
+                TaskStepStatus.SKIPPED
+                if step.key == TaskStepKey.COPY_PRODUCTION_REVIEW.value
+                else step.status
+            ),
+            applicability=step.applicability,
+            skip_reason=(
+                "Attempted to skip an approval"
+                if step.key == TaskStepKey.COPY_PRODUCTION_REVIEW.value
+                else step.skip_reason
+            ),
+            approval_required=(
+                True
+                if step.key == TaskStepKey.COPY_PRODUCTION_REVIEW.value
+                else step.approval_required
+            ),
         )
+        for step in steps
+    ]
+    with pytest.raises(TaskCompletionBlocked, match="cannot be skipped"):
+        ensure_task_can_complete(approval_skipped)
 
 
 def test_task_step_transitions_and_skip_gates() -> None:

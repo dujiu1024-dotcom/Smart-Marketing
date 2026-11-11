@@ -61,11 +61,24 @@ def _clear_session_cookie(response: Response) -> None:
     )
 
 
-def _login_rate_limit_key(request: Request, email: str) -> str:
+def _login_rate_limit_keys(request: Request, email: str) -> tuple[str, str]:
     ip = request.client.host if request.client else "unknown"
     ip_hash = fingerprint(ip, settings.session_token_pepper)
     email_hash = fingerprint(email, settings.session_token_pepper)
-    return f"auth:login:{ip_hash}:{email_hash}"
+    return f"auth:login:ip:{ip_hash}", f"auth:login:account:{email_hash}"
+
+
+def _check_login_rate_limit(keys: tuple[str, str]) -> None:
+    counts = redis_client.mget(keys)
+    if any(int(value or 0) >= settings.auth_login_max_attempts for value in counts):
+        raise ApiError(429, "RATE_LIMITED", "Too many login attempts")
+
+
+def _record_login_failure(keys: tuple[str, str]) -> None:
+    for key in keys:
+        attempts = redis_client.incr(key)
+        if attempts == 1:
+            redis_client.expire(key, settings.auth_login_window_seconds)
 
 
 @router.post("/auth/login", response_model=LoginResponse)
@@ -77,13 +90,9 @@ def login(
 ) -> LoginResponse:
     validate_browser_origin(request)
     email = normalize_email(payload.email)
-    rate_key = _login_rate_limit_key(request, email)
+    rate_keys = _login_rate_limit_keys(request, email)
     try:
-        attempts = redis_client.incr(rate_key)
-        if attempts == 1:
-            redis_client.expire(rate_key, settings.auth_login_window_seconds)
-        if attempts > settings.auth_login_max_attempts:
-            raise ApiError(429, "RATE_LIMITED", "Too many login attempts")
+        _check_login_rate_limit(rate_keys)
     except RedisError as exc:
         raise ApiError(
             503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
@@ -105,10 +114,16 @@ def login(
                 metadata={"reason": "invalid_credentials"},
             )
             db.commit()
+            try:
+                _record_login_failure(rate_keys)
+            except RedisError as exc:
+                raise ApiError(
+                    503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
+                ) from exc
             raise ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password")
 
         try:
-            redis_client.delete(rate_key)
+            redis_client.delete(rate_keys[1])
         except RedisError as exc:
             raise ApiError(
                 503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"

@@ -265,7 +265,6 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | POST | /api/v1/marketing-tasks/{task_id}/requirement/confirm | 生成并确认需求快照 |
 | POST | /api/v1/marketing-tasks/{task_id}/strategy/confirm | 确认策略快照 |
 | POST | /api/v1/marketing-tasks/{task_id}/steps/{step_key}/skip | 提交允许的跳过决策与原因 |
-
 | POST | /api/v1/marketing-tasks/{task_id}/recover | 对失败节点进行显式恢复 |
 | POST | /api/v1/marketing-tasks/{task_id}/cancel | 取消任务 |
 | POST | /api/v1/marketing-tasks/{task_id}/archive | 归档任务 |

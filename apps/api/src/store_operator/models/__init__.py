@@ -1,4 +1,5 @@
 from store_operator.models.base import Base
+from store_operator.models.content_delivery import Artifact, ArtifactVersion, ReviewRecord
 from store_operator.models.identity import (
     AuditEvent,
     AuthSession,
@@ -39,6 +40,9 @@ from store_operator.models.store_knowledge import (
 )
 
 __all__ = [
+    "Artifact",
+    "ArtifactVersion",
+    "ReviewRecord",
     "AIInvocation",
     "AIUsageRecord",
     "AuditEvent",

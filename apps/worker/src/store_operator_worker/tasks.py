@@ -1072,6 +1072,8 @@ async def _douyin_upload_images(
                 object_key=object_key,
                 max_bytes=DOUYIN_IMAGE_MAX_BYTES,
             )
+            if content_type not in {"image/jpeg", "image/png", "image/webp"}:
+                raise ValueError("Stored image content type is not supported by Douyin")
             if hashlib.sha256(content).hexdigest() != image["content_hash"]:
                 raise ValueError("Stored image hash does not match its immutable artifact version")
             uploaded = await client.upload_image(
@@ -1348,6 +1350,16 @@ def execute_douyin_readback(
             "Douyin readback attempt is invalid.",
             retryable=False,
         )
+    try:
+        context.check_control()
+    except JobCancelled:
+        _mark_douyin_operation(
+            operation_id,
+            status="needs_human",
+            error_code="DOUYIN_READBACK_CANCELLED",
+            error_summary="The readback job was cancelled; manual verification is required.",
+        )
+        raise
     with SessionLocal.begin() as db:
         operation = db.scalar(
             select(PublishOperation)
@@ -1371,7 +1383,8 @@ def execute_douyin_readback(
             )
         )
         account_requires_reauth = (
-            account is None or account.access_token_expires_at <= datetime.now(UTC)
+            account is None
+            or account.access_token_expires_at <= datetime.now(UTC) + timedelta(seconds=60)
         )
         if account_requires_reauth:
             token_ref = ""

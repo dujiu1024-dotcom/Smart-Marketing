@@ -510,10 +510,12 @@ def execute_content_quality_check(
 
     with SessionLocal.begin() as db:
         channel_content = db.scalar(
-            select(ChannelContent).where(
+            select(ChannelContent)
+            .where(
                 ChannelContent.id == content_id,
                 ChannelContent.store_id == context.store_id,
             )
+            .with_for_update()
         )
         if (
             channel_content is None

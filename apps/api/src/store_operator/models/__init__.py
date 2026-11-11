@@ -1,5 +1,9 @@
 from store_operator.models.base import Base
-from store_operator.models.channel_delivery import (\n    ChannelAccount,\n    OAuthAuthorizationAttempt,\n    PublishOperation,\n)  # noqa: E501
+from store_operator.models.channel_delivery import (
+    ChannelAccount,
+    OAuthAuthorizationAttempt,
+    PublishOperation,
+)
 from store_operator.models.content_delivery import (
     Artifact,
     ArtifactVersion,

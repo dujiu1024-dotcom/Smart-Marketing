@@ -205,6 +205,14 @@ def upgrade() -> None:
             name="ck_prompt_activations_hashes",
         ),
     )
+    op.create_foreign_key(
+        "fk_ai_invocations_prompt_version",
+        "ai_invocations",
+        "prompt_versions",
+        ["prompt_version_id"],
+        ["id"],
+        ondelete="RESTRICT",
+    )
     op.create_index(
         "ix_prompt_activations_template_created",
         "prompt_activations",
@@ -315,6 +323,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_constraint(
+        "fk_ai_invocations_prompt_version",
+        "ai_invocations",
+        type_="foreignkey",
+    )
     op.execute("DROP TRIGGER IF EXISTS trg_prompt_templates_published_pointer ON prompt_templates")
     op.execute("DROP FUNCTION IF EXISTS enforce_prompt_template_published_pointer()")
     op.execute(

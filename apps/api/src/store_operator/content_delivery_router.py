@@ -449,6 +449,12 @@ def create_review_record(
             "REVIEW_TYPE_MISMATCH",
             "Review type must match the artifact type",
         )
+    if version.version_no != payload.expected_version:
+        raise ApiError(
+            409,
+            "VERSION_CONFLICT",
+            "Expected artifact version does not match the reviewed version",
+        )
     if version.id != artifact.current_version_id:
         raise ApiError(
             409,

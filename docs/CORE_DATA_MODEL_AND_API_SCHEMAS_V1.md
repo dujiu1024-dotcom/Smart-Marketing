@@ -328,10 +328,10 @@ erDiagram
 **状态声明：** 本文完成的是文档层工程化准备。没有修改业务代码，没有生成或执行数据库迁移，没有生成正式 OpenAPI，没有执行测试；因此不代表任何生产能力已实现或测试通过。
 
 
-## 9. Identity / Store Knowledge / Job Runtime 最新映射（待 PR #20、#26 联合评审）
+## 9. Identity / Store Knowledge / Job Runtime 最新映射（PR #26/#27/#29 已合并）
 
 - Identity 的成员实体统一称 StoreMembership；PlatformAdminGrant 是独立平台管理员授权，不是 StoreMembership。
 - 每个门店 API 使用 X-Store-ID 不可信 selector；AuthContext.request_store_id 由服务端逐请求校验后产生。Session.active_store_id 仅作 UI 默认选择。
 - Store Knowledge 增加 AudienceProfile 与 StoreRecordRevision 的领域设计，具体字段和事实确认规则以 STORE_KNOWLEDGE_DOMAIN_DESIGN.md 为准。
 - 用户触发 Job 的 store_id / created_by_user_id 从 AuthorizedStoreContext 注入；系统 Job 使用显式 system scope 与 actor_type=system。
-- Job 状态按 PR #20 提案不包含 dead；OutboxEvent 可以独立使用 dead。PR #20 与 PR #26 均未合并，状态仍待联合评审。
+- Job 状态按已合并的 PR #29 异步运行时契约执行：Job 使用 queued/running/retry_wait/succeeded/failed/needs_human/cancelled；OutboxEvent 的投递耗尽状态独立管理，不得映射为 Job 状态。PR #26（身份）、#27（门店资料）、#29（异步运行时）已合并进入 main；PR #25（营销任务）亦已合并。上述 PR 只完成设计文档，不代表生产实现、迁移或测试通过。

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import httpx
-
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
+
+import httpx
 
 
 DOUYIN_API_BASE = "https://open.douyin.com"

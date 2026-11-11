@@ -85,7 +85,7 @@ class ChannelAccount(Base):
     granted_scopes: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
     access_token_secret_ref: Mapped[str] = mapped_column(String(512), nullable=False)
     refresh_token_secret_ref: Mapped[str] = mapped_column(String(512), nullable=False)
-    access_token_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    access_token_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)  # noqa: E501
     refresh_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(24), nullable=False, server_default="active")
     connected_by_user_id: Mapped[UUID] = mapped_column(
@@ -159,7 +159,7 @@ class PublishOperation(Base):
         nullable=False,
     )
     publish_confirmation_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("publish_confirmations.id", ondelete="RESTRICT"), nullable=False
+        PGUUID(as_uuid=True), ForeignKey("publish_confirmations.id", ondelete="RESTRICT"), nullable=False  # noqa: E501
     )
     channel_account_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), nullable=False

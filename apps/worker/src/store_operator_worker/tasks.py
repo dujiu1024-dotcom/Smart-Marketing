@@ -30,10 +30,6 @@ from store_operator.channels.douyin import (
 )
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
 from store_operator.config import settings
-from store_operator.object_storage import (
-    ObjectStorageNotConfigured,
-    download_object_bytes,
-)
 from store_operator.jobs.service import (  # type: ignore[import-untyped]
     InvalidJobTransition,
     LeaseLostError,
@@ -60,6 +56,10 @@ from store_operator.models import (  # type: ignore[import-untyped]
     PublishPackageItem,
     QualityReport,
     ReviewRecord,
+)
+from store_operator.object_storage import (
+    ObjectStorageNotConfigured,
+    download_object_bytes,
 )
 
 from store_operator_worker.celery_app import celery_app

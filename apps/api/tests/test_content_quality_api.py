@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from store_operator.auth.security import hash_password
-from store_operator.models import MediaAsset, Store, StoreMembership, User
+from store_operator.models import MediaAsset, QualityReport, Store, StoreMembership, User
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -257,6 +257,68 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
     )
     assert stale_quality.status_code == 409, stale_quality.text
     assert stale_quality.json()["error"]["code"] == "CHANNEL_CONTENT_STALE"
+
+    needs_human_report = QualityReport(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=UUID(task_id),
+        channel_content_id=UUID(created.json()["id"]),
+        rule_version="content-structure-v1",
+        input_fingerprint="b" * 64,
+        result="needs_human",
+        issues_json=[{"code": "BUSINESS_FACTS_REQUIRE_HUMAN_CHECK", "severity": "review"}],
+    )
+    db_session.add(needs_human_report)
+    db_session.flush()
+    resolution_url = (
+        f"/api/v1/marketing-tasks/quality-reports/{needs_human_report.id}/resolutions"
+    )
+    resolution_payload = {
+        "decision": "accepted",
+        "reason": "Verified the promotion details against confirmed store facts.",
+        "expected_fingerprint": needs_human_report.input_fingerprint,
+    }
+    resolution_headers = {**headers, "Idempotency-Key": "quality-resolution-1"}
+    resolved = identity_client.post(
+        resolution_url,
+        headers=resolution_headers,
+        json=resolution_payload,
+    )
+    assert resolved.status_code == 201, resolved.text
+    assert resolved.json()["decision"] == "accepted"
+    resolution_replay = identity_client.post(
+        resolution_url,
+        headers=resolution_headers,
+        json=resolution_payload,
+    )
+    assert resolution_replay.status_code == 201, resolution_replay.text
+    assert resolution_replay.json()["id"] == resolved.json()["id"]
+
+    hard_fail_report = QualityReport(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=needs_human_report.task_id,
+        channel_content_id=needs_human_report.channel_content_id,
+        rule_version="content-structure-v1",
+        input_fingerprint="c" * 64,
+        result="fail",
+        issues_json=[{"code": "PLACEHOLDER_TEXT", "severity": "hard"}],
+    )
+    db_session.add(hard_fail_report)
+    db_session.flush()
+    blocked_resolution = identity_client.post(
+        f"/api/v1/marketing-tasks/quality-reports/{hard_fail_report.id}/resolutions",
+        headers={**headers, "Idempotency-Key": "quality-resolution-hard-fail"},
+        json={
+            "decision": "accepted",
+            "reason": "Attempted override",
+            "expected_fingerprint": hard_fail_report.input_fingerprint,
+        },
+    )
+    assert blocked_resolution.status_code == 422, blocked_resolution.text
+    assert (
+        blocked_resolution.json()["error"]["code"] == "QUALITY_RESOLUTION_NOT_ALLOWED"
+    )
 
     listed = identity_client.get(content_url, headers=headers)
     assert listed.status_code == 200, listed.text

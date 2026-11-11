@@ -17,7 +17,7 @@ _DUMMY_PASSWORD_HASH = _password_hasher.hash("not-a-real-user-password")
 
 
 def normalize_email(email: str) -> str:
-    return email.strip().casefold()
+    return email.strip().lower()
 
 
 def hash_password(password: str) -> str:

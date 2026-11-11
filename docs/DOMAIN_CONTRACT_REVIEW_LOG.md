@@ -180,3 +180,22 @@
 首期不锁定 Provider 厂商；必须先核验部署区域、账号主体、数据处理条款、价格、速率限制和图像编辑/Vision/OCR能力，并由项目负责人确认。
 
 本轮只做设计准备；未接入真实 Provider、未执行 AI-01..AI-20，未创建生产迁移或运行时 API。
+
+
+## 13. Issue #12 Channel Integration 设计准备（2026-11-11）
+
+新增 `CHANNEL_INTEGRATION_DOMAIN_DESIGN.md`，按 Demo 门店资料 channels 与 task/channel/publish 步骤定义：
+- 门店级 ChannelAccount、OAuthAuthorizationAttempt 和 SecretRef 生命周期；
+- 全局 ChannelSpec/不可变 ChannelSpecVersion、账号级 ChannelCapabilitySnapshot；
+- PublishOperation 与 PublishOperationAttempt，明确区别于 #9 Job/JobAttempt；
+- 官方 ChannelAdapter、草稿读回、发布证据、Webhook/轮询、幂等与未知结果人工核验；
+- 首个平台选择门禁和 CH-01..CH-22 测试矩阵。
+
+跨域同步：
+- #8 ChannelContent 通过 channel_spec_version_id 引用 #12 精确规格版本；
+- #8 PublishPackage/PackageItem/PublishConfirmation 是发布门禁权威，#12 只执行 official_api；
+- manual_handoff 不创建 PublishOperation；
+- Job succeeded 不等于平台 published；published 必须有外部作品 ID 或等价证据；
+- #13 负责原始指标之后的归因，#12 不产出经营效果结论。
+
+首个平台未选定；本轮不接入真实 OAuth/SDK，不创建平台专属实现。具体平台选择需项目负责人确认。

@@ -27,7 +27,7 @@ async def main() -> None:
             await page.evaluate("(value) => { location.hash = value; }", route)
             await page.wait_for_function(
                 "(expected) => document.querySelector('main h1')?.innerText.includes(expected)",
-                expected_heading,
+                arg=expected_heading,
             )
             actual = await page.locator("main h1").inner_text()
             assert expected_heading in actual, (

@@ -17,6 +17,9 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    op.create_unique_constraint(
+        "uq_publish_package_items_store_id", "publish_package_items", ["store_id", "id"]
+    )
     op.create_table(
         "oauth_authorization_attempts",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
@@ -73,10 +76,10 @@ def upgrade() -> None:
         "publish_operations",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("store_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("publish_package_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publish_packages.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("publish_package_item_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publish_package_items.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column("publish_package_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("publish_package_item_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("publish_confirmation_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publish_confirmations.id", ondelete="RESTRICT"), nullable=False),
-        sa.Column("channel_account_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("channel_accounts.id", ondelete="RESTRICT"), nullable=False),
+        sa.Column("channel_account_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("idempotency_key", sa.String(200), nullable=False),
         sa.Column("request_fingerprint", sa.String(64), nullable=False),
         sa.Column("status", sa.String(24), server_default="queued", nullable=False),
@@ -94,6 +97,34 @@ def upgrade() -> None:
         sa.Column("published_at", sa.DateTime(timezone=True)),
         sa.UniqueConstraint("store_id", "idempotency_key", name="uq_publish_operations_store_key"),
         sa.UniqueConstraint("store_id", "id", name="uq_publish_operations_store_id"),
+        sa.ForeignKeyConstraint(
+            ["store_id", "publish_package_id"],
+            ["publish_packages.store_id", "publish_packages.id"],
+            name="fk_publish_operations_package_same_store",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["store_id", "publish_package_item_id"],
+            ["publish_package_items.store_id", "publish_package_items.id"],
+            name="fk_publish_operations_package_item_same_store",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["store_id", "publish_package_id", "confirmed_package_fingerprint"],
+            [
+                "publish_confirmations.store_id",
+                "publish_confirmations.publish_package_id",
+                "publish_confirmations.package_fingerprint",
+            ],
+            name="fk_publish_operations_confirmation_same_package",
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["store_id", "channel_account_id"],
+            ["channel_accounts.store_id", "channel_accounts.id"],
+            name="fk_publish_operations_channel_account_same_store",
+            ondelete="RESTRICT",
+        ),
         sa.CheckConstraint(
             "status IN ('queued', 'uploading', 'submitting', 'processing', 'published', 'failed', 'needs_human', 'cancelled')",
             name="ck_publish_operations_status",
@@ -108,6 +139,7 @@ def downgrade() -> None:
     op.drop_index("ix_publish_operations_store_created", table_name="publish_operations")
     op.drop_index("ix_publish_operations_status_available", table_name="publish_operations")
     op.drop_table("publish_operations")
+    op.drop_constraint("uq_publish_package_items_store_id", "publish_package_items", type_="unique")
     op.drop_index("ix_channel_accounts_store_provider_status", table_name="channel_accounts")
     op.drop_table("channel_accounts")
     op.drop_index("ix_oauth_authorization_attempts_store_user_created", table_name="oauth_authorization_attempts")

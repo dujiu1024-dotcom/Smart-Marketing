@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -97,3 +98,85 @@ class MarketingTaskDetail(MarketingTaskSummary):
 class MarketingTaskList(BaseModel):
     items: list[MarketingTaskSummary]
     total: int
+
+
+
+class BusinessFactReference(BaseModel):
+    fact_key: str = Field(min_length=1, max_length=120)
+    record_type: Literal[
+        "store_profile",
+        "product",
+        "offer",
+        "audience_profile",
+        "brand_guideline",
+        "knowledge_item",
+    ]
+    record_id: UUID
+    expected_version_no: int | None = Field(default=None, ge=1)
+
+    @field_validator("fact_key", mode="before")
+    @classmethod
+    def normalize_fact_key(cls, value: object) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("fact_key must contain non-whitespace characters")
+        return value.strip()
+
+
+class MarketingTaskRequirementUpdate(BaseModel):
+    expected_version: int = Field(ge=1)
+    requirement_draft: dict[str, object]
+    task_options: MarketingTaskOptions | None = None
+
+
+class MarketingTaskRequirementConfirm(BaseModel):
+    expected_version: int = Field(ge=1)
+    business_facts: list[BusinessFactReference] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode="after")
+    def require_unique_fact_keys(self) -> "MarketingTaskRequirementConfirm":
+        keys = [fact.fact_key for fact in self.business_facts]
+        if len(keys) != len(set(keys)):
+            raise ValueError("business_facts must have unique fact_key values")
+        return self
+
+
+class MarketingTaskStrategyConfirm(BaseModel):
+    expected_version: int = Field(ge=1)
+    strategy: dict[str, object] = Field(min_length=1)
+
+
+class MarketingTaskStepSkip(BaseModel):
+    expected_version: int = Field(ge=1)
+    reason: str = Field(min_length=8, max_length=500)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def normalize_reason(cls, value: object) -> str:
+        if not isinstance(value, str) or len(value.strip()) < 8:
+            raise ValueError("reason must contain at least 8 non-whitespace characters")
+        return value.strip()
+
+
+class MarketingTaskRecover(BaseModel):
+    expected_version: int = Field(ge=1)
+    step_key: TaskStepKey
+    reason: str = Field(min_length=8, max_length=500)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def normalize_reason(cls, value: object) -> str:
+        if not isinstance(value, str) or len(value.strip()) < 8:
+            raise ValueError("reason must contain at least 8 non-whitespace characters")
+        return value.strip()
+
+
+class MarketingTaskAction(BaseModel):
+    expected_version: int = Field(ge=1)
+    reason: str = Field(min_length=8, max_length=500)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def normalize_reason(cls, value: object) -> str:
+        if not isinstance(value, str) or len(value.strip()) < 8:
+            raise ValueError("reason must contain at least 8 non-whitespace characters")
+        return value.strip()

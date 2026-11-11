@@ -970,13 +970,14 @@ def _load_douyin_publish_context(
                 "Douyin post text must contain 1 to 1000 characters.",
                 retryable=False,
             )
-        if "video.create" not in set(account.granted_scopes):
+        required_scopes = {"video.create", "video.list"}
+        if not required_scopes.issubset(set(account.granted_scopes)):
             raise JobExecutionError(
                 "DOUYIN_PUBLISH_SCOPE_MISSING",
                 "The connected Douyin account lacks the required publishing permission.",
                 retryable=False,
             )
-        if account.access_token_expires_at <= datetime.now(UTC):
+        if account.access_token_expires_at <= datetime.now(UTC) + timedelta(seconds=60):
             raise JobExecutionError(
                 "DOUYIN_TOKEN_EXPIRED",
                 "The Douyin account token has expired; refresh authorization before publishing.",
@@ -1007,6 +1008,7 @@ def _mark_douyin_operation(
     error_code: str | None = None,
     error_summary: str | None = None,
     next_attempt_at: datetime | None = None,
+    readback_checked: bool = False,
 ) -> None:
     with SessionLocal.begin() as db:
         operation = db.scalar(
@@ -1021,6 +1023,8 @@ def _mark_douyin_operation(
             operation.platform_item_id = platform_item_id
         if status == "processing":
             operation.submitted_at = operation.submitted_at or datetime.now(UTC)
+        if readback_checked:
+            operation.last_readback_at = datetime.now(UTC)
         if status == "published":
             operation.published_at = datetime.now(UTC)
             operation.last_readback_at = datetime.now(UTC)
@@ -1136,7 +1140,6 @@ def execute_douyin_publish(
     context: JobExecutionContext,
     payload_ref: dict[str, object],
 ) -> dict[str, object]:
-    context.check_control()
     if context.store_id is None or payload_ref.get("schema_version") != 1:
         raise JobExecutionError(
             "DOUYIN_PUBLISH_PAYLOAD_INVALID",
@@ -1151,6 +1154,16 @@ def execute_douyin_publish(
             "Douyin publish job payload is invalid.",
             retryable=False,
         ) from exc
+    try:
+        context.check_control()
+    except JobCancelled:
+        _mark_douyin_operation(
+            operation_id,
+            status="cancelled",
+            error_code="PUBLISH_CANCELLED",
+            error_summary="The publish operation was cancelled before platform submission.",
+        )
+        raise
     try:
         data = _load_douyin_publish_context(
             operation_id=operation_id,
@@ -1181,7 +1194,16 @@ def execute_douyin_publish(
             retry_delay_seconds=60,
         ) from exc
 
-    context.check_control()
+    try:
+        context.check_control()
+    except JobCancelled:
+        _mark_douyin_operation(
+            operation_id,
+            status="cancelled",
+            error_code="PUBLISH_CANCELLED",
+            error_summary="The publish operation was cancelled before platform submission.",
+        )
+        raise
     try:
         uploaded_ids = asyncio.run(
             _douyin_upload_images(
@@ -1215,7 +1237,16 @@ def execute_douyin_publish(
             retryable=True,
             retry_delay_seconds=60,
         ) from exc
-    context.check_control()
+    try:
+        context.check_control()
+    except JobCancelled:
+        _mark_douyin_operation(
+            operation_id,
+            status="cancelled",
+            error_code="PUBLISH_CANCELLED",
+            error_summary="The publish operation was cancelled before platform submission.",
+        )
+        raise
 
     # Persist the irreversible boundary before calling the platform create endpoint.
     with SessionLocal.begin() as db:
@@ -1257,7 +1288,6 @@ def execute_douyin_publish(
         ) from exc
 
     _mark_douyin_operation(operation_id, status="processing", platform_item_id=item_id)
-    context.check_control()
     try:
         found = asyncio.run(
             _douyin_readback(
@@ -1269,12 +1299,21 @@ def execute_douyin_publish(
     except Exception:
         found = None
     if found is not None:
-        _mark_douyin_operation(operation_id, status="published")
+        _mark_douyin_operation(
+            operation_id,
+            status="published",
+            readback_checked=True,
+        )
         return {
             "status": "published",
             "publish_operation_id": str(operation_id),
             "platform_item_id": item_id,
         }
+    _mark_douyin_operation(
+        operation_id,
+        status="processing",
+        readback_checked=True,
+    )
     _schedule_douyin_readback(operation_id, readback_attempt=1)
     return {
         "status": "processing",

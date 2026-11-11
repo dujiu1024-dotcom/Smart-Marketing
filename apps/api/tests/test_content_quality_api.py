@@ -199,6 +199,14 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
     )
     assert image_review.status_code == 201, image_review.text
 
+    image_created = identity_client.post(
+        content_url,
+        headers={**headers, "Idempotency-Key": "channel-content-with-image"},
+        json=image_content_payload,
+    )
+    assert image_created.status_code == 201, image_created.text
+    assert image_created.json()["image_version_ids"] == [image_version_id]
+
     created = identity_client.post(
         content_url,
         headers={**headers, "Idempotency-Key": "channel-content-create"},

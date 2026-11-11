@@ -358,16 +358,20 @@ def heartbeat_job(
         raise ValueError("progress_current cannot be negative")
     if progress_total is not None and progress_total < 0:
         raise ValueError("progress_total cannot be negative")
-    if (
-        progress_current is not None
-        and progress_total is not None
-        and progress_current > progress_total
-    ):
-        raise ValueError("progress_current cannot exceed progress_total")
     current_time = now or datetime.now(UTC)
     job = _get_owned_job(
         db, job_id=job_id, lease_token=lease_token, worker_id=worker_id, now=current_time
     )
+    effective_current = (
+        progress_current if progress_current is not None else job.progress_current
+    )
+    effective_total = progress_total if progress_total is not None else job.progress_total
+    if (
+        effective_current is not None
+        and effective_total is not None
+        and effective_current > effective_total
+    ):
+        raise ValueError("progress_current cannot exceed progress_total")
     attempt = _get_running_attempt(db, job, lease_token)
     job.heartbeat_at = current_time
     job.lease_expires_at = current_time + timedelta(seconds=lease_seconds)

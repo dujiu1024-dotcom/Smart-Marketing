@@ -161,6 +161,8 @@ def create_marketing_task(
             ),
             applicability=applicability.value,
             version=1,
+            output_refs_json=[],
+            blocked_by_json=[],
             skip_reason=(
                 f"Not applicable to {payload.task_type.value} task scope"
                 if not_applicable

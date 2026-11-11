@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from store_operator.auth.audit import record_audit
@@ -551,8 +552,37 @@ def create_douyin_publish_operation(
         confirmed_by_user_id=confirmation.confirmed_by_user_id,
         confirmed_package_fingerprint=package.package_fingerprint,
     )
-    db.add(operation)
-    db.flush()
+    try:
+        with db.begin_nested():
+            db.add(operation)
+            db.flush()
+    except IntegrityError as exc:
+        winner = db.scalar(
+            select(PublishOperation).where(
+                PublishOperation.store_id == store_id,
+                PublishOperation.idempotency_key == normalized_key,
+            )
+        )
+        if winner is not None and winner.request_fingerprint == request_fingerprint:
+            winner_job = db.scalar(
+                select(Job).where(
+                    Job.idempotency_scope_type == "store",
+                    Job.idempotency_scope_id == store_id,
+                    Job.idempotency_key == f"douyin-publish-operation:{winner.id}",
+                )
+            )
+            return {
+                "publish_operation_id": str(winner.id),
+                "job_id": str(winner_job.id) if winner_job else None,
+                "status": winner.status,
+                "platform_item_id": winner.platform_item_id,
+                "idempotent_replay": True,
+            }
+        raise ApiError(
+            409,
+            "PUBLISH_OPERATION_ALREADY_EXISTS",
+            "This frozen package item or idempotency key already has a publish operation.",
+        ) from exc
 
     try:
         job = create_job(

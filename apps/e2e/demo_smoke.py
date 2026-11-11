@@ -88,7 +88,7 @@ async def main() -> None:
             "overview": "运营总览",
             "stores": "门店管理",
             "monitoring": "AI 运行监控",
-            "capabilities": "AI 能力配置",
+            "capabilities": "AI 能力与提示词配置",
             "costs": "用量与成本",
             "audit": "审计日志",
             "settings": "系统配置",

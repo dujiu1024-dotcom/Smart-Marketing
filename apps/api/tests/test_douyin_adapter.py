@@ -127,7 +127,7 @@ def test_profile_and_video_list_use_user_access_token(credentials):
                     200,
                     json={"data": {"error_code": "0", "open_id": "open-123", "nickname": "Store"}},
                 )
-            assert request.url == DOUYIN_VIDEO_LIST_URL
+            assert request.url.path == "/video/list/"
             assert request.headers["access-token"] == "user-access"
             return httpx.Response(
                 200,
@@ -159,7 +159,7 @@ def test_upload_and_publish_requires_explicit_confirmation(credentials):
 
         def handler(request: httpx.Request) -> httpx.Response:
             calls.append(request)
-            if request.url == DOUYIN_VIDEO_UPLOAD_URL:
+            if request.url.path == "/api/douyin/v1/video/upload_video/":
                 assert request.method == "POST"
                 assert request.headers["access-token"] == "user-access"
                 assert b"name=\"video\"" in request.content
@@ -167,7 +167,7 @@ def test_upload_and_publish_requires_explicit_confirmation(credentials):
                     200,
                     json={"data": {"error_code": 0, "video": {"video_id": "encrypted-video-id"}}},
                 )
-            assert request.url == DOUYIN_VIDEO_CREATE_URL
+            assert request.url.path == "/api/douyin/v1/video/create_video/"
             assert request.url.params["open_id"] == "open-123"
             assert request.headers["access-token"] == "user-access"
             assert b'"video_id":"encrypted-video-id"' in request.content
@@ -210,7 +210,7 @@ def test_upload_and_publish_requires_explicit_confirmation(credentials):
 def test_publish_readback_verifies_external_item_id(credentials):
     async def run():
         def handler(request: httpx.Request) -> httpx.Response:
-            assert request.url == DOUYIN_VIDEO_LIST_URL
+            assert request.url.path == "/video/list/"
             return httpx.Response(
                 200,
                 json={

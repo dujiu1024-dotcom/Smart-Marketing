@@ -47,7 +47,7 @@ class StoreProfile(StoreScoped, Base):
         UniqueConstraint("store_id", name="uq_store_profiles_store"),
         UniqueConstraint("store_id", "id", name="uq_store_profiles_store_id"),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -96,7 +96,7 @@ class Product(StoreScoped, Base):
             name="availability_status",
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -151,7 +151,7 @@ class Offer(StoreScoped, Base):
             "status IN ('draft', 'active', 'paused', 'expired', 'archived')", name="status"
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -219,7 +219,7 @@ class AudienceProfile(StoreScoped, Base):
             "segment_type IN ('core', 'secondary', 'seasonal', 'scenario')", name="segment_type"
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -255,7 +255,7 @@ class KnowledgeItem(StoreScoped, Base):
     __table_args__ = (
         UniqueConstraint("store_id", "id", name="uq_knowledge_items_store_id"),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -369,7 +369,7 @@ class StoreRecordRevision(StoreScoped, Base):
             name="uq_store_record_revisions_version",
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -475,3 +475,29 @@ audience_profile_products = Table(
         name="pk_audience_profile_products",
     ),
 )
+
+
+class IdempotencyRecord(StoreScoped, Base):
+    __tablename__ = "idempotency_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "store_id", "idempotency_key", name="uq_idempotency_records_store_key"
+        ),
+        CheckConstraint(
+            "status IN ('in_progress', 'completed')",
+            name="status",
+        ),
+        Index("ix_idempotency_records_expires_at", "expires_at"),
+    )
+
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    operation: Mapped[str] = mapped_column(String(120), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="in_progress"
+    )
+    response_status: Mapped[int | None] = mapped_column(Integer)
+    response_json: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    resource_type: Mapped[str | None] = mapped_column(String(60))
+    resource_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

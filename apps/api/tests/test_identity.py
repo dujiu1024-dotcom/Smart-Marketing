@@ -28,6 +28,14 @@ class FakeRedis:
     def __init__(self):
         self.values: dict[str, int] = {}
 
+    def eval(self, script, numkeys, *args):
+        keys = args[:numkeys]
+        counts = []
+        for key in keys:
+            self.values[key] = self.values.get(key, 0) + 1
+            counts.append(self.values[key])
+        return counts
+
     def mget(self, keys):
         return [
             str(self.values[key]).encode() if key in self.values else None
@@ -87,6 +95,24 @@ def make_store(db: Session, name: str, user: User, role: str = "owner") -> Store
     )
     db.flush()
     return store
+
+
+def test_login_rate_limit_atomically_reserves_ip_and_account_buckets(monkeypatch):
+    import store_operator.auth.router as auth_router
+    from store_operator.auth.errors import ApiError
+
+    redis = FakeRedis()
+    monkeypatch.setattr(auth_router, "redis_client", redis)
+    monkeypatch.setattr(auth_router.settings, "auth_login_max_attempts", 2)
+    keys = ("ip-bucket", "account-bucket")
+
+    auth_router._consume_login_attempt(keys)
+    auth_router._consume_login_attempt(keys)
+    with pytest.raises(ApiError) as exc_info:
+        auth_router._consume_login_attempt(keys)
+
+    assert exc_info.value.status_code == 429
+    assert redis.values == {"ip-bucket": 3, "account-bucket": 3}
 
 
 def fake_redis(monkeypatch):

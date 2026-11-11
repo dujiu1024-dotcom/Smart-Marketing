@@ -376,8 +376,11 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
         lambda **kwargs: {
             "ContentLength": 1024,
             "ContentType": "image/png",
-            "Metadata": {"sha256": sha256},
+            "Metadata": {"sha256": "0" * 64},
         },
+    )
+    monkeypatch.setattr(
+        knowledge_router, "calculate_object_sha256", lambda **kwargs: sha256
     )
     completed = identity_client.post(
         f"/api/v1/store/assets/upload-intents/{intent.id}/complete",
@@ -443,8 +446,11 @@ def test_media_asset_upload_rejects_server_metadata_mismatch(
         lambda **kwargs: {
             "ContentLength": 512,
             "ContentType": "image/jpeg",
-            "Metadata": {"sha256": "c" * 64},
+            "Metadata": {"sha256": "b" * 64},
         },
+    )
+    monkeypatch.setattr(
+        knowledge_router, "calculate_object_sha256", lambda **kwargs: "c" * 64
     )
     rejected = identity_client.post(
         f"/api/v1/store/assets/upload-intents/{intent_id}/complete",

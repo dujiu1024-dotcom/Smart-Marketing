@@ -73,6 +73,13 @@ class ArtifactVersion(Base):
             "store_id", "artifact_id", "id",
             name="uq_artifact_versions_store_artifact_id",
         ),
+        UniqueConstraint("store_id", "id", name="uq_artifact_versions_store_id"),
+        ForeignKeyConstraint(
+            ["prompt_version_id"],
+            ["prompt_versions.id"],
+            name="fk_artifact_versions_prompt_version",
+            ondelete="RESTRICT",
+        ),
         ForeignKeyConstraint(
             ["store_id", "artifact_id"],
             ["artifacts.store_id", "artifacts.id"],

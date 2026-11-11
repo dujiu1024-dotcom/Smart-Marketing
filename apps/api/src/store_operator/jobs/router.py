@@ -88,7 +88,7 @@ def get_job(
     )
 
 
-@router.post("/api/v1/jobs/{job_id}/retry", response_model=JobRead)
+@router.post("/jobs/{job_id}/retry", response_model=JobRead)
 def retry_job(
     job_id: UUID,
     payload: JobRetryRequest,
@@ -115,7 +115,7 @@ def retry_job(
     return JobRead.model_validate(job)
 
 
-@router.post("/api/v1/jobs/{job_id}/cancel", response_model=JobRead)
+@router.post("/jobs/{job_id}/cancel", response_model=JobRead)
 def cancel_job(
     job_id: UUID,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
@@ -139,7 +139,7 @@ def cancel_job(
     return JobRead.model_validate(job)
 
 
-@router.post("/api/v1/jobs/{job_id}/resolve", response_model=JobRead)
+@router.post("/jobs/{job_id}/resolve", response_model=JobRead)
 def resolve_human_job(
     job_id: UUID,
     payload: JobResolveRequest,

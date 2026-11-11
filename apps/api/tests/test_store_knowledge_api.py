@@ -362,6 +362,7 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
     assert created.status_code == 201, created.text
     assert created.json()["method"] == "PUT"
     assert created.json()["required_headers"]["Content-Type"] == "image/png"
+    assert created.json()["required_headers"]["If-None-Match"] == "*"
     assert "x-amz-meta-sha256" in created.json()["required_headers"]
 
     intent = db_session.get(UploadIntent, UUID(created.json()["id"]))

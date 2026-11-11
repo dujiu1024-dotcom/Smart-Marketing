@@ -182,7 +182,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - UNIQUE(store_id, publish_package_id, channel_key)。
 - ChannelContentArtifactRef 复合 FK 到 ChannelContent 和 ArtifactVersion；UNIQUE(store_id, channel_content_id, position)。
 - PublishPackageItem 复合 FK 到 (store_id, channel_content_id, channel_key) 和 (store_id, channel_content_id, quality_report_id)，确保渠道和质检报告对应同一 ChannelContent；#12 ChannelAccount 引用也包含 store_id，manual_handoff 时 channel_account_id 可空。
-- PublishConfirmation FK 到 package_id + package_fingerprint；部分唯一索引保证一个 package 只有一个未撤销确认。
+- PublishConfirmation FK 到 package_id + package_fingerprint；UNIQUE(store_id, publish_package_id, package_fingerprint) 保证同一冻结包只有一条确认记录。
 - 冻结后禁止修改 Package/PackageItem 核心字段；通过数据库权限或触发器保护不可变性。
 
 ## 10. 测试矩阵（设计准备，全部待执行）

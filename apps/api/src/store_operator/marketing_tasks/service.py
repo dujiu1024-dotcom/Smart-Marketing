@@ -25,7 +25,11 @@ from store_operator.domain.marketing_task import (
     resolve_step_applicability,
 )
 from store_operator.idempotency import begin_idempotency, complete_idempotency
-from store_operator.jobs.service import JobIdempotencyConflict, create_job
+from store_operator.jobs.service import (
+    JobIdempotencyConflict,
+    create_job,
+    request_job_cancellation,
+)
 from store_operator.marketing_tasks.schemas import (
     MarketingTaskAction,
     MarketingTaskCreate,
@@ -41,6 +45,7 @@ from store_operator.marketing_tasks.schemas import (
     MarketingTaskSummary,
     TaskStepRead,
 )
+from store_operator.models.job_runtime import Job
 from store_operator.models.marketing_task import (
     BusinessFactSnapshot,
     DependencyEdge,
@@ -1429,8 +1434,27 @@ def cancel_marketing_task(
     _check_expected_version(task, payload.expected_version)
     current_status = MarketingTaskStatus(task.lifecycle_status)
     _ensure_task_transition(current_status, MarketingTaskStatus.CANCELLED)
+    now = datetime.now(UTC)
+    active_jobs = db.scalars(
+        select(Job)
+        .where(
+            Job.store_id == store_id,
+            Job.marketing_task_id == task.id,
+            Job.status.in_({"queued", "running", "retry_wait"}),
+        )
+        .order_by(Job.created_at, Job.id)
+        .with_for_update()
+    ).all()
+    for job in active_jobs:
+        request_job_cancellation(
+            db,
+            job_id=job.id,
+            store_id=store_id,
+            actor_user_id=auth.user.id,
+            now=now,
+        )
     task.lifecycle_status = MarketingTaskStatus.CANCELLED.value
-    task.cancelled_at = datetime.now(UTC)
+    task.cancelled_at = now
     task.version += 1
     return _finish_task_write(
         db,

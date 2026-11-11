@@ -94,15 +94,1398 @@
                 "items": {
                   "type": "string"
                 },
+                "type": "null"
+              }
+            ],
+          },
+            "type": "string"
+          },
+            "anyOf": [
+              {
+                "items": {
+              },
+              {
+            "title": "Purchase Motivations Json"
+          "sample_size": {
+                "type": "integer"
+            "title": "Sample Size"
+          "sampled_at": {
+                "format": "date-time",
+            "title": "Sampled At"
+          "segment_type": {
+            "pattern": "^(core|secondary|seasonal|scenario)$",
+            "title": "Segment Type",
+            "type": "string"
+          },
+          "source_ref": {
+                "maxLength": 500,
+            "title": "Source Ref"
+          "source_type": {
+                "maxLength": 40,
+          }
+        },
+        "required": [
+        ],
+        "type": "object"
+      },
+        "properties": {
+          "items": {
+            "items": {
+            },
+            "title": "Items",
+            "type": "array"
+            "type": "integer"
+          }
+        },
+        "required": [
+        "title": "AudienceProfileList",
+      "AudienceProfileRead": {
+          "audience_description": {
+                "type": "string"
+            "title": "Audience Description"
+          "common_objections_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Common Objections Json"
+          "confidence_level": {
+                "maxLength": 24,
+            "title": "Confidence Level"
+          "consumption_periods_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Consumption Periods Json"
+          "consumption_scenarios_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Consumption Scenarios Json"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+            "type": "string"
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+          },
+          "purchase_motivations_json": {
+            "anyOf": [
+                },
                 "type": "array"
               },
               {
-            "title": "Consumption Scenarios Json"
-          "name": {
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Name",
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Motivations Json"
+          },
+          "sample_size": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Size"
+          },
+          "sampled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "pattern": "^(core|secondary|seasonal|scenario)$",
+            "title": "Segment Type",
+            "type": "string"
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              }
+            ],
+            "title": "Source Type"
+          }
+        },
+          "id",
+          "store_id",
+          "fact_status",
+        "type": "object"
+      },
+        "properties": {
+            "anyOf": [
+              {
+                "type": "string"
+            "title": "Audience Description"
+          "common_objections_json": {
+                  "type": "string"
+                "type": "null"
+              }
+            ],
+          },
+            "anyOf": [
+              {
+              },
+              {
+                "type": "null"
+              }
+            ],
+          },
+            "anyOf": [
+              {
+                "items": {
+              },
+              {
+            "title": "Consumption Periods Json"
+          "consumption_scenarios_json": {
+                  "type": "string"
+                },
+                "type": "null"
+              }
+            ],
+          },
+            "anyOf": [
+              {
+                "type": "string"
+            "title": "Name"
           "purchase_motivations_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Purchase Motivations Json"
+          "sample_size": {
+                "minimum": 0.0,
+                "type": "integer"
+            "title": "Sample Size"
+          "sampled_at": {
+                "format": "date-time",
+            "title": "Sampled At"
+          "segment_type": {
+                "pattern": "^(core|secondary|seasonal|scenario)$",
+            "title": "Segment Type"
+          "source_ref": {
+                "maxLength": 500,
+            "title": "Source Ref"
+          "source_type": {
+                "type": "string"
+              },
+              {
+            "title": "Source Type"
+        "title": "AudienceProfileUpdate",
+      "BrandGuidelineCreate": {
+          "brand_story": {
+            "title": "Brand Story"
+          "color_palette_json": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+            "title": "Color Palette Json"
+          "common_phrases_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Common Phrases Json"
+          "core_values_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Core Values Json"
+          "cta_preferences_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Cta Preferences Json"
+          "differentiators": {
+            "title": "Differentiators"
+          "font_preferences_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Font Preferences Json"
+          },
+          "logo_asset_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+            "title": "Logo Asset Id"
+          "positioning": {
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positioning"
+          },
+          "prohibited_phrases_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+            ],
+            "title": "Prohibited Phrases Json"
+          },
+          "tone_of_voice": {
+            "anyOf": [
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone Of Voice"
+          },
+          "visual_style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+        "title": "BrandGuidelineCreate",
+      "BrandGuidelineRead": {
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Story"
+          },
+          "color_palette_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "null"
+              }
+            ],
+          },
+            "anyOf": [
+              {
+              },
+              {
+                "type": "null"
+              }
+            ],
+          },
+            "anyOf": [
+              {
+                "items": {
+                },
+                "type": "array"
+              },
+            ],
+            "title": "Core Values Json"
+          },
+          "cta_preferences_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+                "type": "string"
+              },
+            ],
+            "title": "Differentiators"
+          },
+          "font_preferences_json": {
+            "anyOf": [
+              {
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo Asset Id"
+          },
+          "positioning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positioning"
+          },
+          "prohibited_phrases_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+            ],
+            "title": "Prohibited Phrases Json"
+          },
+          "tone_of_voice": {
+            "anyOf": [
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone Of Voice"
+          },
+          "visual_style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+            "title": "Visual Style"
+          }
+        },
+        "required": [
+          "id",
+          "store_id",
+          "fact_status",
+          "current_version"
+        ],
+        "title": "BrandGuidelineRead",
+        "type": "object"
+      },
+      "BrandGuidelineUpdate": {
+        "properties": {
+          "brand_story": {
+                "type": "string"
+            "title": "Brand Story"
+          "color_palette_json": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+            "title": "Color Palette Json"
+          "common_phrases_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Common Phrases Json"
+          "core_values_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Core Values Json"
+          "cta_preferences_json": {
+                  "type": "string"
+                },
+            "title": "Cta Preferences Json"
+          },
+          "differentiators": {
+            "title": "Differentiators"
+          "font_preferences_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Font Preferences Json"
+          "logo_asset_id": {
+                "format": "uuid",
+            "title": "Logo Asset Id"
+          "positioning": {
+            "title": "Positioning"
+          "prohibited_phrases_json": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+            "title": "Prohibited Phrases Json"
+          "tone_of_voice": {
+            "title": "Tone Of Voice"
+          "visual_style": {
+            "title": "Visual Style"
+          }
+        },
+        "title": "BrandGuidelineUpdate",
+        "type": "object"
+      },
+      "FactConfirmationRequest": {
+        "properties": {
+          "confirmation_note": {
+                "maxLength": 2000,
+            "title": "Confirmation Note"
+          "source_ref": {
+                "maxLength": 500,
+            "title": "Source Ref"
+          "source_type": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Source Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_type"
+        ],
+        "title": "FactConfirmationRequest",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "KnowledgeItemCreate": {
+        "properties": {
+          "category": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Category",
+            "type": "string"
+          },
+          "content_hash": {
+                "maxLength": 64,
+                "type": "string"
+            "title": "Content Hash"
+          "content_ref": {
+                "maxLength": 700,
+            "title": "Content Ref"
+          "content_text": {
+            "title": "Content Text"
+          "effective_at": {
+                "format": "date-time",
+            "title": "Effective At"
+          "expires_at": {
+                "format": "date-time",
+                "type": "string"
+            "title": "Expires At"
+          "source_ref": {
+                "maxLength": 500,
+            "title": "Source Ref"
+          "source_type": {
+                "maxLength": 40,
+                "type": "string"
+            "title": "Source Type"
+          },
+          "title": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+        "required": [
+          "title",
+          "category"
+        ],
+        "title": "KnowledgeItemCreate",
+      "KnowledgeItemList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeItemRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "KnowledgeItemList",
+        "type": "object"
+      },
+      "KnowledgeItemRead": {
+          "category": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Category",
+            "type": "string"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "content_ref": {
+            "anyOf": [
+              {
+                "maxLength": 700,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Ref"
+          },
+          "content_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Text"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "effective_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "fact_status": {
+            "title": "Fact Status",
+            "type": "string"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 240,
+            "minLength": 1,
+            "title": "Title",
+          "title",
+          "category",
+          "store_id",
+          "fact_status",
+          "current_version"
+        "title": "KnowledgeItemRead",
+      "KnowledgeItemUpdate": {
+          "category": {
+                "maxLength": 40,
+                "minLength": 1,
+            ],
+            "title": "Category"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "content_ref": {
+            "anyOf": [
+              {
+                "maxLength": 700,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Ref"
+          },
+          "content_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Text"
+          },
+          "effective_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "KnowledgeItemUpdate",
+        "type": "object"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
+      "LoginResponse": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionSummary"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSummary"
+          }
+        },
+        "required": [
+          "user",
+          "session",
+          "csrf_token"
+        ],
+        "title": "LoginResponse",
+        "type": "object"
+      },
+      "LogoutAllRequest": {
+        "properties": {
+          "password": {
+            "format": "password",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "LogoutAllRequest",
+        "type": "object"
+      },
+      "MeResponse": {
+        "properties": {
+          "active_store": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoreSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionSummary"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserSummary"
+          }
+        },
+        "required": [
+          "user",
+          "active_store",
+          "session"
+        ],
+        "title": "MeResponse",
+        "type": "object"
+      },
+      "MemberPatchRequest": {
+        "properties": {
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "owner",
+                  "member"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "active",
+                  "suspended",
+                  "removed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "MemberPatchRequest",
+        "type": "object"
+      },
+      "MemberSummary": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "membership_id": {
+            "format": "uuid",
+            "title": "Membership Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "owner",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "invited",
+              "active",
+              "suspended",
+              "removed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "membership_id",
+          "user_id",
+          "email",
+          "role",
+          "status"
+        ],
+        "title": "MemberSummary",
+        "type": "object"
+      },
+      "OfferCreate": {
+        "properties": {
+          "eligibility_rules_json": {
+            "additionalProperties": true,
+            "title": "Eligibility Rules Json",
+            "type": "object"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "offer_type": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Offer Type",
+            "type": "string"
+          },
+          "stacking_policy": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stacking Policy"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "status": {
+            "default": "draft",
+            "pattern": "^(draft|active|paused|expired|archived)$",
+            "title": "Status",
+            "type": "string"
+          },
+          "terms_json": {
+            "additionalProperties": true,
+            "title": "Terms Json",
+            "type": "object"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "usage_limit": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Limit"
+          }
+        },
+        "required": [
+          "title",
+          "offer_type",
+          "terms_json"
+        ],
+        "title": "OfferCreate",
+        "type": "object"
+      },
+      "OfferList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OfferRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "OfferList",
+        "type": "object"
+      },
+      "OfferRead": {
+        "properties": {
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "eligibility_rules_json": {
+            "additionalProperties": true,
+            "title": "Eligibility Rules Json",
+            "type": "object"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "fact_status": {
+            "title": "Fact Status",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "offer_type": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Offer Type",
+            "type": "string"
+          },
+          "stacking_policy": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stacking Policy"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "status": {
+            "default": "draft",
+            "pattern": "^(draft|active|paused|expired|archived)$",
+            "title": "Status",
+            "type": "string"
+          },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          },
+          "terms_json": {
+            "additionalProperties": true,
+            "title": "Terms Json",
+            "type": "object"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "usage_limit": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Limit"
+          }
+        },
+        "required": [
+          "title",
+          "offer_type",
+          "terms_json",
+          "id",
+          "store_id",
+          "fact_status",
+          "current_version"
+        ],
+        "title": "OfferRead",
+        "type": "object"
+      },
+      "OfferUpdate": {
+        "properties": {
+          "eligibility_rules_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eligibility Rules Json"
+          },
+          "ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ends At"
+          },
+          "offer_type": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Type"
+          },
+          "stacking_policy": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stacking Policy"
+          },
+          "starts_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starts At"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "pattern": "^(draft|active|paused|expired|archived)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "terms_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terms Json"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "usage_limit": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage Limit"
+          }
+        },
+        "title": "OfferUpdate",
+        "type": "object"
+      },
+      "ProductCreate": {
+        "properties": {
+          "allergens_and_restrictions_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allergens And Restrictions Json"
+          },
+          "availability_status": {
+            "default": "unknown",
+            "pattern": "^(available|unavailable|seasonal|limited|unknown)$",
+            "title": "Availability Status",
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "maxLength": 3,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "delivery_method": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Method"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ingredients_or_materials": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients Or Materials"
+          },
+          "inventory_quantity": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Quantity"
+          },
+          "key_selling_points_json": {
+            "anyOf": [
+              {
+                "items": {
                   "type": "string"
                 },
                 "type": "array"
@@ -176,12 +1559,26 @@
                 "type": "string"
               },
               {
-            "title": "Source Type"
-          "name",
-          "segment_type"
-        "title": "AudienceProfileCreate",
-      "AudienceProfileList": {
-              "$ref": "#/components/schemas/AudienceProfileRead"
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProductCreate",
+        "type": "object"
+      },
+      "ProductList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProductRead"
+            },
+            "title": "Items",
+            "type": "array"
           },
           "total": {
             "title": "Total",
@@ -275,10 +1672,33 @@
           },
           "id": {
             "format": "uuid",
-            "maxLength": 160,
-            "minLength": 1,
-            "title": "Name",
+            "title": "Id",
             "type": "string"
+          },
+          "ingredients_or_materials": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients Or Materials"
+          },
+          "inventory_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Quantity"
+          },
+          "key_selling_points_json": {
+            "anyOf": [
               {
                 "items": {
                   "type": "string"
@@ -289,57 +1709,66 @@
                 "type": "null"
               }
             ],
-            "title": "Purchase Motivations Json"
+            "title": "Key Selling Points Json"
           },
-          "sample_size": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "price_amount": {
             "anyOf": [
               {
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sample Size"
-          },
-          "sampled_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Sampled At"
+            "title": "Price Amount"
           },
-          "segment_type": {
+          "service_process": {
             "anyOf": [
               {
-                "pattern": "^(core|secondary|seasonal|scenario)$",
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Segment Type"
+            "title": "Service Process"
           },
-          "source_ref": {
+          "sku": {
             "anyOf": [
               {
-                "maxLength": 500,
+                "maxLength": 120,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Source Ref"
+            "title": "Sku"
           },
-          "source_type": {
+          "specification": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Specification"
+          },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          },
+          "unit": {
             "anyOf": [
               {
                 "maxLength": 40,
@@ -347,56 +1776,124 @@
               },
               {
                 "type": "null"
-          },
-          "store_id": {
-            "format": "uuid",
-            "title": "Store Id",
-            "type": "string"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
         "required": [
           "name",
-          "segment_type",
           "id",
           "store_id",
           "fact_status",
           "current_version"
         ],
-        "title": "AudienceProfileRead",
-      "AudienceProfileUpdate": {
-          "audience_description": {
+        "title": "ProductRead",
+        "type": "object"
+      },
+      "ProductUpdate": {
+        "properties": {
+          "allergens_and_restrictions_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Brand Story"
+            "title": "Allergens And Restrictions Json"
           },
-          "color_palette_json": {
+          "availability_status": {
             "anyOf": [
               {
-                "items": {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              {
-            "title": "Common Objections Json"
-          "confidence_level": {
-                "maxLength": 24,
+                "pattern": "^(available|unavailable|seasonal|limited|unknown)$",
                 "type": "string"
-            "title": "Confidence Level"
-          "consumption_periods_json": {
-                  "type": "string"
-                },
-                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Core Values Json"
+            "title": "Availability Status"
           },
-          "cta_preferences_json": {
+          "category": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "maxLength": 3,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "delivery_method": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Method"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ingredients_or_materials": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingredients Or Materials"
+          },
+          "inventory_quantity": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Quantity"
+          },
+          "key_selling_points_json": {
             "anyOf": [
               {
                 "items": {
@@ -405,36 +1902,30 @@
                 "type": "array"
               },
               {
-            "title": "Consumption Scenarios Json"
+                "type": "null"
+              }
+            ],
+            "title": "Key Selling Points Json"
+          },
           "name": {
-                "maxLength": 160,
-                "minLength": 1,
-            "title": "Name"
-          "purchase_motivations_json": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Font Preferences Json"
-          },
-          "logo_asset_id": {
             "anyOf": [
               {
-                "format": "uuid",
+                "maxLength": 200,
+                "minLength": 1,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Logo Asset Id"
+            "title": "Name"
           },
-          "positioning": {
+          "price_amount": {
             "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
               {
                 "type": "string"
               },
@@ -639,9 +2130,57 @@
                 "type": "null"
               }
             ],
-            "title": "Positioning"
+            "title": "Introduction"
           },
-          "prohibited_phrases_json": {
+          "opening_hours_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Hours Json"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "province": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Province"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          },
+          "service_capabilities_json": {
             "anyOf": [
               {
                 "items": {
@@ -652,49 +2191,22 @@
               {
                 "type": "null"
               }
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
             ],
-            "title": "Tone Of Voice"
+            "title": "Service Capabilities Json"
           },
-          "visual_style": {
+          "service_radius": {
             "anyOf": [
               {
+                "maxLength": 120,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Visual Style"
-          }
-        },
-        "required": [
-          "id",
-          "store_id",
-          "fact_status",
-          "current_version"
-        ],
-        "title": "BrandGuidelineRead",
-        "type": "object"
-      },
-      "BrandGuidelineUpdate": {
-        "properties": {
-          "brand_story": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Brand Story"
+            "title": "Service Radius"
           },
-          "color_palette_json": {
+          "temporary_closures_json": {
             "anyOf": [
               {
                 "items": {
@@ -704,106 +2216,125 @@
                 "type": "array"
               },
               {
-            "title": "Color Palette Json"
-          "common_phrases_json": {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-            "title": "Common Phrases Json"
-          "core_values_json": {
-                  "type": "string"
-              {
                 "type": "null"
               }
             ],
-            "title": "Core Values Json"
-          },
-          "cta_preferences_json": {
+            "title": "Temporary Closures Json"
+          }
+        },
+        "required": [
+          "display_name"
+        ],
+        "title": "StoreProfileCreate",
+        "type": "object"
+      },
+      "StoreProfileRead": {
+        "properties": {
+          "address": {
             "anyOf": [
               {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cta Preferences Json"
-          },
-          "differentiators": {
-            "anyOf": [
-              {
+                "maxLength": 500,
                 "type": "string"
               },
               {
                 "type": "null"
               }
+            ],
+            "title": "Address"
+          },
+          "brand_name": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand Name"
+          },
+          "business_type": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Type"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "country_code": {
+            "anyOf": [
+              {
+                "maxLength": 2,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "current_version": {
+            "title": "Current Version",
+            "type": "integer"
+          },
+          "display_name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "district": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "District"
+          },
           "fact_status": {
             "title": "Fact Status",
             "type": "string"
           },
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Font Preferences Json"
-          },
-          "logo_asset_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Logo Asset Id"
-          },
-          "positioning": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Positioning"
-          },
-          "prohibited_phrases_json": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-          "store_id": {
+          "id": {
             "format": "uuid",
-            "title": "Store Id",
+            "title": "Id",
             "type": "string"
           },
+          "industry_category": {
+            "anyOf": [
+              {
+                "maxLength": 120,
                 "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Tone Of Voice"
+            "title": "Industry Category"
           },
-          "visual_style": {
+          "introduction": {
             "anyOf": [
               {
                 "type": "string"
@@ -871,11 +2402,37 @@
                 "type": "array"
               },
               {
-            "title": "Cta Preferences Json"
-          "differentiators": {
-            "title": "Differentiators"
-          "font_preferences_json": {
-                  "type": "string"
+                "type": "null"
+              }
+            ],
+            "title": "Service Capabilities Json"
+          },
+          "service_radius": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Radius"
+          },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          },
+          "temporary_closures_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
               {
                 "type": "null"
               }
@@ -1232,7 +2789,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/KnowledgeItemRead"
+                  "items": {
+                    "$ref": "#/components/schemas/MemberSummary"
+                  },
+                  "title": "Response List Store Members Api V1 Admin Stores  Store Id  Members Get",
+                  "type": "array"
                 }
               }
             },
@@ -1246,15 +2807,432 @@
                 }
               }
             },
-        "summary": "Get Knowledge Item",
-          "store-knowledge"
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Store Members",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/admin/stores/{store_id}/members/{membership_id}": {
+      "patch": {
+        "operationId": "update_store_member_api_v1_admin_stores__store_id__members__membership_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Store Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "membership_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Membership Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberPatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Store Member",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/auth/csrf": {
+      "post": {
+        "operationId": "refresh_csrf_api_v1_auth_csrf_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Refresh Csrf Api V1 Auth Csrf Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Refresh Csrf",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/logout-all": {
+      "post": {
+        "operationId": "logout_all_api_v1_auth_logout_all_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutAllRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Logout All",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "me_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "identity"
+        ]
+      }
+    },
+    "/api/v1/me/stores": {
+      "get": {
+        "operationId": "list_my_stores_api_v1_me_stores_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoresResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List My Stores",
+        "tags": [
+          "store-context"
+        ]
+      }
+    },
+    "/api/v1/session/active-store": {
+      "delete": {
+        "operationId": "clear_active_store_api_v1_session_active_store_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clear Active Store",
+        "tags": [
+          "store-context"
+        ]
       },
-        "operationId": "update_knowledge_item_api_v1_store_knowledge__record_id__patch",
+      "post": {
+        "operationId": "set_active_store_api_v1_session_active_store_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActiveStoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveStoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Active Store",
+        "tags": [
+          "store-context"
+        ]
+      }
+    },
+    "/api/v1/store/audiences": {
+      "get": {
+        "operationId": "list_audience_profiles_api_v1_store_audiences_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudienceProfileList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Audience Profiles",
+        "tags": [
+          "store-knowledge"
+        ]
+      },
+      "post": {
+        "operationId": "create_audience_profile_api_v1_store_audiences_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudienceProfileCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudienceProfileRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Audience Profile",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/audiences/{record_id}": {
+      "delete": {
+        "operationId": "delete_audience_profile_api_v1_store_audiences__record_id__delete",
+        "parameters": [
+          {
+            "in": "path",
             "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
               "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
             "in": "header",
             "name": "If-Match",
             "required": false,
+            "schema": {
               "anyOf": [
                 {
                   "type": "string"
@@ -1280,11 +3258,137 @@
                 }
               ],
               "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Audience Profile",
+        "tags": [
+          "store-knowledge"
+        ]
+      },
+      "get": {
+        "operationId": "get_audience_profile_api_v1_store_audiences__record_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudienceProfileRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Audience Profile",
+        "tags": [
+          "store-knowledge"
+        ]
+      },
+      "patch": {
+        "operationId": "update_audience_profile_api_v1_store_audiences__record_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/KnowledgeItemUpdate"
+                "$ref": "#/components/schemas/AudienceProfileUpdate"
               }
             }
           },
@@ -1295,10 +3399,465 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MemberSummary"
+                  "$ref": "#/components/schemas/AudienceProfileRead"
                 }
               }
             },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Audience Profile",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/brand-guideline": {
+      "get": {
+        "operationId": "get_brand_guideline_api_v1_store_brand_guideline_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandGuidelineRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Brand Guideline",
+        "tags": [
+          "store-knowledge"
+        ]
+      },
+      "patch": {
+        "operationId": "update_brand_guideline_api_v1_store_brand_guideline_patch",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrandGuidelineUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandGuidelineRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Brand Guideline",
+        "tags": [
+          "store-knowledge"
+        ]
+      },
+      "post": {
+        "operationId": "create_brand_guideline_api_v1_store_brand_guideline_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrandGuidelineCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandGuidelineRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Brand Guideline",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/knowledge": {
+      "get": {
+        "operationId": "list_knowledge_items_api_v1_store_knowledge_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            "description": "Validation Error"
+        "summary": "List Knowledge Items",
+        "tags": [
+          "store-knowledge"
+        ]
+      "post": {
+        "operationId": "create_knowledge_item_api_v1_store_knowledge_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeItemCreate"
+              }
+            }
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Knowledge Item",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/knowledge/{record_id}": {
+      "delete": {
+        "operationId": "delete_knowledge_item_api_v1_store_knowledge__record_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+                  "type": "null"
+              ],
+              "title": "If-Match"
+            }
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+        "summary": "Delete Knowledge Item",
+        "tags": [
+          "store-knowledge"
+        ]
+      },
+        "operationId": "get_knowledge_item_api_v1_store_knowledge__record_id__get",
+            "name": "record_id",
+              "title": "Record Id",
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeItemRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+            "description": "Validation Error"
+          }
+        },
+        "tags": [
+        ]
+      "patch": {
+        "parameters": [
+          {
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+            }
+          }
+        ],
+              "schema": {
+                "$ref": "#/components/schemas/KnowledgeItemUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+                  "$ref": "#/components/schemas/KnowledgeItemRead"
             "description": "Successful Response"
           },
           "422": {
@@ -1432,26 +3991,21 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-        "summary": "Create Offer",
-          "store-knowledge"
-    "/api/v1/store/offers/{record_id}": {
-      "delete": {
-        "operationId": "delete_offer_api_v1_store_offers__record_id__delete",
+            "description": "Validation Error"
+          }
+        },
+        "tags": [
+        ]
+      }
+    },
         "parameters": [
           {
             "in": "path",
             "name": "record_id",
             "required": true,
             "schema": {
-              "format": "uuid",
-              "title": "Record Id",
-              "type": "string"
-          {
-            "in": "header",
-            "name": "If-Match",
+            }
+          },
             "required": false,
             "schema": {
               "anyOf": [
@@ -1479,12 +4033,9 @@
                 }
               ],
               "title": "X-Store-Id"
-            }
-          }
-        ],
-          },
-          "422": {
-            "content": {
+        "responses": {
+          "204": {
+            "description": "Successful Response"
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
@@ -1614,13 +4165,7 @@
         },
         "responses": {
           "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ActiveStoreResponse"
-                }
-              }
-            },
+                  "$ref": "#/components/schemas/OfferRead"
             "description": "Successful Response"
           },
           "422": {
@@ -2141,13 +4686,10 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-        "summary": "Create Store Profile",
-          "store-knowledge"
-        ]
-      }
+            "description": "Validation Error"
+          }
+        },
+        "tags": [
     },
     "/api/v1/store/{resource_type}/{record_id}/confirm-facts": {
       "post": {
@@ -2239,12 +4781,9 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Confirm Store Facts",
-        "tags": [
-          "store-knowledge"
-    "/api/v1/system/info": {
-      "get": {
-        "operationId": "system_info_api_v1_system_info_get",
+        ]
+      }
+    },
         "responses": {
           "200": {
             "content": {

@@ -1064,10 +1064,6 @@ def create_brand_guideline(
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> BrandGuidelineRead:
     store_id = _store_id(context)
-    if db.scalar(
-        select(BrandGuideline.id).where(BrandGuideline.store_id == store_id)
-    ):
-        raise ApiError(409, "RESOURCE_ALREADY_EXISTS", "Brand guideline already exists")
     result = _create_scoped_record(
         db, request, auth, store_id,
         BrandGuideline, BrandGuidelineRead, payload, "brand_guideline",

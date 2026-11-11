@@ -1,7 +1,7 @@
 import hmac
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from redis.exceptions import RedisError
@@ -217,7 +217,9 @@ def logout(
             supplied_csrf = request.headers.get("x-csrf-token")
             if (
                 not supplied_csrf
-                or csrf_token_verifier(supplied_csrf) != auth_session.csrf_token_hash
+                or not hmac.compare_digest(
+                    csrf_token_verifier(supplied_csrf), auth_session.csrf_token_hash
+                )
             ):
                 raise ApiError(403, "CSRF_INVALID", "CSRF token is invalid")
             auth_session.revoked_at = datetime.now(UTC)

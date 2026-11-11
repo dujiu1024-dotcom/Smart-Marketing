@@ -5,18 +5,12 @@ import socket
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from celery import shared_task  # type: ignore[import-untyped]
 from sqlalchemy import create_engine, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from store_operator.jobs.service import (
-    JobClaim,
-    acknowledge_job_cancellation,
-    claim_job,
-    complete_job,
-    fail_job,
-)
+from store_operator.jobs.service import claim_job, fail_job
 from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent
+from store_operator_worker.celery_app import celery_app
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
@@ -31,7 +25,7 @@ OUTBOX_LOCK_SECONDS = 30
 OUTBOX_MAX_ATTEMPTS = 12
 
 
-@shared_task(name="jobs.relay_outbox", ignore_result=True)
+@celery_app.task(name="jobs.relay_outbox", ignore_result=True)
 def relay_outbox(batch_size: int = 50) -> int:
     """Publish committed Outbox rows; a crash after publish can cause safe redelivery."""
     now = datetime.now(UTC)
@@ -73,8 +67,6 @@ def relay_outbox(batch_size: int = 50) -> int:
             job_id = payload.get("job_id")
             if not isinstance(job_id, str):
                 raise ValueError("Outbox job_id is invalid")
-            from store_operator_worker.celery_app import celery_app
-
             celery_app.send_task(
                 "jobs.execute",
                 args=[job_id],
@@ -119,7 +111,7 @@ def relay_outbox(batch_size: int = 50) -> int:
     return published
 
 
-@shared_task(name="jobs.execute", bind=True, acks_late=True)
+@celery_app.task(name="jobs.execute", acks_late=True)
 def execute_job(self, job_id: str) -> dict[str, str]:
     """Claim a durable Job; domain handlers are registered in a later capability slice."""
     parsed_job_id = UUID(job_id)
@@ -145,7 +137,7 @@ def execute_job(self, job_id: str) -> dict[str, str]:
     return {"status": "failed", "reason": "handler_not_registered"}
 
 
-@shared_task(name="jobs.recover_expired_leases", ignore_result=True)
+@celery_app.task(name="jobs.recover_expired_leases", ignore_result=True)
 def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     now = datetime.now(UTC)

@@ -39,6 +39,13 @@ class QualityReportRun(BaseModel):
     expected_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class QualityReportRunIdempotency(BaseModel):
+    task_id: UUID
+    content_id: UUID
+    rule_version: str
+    expected_fingerprint: str
+
+
 class ChannelContentCreate(BaseModel):
     channel_key: str = Field(min_length=1, max_length=80)
     copy_version_id: UUID
@@ -353,7 +360,11 @@ def run_quality_report(
         actor_user_id=auth.user.id,
         key=idempotency_key,
         operation="content.quality_report.run",
-        payload={"task_id": task_id, "content_id": content_id, **payload.model_dump()},
+        payload=QualityReportRunIdempotency(
+            task_id=task_id,
+            content_id=content_id,
+            **payload.model_dump(),
+        ),
     )
     if replay is not None:
         return replay

@@ -245,6 +245,11 @@ def test_platform_admin_only_can_manage_members_and_last_owner_is_protected(
     members = identity_client.get(f"/api/v1/admin/stores/{store.id}/members")
     assert members.status_code == 200
     assert len(members.json()) == 1
+    # A platform-admin grant does not create a StoreMembership or bypass store authorization.
+    store_content = identity_client.get(
+        "/_test/store-context", headers={"X-Store-ID": str(store.id)}
+    )
+    assert store_content.status_code == 404
     membership_id = members.json()[0]["membership_id"]
 
     last_owner = identity_client.patch(

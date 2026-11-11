@@ -63,11 +63,11 @@
 
 本轮检索未找到抖音官方草稿箱 API。官方创建视频接口执行的是创建/投稿，并有平台审核流程；这不是草稿保存。
 
-建议 Issue #12 的替代验收路径（仍需产品负责人明确批准）：
-- 系统先完成本地冻结发布包和商家审核；本地“待发布包”是本系统草稿，不称为抖音草稿。
-- 用户在系统确认页主动点击“发布到抖音”；服务端上传并调用创建视频 API。
-- 以 item_id + video.list 读回验证外部结果；如果读回不支持或未命中则 processing/needs_human。
-- UI 明确提示“提交后进入抖音审核，审核期间仅自己可见”；不承诺可在抖音草稿箱编辑。
+**产品决策：已批准（2026-11-11）。** 项目负责人明确批准以下替代验收路径，作为抖音首期正式验收基线；不再以抖音原生草稿箱能力作为首期阻塞条件：
+- 系统先完成本地冻结发布包（含文案、素材、渠道参数、版本指纹及校验结果）；本地冻结包是本系统草稿，不称为抖音草稿。冻结后内容不可原位修改，修改必须生成新版本并重新审核/质检。
+- 商家在最终确认页核对账号、文案、视频、可见性和发布动作后主动点击“确认并发布”；确认记录必须绑定冻结包 fingerprint、门店、账号、操作者和时间。服务端再次校验确认与冻结版本一致后，才可上传并调用官方创建视频 API。
+- 发布操作必须有唯一幂等标识及持久化 PublishOperation/Attempt；以 item_id 和 `video.list` 读回验证外部结果。未读回时保持 processing 并重试只读核验；发布请求结果未知时进入 needs_human，禁止盲目重复 create_video。
+- UI 明确提示“提交后进入抖音审核，审核期间仅自己可见”；不承诺可在抖音草稿箱编辑。只有作品读回证据命中后才记录外部作品归属；读回结果与审核状态分别保存，不将 item_id 返回等同公开发布成功。
 
 ## 5. 代码初版范围
 
@@ -93,7 +93,7 @@
 | video.create.bind | pending | 能力实验室申请通过 |
 | video.list | pending | 对应权限申请通过 |
 | 测试账号 | pending | 获得可授权且可发布的测试抖音账号 |
-| Secret Manager | blocked | 项目负责人确认部署区域/供应商，完成实现与安全审查 |
+| Secret Manager | blocked | 确认部署区域/供应商，完成实现与安全审查 |
 | OAuth API 路由与 OAuthAuthorizationAttempt 持久化 | not implemented | #5 auth context、DB 模型、state 消费事务与安全测试 |
 | ChannelAccount / CapabilitySnapshot 持久化 | not implemented | #12 migration/model/service |
 | PublishOperation + #9 Job Handler | not implemented | #8 frozen package 集成、#9 handler 与幂等/对账 |
@@ -112,6 +112,11 @@
 - 能力与权限申请说明：https://open.douyin.com/platform/resource/docs/accession-guide/type-and-permission
 
 ## 8. 验收记录
+
+### 已批准的首期验收方案（2026-11-11）
+
+项目负责人已明确批准“本地冻结草稿包 + 商家最终确认 + 官方发布 + 作品读回核验”替代抖音原生草稿箱验收。该批准只解除原生草稿箱 API 缺失这一产品决策阻塞，不代表 OAuth、Secret Manager、真实发布和作品读回已完成。首期 DoD 以本地冻结版本可追溯、确认绑定 fingerprint、官方发布受幂等门禁保护、作品读回有真实证据为准。
+
 
 本 PR 的 CI 应执行：
 - `cd apps/api && uv run pytest tests/test_douyin_adapter.py`

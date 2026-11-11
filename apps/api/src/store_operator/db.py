@@ -11,6 +11,6 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expi
 redis_client = Redis.from_url(settings.redis_url, socket_connect_timeout=1)
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db() -> Generator[Session]:
     with SessionLocal() as session:
         yield session

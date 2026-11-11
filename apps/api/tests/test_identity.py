@@ -81,7 +81,7 @@ def make_user(db: Session, email: str, password: str = "test-password-123") -> U
 
 
 def make_store(db: Session, name: str, user: User, role: str = "owner") -> Store:
-    store = Store(id=uuid4(), name=name, status="active")
+    store = Store(id=uuid4(), name=name, timezone="Asia/Tokyo", status="active")
     db.add(store)
     db.flush()
     db.add(

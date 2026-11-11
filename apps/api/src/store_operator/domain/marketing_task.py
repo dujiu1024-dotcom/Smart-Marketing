@@ -225,6 +225,7 @@ def resolve_step_applicability(
     *,
     includes_copy: bool | None = None,
     includes_image: bool | None = None,
+    opportunity_applicable: bool | None = None,
     selected_channels: bool | None = None,
     requires_external_delivery: bool | None = None,
 ) -> StepApplicability:
@@ -260,6 +261,16 @@ def resolve_step_applicability(
             StepApplicability.NOT_APPLICABLE
             if not includes_image
             else applicability
+        )
+
+    if (
+        normalized_step is TaskStepKey.OPPORTUNITY_DECISION
+        and opportunity_applicable is not None
+    ):
+        return (
+            StepApplicability.REQUIRED
+            if opportunity_applicable
+            else StepApplicability.NOT_APPLICABLE
         )
 
     if normalized_step is TaskStepKey.CHANNEL_ADAPTATION and selected_channels is not None:

@@ -48,6 +48,8 @@ class JobResolveRequest(BaseModel):
 
 
 class AIUsageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     input_tokens: int | None
     output_tokens: int | None
     image_units: Decimal | None

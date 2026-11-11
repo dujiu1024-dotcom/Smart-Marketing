@@ -1,5 +1,7 @@
 from typing import Any
 
+from typing import Any
+
 import boto3
 from botocore.config import Config
 
@@ -10,7 +12,7 @@ class ObjectStorageNotConfigured(RuntimeError):
     """The private object-storage backend is not configured."""
 
 
-def _client():
+def _client() -> Any:
     if (
         not settings.object_storage_bucket
         or not settings.object_storage_access_key_id
@@ -32,6 +34,7 @@ def create_upload_url(
     object_key: str,
     mime_type: str,
     sha256: str,
+    byte_size: int,
     expires_in: int | None = None,
 ) -> str:
     client = _client()
@@ -41,6 +44,7 @@ def create_upload_url(
             "Bucket": settings.object_storage_bucket,
             "Key": object_key,
             "ContentType": mime_type,
+            "ContentLength": byte_size,
             "Metadata": {"sha256": sha256},
         },
         ExpiresIn=expires_in or settings.object_storage_upload_ttl_seconds,

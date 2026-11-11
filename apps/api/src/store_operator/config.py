@@ -40,6 +40,8 @@ class Settings(BaseSettings):
                 raise ValueError("SESSION_TOKEN_PEPPER must be explicitly configured in production")
             if len(self.session_token_pepper) < 32:
                 raise ValueError("SESSION_TOKEN_PEPPER must contain at least 32 characters")
+            if self.session_token_pepper == "local-development-only-change-me":
+                raise ValueError("SESSION_TOKEN_PEPPER must not use the local development placeholder")
             if "session_idle_timeout_seconds" not in self.model_fields_set:
                 raise ValueError("SESSION_IDLE_TIMEOUT_SECONDS must be explicitly configured")
             if "session_absolute_timeout_seconds" not in self.model_fields_set:

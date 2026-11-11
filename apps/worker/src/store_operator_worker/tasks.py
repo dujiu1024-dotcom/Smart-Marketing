@@ -197,6 +197,7 @@ def execute_job(job_id: str) -> dict[str, str]:
     stop_heartbeat = Event()
     cancellation_requested = Event()
     lease_lost = Event()
+    deadline_at = datetime.now(UTC) + timedelta(seconds=timeout_seconds)
 
     def update_progress(current: int | None, total: int | None) -> None:
         with SessionLocal.begin() as db:
@@ -213,7 +214,35 @@ def execute_job(job_id: str) -> dict[str, str]:
                 cancellation_requested.set()
 
     def heartbeat_loop() -> None:
-        while not stop_heartbeat.wait(HEARTBEAT_INTERVAL_SECONDS):
+        while not stop_heartbeat.is_set():
+            remaining = (deadline_at - datetime.now(UTC)).total_seconds()
+            if remaining <= 0:
+                try:
+                    with SessionLocal.begin() as db:
+                        fail_job(
+                            db,
+                            job_id=claimed_job_id,
+                            lease_token=lease_token,
+                            worker_id=WORKER_ID,
+                            error_code="JOB_TIMEOUT",
+                            error_summary=(
+                                "Job exceeded its configured execution timeout."
+                            ),
+                            retryable=False,
+                            side_effect_state=SideEffectState.UNKNOWN,
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        "job.timeout.persist_failed",
+                        extra={
+                            "job_id": str(claimed_job_id),
+                            "error_type": type(exc).__name__,
+                        },
+                    )
+                lease_lost.set()
+                return
+            if stop_heartbeat.wait(min(HEARTBEAT_INTERVAL_SECONDS, remaining)):
+                return
             try:
                 update_progress(None, None)
             except Exception as exc:
@@ -239,7 +268,7 @@ def execute_job(job_id: str) -> dict[str, str]:
         attempt_id=attempt_id,
         lease_token=lease_token,
         worker_id=WORKER_ID,
-        deadline_at=datetime.now(UTC) + timedelta(seconds=timeout_seconds),
+        deadline_at=deadline_at,
         cancellation_requested=cancellation_requested,
         lease_lost=lease_lost,
         update_progress_callback=update_progress,

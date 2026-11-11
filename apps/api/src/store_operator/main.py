@@ -11,11 +11,11 @@ from opentelemetry import trace
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract
 from opentelemetry.trace import Status, StatusCode
-from starlette.middleware.base import RequestResponseEndpoint
-from starlette.responses import Response
 from redis import Redis
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from store_operator.config import settings
 from store_operator.observability import configure_logging

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime, UTC
 from uuid import uuid4
 
 from store_operator.auth.security import hash_password

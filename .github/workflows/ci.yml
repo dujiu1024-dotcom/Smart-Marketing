@@ -156,3 +156,20 @@ jobs:
       - name: Stop Web application
         if: always()
         run: if [ -f /tmp/store-operator-web.pid ]; then kill "$(cat /tmp/store-operator-web.pid)" || true; fi
+      - name: Start frozen Demo static server
+        run: |
+          python -m http.server 8080 --bind 127.0.0.1 > /tmp/store-operator-demo.log 2>&1 &
+          echo $! > /tmp/store-operator-demo.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8080/demo/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/store-operator-demo.log
+          exit 1
+      - name: Run frozen Demo route and page-state browser smoke
+        run: uv run --locked --directory apps/e2e python demo_smoke.py
+      - name: Stop frozen Demo static server
+        if: always()
+        run: if [ -f /tmp/store-operator-demo.pid ]; then kill "$(cat /tmp/store-operator-demo.pid)" || true; fi

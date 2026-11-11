@@ -686,6 +686,15 @@ def confirm_publish_package(
     )
     db.add(confirmation)
     db.flush()
+    delivery_modes = {
+        item.delivery_mode
+        for item in db.scalars(
+            select(PublishPackageItem).where(
+                PublishPackageItem.store_id == store_id,
+                PublishPackageItem.publish_package_id == package.id,
+            )
+        ).all()
+    }
     response: dict[str, object] = {
         "id": str(confirmation.id),
         "publish_package_id": str(package.id),
@@ -693,17 +702,7 @@ def confirm_publish_package(
         "confirmed_by_user_id": str(auth.user.id),
         "confirmed_at": confirmation.confirmed_at.isoformat(),
         "confirmation_note": confirmation.confirmation_note,
-        "delivery_mode": (
-            next(iter(delivery_modes)) if len(delivery_modes := {
-                item.delivery_mode
-                for item in db.scalars(
-                    select(PublishPackageItem).where(
-                        PublishPackageItem.store_id == store_id,
-                        PublishPackageItem.publish_package_id == package.id,
-                    )
-                ).all()
-            }) == 1 else "mixed"
-        ),
+        "delivery_mode": next(iter(delivery_modes)) if len(delivery_modes) == 1 else "mixed",
         "published": False,
     }
     complete_idempotency(

@@ -269,7 +269,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 
 ## 2026-11-11 发布包冻结与商家确认第一阶段
 
-新增后端 API（PR #64）：
+新增后端 API（PR #64 已合并至 main，commit `57bfff114f6d5c3b043e81bd20ba6640489f33b4`）：
 
 - `POST /api/v1/marketing-tasks/{task_id}/publish-packages/freeze`
 - `POST /api/v1/marketing-tasks/publish-packages/{package_id}/confirm`
@@ -288,3 +288,14 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 首阶段仅开放 `manual_handoff`。#12 尚未实现 ChannelAccount/真实 OAuth/平台 Adapter，因此 API 不接受 `official_api`，也不会创建 PublishOperation 或显示“已发布”。人工交付确认只代表商家确认冻结内容，不代表渠道发布成功。
 
 验收边界：后端门禁/API/DB 测试正在 PR #64 中验证；Demo 页面、完整浏览器业务流程和真实渠道发布仍未完成。
+
+
+### PR #64 合并验证证据（2026-11-11）
+
+CI Run [42995980116](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42995980116) 在合并前对精确 head `a53dbbb3d0e1f172a79c70c56d2455cb3ae4a41d` 全部 6 个 Job 通过：
+- API：Ruff、MyPy、Alembic upgrade/downgrade/upgrade、119 pytest passed（1 条依赖弃用警告）
+- Worker、Web、Contracts：通过
+- E2E：应用与冻结 Demo 页面/路由 smoke 通过
+- Infrastructure：完整 Compose 启动、API/Web readiness、PostgreSQL volume restart persistence 通过
+
+未完成：发布包前端工作区、完整商家业务流浏览器验收、细粒度审核角色、真实渠道 OAuth/官方 API 发布仍需后续实现；Issue #8 保持 Open。

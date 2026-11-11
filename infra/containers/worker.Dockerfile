@@ -4,9 +4,10 @@ COPY --from=uv /uv /uvx /bin/
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    PYTHONPATH=/app/src \
+    PYTHONPATH=/app/src:/app/api_src \
     PATH="/app/.venv/bin:$PATH"
 COPY apps/worker/pyproject.toml apps/worker/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY apps/worker/src ./src
-CMD ["celery", "-A", "store_operator_worker.celery_app:celery_app", "worker", "--loglevel=INFO"]
+COPY apps/api/src ./api_src
+CMD ["celery", "-A", "store_operator_worker.celery_app:celery_app", "worker", "--loglevel=INFO", "--beat"]

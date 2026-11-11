@@ -6,6 +6,7 @@ from sqlalchemy import select
 from store_operator.ai_gateway.errors import SideEffectState
 from store_operator.jobs import (
     SYSTEM_SCOPE_ID,
+    InvalidJobTransition,
     JobIdempotencyConflict,
     LeaseLostError,
     acknowledge_job_cancellation,
@@ -15,6 +16,8 @@ from store_operator.jobs import (
     fail_job,
     heartbeat_job,
     request_job_cancellation,
+    resolve_job,
+    retry_failed_job,
 )
 from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent, Store, User
 
@@ -304,3 +307,136 @@ def test_job_attempt_history_is_preserved_after_retry(db_session) -> None:
     assert attempts[0].status == "failed"
     assert attempts[1].status == "running"
     assert db_session.get(Job, job.id) is not None
+
+
+def test_manual_retry_is_idempotent_and_requires_side_effect_confirmation(
+    db_session,
+) -> None:
+    user, store = create_actor_and_store(db_session)
+    job = create_store_job(
+        db_session, user, store, idempotency_key="manual-retry", max_attempts=1
+    )
+    now = datetime.now(UTC)
+    claim = claim_job(db_session, job_id=job.id, worker_id="worker-1", now=now)
+    assert claim is not None
+    failed = fail_job(
+        db_session,
+        job_id=job.id,
+        lease_token=claim.attempt.lease_token,
+        worker_id="worker-1",
+        error_code="TEMPORARY",
+        error_summary="Retry budget exhausted",
+        retryable=False,
+        now=now + timedelta(seconds=1),
+    )
+    assert failed.status == "failed"
+
+    with pytest.raises(InvalidJobTransition):
+        retry_failed_job(
+            db_session,
+            job_id=job.id,
+            store_id=store.id,
+            actor_user_id=user.id,
+            idempotency_key="retry-key-1",
+            reason="Need operator confirmation",
+            side_effects_confirmed_absent=False,
+        )
+
+    retried = retry_failed_job(
+        db_session,
+        job_id=job.id,
+        store_id=store.id,
+        actor_user_id=user.id,
+        idempotency_key="retry-key-1",
+        reason="Provider confirms no external side effect",
+        side_effects_confirmed_absent=True,
+        now=now + timedelta(seconds=2),
+    )
+    assert retried.status == "queued"
+    assert retried.max_attempts == 2
+    outbox = db_session.scalars(
+        select(OutboxEvent).where(OutboxEvent.aggregate_id == job.id)
+    ).all()
+    assert len(outbox) == 2
+
+    replay = retry_failed_job(
+        db_session,
+        job_id=job.id,
+        store_id=store.id,
+        actor_user_id=user.id,
+        idempotency_key="retry-key-1",
+        reason="Provider confirms no external side effect",
+        side_effects_confirmed_absent=True,
+        now=now + timedelta(seconds=3),
+    )
+    assert replay.id == job.id
+    assert len(
+        db_session.scalars(
+            select(OutboxEvent).where(OutboxEvent.aggregate_id == job.id)
+        ).all()
+    ) == 2
+
+    with pytest.raises(JobIdempotencyConflict):
+        retry_failed_job(
+            db_session,
+            job_id=job.id,
+            store_id=store.id,
+            actor_user_id=user.id,
+            idempotency_key="retry-key-1",
+            reason="A different decision",
+            side_effects_confirmed_absent=True,
+        )
+
+
+def test_needs_human_resolution_is_audited_and_idempotent(db_session) -> None:
+    user, store = create_actor_and_store(db_session)
+    job = create_store_job(
+        db_session, user, store, idempotency_key="manual-resolution"
+    )
+    now = datetime.now(UTC)
+    claim = claim_job(db_session, job_id=job.id, worker_id="worker-1", now=now)
+    assert claim is not None
+    needs_human = fail_job(
+        db_session,
+        job_id=job.id,
+        lease_token=claim.attempt.lease_token,
+        worker_id="worker-1",
+        error_code="SIDE_EFFECT_UNKNOWN",
+        error_summary="Provider result is uncertain",
+        retryable=True,
+        side_effect_state=SideEffectState.UNKNOWN,
+        now=now + timedelta(seconds=1),
+    )
+    assert needs_human.status == "needs_human"
+
+    resolved = resolve_job(
+        db_session,
+        job_id=job.id,
+        store_id=store.id,
+        actor_user_id=user.id,
+        idempotency_key="resolve-key-1",
+        resolution="fail",
+        reason="Operator checked provider console; operation did not complete",
+        now=now + timedelta(seconds=2),
+    )
+    assert resolved.status == "failed"
+    replay = resolve_job(
+        db_session,
+        job_id=job.id,
+        store_id=store.id,
+        actor_user_id=user.id,
+        idempotency_key="resolve-key-1",
+        resolution="fail",
+        reason="Operator checked provider console; operation did not complete",
+        now=now + timedelta(seconds=3),
+    )
+    assert replay.status == "failed"
+    event = db_session.scalar(
+        select(JobEvent).where(
+            JobEvent.job_id == job.id,
+            JobEvent.event_type == "job.manual_resolution_failed",
+        )
+    )
+    assert event is not None
+    assert event.actor_id == user.id
+    assert event.data_json["reason"].startswith("Operator checked")

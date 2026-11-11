@@ -338,9 +338,15 @@ export interface paths {
         /** Create Store Profile */
         post: operations["create_store_profile_api_v1_store_profile_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Store Profile */
         patch: operations["update_store_profile_api_v1_store_profile_patch"];
         trace?: never;
     };
+    "/api/v1/store/{resource_type}/{record_id}/confirm-facts": {
+        parameters: {
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -352,9 +358,15 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/info": {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
         /** System Info */
         get: operations["system_info_api_v1_system_info_get"];
@@ -781,6 +793,9 @@ export interface components {
             /**
              * User Id
              * Format: uuid
+             */
+            user_id: string;
+        };
         /** OfferCreate */
         OfferCreate: {
             /** Eligibility Rules Json */
@@ -883,6 +898,9 @@ export interface components {
             /** Usage Limit */
             usage_limit?: number | null;
         };
+        /** ProductCreate */
+        ProductCreate: {
+            /** Allergens And Restrictions Json */
             allergens_and_restrictions_json?: string[] | null;
             /**
              * Availability Status
@@ -1485,12 +1503,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/json": components["schemas"]["AudienceProfileList"];
                 };
             };
             /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
@@ -1506,7 +1531,13 @@ export interface operations {
             };
             path?: never;
             cookie?: never;
+        };
+        requestBody: {
+            content: {
                 "application/json": components["schemas"]["AudienceProfileCreate"];
+            };
+        };
+        responses: {
             /** @description Successful Response */
             201: {
                 headers: {
@@ -1521,18 +1552,26 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
+    get_audience_profile_api_v1_store_audiences__record_id__get: {
         parameters: {
             query?: never;
             header?: {
                 "X-Store-ID"?: string | null;
             };
             path: {
+                record_id: string;
             };
             cookie?: never;
         };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1549,7 +1588,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
     delete_audience_profile_api_v1_store_audiences__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
                 "If-Match"?: string | null;
                 "X-Store-ID"?: string | null;
             };
@@ -1572,12 +1617,19 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
+    update_audience_profile_api_v1_store_audiences__record_id__patch: {
         parameters: {
             query?: never;
             header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
             path: {
                 record_id: string;
             };
@@ -1592,7 +1644,13 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     "application/json": components["schemas"]["AudienceProfileRead"];
+                };
+            };
+            /** @description Validation Error */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1614,12 +1672,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/json": components["schemas"]["BrandGuidelineRead"];
                 };
             };
             /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
@@ -1635,7 +1700,13 @@ export interface operations {
             };
             path?: never;
             cookie?: never;
+        };
+        requestBody: {
+            content: {
                 "application/json": components["schemas"]["BrandGuidelineCreate"];
+            };
+        };
+        responses: {
             /** @description Successful Response */
             201: {
                 headers: {
@@ -1650,12 +1721,19 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
+    update_brand_guideline_api_v1_store_brand_guideline_patch: {
         parameters: {
             query?: never;
             header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1668,6 +1746,9 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
                     "application/json": components["schemas"]["BrandGuidelineRead"];
                 };
             };
@@ -2328,6 +2409,9 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
             422: {
                 headers: {
                     [name: string]: unknown;

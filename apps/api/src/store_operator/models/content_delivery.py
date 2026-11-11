@@ -439,6 +439,7 @@ class PublishPackageItem(Base):
             "store_id", "publish_package_id", "channel_key",
             name="uq_publish_package_items_channel",
         ),
+        UniqueConstraint("store_id", "id", name="uq_publish_package_items_store_id"),
         ForeignKeyConstraint(
             ["store_id", "publish_package_id"],
             ["publish_packages.store_id", "publish_packages.id"],
@@ -453,6 +454,12 @@ class PublishPackageItem(Base):
                 "channel_contents.channel_key",
             ],
             name="fk_publish_package_items_channel_content_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "channel_account_id"],
+            ["channel_accounts.store_id", "channel_accounts.id"],
+            name="fk_publish_package_items_channel_account_same_store",
             ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(

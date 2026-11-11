@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from store_operator.domain.marketing_task import (
     MarketingTaskStatus,
@@ -25,6 +25,13 @@ class MarketingTaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     requirement_draft: dict[str, object] = Field(default_factory=dict)
     task_options: MarketingTaskOptions = Field(default_factory=MarketingTaskOptions)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def normalize_title(cls, value: object) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("title must contain non-whitespace characters")
+        return value.strip()
 
     @model_validator(mode="after")
     def validate_task_scope(self) -> "MarketingTaskCreate":

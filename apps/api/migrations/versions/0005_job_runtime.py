@@ -38,7 +38,9 @@ def upgrade() -> None:
         sa.Column("queue_name", sa.String(100), server_default="default", nullable=False),
         sa.Column("attempt_count", sa.Integer(), server_default="0", nullable=False),
         sa.Column("max_attempts", sa.Integer(), server_default="3", nullable=False),
-        sa.Column("available_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "available_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("timeout_seconds", sa.Integer(), server_default="300", nullable=False),
         sa.Column("lease_owner", sa.String(200)),
         sa.Column("lease_token", postgresql.UUID(as_uuid=True)),
@@ -54,8 +56,12 @@ def upgrade() -> None:
             postgresql.UUID(as_uuid=True),
             sa.ForeignKey("users.id", ondelete="SET NULL"),
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("started_at", sa.DateTime(timezone=True)),
         sa.Column("finished_at", sa.DateTime(timezone=True)),
         sa.Column("cancelled_at", sa.DateTime(timezone=True)),
@@ -72,7 +78,8 @@ def upgrade() -> None:
             name="ck_jobs_idempotency_scope",
         ),
         sa.CheckConstraint(
-            "status IN ('queued', 'running', 'retry_wait', 'succeeded', 'failed', 'cancelled', 'needs_human')",
+            "status IN ('queued', 'running', 'retry_wait', 'succeeded', "
+            "'failed', 'cancelled', 'needs_human')",
             name="ck_jobs_status",
         ),
         sa.CheckConstraint(
@@ -92,7 +99,8 @@ def upgrade() -> None:
             name="ck_jobs_progress_total_nonnegative",
         ),
         sa.CheckConstraint(
-            "progress_current IS NULL OR progress_total IS NULL OR progress_current <= progress_total",
+            "progress_current IS NULL OR progress_total IS NULL "
+            "OR progress_current <= progress_total",
             name="ck_jobs_progress_within_total",
         ),
         sa.CheckConstraint(
@@ -123,7 +131,9 @@ def upgrade() -> None:
         sa.Column("lease_token", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("worker_id", sa.String(200), nullable=False),
         sa.Column("status", sa.String(30), server_default="running", nullable=False),
-        sa.Column("started_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "started_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("heartbeat_at", sa.DateTime(timezone=True)),
         sa.Column("finished_at", sa.DateTime(timezone=True)),
         sa.Column("duration_ms", sa.BigInteger()),
@@ -159,7 +169,9 @@ def upgrade() -> None:
         ),
         sa.Column("lease_token", postgresql.UUID(as_uuid=True)),
         sa.Column("data", postgresql.JSONB(), server_default="{}", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "actor_type IN ('user', 'platform_admin', 'system')",
             name="ck_job_events_actor_type",
@@ -177,12 +189,16 @@ def upgrade() -> None:
         sa.Column("payload", postgresql.JSONB(), nullable=False),
         sa.Column("dedupe_key", sa.String(200), nullable=False),
         sa.Column("status", sa.String(20), server_default="pending", nullable=False),
-        sa.Column("available_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "available_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("publish_attempts", sa.Integer(), server_default="0", nullable=False),
         sa.Column("locked_by", sa.String(200)),
         sa.Column("locked_until", sa.DateTime(timezone=True)),
         sa.Column("last_error", sa.String(500)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.Column("published_at", sa.DateTime(timezone=True)),
         sa.UniqueConstraint("dedupe_key", name="uq_outbox_events_dedupe_key"),
         sa.CheckConstraint(
@@ -190,7 +206,9 @@ def upgrade() -> None:
             name="ck_outbox_events_status",
         ),
         sa.CheckConstraint("schema_version >= 1", name="ck_outbox_events_schema_version_positive"),
-        sa.CheckConstraint("publish_attempts >= 0", name="ck_outbox_events_publish_attempts_nonnegative"),
+        sa.CheckConstraint(
+            "publish_attempts >= 0", name="ck_outbox_events_publish_attempts_nonnegative"
+        ),
         sa.CheckConstraint(
             "status <> 'publishing' OR (locked_by IS NOT NULL AND locked_until IS NOT NULL)",
             name="ck_outbox_events_publishing_lock_required",
@@ -200,7 +218,9 @@ def upgrade() -> None:
             name="ck_outbox_events_published_timestamp_required",
         ),
     )
-    op.create_index("ix_outbox_events_status_available", "outbox_events", ["status", "available_at"])
+    op.create_index(
+        "ix_outbox_events_status_available", "outbox_events", ["status", "available_at"]
+    )
     op.create_index("ix_outbox_events_lock_expiry", "outbox_events", ["locked_until"])
 
     op.create_table(
@@ -212,7 +232,11 @@ def upgrade() -> None:
             sa.ForeignKey("stores.id", ondelete="RESTRICT"),
         ),
         sa.Column("marketing_task_id", postgresql.UUID(as_uuid=True)),
-        sa.Column("job_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("jobs.id", ondelete="SET NULL")),
+        sa.Column(
+            "job_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("jobs.id", ondelete="SET NULL"),
+        ),
         sa.Column(
             "attempt_id",
             postgresql.UUID(as_uuid=True),
@@ -230,14 +254,25 @@ def upgrade() -> None:
         sa.Column("status", sa.String(20), nullable=False),
         sa.Column("latency_ms", sa.BigInteger()),
         sa.Column("error_code", sa.String(100)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.CheckConstraint(
             "status IN ('started', 'succeeded', 'failed', 'needs_human')",
             name="ck_ai_invocations_status",
         ),
-        sa.CheckConstraint("latency_ms IS NULL OR latency_ms >= 0", name="ck_ai_invocations_latency_nonnegative"),
-        sa.CheckConstraint("input_schema_version >= 1", name="ck_ai_invocations_input_schema_version_positive"),
-        sa.CheckConstraint("output_schema_version >= 1", name="ck_ai_invocations_output_schema_version_positive"),
+        sa.CheckConstraint(
+            "latency_ms IS NULL OR latency_ms >= 0",
+            name="ck_ai_invocations_latency_nonnegative",
+        ),
+        sa.CheckConstraint(
+            "input_schema_version >= 1",
+            name="ck_ai_invocations_input_schema_version_positive",
+        ),
+        sa.CheckConstraint(
+            "output_schema_version >= 1",
+            name="ck_ai_invocations_output_schema_version_positive",
+        ),
     )
     op.create_index("ix_ai_invocations_store_created", "ai_invocations", ["store_id", "created_at"])
     op.create_index("ix_ai_invocations_job", "ai_invocations", ["job_id"])
@@ -257,11 +292,25 @@ def upgrade() -> None:
         sa.Column("cost_amount", sa.Numeric(18, 6)),
         sa.Column("currency", sa.String(3)),
         sa.Column("metering_source", sa.String(40), nullable=False),
-        sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.CheckConstraint("input_tokens IS NULL OR input_tokens >= 0", name="ck_ai_usage_records_input_tokens_nonnegative"),
-        sa.CheckConstraint("output_tokens IS NULL OR output_tokens >= 0", name="ck_ai_usage_records_output_tokens_nonnegative"),
-        sa.CheckConstraint("image_units IS NULL OR image_units >= 0", name="ck_ai_usage_records_image_units_nonnegative"),
-        sa.CheckConstraint("cost_amount IS NULL OR cost_amount >= 0", name="ck_ai_usage_records_cost_nonnegative"),
+        sa.Column(
+            "recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.CheckConstraint(
+            "input_tokens IS NULL OR input_tokens >= 0",
+            name="ck_ai_usage_records_input_tokens_nonnegative",
+        ),
+        sa.CheckConstraint(
+            "output_tokens IS NULL OR output_tokens >= 0",
+            name="ck_ai_usage_records_output_tokens_nonnegative",
+        ),
+        sa.CheckConstraint(
+            "image_units IS NULL OR image_units >= 0",
+            name="ck_ai_usage_records_image_units_nonnegative",
+        ),
+        sa.CheckConstraint(
+            "cost_amount IS NULL OR cost_amount >= 0",
+            name="ck_ai_usage_records_cost_nonnegative",
+        ),
         sa.CheckConstraint(
             "(cost_amount IS NULL AND currency IS NULL) OR "
             "(cost_amount IS NOT NULL AND currency IS NOT NULL)",

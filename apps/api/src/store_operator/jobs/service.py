@@ -187,7 +187,7 @@ def create_job(
         with db.begin_nested():
             db.add(job)
             db.flush()
-    except IntegrityError:
+    except IntegrityError as exc:
         winner = db.scalar(
             select(Job).where(
                 Job.idempotency_scope_type == scope_type,

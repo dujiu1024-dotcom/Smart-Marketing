@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from store_operator.auth.security import hash_password
-from store_operator.models import Store, StoreMembership, User
+from store_operator.models import MediaAsset, Store, StoreMembership, User
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -144,6 +144,60 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
         },
     )
     assert review.status_code == 201, review.text
+
+    media = MediaAsset(
+        id=uuid4(),
+        store_id=store.id,
+        object_key=f"stores/{store.id}/media/channel-image.png",
+        sha256="a" * 64,
+        mime_type="image/png",
+        byte_size=2048,
+        asset_type="product_image",
+        source_type="merchant_upload",
+        usage_rights_status="confirmed_allowed",
+        status="ready",
+        created_by_user_id=user.id,
+    )
+    db_session.add(media)
+    db_session.flush()
+    image_artifact = identity_client.post(
+        f"/api/v1/marketing-tasks/{task_id}/artifacts",
+        headers={**headers, "Idempotency-Key": "channel-image-artifact"},
+        json={
+            "artifact_type": "image",
+            "version": {
+                "source_type": "merchant_upload",
+                "media_asset_id": str(media.id),
+            },
+        },
+    )
+    assert image_artifact.status_code == 201, image_artifact.text
+    image_version_id = image_artifact.json()["current_version_id"]
+    image_content_payload = {
+        **content_payload,
+        "image_version_ids": [image_version_id],
+    }
+    unreviewed_image = identity_client.post(
+        content_url,
+        headers={**headers, "Idempotency-Key": "channel-content-unreviewed-image"},
+        json=image_content_payload,
+    )
+    assert unreviewed_image.status_code == 409, unreviewed_image.text
+    assert unreviewed_image.json()["error"]["code"] == "IMAGE_REVIEW_REQUIRED"
+
+    image_review = identity_client.post(
+        (
+            f"/api/v1/marketing-tasks/{task_id}/artifacts/{image_artifact.json()['id']}/"
+            f"versions/{image_version_id}/reviews"
+        ),
+        headers={**headers, "Idempotency-Key": "channel-image-review"},
+        json={
+            "expected_version": 1,
+            "review_type": "image",
+            "decision": "approved",
+        },
+    )
+    assert image_review.status_code == 201, image_review.text
 
     created = identity_client.post(
         content_url,

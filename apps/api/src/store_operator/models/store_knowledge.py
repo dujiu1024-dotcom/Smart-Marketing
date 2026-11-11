@@ -47,7 +47,7 @@ class StoreProfile(StoreScoped, Base):
         UniqueConstraint("store_id", name="uq_store_profiles_store"),
         UniqueConstraint("store_id", "id", name="uq_store_profiles_store_id"),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -96,7 +96,7 @@ class Product(StoreScoped, Base):
             name="availability_status",
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -151,7 +151,7 @@ class Offer(StoreScoped, Base):
             "status IN ('draft', 'active', 'paused', 'expired', 'archived')", name="status"
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -219,7 +219,7 @@ class AudienceProfile(StoreScoped, Base):
             "segment_type IN ('core', 'secondary', 'seasonal', 'scenario')", name="segment_type"
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -255,7 +255,7 @@ class KnowledgeItem(StoreScoped, Base):
     __table_args__ = (
         UniqueConstraint("store_id", "id", name="uq_knowledge_items_store_id"),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),
@@ -369,7 +369,7 @@ class StoreRecordRevision(StoreScoped, Base):
             name="uq_store_record_revisions_version",
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', "
             "'needs_review', 'expired')",
             name="fact_status",
         ),

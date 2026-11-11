@@ -89,7 +89,7 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
 
     created_profile = identity_client.post(
         "/api/v1/store/profile",
-        headers=headers_a,
+        headers={**headers_a, "Idempotency-Key": "profile-create-1"},
         json={"display_name": "Knowledge A Shop", "city": "Tokyo"},
     )
     assert created_profile.status_code == 201, created_profile.text
@@ -115,7 +115,7 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
 
     created_product = identity_client.post(
         "/api/v1/store/products",
-        headers=headers_a,
+        headers={**headers_a, "Idempotency-Key": "product-create-1"},
         json={
             "name": "Seasonal tea",
             "price_amount": "680.00",
@@ -127,6 +127,27 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     product = created_product.json()
     assert product["fact_status"] == "pending_confirmation"
     assert product["current_version"] == 1
+
+    replay = identity_client.post(
+        "/api/v1/store/products",
+        headers={**headers_a, "Idempotency-Key": "product-create-1"},
+        json={
+            "name": "Seasonal tea",
+            "price_amount": "680.00",
+            "currency": "JPY",
+            "availability_status": "available",
+        },
+    )
+    assert replay.status_code == 201
+    assert replay.json()["id"] == product["id"]
+
+    key_conflict = identity_client.post(
+        "/api/v1/store/products",
+        headers={**headers_a, "Idempotency-Key": "product-create-1"},
+        json={"name": "Different payload"},
+    )
+    assert key_conflict.status_code == 409
+    assert key_conflict.json()["error"]["code"] == "IDEMPOTENCY_KEY_REUSED"
 
     hidden_from_other_store = identity_client.get(
         f"/api/v1/store/products/{product['id']}",
@@ -193,7 +214,7 @@ def test_offer_knowledge_brand_and_audience_apis_support_fact_confirmation(
 
     offer_response = identity_client.post(
         "/api/v1/store/offers",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "offer-create-1"},
         json={
             "title": "Lunch set",
             "offer_type": "bundle",
@@ -221,7 +242,7 @@ def test_offer_knowledge_brand_and_audience_apis_support_fact_confirmation(
 
     knowledge_response = identity_client.post(
         "/api/v1/store/knowledge",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "knowledge-create-1"},
         json={
             "title": "Store opening policy",
             "category": "policy",
@@ -234,7 +255,7 @@ def test_offer_knowledge_brand_and_audience_apis_support_fact_confirmation(
 
     audience_response = identity_client.post(
         "/api/v1/store/audiences",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "audience-create-1"},
         json={
             "name": "Nearby office workers",
             "segment_type": "core",
@@ -245,7 +266,7 @@ def test_offer_knowledge_brand_and_audience_apis_support_fact_confirmation(
 
     brand_response = identity_client.post(
         "/api/v1/store/brand-guideline",
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "brand-create-1"},
         json={"tone_of_voice": "Clear, practical and restrained"},
     )
     assert brand_response.status_code == 201, brand_response.text

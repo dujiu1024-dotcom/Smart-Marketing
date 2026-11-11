@@ -126,3 +126,8 @@ PRODUCT_DESIGN.md v1.8 将门店用户管理明确归属平台管理员的门店
 - `POST /auth/logout-all` 请求体为 `password`，通过当前密码即时重新认证后递增 `User.auth_version` 并撤销全部 Session。
 - 初始门店 owner 通过离线命令 `python -m store_operator.cli bootstrap-store-owner --email <email> --store-name <name>` 建立；初始/紧急平台管理员通过 `grant-platform-admin` / `revoke-platform-admin` 命令管理，必须提供 reason。CLI 不发送邀请邮件、不替代未来邀请流程。
 - Session 时限的本地开发默认值不是生产策略；生产必须显式配置 `SESSION_IDLE_TIMEOUT_SECONDS`、`SESSION_ABSOLUTE_TIMEOUT_SECONDS` 与强随机 `SESSION_TOKEN_PEPPER`。
+
+
+## 11. 门店初始化参数
+
+离线命令 `bootstrap-store-owner` 必须同时接收 `--email`、`--store-name` 与 `--timezone`。时区必须是有效 IANA 标识，由服务端校验；不允许以部署服务器时区或隐式 UTC 代替门店时区。

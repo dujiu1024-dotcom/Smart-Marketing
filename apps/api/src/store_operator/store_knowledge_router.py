@@ -124,6 +124,207 @@ def _audit(
     )
 
 
+
+
+def _create_scoped_record(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    store_id: UUID,
+    model: type[Any],
+    read_schema: type[BaseModel],
+    payload: BaseModel,
+    record_type: str,
+) -> dict[str, object]:
+    record = model(
+        id=uuid4(),
+        store_id=store_id,
+        **payload.model_dump(),
+        fact_status="pending_confirmation",
+        current_version=1,
+        created_by_user_id=auth.user.id,
+        updated_by_user_id=auth.user.id,
+    )
+    db.add(record)
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ApiError(
+            409, "RECORD_CONFLICT", "Record conflicts with an existing record"
+        ) from exc
+    snapshot = read_schema.model_validate(record).model_dump(mode="json")
+    _record_revision(
+        db,
+        store_id=store_id,
+        record_type=record_type,
+        record_id=record.id,
+        version=1,
+        snapshot=snapshot,
+        fact_status=record.fact_status,
+        actor_id=auth.user.id,
+    )
+    _audit(
+        db,
+        request,
+        action=f"store.{record_type}.created",
+        record_type=record_type,
+        record_id=record.id,
+        actor_id=auth.user.id,
+        store_id=store_id,
+    )
+    db.commit()
+    db.refresh(record)
+    return read_schema.model_validate(record).model_dump(mode="json")
+
+
+def _get_scoped_record(
+    db: Session,
+    store_id: UUID,
+    record_id: UUID,
+    model: type[Any],
+    read_schema: type[BaseModel],
+) -> dict[str, object]:
+    record = db.scalar(
+        select(model).where(model.id == record_id, model.store_id == store_id)
+    )
+    if record is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
+    return read_schema.model_validate(record).model_dump(mode="json")
+
+
+def _list_scoped_records(
+    db: Session,
+    store_id: UUID,
+    model: type[Any],
+    read_schema: type[BaseModel],
+    limit: int,
+    offset: int,
+) -> dict[str, object]:
+    if not 1 <= limit <= 200 or offset < 0:
+        raise ApiError(400, "INVALID_PAGINATION", "Invalid pagination parameters")
+    total = db.scalar(
+        select(func.count()).select_from(model).where(model.store_id == store_id)
+    ) or 0
+    records = db.scalars(
+        select(model)
+        .where(model.store_id == store_id)
+        .order_by(model.created_at.desc(), model.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return {
+        "items": [read_schema.model_validate(record).model_dump(mode="json") for record in records],
+        "total": total,
+    }
+
+
+def _update_scoped_record(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    store_id: UUID,
+    record_id: UUID,
+    if_match: str | None,
+    model: type[Any],
+    read_schema: type[BaseModel],
+    payload: BaseModel,
+    record_type: str,
+) -> dict[str, object]:
+    expected = _expected_version(if_match)
+    record = db.scalar(
+        select(model)
+        .where(model.id == record_id, model.store_id == store_id)
+        .with_for_update()
+    )
+    if record is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
+    if record.current_version != expected:
+        raise ApiError(409, "VERSION_CONFLICT", "Record has changed")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(record, field, value)
+    record.current_version += 1
+    record.fact_status = "pending_confirmation"
+    if hasattr(record, "updated_by_user_id"):
+        record.updated_by_user_id = auth.user.id
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ApiError(
+            409, "RECORD_CONFLICT", "Record conflicts with an existing record"
+        ) from exc
+    snapshot = read_schema.model_validate(record).model_dump(mode="json")
+    _record_revision(
+        db,
+        store_id=store_id,
+        record_type=record_type,
+        record_id=record.id,
+        version=record.current_version,
+        snapshot=snapshot,
+        fact_status=record.fact_status,
+        actor_id=auth.user.id,
+    )
+    _audit(
+        db,
+        request,
+        action=f"store.{record_type}.updated",
+        record_type=record_type,
+        record_id=record.id,
+        actor_id=auth.user.id,
+        store_id=store_id,
+        metadata={"version": record.current_version},
+    )
+    db.commit()
+    db.refresh(record)
+    return read_schema.model_validate(record).model_dump(mode="json")
+
+
+def _delete_scoped_record(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    store_id: UUID,
+    record_id: UUID,
+    if_match: str | None,
+    model: type[Any],
+    read_schema: type[BaseModel],
+    record_type: str,
+) -> None:
+    expected = _expected_version(if_match)
+    record = db.scalar(
+        select(model)
+        .where(model.id == record_id, model.store_id == store_id)
+        .with_for_update()
+    )
+    if record is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
+    if record.current_version != expected:
+        raise ApiError(409, "VERSION_CONFLICT", "Record has changed")
+    snapshot = read_schema.model_validate(record).model_dump(mode="json")
+    _record_revision(
+        db,
+        store_id=store_id,
+        record_type=record_type,
+        record_id=record.id,
+        version=record.current_version + 1,
+        snapshot=snapshot,
+        fact_status="expired",
+        actor_id=auth.user.id,
+    )
+    _audit(
+        db,
+        request,
+        action=f"store.{record_type}.deleted",
+        record_type=record_type,
+        record_id=record.id,
+        actor_id=auth.user.id,
+        store_id=store_id,
+    )
+    db.delete(record)
+    db.commit()
+
+
 @router.get("/profile", response_model=StoreProfileRead)
 def get_store_profile(
     context: Annotated[AuthContext, Depends(require_store_context)],

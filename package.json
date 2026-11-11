@@ -10,7 +10,7 @@
     "build": "pnpm --filter @store-operator/web build",
     "test": "pnpm --filter @store-operator/web test",
     "typecheck": "pnpm --filter @store-operator/web typecheck",
-    "api:openapi": "uv run --locked --directory apps/api python -c 'import json; from store_operator.main import app; print(json.dumps(app.openapi(), indent=2, sort_keys=True))' > packages/api-client/openapi.json",
+    "api:openapi": "PYTHONPATH=src uv run --locked --directory apps/api python -c 'import json; from store_operator.main import app; print(json.dumps(app.openapi(), indent=2, sort_keys=True))' > packages/api-client/openapi.json",
     "api:types": "pnpm exec openapi-typescript packages/api-client/openapi.json -o packages/api-client/src/schema.ts",
     "api:generate": "pnpm api:openapi && pnpm api:types"
   },

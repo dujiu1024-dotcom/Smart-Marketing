@@ -1220,6 +1220,7 @@ def create_asset_upload_intent(
         upload_url=upload_url,
         required_headers={
             "Content-Type": intent.expected_mime_type,
+            "If-None-Match": "*",
             "x-amz-meta-sha256": intent.expected_sha256 or "",
         },
         expires_at=intent.expires_at,

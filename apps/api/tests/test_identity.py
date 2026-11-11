@@ -3,6 +3,7 @@ from uuid import uuid4
 
 import pytest
 from typing import Annotated
+from fastapi import Depends
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError

@@ -161,7 +161,10 @@ def test_artifact_versions_and_reviews_are_version_bound(
     assert second.json()["version_no"] == 2
 
     stale_review = identity_client.post(
-        f"/api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/versions/{first_version_id}/reviews",
+        (
+            f"/api/v1/marketing-tasks/{task_id}/artifacts/"
+            f"{artifact_id}/versions/{first_version_id}/reviews"
+        ),
         headers={**headers, "Idempotency-Key": "content-review-stale"},
         json={"expected_version": 1, "review_type": "copy", "decision": "approved"},
     )
@@ -169,7 +172,10 @@ def test_artifact_versions_and_reviews_are_version_bound(
     assert stale_review.json()["error"]["code"] == "STALE_ARTIFACT_VERSION"
 
     approved = identity_client.post(
-        f"/api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/versions/{second_version_id}/reviews",
+        (
+            f"/api/v1/marketing-tasks/{task_id}/artifacts/"
+            f"{artifact_id}/versions/{second_version_id}/reviews"
+        ),
         headers={**headers, "Idempotency-Key": "content-review-approved"},
         json={"expected_version": 2, "review_type": "copy", "decision": "approved"},
     )

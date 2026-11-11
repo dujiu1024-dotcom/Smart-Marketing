@@ -2218,13 +2218,7 @@
           }
         ],
         "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MemberPatchRequest"
-              }
-            }
-          },
+                "$ref": "#/components/schemas/ProductUpdate"
           "required": true
         },
         "responses": {

@@ -236,7 +236,7 @@ class AIInvocation(Base):
     __tablename__ = "ai_invocations"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('started', 'succeeded', 'failed', 'needs_human')",
+            "status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')",
             name="status",
         ),
         CheckConstraint("latency_ms IS NULL OR latency_ms >= 0", name="latency_nonnegative"),
@@ -268,6 +268,7 @@ class AIInvocation(Base):
     input_schema_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     output_schema_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     provider_request_id: Mapped[str | None] = mapped_column(String(200))
+    request_fingerprint: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     latency_ms: Mapped[int | None] = mapped_column(BigInteger)
     error_code: Mapped[str | None] = mapped_column(String(100))

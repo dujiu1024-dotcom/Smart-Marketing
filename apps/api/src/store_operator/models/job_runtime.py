@@ -45,6 +45,15 @@ class Job(Base):
             "'failed', 'cancelled', 'needs_human')",
             name="status",
         ),
+        CheckConstraint(
+            "actor_type IN ('user', 'platform_admin', 'system')", name="actor_type"
+        ),
+        CheckConstraint("priority BETWEEN -100 AND 100", name="priority_bounds"),
+        CheckConstraint(
+            "status <> 'running' OR (lease_owner IS NOT NULL AND lease_token IS NOT NULL "
+            "AND lease_expires_at IS NOT NULL)",
+            name="running_lease_required",
+        ),
         CheckConstraint("attempt_count >= 0", name="attempt_count_nonnegative"),
         CheckConstraint("max_attempts >= 1", name="max_attempts_positive"),
         CheckConstraint("timeout_seconds > 0", name="timeout_positive"),
@@ -180,6 +189,14 @@ class OutboxEvent(Base):
             "status IN ('pending', 'publishing', 'published', 'dead')",
             name="status",
         ),
+        CheckConstraint(
+            "status <> 'publishing' OR (locked_by IS NOT NULL AND locked_until IS NOT NULL)",
+            name="publishing_lock_required",
+        ),
+        CheckConstraint(
+            "status <> 'published' OR published_at IS NOT NULL",
+            name="published_timestamp_required",
+        ),
         CheckConstraint("schema_version >= 1", name="schema_version_positive"),
         CheckConstraint("publish_attempts >= 0", name="publish_attempts_nonnegative"),
         Index("ix_outbox_events_status_available", "status", "available_at"),
@@ -213,10 +230,12 @@ class AIInvocation(Base):
     __tablename__ = "ai_invocations"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('succeeded', 'failed', 'needs_human')",
+            "status IN ('started', 'succeeded', 'failed', 'needs_human')",
             name="status",
         ),
         CheckConstraint("latency_ms IS NULL OR latency_ms >= 0", name="latency_nonnegative"),
+        CheckConstraint("input_schema_version >= 1", name="input_schema_version_positive"),
+        CheckConstraint("output_schema_version >= 1", name="output_schema_version_positive"),
         Index("ix_ai_invocations_store_created", "store_id", "created_at"),
         Index("ix_ai_invocations_job", "job_id"),
     )

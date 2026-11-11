@@ -158,6 +158,9 @@ def _new_version(
     store_id: UUID,
     artifact_id: UUID,
     artifact_type: str,
+    task_version: int,
+    requirement_snapshot_id: UUID | None,
+    strategy_snapshot_id: UUID | None,
     version_no: int,
     payload: ArtifactVersionInput,
     actor_user_id: UUID,
@@ -196,6 +199,13 @@ def _new_version(
     fingerprint_payload = {
         "artifact_id": str(artifact_id),
         "artifact_type": artifact_type,
+        "task_version": task_version,
+        "requirement_snapshot_id": (
+            str(requirement_snapshot_id) if requirement_snapshot_id else None
+        ),
+        "strategy_snapshot_id": (
+            str(strategy_snapshot_id) if strategy_snapshot_id else None
+        ),
         "source_type": payload.source_type,
         "source_refs": source_refs,
         "instruction": payload.instruction,
@@ -257,10 +267,12 @@ def create_artifact(
     if replay is not None:
         return replay
     task = db.scalar(
-        select(MarketingTask).where(
+        select(MarketingTask)
+        .where(
             MarketingTask.id == task_id,
             MarketingTask.store_id == store_id,
         )
+        .with_for_update()
     )
     if task is None:
         raise ApiError(404, "TASK_NOT_FOUND", "Marketing task not found")
@@ -281,6 +293,9 @@ def create_artifact(
         store_id=store_id,
         artifact_id=artifact.id,
         artifact_type=artifact.artifact_type,
+        task_version=task.version,
+        requirement_snapshot_id=task.current_requirement_snapshot_id,
+        strategy_snapshot_id=task.current_strategy_snapshot_id,
         version_no=1,
         payload=payload.version,
         actor_user_id=auth.user.id,
@@ -379,6 +394,16 @@ def create_artifact_version(
     )
     if replay is not None:
         return replay
+    task = db.scalar(
+        select(MarketingTask)
+        .where(
+            MarketingTask.id == task_id,
+            MarketingTask.store_id == store_id,
+        )
+        .with_for_update()
+    )
+    if task is None:
+        raise ApiError(404, "TASK_NOT_FOUND", "Marketing task not found")
     artifact = db.scalar(
         select(Artifact)
         .where(
@@ -419,6 +444,9 @@ def create_artifact_version(
         store_id=store_id,
         artifact_id=artifact_id,
         artifact_type=artifact.artifact_type,
+        task_version=task.version,
+        requirement_snapshot_id=task.current_requirement_snapshot_id,
+        strategy_snapshot_id=task.current_strategy_snapshot_id,
         version_no=version_no,
         payload=payload,
         actor_user_id=auth.user.id,

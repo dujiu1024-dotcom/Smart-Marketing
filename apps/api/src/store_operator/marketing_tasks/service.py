@@ -81,7 +81,7 @@ def _summary(
         lifecycle_status=MarketingTaskStatus(task.lifecycle_status),
         title=task.title,
         version=task.version,
-        current_requirement_snapshot_id=task.current_requirement_snapshot_id,
+        current_requirement_snapshot_id=requirement_snapshot.id,
         current_strategy_snapshot_id=task.current_strategy_snapshot_id,
         created_at=task.created_at,
         updated_at=task.updated_at,

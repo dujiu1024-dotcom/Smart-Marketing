@@ -196,7 +196,7 @@ def create_channel_content(
         )
     )
     if existing is not None:
-        refs = list(
+        existing_refs = list(
             db.scalars(
                 select(ChannelContentArtifactRef)
                 .where(
@@ -214,7 +214,7 @@ def create_channel_content(
                 )
             ).all()
         )
-        response = _content_payload(existing, refs, reports)
+        response = _content_payload(existing, existing_refs, reports)
         complete_idempotency(
             idempotency,
             response=response,

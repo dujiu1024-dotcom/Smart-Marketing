@@ -74,14 +74,15 @@ Demo 的连接、校验和发布目前均为本地演示，不是真实 OAuth �
 - OAuth code 只在服务端交换，不写日志、事件或前端存储。
 - 一次授权 attempt 只能成功消费一次；重复 callback 返回幂等结果，不重复创建账号。
 
-### 4.3 ChannelSpecVersion（平台级不可变规格）
+### 4.3 ChannelSpec / ChannelSpecVersion（平台级规格）
 
-建议字段：
+ChannelSpec：**id, channel_key, current_version_id, status(active|archived), created_at, updated_at**；channel_key UNIQUE。
 
-**id, channel_key, spec_version, text_constraints_json, media_constraints_json, hashtag_constraints_json, link_constraints_json, schedule_constraints_json, draft_supported, publish_supported, status(published|superseded), published_at, source_document_ref, created_at**
+ChannelSpecVersion：**id, channel_spec_id, spec_version, text_constraints_json, media_constraints_json, hashtag_constraints_json, link_constraints_json, schedule_constraints_json, draft_supported, publish_supported, published_at, source_document_ref, created_at**；UNIQUE(channel_spec_id, spec_version)。
 
-- ChannelSpecVersion 是平台公开规则的结构化快照；无 store_id。
-- 规格更新创建新版本；旧 ChannelContent/PublishPackage 继续引用原版本，不静默改变历史内容。
+- ChannelSpec 是平台级规格目录；ChannelSpecVersion 是不可变的公开规则快照，两者均无 store_id。
+- current_version_id 必须通过复合 FK 指向同一 ChannelSpec 的 ChannelSpecVersion；规格更新创建新版本，不修改旧版本。
+- 旧 ChannelContent/PublishPackage 继续引用原 ChannelSpecVersion，不静默改变历史内容。
 - 规则来源必须保存官方文档 URL/版本/检查日期；未核验项标记 pending_verification。
 - 文本长度、图片格式/尺寸/比例、标签数量、链接/定位、定时发布等能力逐项表达，不用一个泛化 supports_publish 布尔值覆盖。
 
@@ -89,9 +90,10 @@ Demo 的连接、校验和发布目前均为本地演示，不是真实 OAuth �
 
 建议字段：
 
-**id, store_id, channel_account_id, channel_key, spec_version, capability_key, support_status(supported|unsupported|pending_verification), evidence_ref, reason, checked_at, expires_at, created_at**
+**id, store_id, channel_account_id, channel_spec_version_id, capability_key, support_status(supported|unsupported|pending_verification), evidence_ref, reason, checked_at, expires_at, created_at**
 
 - 能力属于具体账号/应用授权上下文；不能只根据平台名称推断。
+- 每个 snapshot 必须引用探测时使用的确切 ChannelSpecVersion。
 - capability_key 示例：account_read、draft_create、draft_read、publish_text、publish_image、publish_video、publish_schedule、publish_status_query、metrics_read。
 - 每次授权、Token scope 变化、平台 API 版本变化或定期刷新后重新探测。
 - pending_verification / unsupported 必须在 UI 明确展示；不能伪装成已接通。

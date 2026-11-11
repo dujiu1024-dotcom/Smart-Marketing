@@ -158,6 +158,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/store/audiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Audience Profiles */
+        get: operations["list_audience_profiles_api_v1_store_audiences_get"];
+        put?: never;
+        /** Create Audience Profile */
+        post: operations["create_audience_profile_api_v1_store_audiences_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/audiences/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Audience Profile */
+        get: operations["get_audience_profile_api_v1_store_audiences__record_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Audience Profile */
+        delete: operations["delete_audience_profile_api_v1_store_audiences__record_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Audience Profile */
+        patch: operations["update_audience_profile_api_v1_store_audiences__record_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/store/brand-guideline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Brand Guideline */
+        get: operations["get_brand_guideline_api_v1_store_brand_guideline_get"];
+        put?: never;
+        /** Create Brand Guideline */
+        post: operations["create_brand_guideline_api_v1_store_brand_guideline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Brand Guideline */
+        patch: operations["update_brand_guideline_api_v1_store_brand_guideline_patch"];
+        trace?: never;
+    };
+    "/api/v1/store/knowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Knowledge Items */
+        get: operations["list_knowledge_items_api_v1_store_knowledge_get"];
+        put?: never;
+        /** Create Knowledge Item */
+        post: operations["create_knowledge_item_api_v1_store_knowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/knowledge/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Knowledge Item */
+        get: operations["get_knowledge_item_api_v1_store_knowledge__record_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Knowledge Item */
+        delete: operations["delete_knowledge_item_api_v1_store_knowledge__record_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Knowledge Item */
+        patch: operations["update_knowledge_item_api_v1_store_knowledge__record_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/store/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Offers */
+        get: operations["list_offers_api_v1_store_offers_get"];
+        put?: never;
+        /** Create Offer */
+        post: operations["create_offer_api_v1_store_offers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/offers/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Offer */
+        get: operations["get_offer_api_v1_store_offers__record_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Offer */
+        delete: operations["delete_offer_api_v1_store_offers__record_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Offer */
+        patch: operations["update_offer_api_v1_store_offers__record_id__patch"];
+        trace?: never;
+    };
     "/api/v1/store/products": {
         parameters: {
             query?: never;
@@ -285,10 +415,306 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** AudienceProfileCreate */
+        AudienceProfileCreate: {
+            /** Audience Description */
+            audience_description?: string | null;
+            /** Common Objections Json */
+            common_objections_json?: string[] | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Consumption Periods Json */
+            consumption_periods_json?: string[] | null;
+            /** Consumption Scenarios Json */
+            consumption_scenarios_json?: string[] | null;
+            /** Name */
+            name: string;
+            /** Purchase Motivations Json */
+            purchase_motivations_json?: string[] | null;
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Sampled At */
+            sampled_at?: string | null;
+            /** Segment Type */
+            segment_type: string;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+        };
+        /** AudienceProfileList */
+        AudienceProfileList: {
+            /** Items */
+            items: components["schemas"]["AudienceProfileRead"][];
+            /** Total */
+            total: number;
+        };
+        /** AudienceProfileRead */
+        AudienceProfileRead: {
+            /** Audience Description */
+            audience_description?: string | null;
+            /** Common Objections Json */
+            common_objections_json?: string[] | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Consumption Periods Json */
+            consumption_periods_json?: string[] | null;
+            /** Consumption Scenarios Json */
+            consumption_scenarios_json?: string[] | null;
+            /** Current Version */
+            current_version: number;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Purchase Motivations Json */
+            purchase_motivations_json?: string[] | null;
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Sampled At */
+            sampled_at?: string | null;
+            /** Segment Type */
+            segment_type: string;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+        };
+        /** AudienceProfileUpdate */
+        AudienceProfileUpdate: {
+            /** Audience Description */
+            audience_description?: string | null;
+            /** Common Objections Json */
+            common_objections_json?: string[] | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Consumption Periods Json */
+            consumption_periods_json?: string[] | null;
+            /** Consumption Scenarios Json */
+            consumption_scenarios_json?: string[] | null;
+            /** Name */
+            name?: string | null;
+            /** Purchase Motivations Json */
+            purchase_motivations_json?: string[] | null;
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Sampled At */
+            sampled_at?: string | null;
+            /** Segment Type */
+            segment_type?: string | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+        };
+        /** BrandGuidelineCreate */
+        BrandGuidelineCreate: {
+            /** Brand Story */
+            brand_story?: string | null;
+            /** Color Palette Json */
+            color_palette_json?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Common Phrases Json */
+            common_phrases_json?: string[] | null;
+            /** Core Values Json */
+            core_values_json?: string[] | null;
+            /** Cta Preferences Json */
+            cta_preferences_json?: string[] | null;
+            /** Differentiators */
+            differentiators?: string | null;
+            /** Font Preferences Json */
+            font_preferences_json?: string[] | null;
+            /** Logo Asset Id */
+            logo_asset_id?: string | null;
+            /** Positioning */
+            positioning?: string | null;
+            /** Prohibited Phrases Json */
+            prohibited_phrases_json?: string[] | null;
+            /** Tone Of Voice */
+            tone_of_voice?: string | null;
+            /** Visual Style */
+            visual_style?: string | null;
+        };
+        /** BrandGuidelineRead */
+        BrandGuidelineRead: {
+            /** Brand Story */
+            brand_story?: string | null;
+            /** Color Palette Json */
+            color_palette_json?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Common Phrases Json */
+            common_phrases_json?: string[] | null;
+            /** Core Values Json */
+            core_values_json?: string[] | null;
+            /** Cta Preferences Json */
+            cta_preferences_json?: string[] | null;
+            /** Current Version */
+            current_version: number;
+            /** Differentiators */
+            differentiators?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /** Font Preferences Json */
+            font_preferences_json?: string[] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Logo Asset Id */
+            logo_asset_id?: string | null;
+            /** Positioning */
+            positioning?: string | null;
+            /** Prohibited Phrases Json */
+            prohibited_phrases_json?: string[] | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Tone Of Voice */
+            tone_of_voice?: string | null;
+            /** Visual Style */
+            visual_style?: string | null;
+        };
+        /** BrandGuidelineUpdate */
+        BrandGuidelineUpdate: {
+            /** Brand Story */
+            brand_story?: string | null;
+            /** Color Palette Json */
+            color_palette_json?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Common Phrases Json */
+            common_phrases_json?: string[] | null;
+            /** Core Values Json */
+            core_values_json?: string[] | null;
+            /** Cta Preferences Json */
+            cta_preferences_json?: string[] | null;
+            /** Differentiators */
+            differentiators?: string | null;
+            /** Font Preferences Json */
+            font_preferences_json?: string[] | null;
+            /** Logo Asset Id */
+            logo_asset_id?: string | null;
+            /** Positioning */
+            positioning?: string | null;
+            /** Prohibited Phrases Json */
+            prohibited_phrases_json?: string[] | null;
+            /** Tone Of Voice */
+            tone_of_voice?: string | null;
+            /** Visual Style */
+            visual_style?: string | null;
+        };
+        /** FactConfirmationRequest */
+        FactConfirmationRequest: {
+            /** Confirmation Note */
+            confirmation_note?: string | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** KnowledgeItemCreate */
+        KnowledgeItemCreate: {
+            /** Category */
+            category: string;
+            /** Content Hash */
+            content_hash?: string | null;
+            /** Content Ref */
+            content_ref?: string | null;
+            /** Content Text */
+            content_text?: string | null;
+            /** Effective At */
+            effective_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** KnowledgeItemList */
+        KnowledgeItemList: {
+            /** Items */
+            items: components["schemas"]["KnowledgeItemRead"][];
+            /** Total */
+            total: number;
+        };
+        /** KnowledgeItemRead */
+        KnowledgeItemRead: {
+            /** Category */
+            category: string;
+            /** Content Hash */
+            content_hash?: string | null;
+            /** Content Ref */
+            content_ref?: string | null;
+            /** Content Text */
+            content_text?: string | null;
+            /** Current Version */
+            current_version: number;
+            /** Effective At */
+            effective_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Title */
+            title: string;
+        };
+        /** KnowledgeItemUpdate */
+        KnowledgeItemUpdate: {
+            /** Category */
+            category?: string | null;
+            /** Content Hash */
+            content_hash?: string | null;
+            /** Content Ref */
+            content_ref?: string | null;
+            /** Content Text */
+            content_text?: string | null;
+            /** Effective At */
+            effective_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -944,7 +1370,7 @@ export interface operations {
             };
         };
     };
-    list_products_api_v1_store_products_get: {
+    list_audience_profiles_api_v1_store_audiences_get: {
         parameters: {
             query?: {
                 limit?: number;
@@ -978,7 +1404,7 @@ export interface operations {
             };
         };
     };
-    create_product_api_v1_store_products_post: {
+    create_audience_profile_api_v1_store_audiences_post: {
         parameters: {
             query?: never;
             header?: {
@@ -999,7 +1425,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProductRead"];
+                    "application/json": components["schemas"]["AudienceProfileRead"];
                 };
             };
             /** @description Validation Error */
@@ -1032,7 +1458,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProductRead"];
+                    "application/json": components["schemas"]["AudienceProfileRead"];
                 };
             };
             /** @description Validation Error */
@@ -1054,7 +1480,7 @@ export interface operations {
                 "X-Store-ID"?: string | null;
             };
             path: {
-                product_id: string;
+                record_id: string;
             };
             cookie?: never;
         };
@@ -1086,13 +1512,13 @@ export interface operations {
                 "X-Store-ID"?: string | null;
             };
             path: {
-                product_id: string;
+                record_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProductUpdate"];
+                "application/json": components["schemas"]["AudienceProfileUpdate"];
             };
         };
         responses: {
@@ -1116,7 +1542,7 @@ export interface operations {
             };
         };
     };
-    get_store_profile_api_v1_store_profile_get: {
+    get_brand_guideline_api_v1_store_brand_guideline_get: {
         parameters: {
             query?: never;
             header?: {
@@ -1147,7 +1573,7 @@ export interface operations {
             };
         };
     };
-    create_store_profile_api_v1_store_profile_post: {
+    create_brand_guideline_api_v1_store_brand_guideline_post: {
         parameters: {
             query?: never;
             header?: {
@@ -1168,7 +1594,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StoreProfileRead"];
+                    "application/json": components["schemas"]["BrandGuidelineRead"];
                 };
             };
             /** @description Validation Error */
@@ -1194,7 +1620,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["StoreProfileUpdate"];
+                "application/json": components["schemas"]["BrandGuidelineUpdate"];
             };
         };
         responses: {

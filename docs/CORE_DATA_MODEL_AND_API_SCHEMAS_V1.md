@@ -220,19 +220,39 @@ erDiagram
 
 ```json
 {
-  "channel_key": "wechat_official_account",
   "expected_task_version": 8,
-  "copy_version_id": "7e8c9a10-0000-4000-8000-000000000003",
-  "image_version_ids": ["7e8c9a10-0000-4000-8000-000000000004"],
-  "quality_check_id": "7e8c9a10-0000-4000-8000-000000000005"
+  "fact_snapshot_ids": ["7e8c9a10-0000-4000-8000-000000000010"],
+  "items": [
+    {
+      "channel_key": "wechat_official_account",
+      "channel_content_id": "7e8c9a10-0000-4000-8000-000000000006",
+      "copy_version_id": "7e8c9a10-0000-4000-8000-000000000003",
+      "image_version_ids": ["7e8c9a10-0000-4000-8000-000000000004"],
+      "quality_report_id": "7e8c9a10-0000-4000-8000-000000000005",
+      "channel_account_id": "7e8c9a10-0000-4000-8000-000000000007",
+      "delivery_mode": "official_api",
+      "planned_publish_at": null
+    },
+    {
+      "channel_key": "douyin",
+      "channel_content_id": "7e8c9a10-0000-4000-8000-000000000008",
+      "copy_version_id": "7e8c9a10-0000-4000-8000-000000000009",
+      "image_version_ids": ["7e8c9a10-0000-4000-8000-000000000004"],
+      "quality_report_id": "7e8c9a10-0000-4000-8000-000000000011",
+      "channel_account_id": null,
+      "delivery_mode": "manual_handoff",
+      "planned_publish_at": null
+    }
+  ]
 }
 ```
 
 规则：
-- Freeze 时重新校验审核、渠道规格、事实快照、质检指纹和所有版本归属。
-- 冻结包不可变；最终确认只接受 package_id + fingerprint。
-- 任一上游变化产生新包，旧确认不继承。
-- 发布请求只接受已确认的包；#12 渠道 Adapter 执行外部副作用。
+- Freeze 时逐项重新校验审核、渠道规格、事实快照、质检指纹和所有版本归属；items[] 必须至少一项且 channel_key 不重复。
+- 一个 PublishPackage 聚合多个 PublishPackageItem；冻结包与所有 items 在同一事务写入，不允许部分冻结。
+- 冻结包不可变；最终确认只接受 package_id + package_fingerprint，任一上游变化产生新包，旧确认不继承。
+- official_api item 必须绑定 #12 已授权 ChannelAccount；manual_handoff item 不得伪造发布成功。
+- 发布请求只接受已确认的包；#8 为每个 official_api item 创建受控命令，#12 渠道 Adapter 执行外部副作用。
 
 ### 5.5 Job 人工恢复/处理
 
@@ -296,7 +316,9 @@ erDiagram
 6. 依赖边需支持上游与下游两个方向索引；同一版本依赖边唯一。
 7. Job 尝试唯一：`UNIQUE(job_id, attempt_no)`；租约领取用原子 UPDATE/SELECT FOR UPDATE SKIP LOCKED。
 8. Outbox 消费端持久化 event_id 去重；Relay 通过租约/锁避免并发重复 claim。
-9. PublishPackage 冻结后禁止 UPDATE；PublishConfirmation 绑定 package fingerprint。
+9. PublishPackage 与 PublishPackageItem 冻结后禁止 UPDATE；PublishConfirmation 绑定整个 package fingerprint。
+10. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 的 ChannelContent/QualityReport/ArtifactVersion 复合 FK 必须包含 store_id。
+11. 一个 PublishPackage 至少有一个 PackageItem；manual_handoff 时 channel_account_id 允许 NULL，official_api 时必须非 NULL。
 10. PublishOperation 对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
 11. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
 12. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。

@@ -70,7 +70,9 @@ class ProductFields(BaseModel):
     unit: str | None = Field(default=None, max_length=40)
     price_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
-    availability_status: str = Field(default="unknown", pattern="^(available|unavailable|seasonal|limited|unknown)$")
+    availability_status: str = Field(
+        default="unknown", pattern="^(available|unavailable|seasonal|limited|unknown)$"
+    )
     inventory_quantity: Decimal | None = Field(default=None, ge=0, max_digits=14, decimal_places=3)
     key_selling_points_json: list[str] | None = None
     description: str | None = None
@@ -98,7 +100,9 @@ class ProductUpdate(BaseModel):
     unit: str | None = Field(default=None, max_length=40)
     price_amount: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
-    availability_status: str | None = Field(default=None, pattern="^(available|unavailable|seasonal|limited|unknown)$")
+    availability_status: str | None = Field(
+        default=None, pattern="^(available|unavailable|seasonal|limited|unknown)$"
+    )
     inventory_quantity: Decimal | None = Field(default=None, ge=0, max_digits=14, decimal_places=3)
     key_selling_points_json: list[str] | None = None
     description: str | None = None

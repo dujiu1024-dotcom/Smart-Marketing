@@ -8,7 +8,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0014_publish_operation_item_unique"
+revision: str = "0014_pubop_item_unique"
 down_revision: str | None = "0013_douyin_channel_delivery"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None

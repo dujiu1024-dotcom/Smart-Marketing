@@ -262,7 +262,7 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
         model_key="test-model",
         capability="text_generate",
         status="succeeded",
-        prompt_version_id=uuid4(),
+        prompt_version_id=None,
     )
     db_session.add(invocation)
     db_session.flush()

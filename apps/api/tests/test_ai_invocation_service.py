@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
@@ -24,7 +23,7 @@ def start_invocation(db_session, **overrides) -> AIInvocation:
         "model_key": "model-test",
         "capability": "text_generate",
         "request_fingerprint": "a" * 64,
-        "prompt_version_id": uuid4(),
+        "prompt_version_id": None,
         "parameter_snapshot": {
             "temperature": 0.4,
             "max_output_tokens": 512,

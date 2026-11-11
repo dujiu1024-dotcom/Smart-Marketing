@@ -11,11 +11,15 @@ permissions:
 jobs:
   contracts:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
       REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.8.1
@@ -28,6 +32,29 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --locked --extra dev --directory apps/api
       - run: pnpm api:generate
+      - name: Upload generated API contract snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-api-contract
+          path: |
+            packages/api-client/openapi.json
+            packages/api-client/src/schema.ts
+          if-no-files-found: error
+      - name: Commit regenerated API contracts to same-repository PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if git diff --quiet -- packages/api-client/openapi.json packages/api-client/src/schema.ts; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/api-client/openapi.json packages/api-client/src/schema.ts
+          git commit -m "chore(api): regenerate OpenAPI and TypeScript contracts"
+          git push origin "HEAD:${HEAD_BRANCH}"
       - name: Check committed OpenAPI and TypeScript client are current
         run: git diff --exit-code -- packages/api-client/openapi.json packages/api-client/src/schema.ts
 

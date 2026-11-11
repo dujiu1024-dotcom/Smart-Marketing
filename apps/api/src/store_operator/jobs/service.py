@@ -56,7 +56,7 @@ def _request_hash(
     canonical = json.dumps(
         request, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def _append_event(
@@ -482,9 +482,19 @@ def request_job_cancellation(
     job_id: UUID,
     store_id: UUID,
     actor_user_id: UUID,
+    idempotency_key: str | None = None,
     now: datetime | None = None,
 ) -> Job:
     current_time = now or datetime.now(UTC)
+    key_hash = (
+        hashlib.sha256(idempotency_key.strip().encode()).hexdigest()
+        if idempotency_key is not None
+        else None
+    )
+    if idempotency_key is not None and (
+        not idempotency_key.strip() or len(idempotency_key.strip()) > 200
+    ):
+        raise ValueError("Idempotency-Key must contain 1-200 characters")
     job = db.scalar(
         select(Job)
         .where(Job.id == job_id, Job.store_id == store_id)
@@ -505,6 +515,7 @@ def request_job_cancellation(
                 "job.cancel_requested",
                 actor_type="user",
                 actor_id=actor_user_id,
+                data={"idempotency_key_hash": key_hash} if key_hash else None,
             )
     else:
         job.status = "cancelled"
@@ -517,6 +528,7 @@ def request_job_cancellation(
             "job.cancelled",
             actor_type="user",
             actor_id=actor_user_id,
+            data={"idempotency_key_hash": key_hash} if key_hash else None,
         )
     db.flush()
     return job
@@ -552,6 +564,212 @@ def acknowledge_job_cancellation(
         "job.cancelled",
         attempt_id=attempt.id,
         lease_token=lease_token,
+    )
+    db.flush()
+    return job
+
+
+def _manual_retry(
+    db: Session,
+    job: Job,
+    *,
+    actor_user_id: UUID,
+    idempotency_key: str,
+    reason: str,
+    event_type: str,
+    expected_status: str,
+    now: datetime,
+) -> Job:
+    normalized_key = idempotency_key.strip()
+    if not normalized_key or len(normalized_key) > 200:
+        raise ValueError("Idempotency-Key must contain 1-200 characters")
+    safe_reason = " ".join(reason.split())[:500]
+    if not safe_reason:
+        raise ValueError("A recovery reason is required")
+    key_hash = hashlib.sha256(normalized_key.encode()).hexdigest()
+    request_hash = hashlib.sha256(
+        f"{event_type}:{safe_reason}".encode()
+    ).hexdigest()
+
+    prior_events = db.scalars(
+        select(JobEvent).where(
+            JobEvent.job_id == job.id,
+            JobEvent.event_type == event_type,
+        )
+    ).all()
+    for prior in prior_events:
+        if prior.data_json.get("idempotency_key_hash") == key_hash:
+            if prior.data_json.get("request_hash") != request_hash:
+                raise JobIdempotencyConflict(
+                    "Idempotency-Key was reused with a different recovery request"
+                )
+            return job
+
+    if job.status != expected_status:
+        raise InvalidJobTransition(
+            f"Only {expected_status} jobs can use this recovery action"
+        )
+
+    job.max_attempts = max(job.max_attempts, job.attempt_count + 1)
+    job.status = "queued"
+    job.available_at = now
+    job.finished_at = None
+    job.cancel_requested_at = None
+    job.cancelled_at = None
+    job.error_code = None
+    job.error_summary = None
+    job.result_ref = None
+
+    dispatch_event_id = uuid4()
+    db.add(
+        OutboxEvent(
+            id=dispatch_event_id,
+            aggregate_type="job",
+            aggregate_id=job.id,
+            event_type="job.dispatch_requested",
+            schema_version=1,
+            payload_json={
+                "job_id": str(job.id),
+                "dispatch_event_id": str(dispatch_event_id),
+                "schema_version": 1,
+            },
+            dedupe_key=f"job.manual_retry:{job.id}:{key_hash}",
+            status="pending",
+            available_at=now,
+            publish_attempts=0,
+        )
+    )
+    _append_event(
+        db,
+        job,
+        event_type,
+        actor_type="user",
+        actor_id=actor_user_id,
+        data={
+            "idempotency_key_hash": key_hash,
+            "request_hash": request_hash,
+            "reason": safe_reason,
+            "attempt_budget": job.max_attempts,
+        },
+    )
+    db.flush()
+    return job
+
+
+def retry_failed_job(
+    db: Session,
+    *,
+    job_id: UUID,
+    store_id: UUID,
+    actor_user_id: UUID,
+    idempotency_key: str,
+    reason: str,
+    side_effects_confirmed_absent: bool,
+    now: datetime | None = None,
+) -> Job:
+    current_time = now or datetime.now(UTC)
+    job = db.scalar(
+        select(Job)
+        .where(Job.id == job_id, Job.store_id == store_id)
+        .with_for_update()
+    )
+    if job is None:
+        raise LookupError("Job not found")
+    if not side_effects_confirmed_absent:
+        raise InvalidJobTransition(
+            "Manual retry requires confirmation that no external side effect occurred"
+        )
+    return _manual_retry(
+        db,
+        job,
+        actor_user_id=actor_user_id,
+        idempotency_key=idempotency_key,
+        reason=reason,
+        event_type="job.manual_retry_requested",
+        expected_status="failed",
+        now=current_time,
+    )
+
+
+def resolve_job(
+    db: Session,
+    *,
+    job_id: UUID,
+    store_id: UUID,
+    actor_user_id: UUID,
+    idempotency_key: str,
+    resolution: str,
+    reason: str,
+    side_effects_confirmed_absent: bool = False,
+    now: datetime | None = None,
+) -> Job:
+    current_time = now or datetime.now(UTC)
+    job = db.scalar(
+        select(Job)
+        .where(Job.id == job_id, Job.store_id == store_id)
+        .with_for_update()
+    )
+    if job is None:
+        raise LookupError("Job not found")
+    if resolution == "retry":
+        if not side_effects_confirmed_absent:
+            raise InvalidJobTransition(
+                "Retry resolution requires confirmation that no external side effect occurred"
+            )
+        return _manual_retry(
+            db,
+            job,
+            actor_user_id=actor_user_id,
+            idempotency_key=idempotency_key,
+            reason=reason,
+            event_type="job.manual_resolution_retry",
+            expected_status="needs_human",
+            now=current_time,
+        )
+    if resolution != "fail":
+        raise ValueError("resolution must be retry or fail")
+
+    normalized_key = idempotency_key.strip()
+    if not normalized_key or len(normalized_key) > 200:
+        raise ValueError("Idempotency-Key must contain 1-200 characters")
+    safe_reason = " ".join(reason.split())[:500]
+    if not safe_reason:
+        raise ValueError("A resolution reason is required")
+    key_hash = hashlib.sha256(normalized_key.encode()).hexdigest()
+    request_hash = hashlib.sha256(
+        f"job.manual_resolution_fail:{safe_reason}".encode()
+    ).hexdigest()
+    prior_events = db.scalars(
+        select(JobEvent).where(
+            JobEvent.job_id == job.id,
+            JobEvent.event_type == "job.manual_resolution_failed",
+        )
+    ).all()
+    for prior in prior_events:
+        if prior.data_json.get("idempotency_key_hash") == key_hash:
+            if prior.data_json.get("request_hash") != request_hash:
+                raise JobIdempotencyConflict(
+                    "Idempotency-Key was reused with a different recovery request"
+                )
+            return job
+
+    if job.status != "needs_human":
+        raise InvalidJobTransition("Only needs_human jobs can be resolved")
+    job.status = "failed"
+    job.finished_at = current_time
+    job.error_code = "MANUALLY_RESOLVED_FAILED"
+    job.error_summary = safe_reason
+    _append_event(
+        db,
+        job,
+        "job.manual_resolution_failed",
+        actor_type="user",
+        actor_id=actor_user_id,
+        data={
+            "idempotency_key_hash": key_hash,
+            "request_hash": request_hash,
+            "reason": safe_reason,
+        },
     )
     db.flush()
     return job

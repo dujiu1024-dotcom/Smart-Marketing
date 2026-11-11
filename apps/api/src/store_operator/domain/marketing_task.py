@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -53,6 +54,12 @@ class StepApplicability(StrEnum):
     NOT_APPLICABLE = "not_applicable"
 
 
+class DependencyImpactPolicy(StrEnum):
+    INVALIDATE = "invalidate"
+    RECHECK = "recheck"
+    IGNORE = "ignore"
+
+
 class InvalidMarketingTaskTransition(ValueError):
     pass
 
@@ -63,6 +70,17 @@ class InvalidTaskStepTransition(ValueError):
 
 class TaskCompletionBlocked(ValueError):
     pass
+
+
+class DependencyGraphCycleError(ValueError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class DependencyEdgeSnapshot:
+    upstream_key: str
+    downstream_key: str
+    impact_policy: DependencyImpactPolicy | str = DependencyImpactPolicy.INVALIDATE
 
 
 @dataclass(frozen=True, slots=True)
@@ -392,3 +410,71 @@ def ensure_step_transition(
             raise InvalidTaskStepTransition(
                 "An applicable task step requires an explicit skip decision"
             )
+
+
+def validate_dependency_graph(edges: Iterable[DependencyEdgeSnapshot]) -> None:
+    adjacency: dict[str, set[str]] = defaultdict(set)
+    in_degree: dict[str, int] = defaultdict(int)
+
+    for edge in edges:
+        if not edge.upstream_key or not edge.downstream_key:
+            raise ValueError("Dependency edge endpoints must be non-empty")
+        try:
+            DependencyImpactPolicy(edge.impact_policy)
+        except ValueError as exc:
+            raise ValueError(
+                f"Unknown dependency impact policy: {edge.impact_policy}"
+            ) from exc
+        if edge.upstream_key == edge.downstream_key:
+            raise DependencyGraphCycleError("A dependency edge cannot reference itself")
+        if edge.downstream_key not in adjacency[edge.upstream_key]:
+            adjacency[edge.upstream_key].add(edge.downstream_key)
+            in_degree[edge.downstream_key] += 1
+            in_degree.setdefault(edge.upstream_key, in_degree.get(edge.upstream_key, 0))
+
+    ready = deque(node for node, degree in in_degree.items() if degree == 0)
+    visited = 0
+    while ready:
+        node = ready.popleft()
+        visited += 1
+        for downstream in adjacency[node]:
+            in_degree[downstream] -= 1
+            if in_degree[downstream] == 0:
+                ready.append(downstream)
+
+    if visited != len(in_degree):
+        raise DependencyGraphCycleError("Task dependency graph must be acyclic")
+
+
+def compute_stale_downstream(
+    changed_nodes: Iterable[str],
+    edges: Iterable[DependencyEdgeSnapshot],
+) -> frozenset[str]:
+    edge_list = tuple(edges)
+    validate_dependency_graph(edge_list)
+
+    adjacency: dict[str, list[DependencyEdgeSnapshot]] = defaultdict(list)
+    for edge in edge_list:
+        adjacency[edge.upstream_key].append(edge)
+
+    changed = set(changed_nodes)
+    affected: set[str] = set()
+    propagated: set[str] = set(changed)
+    pending = deque(changed)
+
+    while pending:
+        upstream = pending.popleft()
+        for edge in adjacency[upstream]:
+            policy = DependencyImpactPolicy(edge.impact_policy)
+            if policy is DependencyImpactPolicy.IGNORE:
+                continue
+            downstream = edge.downstream_key
+            affected.add(downstream)
+            if (
+                policy is DependencyImpactPolicy.INVALIDATE
+                and downstream not in propagated
+            ):
+                propagated.add(downstream)
+                pending.append(downstream)
+
+    return frozenset(affected - changed)

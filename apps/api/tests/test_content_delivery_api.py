@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
-from store_operator.models import MediaAsset, Store, StoreMembership, User
+from store_operator.models import MediaAsset, OutboxEvent, Store, StoreMembership, User
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -222,6 +222,18 @@ def test_artifact_versions_and_reviews_are_version_bound(
         "type": "media_asset",
         "id": str(media.id),
     }
+    assert (
+        db_session.query(OutboxEvent)
+        .filter(OutboxEvent.event_type == "content.artifact_version_created")
+        .count()
+        == 3
+    )
+    assert (
+        db_session.query(OutboxEvent)
+        .filter(OutboxEvent.event_type == "content.review_recorded")
+        .count()
+        == 1
+    )
 
     restricted = MediaAsset(
         id=uuid4(),

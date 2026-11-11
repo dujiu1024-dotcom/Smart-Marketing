@@ -70,7 +70,13 @@ class Job(Base):
             "OR progress_current <= progress_total",
             name="progress_within_total",
         ),
-        Index("ix_jobs_status_available_priority", "status", "available_at", "priority", "created_at"),
+        Index(
+            "ix_jobs_status_available_priority",
+            "status",
+            "available_at",
+            "priority",
+            "created_at",
+        ),
         Index("ix_jobs_store_created", "store_id", "created_at"),
         Index("ix_jobs_marketing_task", "marketing_task_id"),
         Index("ix_jobs_lease_expires", "lease_expires_at"),
@@ -273,8 +279,12 @@ class AIInvocation(Base):
 class AIUsageRecord(Base):
     __tablename__ = "ai_usage_records"
     __table_args__ = (
-        CheckConstraint("input_tokens IS NULL OR input_tokens >= 0", name="input_tokens_nonnegative"),
-        CheckConstraint("output_tokens IS NULL OR output_tokens >= 0", name="output_tokens_nonnegative"),
+        CheckConstraint(
+            "input_tokens IS NULL OR input_tokens >= 0", name="input_tokens_nonnegative"
+        ),
+        CheckConstraint(
+            "output_tokens IS NULL OR output_tokens >= 0", name="output_tokens_nonnegative"
+        ),
         CheckConstraint("image_units IS NULL OR image_units >= 0", name="image_units_nonnegative"),
         CheckConstraint("cost_amount IS NULL OR cost_amount >= 0", name="cost_nonnegative"),
         CheckConstraint(

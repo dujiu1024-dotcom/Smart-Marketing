@@ -201,7 +201,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 | CNT-08 | 图片版本变化 | 不重置文案审核 |
 | CNT-09 | Worker 迟到提交旧 input_fingerprint | 拒绝成为 current_version |
 | CNT-10 | 渠道适配使用未审核文案/图片 | 422 REVIEW_REQUIRED |
-| CNT-11 | channel spec_version 变化 | 旧 ChannelContent stale，必须重新适配 |
+| CNT-11 | ChannelSpecVersion 变化 | 旧 ChannelContent 对新任务 stale；冻结包保留原版本并在发布前重新核验兼容性 |
 | CNT-12 | QualityReport 规则版本变化 | 旧报告 stale，不能冻结 |
 | CNT-13 | Hard fail 试图人工覆盖 | 拒绝 |
 | CNT-14 | needs_human 未创建 QualityResolution 或缺少操作者/理由 | Freeze 阻断并审计；accepted 决议允许，rejected 决议继续阻断 |

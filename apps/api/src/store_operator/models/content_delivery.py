@@ -457,6 +457,12 @@ class PublishPackageItem(Base):
             ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(
+            ["store_id", "channel_account_id"],
+            ["channel_accounts.store_id", "channel_accounts.id"],
+            name="fk_publish_package_items_channel_account_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
             ["store_id", "channel_content_id", "quality_report_id"],
             [
                 "quality_reports.store_id",

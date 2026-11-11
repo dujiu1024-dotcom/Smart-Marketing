@@ -97,7 +97,6 @@ erDiagram
   CHANNEL_ACCOUNT ||--o{ OAUTH_AUTHORIZATION_ATTEMPT : authorizes
   CHANNEL_SPEC ||--o{ CHANNEL_SPEC_VERSION : versions
   CHANNEL_ACCOUNT ||--o{ CHANNEL_CAPABILITY_SNAPSHOT : discovers
-  CHANNEL_SPEC_VERSION ||--o{ CHANNEL_CAPABILITY_SNAPSHOT : evaluated_against
   CHANNEL_SPEC_VERSION ||--o{ CHANNEL_CONTENT : adapts_with
   CHANNEL_SPEC_VERSION ||--o{ CHANNEL_CAPABILITY_SNAPSHOT : constrains
   PUBLISH_PACKAGE ||--o{ PUBLISH_CONFIRMATION : confirms
@@ -392,7 +391,7 @@ PublishOperation.published 必须有 external_post_id 或等价平台证据；Jo
 22. PromptTemplate.current_published_version_id 通过复合 FK 校验 PromptVersion 属于同一模板；PromptActivation 的 activated_version_id/previous_version_id 也必须属于该模板且为 published 版本。
 23. ChannelAccount UNIQUE(store_id, channel_key, external_account_id)；所有 ChannelAccount/Capability/Operation 复合 FK 必须同 store。
 24. OAuthAuthorizationAttempt.state_hash UNIQUE、expires_at 必须有效、consumed_at 只允许从 NULL 单向设置；不得存 state/code 原文。
-25. ChannelSpecVersion UNIQUE(channel_key, spec_version)，发布后不可 UPDATE/DELETE；ChannelCapabilitySnapshot 引用精确 spec_version。
+25. ChannelSpecVersion UNIQUE(channel_spec_id, spec_version)，发布后不可 UPDATE/DELETE；ChannelCapabilitySnapshot 引用精确 channel_spec_version_id。
 26. PublishOperation UNIQUE(store_id, package_item_id, channel_account_id, action, package_fingerprint)；idempotency_key 唯一，且复合 FK 到同店 PublishPackage/PackageItem/ChannelAccount。
 27. PublishOperationAttempt UNIQUE(publish_operation_id, attempt_no)，外部请求证据按受控引用保存。
 28. PublishOperation.status=published 时必须有 external_post_id 或平台等价成功证据；draft_saved 必须有平台草稿证据。

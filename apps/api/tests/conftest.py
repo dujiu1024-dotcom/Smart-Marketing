@@ -1,31 +1,49 @@
 import os
-from collections.abc import Iterator
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from starlette.testclient import TestClient
 
 os.environ.setdefault(
     "DATABASE_URL",
     "postgresql+psycopg://test:test@localhost:5432/test",
 )
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("SESSION_TOKEN_PEPPER", "test-only-session-token-pepper-32-bytes")
 
 
 @pytest.fixture
-def db_session() -> Iterator[Session]:
-    """Provide a transaction-scoped database session; all test writes are rolled back."""
+def db_session():
+    from store_operator.db import engine
 
-    engine = create_engine(os.environ["DATABASE_URL"])
+    connection = engine.connect()
+    outer_transaction = connection.begin()
+    session = Session(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
+
     try:
-        with engine.connect() as connection:
-            transaction = connection.begin()
-            session = Session(bind=connection)
-            try:
-                yield session
-            finally:
-                session.close()
-                if transaction.is_active:
-                    transaction.rollback()
+        yield session
     finally:
-        engine.dispose()
+        session.close()
+        outer_transaction.rollback()
+        connection.close()
+
+
+@pytest.fixture
+def identity_client(db_session):
+    from store_operator.db import get_db
+    from store_operator.main import app
+
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    client = TestClient(app, base_url="https://testserver")
+    try:
+        yield client
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        client.close()

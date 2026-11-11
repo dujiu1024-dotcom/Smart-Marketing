@@ -12,16 +12,21 @@ from opentelemetry import trace
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract
 from opentelemetry.trace import Status, StatusCode
-from redis import Redis
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from store_operator.admin_router import router as admin_router
 from store_operator.application.system_info import get_system_info
+from store_operator.auth.dependencies import SESSION_COOKIE_NAME
+from store_operator.auth.errors import ApiError
+from store_operator.auth.router import router as auth_router
 from store_operator.config import settings
+from store_operator.db import engine, redis_client
 from store_operator.observability import configure_logging
+from store_operator.store_router import router as store_router
 from store_operator.tracing import configure_tracing
 
 configure_logging()
@@ -44,9 +49,6 @@ app = FastAPI(
     openapi_url="/api/v1/openapi.json",
     lifespan=lifespan,
 )
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-redis_client = Redis.from_url(settings.redis_url, socket_connect_timeout=1)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
@@ -126,18 +128,36 @@ def _error_response(
 async def http_exception_handler(
     request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
-    error = {
-        400: ("BAD_REQUEST", "Bad request"),
-        401: ("UNAUTHENTICATED", "Unauthenticated"),
-        403: ("FORBIDDEN", "Forbidden"),
-        404: ("RESOURCE_NOT_FOUND", "Resource not found"),
-        405: ("METHOD_NOT_ALLOWED", "Method not allowed"),
-        409: ("CONFLICT", "Conflict"),
-        429: ("RATE_LIMITED", "Rate limited"),
-        503: ("SERVICE_UNAVAILABLE", "Service unavailable"),
-    }.get(exc.status_code, ("HTTP_ERROR", "Request failed"))
-    return _error_response(
+    if isinstance(exc, ApiError):
+        error = (exc.code, exc.public_message)
+    else:
+        error = {
+            400: ("BAD_REQUEST", "Bad request"),
+            401: ("UNAUTHENTICATED", "Unauthenticated"),
+            403: ("FORBIDDEN", "Forbidden"),
+            404: ("RESOURCE_NOT_FOUND", "Resource not found"),
+            405: ("METHOD_NOT_ALLOWED", "Method not allowed"),
+            409: ("CONFLICT", "Conflict"),
+            429: ("RATE_LIMITED", "Rate limited"),
+            503: ("SERVICE_UNAVAILABLE", "Service unavailable"),
+        }.get(exc.status_code, ("HTTP_ERROR", "Request failed"))
+    response = _error_response(
         request, status_code=exc.status_code, code=error[0], message=error[1]
+    )
+    if getattr(request.state, "clear_session_cookie", False):
+        response.delete_cookie(
+            SESSION_COOKIE_NAME, path="/", secure=True, httponly=True, samesite="lax"
+        )
+    return response
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_exception_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+    return _error_response(
+        request,
+        status_code=503,
+        code="AUTHORIZATION_UNAVAILABLE",
+        message="Authorization service unavailable",
     )
 
 
@@ -161,6 +181,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         code="INTERNAL_ERROR",
         message="服务暂时不可用",
     )
+
+
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(store_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
 
 
 @app.get("/health/live", tags=["health"])

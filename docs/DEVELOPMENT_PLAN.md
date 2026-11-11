@@ -33,7 +33,7 @@
 | Stage 3 营销领域与交付 | #7、#8 | P0 | 任务状态机、快照、版本依赖、文案/图片双审核、质检、发布包 | #5/#6；#7 先冻结业务状态与依赖契约，#8 消费该契约 |
 | Stage 4 异步运行时与 AI | #9、#10 | P0 | PostgreSQL Job/Outbox、Celery Worker、AI Gateway、真实 Provider | #9 与 #8 并行契约设计；#10 依赖 Provider 契约 |
 | Stage 5 外部能力 | #11、#12 | P1 | 热点来源与机会匹配；首个真实渠道授权/草稿/发布核验 | #11 依赖 #5/#6/#7/#9；#12 依赖 #7/#8/#9/#10 |
-| Stage 6 经营效果 | #13 | P2 | 指标证据、观察窗口、归因可信度 | #6/#8/#10/#12 |
+| Stage 6 经营效果 | #13 | P2 | 指标证据、作品归属、观察窗口、归因可信度 | #6/#8/#10/#12；先完成领域契约评审，真实同步依赖来源权限 |
 | Stage 7 上线门禁 | #14 | P0 持续门禁 | 安全、恢复、监控、备份、回滚和端到端验收 | 覆盖实际交付能力；任何生产上线前必须通过 |
 
 ## 3. P0 核心上线最小子集
@@ -63,7 +63,7 @@
 
 #5–#10 的跨域实体、字段、API、事件、状态枚举和错误语义统一以 `docs/DOMAIN_INTEGRATION_CONTRACTS_V1.md` 为评审入口；工程化逻辑 ERD/API/事件草案见 `docs/CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md`；身份域细节以 `docs/IDENTITY_STORE_SECURITY_DESIGN.md` 为准，营销任务状态机以 `docs/MARKETING_TASK_DOMAIN_DESIGN.md` 为准。上述文档目前均为设计提案，只有完成 B/C/D 联合评审并记录决议后才视为冻结契约。
 
-## 6. 统一交付定义（DoD）
+## 6. Stage 6 经营效果推进基线\n\nStage 6 领域设计入口：`docs/EFFECT_EVIDENCE_ATTRIBUTION_DOMAIN_DESIGN.md`。设计明确 PublishedWork / WorkOwnershipEvidence / MetricDefinition / MetricObservation / BusinessOutcomeEvidence / AttributionEvidence 的边界，Demo 对照 `#effects`、`#account-ops`、`#account-register`。\n\n阶段门禁：\n- 作品归属核验与指标真实性分开；人工登记先 pending_verification，未经核验不进入任务效果。\n- 内容表现、互动意向、经营结果分层；没有交易证据不输出销售增长、到店增长或 ROI。\n- #12 的作品列表读回不等于指标 API 已开放；抖音指标权限必须独立核验。\n- 经营数据源不默认接入 POS/CRM；仅消费经批准、可追溯的数据来源。\n- 先完成契约评审，再实施迁移/API/Worker；EFF-01..EFF-30 通过前不得关闭 #13。\n\n## 7. 统一交付定义（DoD）
 
 每个 Issue 完成前必须逐项勾选：
 - [ ] 范围、非目标、Demo 页面/路由和相关状态已明确。
@@ -79,7 +79,7 @@
 
 建议测试命令以仓库 Makefile 为统一入口；提交前至少核对 `make help`（若存在）、`make test`、`make lint`、`make typecheck`、`make build` 和对应服务的专项测试。若命令尚未实现，应在该 Issue 中补齐并记录实际命令，禁止声称未执行的测试已通过。
 
-## 7. 当前状态解释
+## 8. 当前状态解释
 
 - Issue 状态、PR 状态和验收状态是不同事实。PR 合并不自动关闭所有相关 Issue；Issue 关闭必须有对应验收证据。
 - Stage 0 只有在浏览器验收报告、缺陷清单、矩阵更新和基线证据入库后才可关闭 #2。

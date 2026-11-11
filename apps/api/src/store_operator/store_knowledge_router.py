@@ -1,9 +1,9 @@
 import hashlib
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 from uuid import UUID, uuid4
-import re
 
 from fastapi import APIRouter, Depends, Header, Request, Response, status
 from pydantic import BaseModel
@@ -1179,6 +1179,7 @@ def create_asset_upload_intent(
             object_key=intent.object_key,
             mime_type=intent.expected_mime_type,
             sha256=intent.expected_sha256 or "",
+            byte_size=intent.expected_byte_size,
         )
     except ObjectStorageNotConfigured as exc:
         db.rollback()

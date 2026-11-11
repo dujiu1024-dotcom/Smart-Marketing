@@ -5,9 +5,9 @@ from sqlalchemy import select
 
 from store_operator.ai_gateway.errors import SideEffectState
 from store_operator.jobs import (
+    SYSTEM_SCOPE_ID,
     JobIdempotencyConflict,
     LeaseLostError,
-    SYSTEM_SCOPE_ID,
     acknowledge_job_cancellation,
     claim_job,
     complete_job,

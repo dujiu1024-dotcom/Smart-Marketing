@@ -96,3 +96,5 @@ pnpm api:generate
 ```
 
 生成文件位于 `packages/api-client/openapi.json` 和 `packages/api-client/src/schema.ts`。CI 会重新生成并检查是否与提交版本一致。
+
+生成的客户端类型通过 `@store-operator/api-client` 工作区包导出；修改 OpenAPI 后必须重新生成并提交两个生成文件，CI 会检查漂移。

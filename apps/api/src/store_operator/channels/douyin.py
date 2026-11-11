@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+# ruff: noqa: I001
+
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
-import httpx  # noqa: I001
+import httpx
 
 
 DOUYIN_API_BASE = "https://open.douyin.com"

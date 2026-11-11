@@ -3911,6 +3911,132 @@
         "title": "ProductUpdate",
         "type": "object"
       },
+      "PromptActivationRequest": {
+        "properties": {
+          "reason": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "PromptActivationRequest",
+        "type": "object"
+      },
+      "PromptTemplateCreate": {
+        "properties": {
+          "capability": {
+            "enum": [
+              "text",
+              "image",
+              "vision",
+              "ocr"
+            ],
+            "title": "Capability",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "display_name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "industry_key": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Industry Key",
+            "type": "string"
+          },
+          "task_type": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Task Type",
+            "type": "string"
+          },
+          "template_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Template Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "template_key",
+          "display_name",
+          "industry_key",
+          "task_type",
+          "capability"
+        ],
+        "title": "PromptTemplateCreate",
+        "type": "object"
+      },
+      "PromptVersionCreate": {
+        "properties": {
+          "changelog": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Changelog",
+            "type": "string"
+          },
+          "input_policy_json": {
+            "additionalProperties": true,
+            "title": "Input Policy Json",
+            "type": "object"
+          },
+          "output_schema_json": {
+            "additionalProperties": true,
+            "title": "Output Schema Json",
+            "type": "object"
+          },
+          "schema_version": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "system_prompt": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "System Prompt",
+            "type": "string"
+          },
+          "user_prompt_template": {
+            "maxLength": 100000,
+            "minLength": 1,
+            "title": "User Prompt Template",
+            "type": "string"
+          },
+          "variables_schema_json": {
+            "additionalProperties": true,
+            "title": "Variables Schema Json",
+            "type": "object"
+          }
+        },
+        "required": [
+          "system_prompt",
+          "user_prompt_template",
+          "variables_schema_json",
+          "output_schema_json",
+          "changelog"
+        ],
+        "title": "PromptVersionCreate",
+        "type": "object"
+      },
       "SessionSummary": {
         "properties": {
           "expires_at": {
@@ -4908,6 +5034,405 @@
         "summary": "Requeue Dead Outbox Event",
         "tags": [
           "platform-admin"
+        ]
+      }
+    },
+    "/api/v1/admin/prompt-templates": {
+      "get": {
+        "operationId": "list_prompt_templates_api_v1_admin_prompt_templates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "industry_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Industry Key"
+            }
+          },
+          {
+            "in": "query",
+            "name": "task_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Task Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "capability",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Capability"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "archived"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Prompt Templates Api V1 Admin Prompt Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Prompt Templates",
+        "tags": [
+          "platform-admin-prompts"
+        ]
+      },
+      "post": {
+        "operationId": "create_prompt_template_api_v1_admin_prompt_templates_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptTemplateCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Prompt Template Api V1 Admin Prompt Templates Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Prompt Template",
+        "tags": [
+          "platform-admin-prompts"
+        ]
+      }
+    },
+    "/api/v1/admin/prompt-templates/{template_id}": {
+      "get": {
+        "operationId": "get_prompt_template_api_v1_admin_prompt_templates__template_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Prompt Template Api V1 Admin Prompt Templates  Template Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Prompt Template",
+        "tags": [
+          "platform-admin-prompts"
+        ]
+      }
+    },
+    "/api/v1/admin/prompt-templates/{template_id}/rollback/{version_id}": {
+      "post": {
+        "operationId": "rollback_prompt_version_api_v1_admin_prompt_templates__template_id__rollback__version_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rollback Prompt Version Api V1 Admin Prompt Templates  Template Id  Rollback  Version Id  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rollback Prompt Version",
+        "tags": [
+          "platform-admin-prompts"
+        ]
+      }
+    },
+    "/api/v1/admin/prompt-templates/{template_id}/versions": {
+      "post": {
+        "operationId": "create_prompt_version_api_v1_admin_prompt_templates__template_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptVersionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Prompt Version Api V1 Admin Prompt Templates  Template Id  Versions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Prompt Version",
+        "tags": [
+          "platform-admin-prompts"
+        ]
+      }
+    },
+    "/api/v1/admin/prompt-templates/{template_id}/versions/{version_id}/publish": {
+      "post": {
+        "operationId": "publish_prompt_version_api_v1_admin_prompt_templates__template_id__versions__version_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Version Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Publish Prompt Version Api V1 Admin Prompt Templates  Template Id  Versions  Version Id  Publish Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Prompt Version",
+        "tags": [
+          "platform-admin-prompts"
         ]
       }
     },

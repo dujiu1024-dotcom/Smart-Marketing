@@ -2134,6 +2134,329 @@
         "title": "LogoutAllRequest",
         "type": "object"
       },
+      "MarketingTaskCreate": {
+        "properties": {
+          "requirement_draft": {
+            "additionalProperties": true,
+            "title": "Requirement Draft",
+            "type": "object"
+          },
+          "task_options": {
+            "$ref": "#/components/schemas/MarketingTaskOptions"
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/MarketingTaskType"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_type",
+          "title"
+        ],
+        "title": "MarketingTaskCreate",
+        "type": "object"
+      },
+      "MarketingTaskDetail": {
+        "properties": {
+          "blocked_steps_count": {
+            "title": "Blocked Steps Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_requirement_snapshot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Requirement Snapshot Id"
+          },
+          "current_strategy_snapshot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Strategy Snapshot Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lifecycle_status": {
+            "$ref": "#/components/schemas/MarketingTaskStatus"
+          },
+          "pending_steps_count": {
+            "title": "Pending Steps Count",
+            "type": "integer"
+          },
+          "requirement_draft": {
+            "additionalProperties": true,
+            "title": "Requirement Draft",
+            "type": "object"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TaskStepRead"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          },
+          "strategy_draft": {
+            "additionalProperties": true,
+            "title": "Strategy Draft",
+            "type": "object"
+          },
+          "task_options": {
+            "additionalProperties": true,
+            "title": "Task Options",
+            "type": "object"
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/MarketingTaskType"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "store_id",
+          "task_type",
+          "lifecycle_status",
+          "title",
+          "version",
+          "current_requirement_snapshot_id",
+          "current_strategy_snapshot_id",
+          "created_at",
+          "updated_at",
+          "pending_steps_count",
+          "blocked_steps_count",
+          "requirement_draft",
+          "strategy_draft",
+          "task_options",
+          "steps"
+        ],
+        "title": "MarketingTaskDetail",
+        "type": "object"
+      },
+      "MarketingTaskList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketingTaskSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "MarketingTaskList",
+        "type": "object"
+      },
+      "MarketingTaskOptions": {
+        "properties": {
+          "includes_copy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Includes Copy"
+          },
+          "includes_image": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Includes Image"
+          },
+          "opportunity_applicable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opportunity Applicable"
+          },
+          "requires_external_delivery": {
+            "default": false,
+            "title": "Requires External Delivery",
+            "type": "boolean"
+          },
+          "selected_channel_keys": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Selected Channel Keys",
+            "type": "array"
+          }
+        },
+        "title": "MarketingTaskOptions",
+        "type": "object"
+      },
+      "MarketingTaskStatus": {
+        "enum": [
+          "draft",
+          "active",
+          "waiting_for_user",
+          "blocked",
+          "failed",
+          "completed",
+          "cancelled",
+          "archived"
+        ],
+        "title": "MarketingTaskStatus",
+        "type": "string"
+      },
+      "MarketingTaskSummary": {
+        "properties": {
+          "blocked_steps_count": {
+            "title": "Blocked Steps Count",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_requirement_snapshot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Requirement Snapshot Id"
+          },
+          "current_strategy_snapshot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Strategy Snapshot Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lifecycle_status": {
+            "$ref": "#/components/schemas/MarketingTaskStatus"
+          },
+          "pending_steps_count": {
+            "title": "Pending Steps Count",
+            "type": "integer"
+          },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/MarketingTaskType"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "store_id",
+          "task_type",
+          "lifecycle_status",
+          "title",
+          "version",
+          "current_requirement_snapshot_id",
+          "current_strategy_snapshot_id",
+          "created_at",
+          "updated_at",
+          "pending_steps_count",
+          "blocked_steps_count"
+        ],
+        "title": "MarketingTaskSummary",
+        "type": "object"
+      },
+      "MarketingTaskType": {
+        "enum": [
+          "full_marketing",
+          "copy_only",
+          "image_only",
+          "image_optimization",
+          "merchant_content"
+        ],
+        "title": "MarketingTaskType",
+        "type": "string"
+      },
       "MeResponse": {
         "properties": {
           "active_store": {
@@ -3190,6 +3513,15 @@
         "title": "SessionSummary",
         "type": "object"
       },
+      "StepApplicability": {
+        "enum": [
+          "required",
+          "optional",
+          "not_applicable"
+        ],
+        "title": "StepApplicability",
+        "type": "string"
+      },
       "StoreMembershipSummary": {
         "properties": {
           "id": {
@@ -3892,6 +4224,134 @@
         "title": "StoresResponse",
         "type": "object"
       },
+      "TaskStepKey": {
+        "enum": [
+          "requirement_understanding",
+          "context_snapshot",
+          "opportunity_decision",
+          "strategy_confirmation",
+          "copy_production_review",
+          "image_production_review",
+          "channel_adaptation",
+          "quality_check",
+          "final_confirmation",
+          "delivery"
+        ],
+        "title": "TaskStepKey",
+        "type": "string"
+      },
+      "TaskStepRead": {
+        "properties": {
+          "applicability": {
+            "$ref": "#/components/schemas/StepApplicability"
+          },
+          "blocked_by": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Blocked By",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "input_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Fingerprint"
+          },
+          "output_refs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Output Refs",
+            "type": "array"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Reason"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStepStatus"
+          },
+          "step_key": {
+            "$ref": "#/components/schemas/TaskStepKey"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "step_key",
+          "status",
+          "applicability",
+          "version",
+          "skip_reason",
+          "input_fingerprint",
+          "output_refs",
+          "blocked_by",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "TaskStepRead",
+        "type": "object"
+      },
+      "TaskStepStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "waiting_for_user",
+          "succeeded",
+          "failed",
+          "skipped",
+          "stale"
+        ],
+        "title": "TaskStepStatus",
+        "type": "string"
+      },
       "UserSummary": {
         "properties": {
           "email": {
@@ -4564,6 +5024,235 @@
         "summary": "Retry Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/v1/marketing-tasks": {
+      "get": {
+        "operationId": "list_tasks_api_v1_marketing_tasks_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lifecycle_status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MarketingTaskStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lifecycle Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "task_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MarketingTaskType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Task Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketingTaskList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tasks",
+        "tags": [
+          "marketing-tasks"
+        ]
+      },
+      "post": {
+        "operationId": "create_task_api_v1_marketing_tasks_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketingTaskCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketingTaskDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Task",
+        "tags": [
+          "marketing-tasks"
+        ]
+      }
+    },
+    "/api/v1/marketing-tasks/{task_id}": {
+      "get": {
+        "operationId": "get_task_api_v1_marketing_tasks__task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketingTaskDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Task",
+        "tags": [
+          "marketing-tasks"
         ]
       }
     },

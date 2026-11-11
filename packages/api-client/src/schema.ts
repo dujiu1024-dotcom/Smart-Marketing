@@ -208,6 +208,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketing-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tasks */
+        get: operations["list_tasks_api_v1_marketing_tasks_get"];
+        put?: never;
+        /** Create Task */
+        post: operations["create_task_api_v1_marketing_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketing-tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Task */
+        get: operations["get_task_api_v1_marketing_tasks__task_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/stores": {
         parameters: {
             query?: never;
@@ -1017,6 +1052,138 @@ export interface components {
              */
             password: string;
         };
+        /** MarketingTaskCreate */
+        MarketingTaskCreate: {
+            /** Requirement Draft */
+            requirement_draft?: {
+                [key: string]: unknown;
+            };
+            task_options?: components["schemas"]["MarketingTaskOptions"];
+            task_type: components["schemas"]["MarketingTaskType"];
+            /** Title */
+            title: string;
+        };
+        /** MarketingTaskDetail */
+        MarketingTaskDetail: {
+            /** Blocked Steps Count */
+            blocked_steps_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Requirement Snapshot Id */
+            current_requirement_snapshot_id: string | null;
+            /** Current Strategy Snapshot Id */
+            current_strategy_snapshot_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            lifecycle_status: components["schemas"]["MarketingTaskStatus"];
+            /** Pending Steps Count */
+            pending_steps_count: number;
+            /** Requirement Draft */
+            requirement_draft: {
+                [key: string]: unknown;
+            };
+            /** Steps */
+            steps: components["schemas"]["TaskStepRead"][];
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Strategy Draft */
+            strategy_draft: {
+                [key: string]: unknown;
+            };
+            /** Task Options */
+            task_options: {
+                [key: string]: unknown;
+            };
+            task_type: components["schemas"]["MarketingTaskType"];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** MarketingTaskList */
+        MarketingTaskList: {
+            /** Items */
+            items: components["schemas"]["MarketingTaskSummary"][];
+            /** Total */
+            total: number;
+        };
+        /** MarketingTaskOptions */
+        MarketingTaskOptions: {
+            /** Includes Copy */
+            includes_copy?: boolean | null;
+            /** Includes Image */
+            includes_image?: boolean | null;
+            /** Opportunity Applicable */
+            opportunity_applicable?: boolean | null;
+            /**
+             * Requires External Delivery
+             * @default false
+             */
+            requires_external_delivery: boolean;
+            /** Selected Channel Keys */
+            selected_channel_keys?: string[];
+        };
+        /**
+         * MarketingTaskStatus
+         * @enum {string}
+         */
+        MarketingTaskStatus: "draft" | "active" | "waiting_for_user" | "blocked" | "failed" | "completed" | "cancelled" | "archived";
+        /** MarketingTaskSummary */
+        MarketingTaskSummary: {
+            /** Blocked Steps Count */
+            blocked_steps_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Requirement Snapshot Id */
+            current_requirement_snapshot_id: string | null;
+            /** Current Strategy Snapshot Id */
+            current_strategy_snapshot_id: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            lifecycle_status: components["schemas"]["MarketingTaskStatus"];
+            /** Pending Steps Count */
+            pending_steps_count: number;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            task_type: components["schemas"]["MarketingTaskType"];
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * MarketingTaskType
+         * @enum {string}
+         */
+        MarketingTaskType: "full_marketing" | "copy_only" | "image_only" | "image_optimization" | "merchant_content";
         /** MeResponse */
         MeResponse: {
             active_store: components["schemas"]["StoreSummary"] | null;
@@ -1291,6 +1458,11 @@ export interface components {
              */
             expires_at: string;
         };
+        /**
+         * StepApplicability
+         * @enum {string}
+         */
+        StepApplicability: "required" | "optional" | "not_applicable";
         /** StoreMembershipSummary */
         StoreMembershipSummary: {
             /**
@@ -1454,6 +1626,45 @@ export interface components {
             /** Items */
             items: components["schemas"]["StoreMembershipSummary"][];
         };
+        /**
+         * TaskStepKey
+         * @enum {string}
+         */
+        TaskStepKey: "requirement_understanding" | "context_snapshot" | "opportunity_decision" | "strategy_confirmation" | "copy_production_review" | "image_production_review" | "channel_adaptation" | "quality_check" | "final_confirmation" | "delivery";
+        /** TaskStepRead */
+        TaskStepRead: {
+            applicability: components["schemas"]["StepApplicability"];
+            /** Blocked By */
+            blocked_by: {
+                [key: string]: unknown;
+            }[];
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Input Fingerprint */
+            input_fingerprint: string | null;
+            /** Output Refs */
+            output_refs: {
+                [key: string]: unknown;
+            }[];
+            /** Skip Reason */
+            skip_reason: string | null;
+            /** Started At */
+            started_at: string | null;
+            status: components["schemas"]["TaskStepStatus"];
+            step_key: components["schemas"]["TaskStepKey"];
+            /** Version */
+            version: number;
+        };
+        /**
+         * TaskStepStatus
+         * @enum {string}
+         */
+        TaskStepStatus: "pending" | "running" | "waiting_for_user" | "succeeded" | "failed" | "skipped" | "stale";
         /** UserSummary */
         UserSummary: {
             /** Email */
@@ -1840,6 +2051,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tasks_api_v1_marketing_tasks_get: {
+        parameters: {
+            query?: {
+                lifecycle_status?: components["schemas"]["MarketingTaskStatus"] | null;
+                task_type?: components["schemas"]["MarketingTaskType"] | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketingTaskList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_task_api_v1_marketing_tasks_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketingTaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketingTaskDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_task_api_v1_marketing_tasks__task_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketingTaskDetail"];
                 };
             };
             /** @description Validation Error */

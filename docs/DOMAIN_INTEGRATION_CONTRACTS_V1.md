@@ -109,7 +109,7 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 ## 6. Content / Media / Publishing（#8）实体契约
 
 ### Artifact / ArtifactVersion
-逻辑 Artifact 与不可变版本分离。Artifact 保存 `id, store_id, task_id, artifact_type(copy|image|channel_content), current_version_id, created_at`；ArtifactVersion 保存 `id, store_id, artifact_id, version_no, source_type(ai_generated|merchant_upload|manual_edit), source_refs_json, instruction, content_ref/content_json, content_hash, provider_id, model_id, prompt_version_id, input_fingerprint, created_by, created_at`。
+逻辑 Artifact 与不可变版本分离。Artifact 保存 `id, store_id, task_id, artifact_type(copy|image), current_version_id, created_at`；ArtifactVersion 保存 `id, store_id, artifact_id, version_no, source_type(ai_generated|merchant_upload|manual_edit), source_refs_json, instruction, content_ref/content_json, content_hash, provider_id, model_id, prompt_version_id, input_fingerprint, created_by, created_at`。
 - 大图片二进制放 SeaweedFS/S3；DB 仅保存 object key、hash、MIME、尺寸与版本元数据。
 - 新版本不能覆盖旧版本；current_version_id 只是当前展示指针，不是历史事实。
 

@@ -23,6 +23,18 @@
             ],
             "title": "Error Code"
           },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -93,6 +105,17 @@
             ],
             "title": "Provider Request Id"
           },
+          "request_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Fingerprint"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -117,10 +140,12 @@
           "capability",
           "prompt_version",
           "provider_request_id",
+          "request_fingerprint",
           "status",
           "latency_ms",
           "error_code",
           "created_at",
+          "finished_at",
           "usage"
         ],
         "title": "AIInvocationRead",

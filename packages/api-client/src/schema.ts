@@ -512,6 +512,8 @@ export interface components {
             created_at: string;
             /** Error Code */
             error_code: string | null;
+            /** Finished At */
+            finished_at: string | null;
             /**
              * Id
              * Format: uuid
@@ -531,6 +533,8 @@ export interface components {
             provider: string;
             /** Provider Request Id */
             provider_request_id: string | null;
+            /** Request Fingerprint */
+            request_fingerprint: string | null;
             /** Status */
             status: string;
             usage: components["schemas"]["AIUsageRead"] | null;

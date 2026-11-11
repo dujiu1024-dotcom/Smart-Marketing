@@ -36,6 +36,8 @@ _PENDING_STEP_STATUSES = {
     TaskStepStatus.PENDING.value,
     TaskStepStatus.RUNNING.value,
     TaskStepStatus.WAITING_FOR_USER.value,
+}
+_BLOCKED_STEP_STATUSES = {
     TaskStepStatus.FAILED.value,
     TaskStepStatus.STALE.value,
 }
@@ -67,7 +69,11 @@ def _summary(
         pending_steps_count=sum(
             1 for step in step_rows if step.status in _PENDING_STEP_STATUSES
         ),
-        blocked_steps_count=sum(1 for step in step_rows if step.blocked_by_json),
+        blocked_steps_count=sum(
+            1
+            for step in step_rows
+            if step.status in _BLOCKED_STEP_STATUSES or step.blocked_by_json
+        ),
     )
 
 

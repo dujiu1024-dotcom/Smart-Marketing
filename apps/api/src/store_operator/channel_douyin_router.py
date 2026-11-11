@@ -445,6 +445,13 @@ def create_douyin_publish_operation(
     if item.channel_account_id is None:
         raise ApiError(409, "DOUYIN_ACCOUNT_REQUIRED", "A Douyin account is required")
 
+    if item.planned_publish_at is not None and item.planned_publish_at > datetime.now(UTC):
+        raise ApiError(
+            409,
+            "SCHEDULED_PUBLISH_NOT_SUPPORTED",
+            "Scheduled Douyin publishing is not enabled in this pilot; publish the confirmed package manually.",
+        )
+
     latest_version = db.scalar(
         select(func.max(PublishPackage.package_version)).where(
             PublishPackage.store_id == store_id,

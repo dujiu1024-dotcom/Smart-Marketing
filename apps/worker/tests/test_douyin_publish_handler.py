@@ -49,6 +49,8 @@ def test_uncertain_create_state_is_never_submitted_twice(monkeypatch) -> None:
         store_id=store_id,
         status="submitting",
         platform_item_id=None,
+        last_error_code=None,
+        last_error_summary=None,
     )
     monkeypatch.setattr(tasks, "SessionLocal", FakeSessionFactory(operation))
     context = JobExecutionContext(

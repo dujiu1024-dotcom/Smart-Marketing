@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 from store_operator.models import ArtifactVersion, ChannelContent, QualityReport
+
 from store_operator_worker.handlers import JobExecutionContext, JobExecutionError
 
 

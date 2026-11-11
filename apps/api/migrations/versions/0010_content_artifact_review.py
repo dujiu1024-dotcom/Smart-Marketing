@@ -27,8 +27,18 @@ def upgrade() -> None:
         sa.Column("task_id", UUID, nullable=False),
         sa.Column("artifact_type", sa.String(length=16), nullable=False),
         sa.Column("current_version_id", UUID, nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id", name="pk_artifacts"),
         sa.UniqueConstraint("store_id", "id", name="uq_artifacts_store_id"),
         sa.ForeignKeyConstraint(
@@ -138,13 +148,19 @@ def upgrade() -> None:
             name="fk_review_records_reviewer_user_id_users",
             ondelete="SET NULL",
         ),
-        sa.CheckConstraint("review_type IN ('copy', 'image')", name="ck_review_records_review_type"),
+        sa.CheckConstraint(
+            "review_type IN ('copy', 'image')",
+            name="ck_review_records_review_type",
+        ),
         sa.CheckConstraint(
             "decision IN ('approved', 'revision_requested', 'rejected')",
             name="ck_review_records_decision",
         ),
         sa.CheckConstraint(
-            "decision <> 'revision_requested' OR (comment IS NOT NULL AND length(trim(comment)) > 0)",
+            (
+                "decision <> 'revision_requested' OR "
+                "(comment IS NOT NULL AND length(trim(comment)) > 0)"
+            ),
             name="ck_review_records_revision_comment_required",
         ),
     )

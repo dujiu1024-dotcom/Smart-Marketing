@@ -147,7 +147,16 @@ def downgrade() -> None:
     op.drop_index("ix_publish_operations_store_created", table_name="publish_operations")
     op.drop_index("ix_publish_operations_status_available", table_name="publish_operations")
     op.drop_table("publish_operations")
-    op.drop_constraint(\n        "fk_publish_package_items_channel_account_same_store",\n        "publish_package_items",\n        type_="foreignkey",\n    )\n    op.drop_constraint("uq_publish_package_items_store_id", "publish_package_items", type_="unique")
+    op.drop_constraint(
+        "fk_publish_package_items_channel_account_same_store",
+        "publish_package_items",
+        type_="foreignkey",
+    )
+    op.drop_constraint(
+        "uq_publish_package_items_store_id",
+        "publish_package_items",
+        type_="unique",
+    )
     op.drop_index("ix_channel_accounts_store_provider_status", table_name="channel_accounts")
     op.drop_table("channel_accounts")
     op.drop_index("ix_oauth_authorization_attempts_store_user_created", table_name="oauth_authorization_attempts")  # noqa: E501

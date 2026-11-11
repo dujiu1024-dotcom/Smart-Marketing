@@ -450,6 +450,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketing-tasks/{task_id}/channel-contents/{content_id}/quality-reports/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Quality Report */
+        post: operations["run_quality_report_api_v1_marketing_tasks__task_id__channel_contents__content_id__quality_reports_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/marketing-tasks/{task_id}/recover": {
         parameters: {
             query?: never;
@@ -2119,6 +2136,13 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** QualityReportRun */
+        QualityReportRun: {
+            /** Expected Fingerprint */
+            expected_fingerprint: string;
+            /** Rule Version */
+            rule_version: string;
+        };
         /** ReviewCreate */
         ReviewCreate: {
             /** Comment */
@@ -3412,6 +3436,47 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_quality_report_api_v1_marketing_tasks__task_id__channel_contents__content_id__quality_reports_run_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+                content_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QualityReportRun"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };

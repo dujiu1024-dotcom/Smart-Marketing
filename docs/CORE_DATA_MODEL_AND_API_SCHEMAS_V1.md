@@ -297,7 +297,7 @@ erDiagram
   "data": {
     "snapshot_type": "requirement",
     "snapshot_id": "7e8c9a10-0000-4000-8000-000000000011",
-    "content_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "package_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   }
 }
 ```

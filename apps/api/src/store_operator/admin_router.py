@@ -3,6 +3,7 @@ from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -16,8 +17,13 @@ from store_operator.auth.errors import ApiError
 from store_operator.auth.schemas import MemberPatchRequest, MemberSummary
 from store_operator.db import get_db
 from store_operator.models.identity import Store, StoreMembership, User
+from store_operator.models.job_runtime import Job, OutboxEvent
 
 router = APIRouter(prefix="/admin", tags=["platform-admin"])
+
+
+class OutboxRequeueRequest(BaseModel):
+    reason: str = Field(min_length=8, max_length=500)
 
 
 @router.get("/stores/{store_id}/members", response_model=list[MemberSummary])
@@ -145,3 +151,88 @@ def update_store_member(
             Literal["invited", "active", "suspended", "removed"], membership.status
         ),
     )
+
+
+
+@router.post("/outbox-events/{event_id}/requeue")
+def requeue_dead_outbox_event(
+    event_id: UUID,
+    payload: OutboxRequeueRequest,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    _admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    event = db.scalar(
+        select(OutboxEvent)
+        .where(OutboxEvent.id == event_id)
+        .with_for_update()
+    )
+    if event is None:
+        raise ApiError(404, "OUTBOX_EVENT_NOT_FOUND", "Outbox event not found")
+    if event.status != "dead":
+        raise ApiError(
+            409,
+            "OUTBOX_EVENT_NOT_DEAD",
+            "Only dead-lettered Outbox events can be requeued",
+        )
+    if event.event_type != "job.dispatch_requested" or event.aggregate_type != "job":
+        raise ApiError(
+            409,
+            "OUTBOX_EVENT_UNSUPPORTED",
+            "This Outbox event type cannot be manually requeued",
+        )
+
+    raw_job_id = event.payload_json.get("job_id")
+    try:
+        job_id = UUID(raw_job_id) if isinstance(raw_job_id, str) else None
+    except ValueError as exc:
+        raise ApiError(
+            409, "OUTBOX_EVENT_INVALID", "Outbox event payload is invalid"
+        ) from exc
+    if job_id is None or job_id != event.aggregate_id:
+        raise ApiError(
+            409, "OUTBOX_EVENT_INVALID", "Outbox event payload is invalid"
+        )
+
+    job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+    if job is None or job.status not in {"queued", "retry_wait"}:
+        raise ApiError(
+            409,
+            "OUTBOX_JOB_NOT_DISPATCHABLE",
+            "The associated Job is no longer dispatchable",
+        )
+
+    now = datetime.now(UTC)
+    previous_attempts = event.publish_attempts
+    event.status = "pending"
+    event.publish_attempts = 0
+    event.available_at = now
+    event.locked_by = None
+    event.locked_until = None
+    event.last_error = None
+    event.published_at = None
+    record_audit(
+        db,
+        request,
+        action="outbox.event.requeued",
+        target_type="outbox_event",
+        target_id=event.id,
+        actor_user_id=auth.user.id,
+        store_id=job.store_id,
+        actor_type="platform_admin",
+        metadata={
+            "reason": payload.reason,
+            "job_id": str(job.id),
+            "event_type": event.event_type,
+            "previous_publish_attempts": previous_attempts,
+        },
+    )
+    db.commit()
+    return {
+        "outbox_event_id": str(event.id),
+        "job_id": str(job.id),
+        "status": event.status,
+        "previous_publish_attempts": previous_attempts,
+        "available_at": event.available_at.isoformat(),
+    }

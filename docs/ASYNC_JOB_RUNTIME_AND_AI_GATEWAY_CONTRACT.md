@@ -2,7 +2,7 @@
 
 > 对应：Issue #9  
 > 日期：2026-11-11  
-> 状态：架构设计与接口契约（待评审；不是已实现能力）  
+> 状态：核心运行时代码已交付；并发限流、Provider 配置和业务端到端验收仍在进行  
 > 技术基线：FastAPI + PostgreSQL + SQLAlchemy/Alembic + Celery/Redis + Pydantic  
 > 上位文档：[项目宪法](PROJECT_CONSTITUTION.md)、[技术架构](TECHNICAL_ARCHITECTURE.md)、[技术选型](TECH_STACK_SELECTION.md)、[产品设计](PRODUCT_DESIGN.md)
 
@@ -439,9 +439,9 @@ Job Runtime API 是平台内部/受权限保护的运维能力，不向普通商
 6. 真实 Provider 适配器和对象存储输出。
 7. PostgreSQL 集成、故障注入、并发、安全和端到端测试。
 
-## 14. 冻结决策与待评审项
+## 14. 冻结决策与待实施配置
 
-本文件提出以下首期契约供架构评审冻结：
+以下首期架构契约已冻结；参数需通过压测和生产观测校准，不改变状态机与一致性原则：
 - PostgreSQL 为唯一 Job/Outbox/Attempt 状态事实源；Celery result backend 非权威。
 - Outbox + Relay 采用至少一次投递；消费者通过 DB 原子认领和业务幂等防重。
 - 租约 token 是 fencing token；所有续租/结果写入必须校验 token。
@@ -450,7 +450,7 @@ Job Runtime API 是平台内部/受权限保护的运维能力，不向普通商
 - AI Gateway 只暴露 Text/Image/Vision/OCR 能力契约，业务域不依赖厂商 SDK。
 - API/Worker 共用模块化单体领域包；Worker 作为独立进程，不拆独立业务微服务。
 
-评审时需确认的参数（不影响上述架构原则）：
+待实施/校准的参数（不影响已冻结的架构原则）：
 - 租约/心跳初始值及不同 job_type 的超时配置；
 - 各队列并发、Provider 限流和成本预算；
 - Outbox/Job/调用审计保留与归档周期；
@@ -459,3 +459,22 @@ Job Runtime API 是平台内部/受权限保护的运维能力，不向普通商
 ---
 
 **状态声明：** 本文是设计与契约，不代表已创建数据库表、部署 Redis/Celery、接通 AI Provider 或通过任何生产验收。实现和测试状态必须以代码、CI 记录和运行证据更新。
+
+
+## 15. 实际实现状态（2026-11-11）
+
+### 已进入 main
+- PR #42：Provider Protocol、Descriptor、Registry、结构化 Schema、统一错误与副作用状态契约。
+- PR #44：Job、JobAttempt、JobEvent、OutboxEvent、AIInvocation、AIUsageRecord ORM 与 migration 0005。
+- PR #48：Job + Outbox 原子创建服务、Outbox Relay、租约恢复 Sweeper、Celery Worker Handler Registry、原子认领、心跳、deadline、取消协作、lease fencing、人工 retry/resolve API 和 AIInvocation/AIUsageRecord 生命周期；migration 0006。
+- PR #49：幂等记录 actor_user_id 绑定，防止跨操作者重放。
+- PR #48 CI Run 42968216381：API/Web/Worker/Contracts/E2E/Infrastructure 六项全部通过。
+
+### 尚未完成的运行时 DoD
+- Provider/ModelConfig 持久配置、Secret reference 生命周期、路由和区域策略。
+- ProviderDescriptor.max_concurrency 尚未落实为跨 Worker 的并发配额；门店级资源限流、429/Retry-After 协调仍需实现。
+- Dead Outbox 的平台管理员审计重驱入口和告警观测仍需补齐。
+- Worker/Relay 的崩溃、重复投递、并发认领、租约过期、429/超时及外部副作用未知场景需增加专门故障注入测试。
+- #7/#8/#11/#12 的业务 Handler 与真实 Provider Adapter 完成后，补齐端到端联调；真实厂商 SDK/适配器由 #10 负责，渠道发布由 #12 负责。
+
+当前状态是“核心持久化执行链路已交付”，不是“Job Runtime 全部生产验收完成”。Issue #9 在上述限流、故障注入、运维可观测和业务联调完成前保持 Open。

@@ -2576,6 +2576,21 @@
         "title": "OfferUpdate",
         "type": "object"
       },
+      "OutboxRequeueRequest": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 8,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "OutboxRequeueRequest",
+        "type": "object"
+      },
       "ProductCreate": {
         "properties": {
           "allergens_and_restrictions_json": {
@@ -3959,6 +3974,61 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/outbox-events/{event_id}/requeue": {
+      "post": {
+        "operationId": "requeue_dead_outbox_event_api_v1_admin_outbox_events__event_id__requeue_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Event Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutboxRequeueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Requeue Dead Outbox Event Api V1 Admin Outbox Events  Event Id  Requeue Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Requeue Dead Outbox Event",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
     "/api/v1/admin/stores/{store_id}/members": {
       "get": {
         "operationId": "list_store_members_api_v1_admin_stores__store_id__members_get",

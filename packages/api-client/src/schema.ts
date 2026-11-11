@@ -338,12 +338,9 @@ export interface paths {
         /** Create Store Profile */
         post: operations["create_store_profile_api_v1_store_profile_post"];
         delete?: never;
-        options?: never;
-        head?: never;
-        /** Update Store Profile */
-    "/api/v1/store/{resource_type}/{record_id}/confirm-facts": {
-        parameters: {
-            query?: never;
+        patch: operations["update_store_profile_api_v1_store_profile_patch"];
+        trace?: never;
+    };
             header?: never;
             path?: never;
             cookie?: never;
@@ -355,12 +352,9 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
-        trace?: never;
-    };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    "/api/v1/system/info": {
+        parameters: {
+            query?: never;
         };
         /** System Info */
         get: operations["system_info_api_v1_system_info_get"];
@@ -787,12 +781,108 @@ export interface components {
             /**
              * User Id
              * Format: uuid
+        /** OfferCreate */
+        OfferCreate: {
+            /** Eligibility Rules Json */
+            eligibility_rules_json?: {
+                [key: string]: unknown;
+            };
+            /** Ends At */
+            ends_at?: string | null;
+            /** Offer Type */
+            offer_type: string;
+            /** Stacking Policy */
+            stacking_policy?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /**
+             * Status
+             * @default draft
              */
-            user_id: string;
+            status: string;
+            /** Terms Json */
+            terms_json: {
+                [key: string]: unknown;
+            };
+            /** Title */
+            title: string;
+            /** Usage Limit */
+            usage_limit?: number | null;
         };
-        /** ProductCreate */
-        ProductCreate: {
-            /** Allergens And Restrictions Json */
+        /** OfferList */
+        OfferList: {
+            /** Items */
+            items: components["schemas"]["OfferRead"][];
+            /** Total */
+            total: number;
+        };
+        /** OfferRead */
+        OfferRead: {
+            /** Current Version */
+            current_version: number;
+            /** Eligibility Rules Json */
+            eligibility_rules_json?: {
+                [key: string]: unknown;
+            };
+            /** Ends At */
+            ends_at?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Offer Type */
+            offer_type: string;
+            /** Stacking Policy */
+            stacking_policy?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /**
+             * Status
+             * @default draft
+             */
+            status: string;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Terms Json */
+            terms_json: {
+                [key: string]: unknown;
+            };
+            /** Title */
+            title: string;
+            /** Usage Limit */
+            usage_limit?: number | null;
+        };
+        /** OfferUpdate */
+        OfferUpdate: {
+            /** Eligibility Rules Json */
+            eligibility_rules_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Offer Type */
+            offer_type?: string | null;
+            /** Stacking Policy */
+            stacking_policy?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Terms Json */
+            terms_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Title */
+            title?: string | null;
+            /** Usage Limit */
+            usage_limit?: number | null;
+        };
             allergens_and_restrictions_json?: string[] | null;
             /**
              * Availability Status
@@ -1395,13 +1485,12 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    "application/json": components["schemas"]["AudienceProfileList"];
-            422: {
-                headers: {
                     [name: string]: unknown;
+                };
+                content: {
+                };
+            };
+            /** @description Validation Error */
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
@@ -1417,13 +1506,7 @@ export interface operations {
             };
             path?: never;
             cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProductCreate"];
-            };
-        };
-        responses: {
+                "application/json": components["schemas"]["AudienceProfileCreate"];
             /** @description Successful Response */
             201: {
                 headers: {
@@ -1438,14 +1521,18 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-    get_audience_profile_api_v1_store_audiences__record_id__get: {
-                record_id: string;
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
+            };
+        };
+    };
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+            };
+            cookie?: never;
+        };
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1462,10 +1549,242 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+    delete_audience_profile_api_v1_store_audiences__record_id__delete: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
             };
         };
     };
-    delete_product_api_v1_store_products__product_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AudienceProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "application/json": components["schemas"]["AudienceProfileRead"];
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_brand_guideline_api_v1_store_brand_guideline_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+                    [name: string]: unknown;
+                };
+                content: {
+                };
+            };
+            /** @description Validation Error */
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_brand_guideline_api_v1_store_brand_guideline_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+                "application/json": components["schemas"]["BrandGuidelineCreate"];
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandGuidelineRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+            };
+        };
+    };
+        parameters: {
+            query?: never;
+            header?: {
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandGuidelineUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    "application/json": components["schemas"]["BrandGuidelineRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_knowledge_items_api_v1_store_knowledge_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_knowledge_item_api_v1_store_knowledge_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgeItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_knowledge_item_api_v1_store_knowledge__record_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_knowledge_item_api_v1_store_knowledge__record_id__delete: {
         parameters: {
             query?: never;
             header?: {
@@ -1494,7 +1813,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
-    update_audience_profile_api_v1_store_audiences__record_id__patch: {
+            };
+        };
+    };
+    update_knowledge_item_api_v1_store_knowledge__record_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
                 "If-Match"?: string | null;
                 "X-Store-ID"?: string | null;
             };
@@ -1505,7 +1830,351 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AudienceProfileUpdate"];
+                "application/json": components["schemas"]["KnowledgeItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_offers_api_v1_store_offers_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_offer_api_v1_store_offers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_offer_api_v1_store_offers__record_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_offer_api_v1_store_offers__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_offer_api_v1_store_offers__record_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_products_api_v1_store_products_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_product_api_v1_store_products_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_product_api_v1_store_products__product_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_product_api_v1_store_products__product_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_product_api_v1_store_products__product_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductUpdate"];
             };
         };
         responses: {
@@ -1529,7 +2198,7 @@ export interface operations {
             };
         };
     };
-    get_brand_guideline_api_v1_store_brand_guideline_get: {
+    get_store_profile_api_v1_store_profile_get: {
         parameters: {
             query?: never;
             header?: {
@@ -1543,7 +2212,13 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
-                    "application/json": components["schemas"]["BrandGuidelineRead"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreProfileRead"];
+                };
+            };
+            /** @description Validation Error */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1554,7 +2229,7 @@ export interface operations {
             };
         };
     };
-    create_brand_guideline_api_v1_store_brand_guideline_post: {
+    create_store_profile_api_v1_store_profile_post: {
         parameters: {
             query?: never;
             header?: {
@@ -1575,7 +2250,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BrandGuidelineRead"];
+                    "application/json": components["schemas"]["StoreProfileRead"];
                 };
             };
             /** @description Validation Error */
@@ -1586,7 +2261,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
-    update_brand_guideline_api_v1_store_brand_guideline_patch: {
+            };
+        };
+    };
+    update_store_profile_api_v1_store_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: {
                 "If-Match"?: string | null;
                 "X-Store-ID"?: string | null;
             };
@@ -1595,7 +2276,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BrandGuidelineUpdate"];
+                "application/json": components["schemas"]["StoreProfileUpdate"];
             };
         };
         responses: {
@@ -1609,6 +2290,44 @@ export interface operations {
                 };
             };
             /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_store_facts_api_v1_store__resource_type___record_id__confirm_facts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                resource_type: string;
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactConfirmationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
             422: {
                 headers: {
                     [name: string]: unknown;

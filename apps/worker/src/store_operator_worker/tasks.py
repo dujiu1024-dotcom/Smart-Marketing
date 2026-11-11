@@ -977,6 +977,13 @@ def execute_douyin_image_text_publish(
         and settings.douyin_client_secret
         and settings.channel_secret_store_region
     ):
+        _set_douyin_publish_state(
+            operation_id,
+            store_id,
+            status="needs_human",
+            error_code="DOUYIN_CHANNEL_NOT_CONFIGURED",
+            error_summary="Douyin publishing credentials or secure credential storage are not configured.",
+        )
         raise JobExecutionError(
             "DOUYIN_CHANNEL_NOT_CONFIGURED",
             "Douyin publishing credentials or secure credential storage are not configured.",
@@ -987,6 +994,13 @@ def execute_douyin_image_text_publish(
     try:
         secrets = secret_store.get_json(account_secret_ref)
     except SecretStoreError as exc:
+        _set_douyin_publish_state(
+            operation_id,
+            store_id,
+            status="needs_human",
+            error_code="DOUYIN_SECRET_UNAVAILABLE",
+            error_summary="Douyin credentials could not be retrieved from secure storage.",
+        )
         raise JobExecutionError(
             "DOUYIN_SECRET_UNAVAILABLE",
             "Douyin credentials could not be retrieved from secure storage.",
@@ -995,6 +1009,13 @@ def execute_douyin_image_text_publish(
     access_token = secrets.get("access_token")
     refresh_token = secrets.get("refresh_token")
     if not isinstance(access_token, str) or not access_token:
+        _set_douyin_publish_state(
+            operation_id,
+            store_id,
+            status="needs_human",
+            error_code="DOUYIN_SECRET_INVALID",
+            error_summary="Douyin access credentials are invalid.",
+        )
         raise JobExecutionError(
             "DOUYIN_SECRET_INVALID",
             "Douyin access credentials are invalid.",
@@ -1047,19 +1068,40 @@ def execute_douyin_image_text_publish(
             "video.create",
             "video.list",
         }.issubset(token_set.scope):
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="needs_human",
+                error_code="DOUYIN_REAUTH_REQUIRED",
+                error_summary="Refreshed Douyin authorization does not match the connected account.",
+            )
             raise JobExecutionError(
                 "DOUYIN_REAUTH_REQUIRED",
                 "Refreshed Douyin authorization does not match the connected account.",
                 retryable=False,
             )
         digest = hashlib.sha256(account_open_id.encode("utf-8")).hexdigest()
-        new_secret_ref = secret_store.put_json(
-            f"{settings.channel_secret_store_prefix}/{store_id}/douyin/{digest}",
-            {
-                "access_token": token_set.access_token,
-                "refresh_token": token_set.refresh_token,
-            },
-        )
+        try:
+            new_secret_ref = secret_store.put_json(
+                f"{settings.channel_secret_store_prefix}/{store_id}/douyin/{digest}",
+                {
+                    "access_token": token_set.access_token,
+                    "refresh_token": token_set.refresh_token,
+                },
+            )
+        except SecretStoreError as exc:
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="needs_human",
+                error_code="DOUYIN_SECRET_UPDATE_FAILED",
+                error_summary="Refreshed Douyin credentials could not be saved securely.",
+            )
+            raise JobExecutionError(
+                "DOUYIN_SECRET_UPDATE_FAILED",
+                "Refreshed Douyin credentials could not be saved securely.",
+                retryable=False,
+            ) from exc
         with SessionLocal.begin() as db:
             current_account = db.scalar(
                 select(ChannelAccount)
@@ -1091,6 +1133,7 @@ def execute_douyin_image_text_publish(
                 else None
             )
             current_account.granted_scopes = sorted(token_set.scope)
+            current_account.last_verified_at = now
             current_account.last_verified_at = now
         access_token = token_set.access_token
 

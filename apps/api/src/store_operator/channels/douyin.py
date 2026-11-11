@@ -15,9 +15,12 @@ DOUYIN_TOKEN_URL = f"{DOUYIN_API_BASE}/oauth/access_token/"
 DOUYIN_REFRESH_URL = f"{DOUYIN_API_BASE}/oauth/refresh_token/"
 DOUYIN_USERINFO_URL = f"{DOUYIN_API_BASE}/oauth/userinfo/"
 DOUYIN_VIDEO_LIST_URL = f"{DOUYIN_API_BASE}/video/list/"
-DOUYIN_VIDEO_UPLOAD_URL = f"{DOUYIN_API_BASE}/api/douyin/v1/video/upload_video/"
-DOUYIN_VIDEO_CREATE_URL = f"{DOUYIN_API_BASE}/api/douyin/v1/video/create_video/"
-MAX_SINGLE_VIDEO_UPLOAD_BYTES = 300 * 1024 * 1024
+DOUYIN_VIDEO_UPLOAD_URL = f"{DOUYIN_API_BASE}/video/upload/"
+DOUYIN_VIDEO_CREATE_URL = f"{DOUYIN_API_BASE}/video/create/"
+DOUYIN_IMAGE_UPLOAD_URL = f"{DOUYIN_API_BASE}/image/upload/"
+DOUYIN_IMAGE_CREATE_URL = f"{DOUYIN_API_BASE}/image_text/create/"
+MAX_SINGLE_VIDEO_UPLOAD_BYTES = 128 * 1024 * 1024
+MAX_DOYIN_IMAGE_BYTES = 20 * 1024 * 1024
 
 
 class DouyinApiError(RuntimeError):
@@ -54,7 +57,7 @@ class DouyinPublishReceipt:
 
 
 class DouyinOAuthClient:
-    """Server-side Douyin website OAuth and video OpenAPI client.
+    """Server-side Douyin website OAuth and content publishing OpenAPI client.
 
     This adapter deliberately does not persist tokens. Callers must store returned
     credentials through the approved Secret Manager adapter, never in browser
@@ -162,7 +165,7 @@ class DouyinOAuthClient:
         if not content:
             raise ValueError("Video content is required")
         if len(content) > MAX_SINGLE_VIDEO_UPLOAD_BYTES:
-            raise ValueError("Videos above 300 MB require the official multipart upload flow")
+            raise ValueError("Videos above 128 MiB require the official multipart upload flow")
         if content_type not in {"video/mp4", "video/webm"}:
             raise ValueError("Only MP4 and WebM video uploads are enabled for the pilot")
         response = await self._http.post(
@@ -180,6 +183,61 @@ class DouyinOAuthClient:
             "width": video.get("width"),
             "height": video.get("height"),
         }
+
+    async def upload_image(
+        self,
+        *,
+        access_token: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+    ) -> dict[str, Any]:
+        if not content:
+            raise ValueError("Image content is required")
+        if len(content) > MAX_DOYIN_IMAGE_BYTES:
+            raise ValueError("Each image in a Douyin image-text post must not exceed 20 MiB")
+        if content_type not in {"image/jpeg", "image/png", "image/webp"}:
+            raise ValueError("Only JPEG, PNG and WebP images are enabled for the pilot")
+        response = await self._http.post(
+            DOUYIN_IMAGE_UPLOAD_URL,
+            headers={"access-token": access_token},
+            files={"image": (filename, content, content_type)},
+        )
+        data = self._data(self._decode_response(response))
+        image = data.get("image")
+        if not isinstance(image, dict) or not image.get("image_id"):
+            raise DouyinApiError("MISSING_IMAGE_ID", "Douyin image upload response is incomplete")
+        return {
+            "image_id": str(image["image_id"]),
+            "width": image.get("width"),
+            "height": image.get("height"),
+        }
+
+    async def publish_images(
+        self,
+        *,
+        access_token: str,
+        open_id: str,
+        image_ids: list[str],
+        text: str,
+        merchant_confirmed: bool,
+    ) -> DouyinPublishReceipt:
+        if not merchant_confirmed:
+            raise ValueError("Explicit merchant confirmation is required before publishing")
+        if not 1 <= len(image_ids) <= 30 or any(not item for item in image_ids):
+            raise ValueError("Douyin image-text posts require between 1 and 30 uploaded images")
+        if not text.strip() or len(text) > 1000:
+            raise ValueError("Douyin image-text post text must contain 1-1000 characters")
+        response = await self._http.post(
+            DOUYIN_IMAGE_CREATE_URL,
+            params={"open_id": open_id},
+            headers={"access-token": access_token, "Content-Type": "application/json"},
+            json={"image_list": image_ids, "text": text},
+        )
+        data = self._data(self._decode_response(response))
+        if not data.get("item_id"):
+            raise DouyinApiError("MISSING_ITEM_ID", "Douyin image-text response is incomplete")
+        return DouyinPublishReceipt(item_id=str(data["item_id"]))
 
     async def publish_video(
         self,

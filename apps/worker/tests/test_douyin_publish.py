@@ -13,8 +13,15 @@ os.environ.setdefault(
 )
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 
-from store_operator_worker.handlers import JobExecutionContext, JobExecutionError, resolve_job_handler
-from store_operator_worker.tasks import execute_douyin_publish, execute_douyin_readback
+from store_operator_worker.handlers import (  # noqa: E402
+    JobExecutionContext,
+    JobExecutionError,
+    resolve_job_handler,
+)
+from store_operator_worker.tasks import (  # noqa: E402
+    execute_douyin_publish,
+    execute_douyin_readback,
+)
 
 
 def make_context() -> JobExecutionContext:

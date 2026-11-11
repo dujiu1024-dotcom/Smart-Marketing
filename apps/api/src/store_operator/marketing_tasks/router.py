@@ -26,6 +26,7 @@ from store_operator.marketing_tasks.schemas import (
     MarketingTaskRequirementUpdate,
     MarketingTaskStepSkip,
     MarketingTaskStrategyConfirm,
+    MarketingTaskStrategyUpdate,
 )
 from store_operator.marketing_tasks.service import (
     archive_marketing_task,
@@ -38,6 +39,7 @@ from store_operator.marketing_tasks.service import (
     recover_marketing_task,
     skip_task_step,
     update_requirement_draft,
+    update_strategy_draft,
 )
 
 router = APIRouter(prefix="/marketing-tasks", tags=["marketing-tasks"])
@@ -121,6 +123,21 @@ def confirm_task_requirement(
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> MarketingTaskDetail:
     return confirm_requirement(
+        db, request, auth, context, task_id, payload, idempotency_key
+    )
+
+
+@router.patch("/{task_id}/strategy", response_model=MarketingTaskDetail)
+def patch_strategy(
+    task_id: UUID,
+    payload: MarketingTaskStrategyUpdate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MarketingTaskDetail:
+    return update_strategy_draft(
         db, request, auth, context, task_id, payload, idempotency_key
     )
 

@@ -1,12 +1,4 @@
 from store_operator.models.base import Base
-from store_operator.models.job_runtime import (
-    AIInvocation,
-    AIUsageRecord,
-    Job,
-    JobAttempt,
-    JobEvent,
-    OutboxEvent,
-)
 from store_operator.models.identity import (
     AuditEvent,
     AuthSession,
@@ -14,6 +6,14 @@ from store_operator.models.identity import (
     Store,
     StoreMembership,
     User,
+)
+from store_operator.models.job_runtime import (
+    AIInvocation,
+    AIUsageRecord,
+    Job,
+    JobAttempt,
+    JobEvent,
+    OutboxEvent,
 )
 from store_operator.models.store_knowledge import (
     AudienceProfile,
@@ -27,7 +27,6 @@ from store_operator.models.store_knowledge import (
     StoreRecordRevision,
     UploadIntent,
 )
-
 __all__ = [
     "AIInvocation",
     "AIUsageRecord",

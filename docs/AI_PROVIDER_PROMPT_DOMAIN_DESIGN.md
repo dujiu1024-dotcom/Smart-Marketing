@@ -187,7 +187,7 @@ AIInvocation 由 #9 持有。每次调用必须关联：
 | PATCH | /api/v1/admin/prompt-versions/{id} | 编辑 Draft | published 返回 409 |
 | POST | /api/v1/admin/prompt-versions/{id}/validate | 校验 Schema/占位符 | 不调用真实 Provider |
 | POST | /api/v1/admin/prompt-versions/{id}/publish | 发布版本 | 同事务追加 PromptActivation |
-| POST | /api/v1/admin/prompt-templates/{id}/activate | 激活/回滚已发布版本 | body: version_id、reason、expected_version；追加 activation |
+| POST | /api/v1/admin/prompt-templates/{id}/rollback | 回滚到已发布版本 | body: version_id、reason、expected_version；追加 activation |
 
 - 所有写请求使用 Idempotency-Key；更新使用 expected_version/If-Match。
 - Prompt 预览首期只渲染合成 Fixture，不读取真实门店资料、不触发真实 Provider 调用；真实 Provider 联调走独立测试环境/受控任务。

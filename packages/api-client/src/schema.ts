@@ -158,6 +158,209 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/store/audiences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Audience Profiles */
+        get: operations["list_audience_profiles_api_v1_store_audiences_get"];
+        put?: never;
+        /** Create Audience Profile */
+        post: operations["create_audience_profile_api_v1_store_audiences_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/audiences/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Audience Profile */
+        get: operations["get_audience_profile_api_v1_store_audiences__record_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Audience Profile */
+        delete: operations["delete_audience_profile_api_v1_store_audiences__record_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Audience Profile */
+        patch: operations["update_audience_profile_api_v1_store_audiences__record_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/store/brand-guideline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Brand Guideline */
+        get: operations["get_brand_guideline_api_v1_store_brand_guideline_get"];
+        put?: never;
+        /** Create Brand Guideline */
+        post: operations["create_brand_guideline_api_v1_store_brand_guideline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Brand Guideline */
+        patch: operations["update_brand_guideline_api_v1_store_brand_guideline_patch"];
+        trace?: never;
+    };
+    "/api/v1/store/knowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Knowledge Items */
+        get: operations["list_knowledge_items_api_v1_store_knowledge_get"];
+        put?: never;
+        /** Create Knowledge Item */
+        post: operations["create_knowledge_item_api_v1_store_knowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/knowledge/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Knowledge Item */
+        get: operations["get_knowledge_item_api_v1_store_knowledge__record_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Knowledge Item */
+        delete: operations["delete_knowledge_item_api_v1_store_knowledge__record_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Knowledge Item */
+        patch: operations["update_knowledge_item_api_v1_store_knowledge__record_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/store/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Offers */
+        get: operations["list_offers_api_v1_store_offers_get"];
+        put?: never;
+        /** Create Offer */
+        post: operations["create_offer_api_v1_store_offers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/offers/{record_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Offer */
+        get: operations["get_offer_api_v1_store_offers__record_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Offer */
+        delete: operations["delete_offer_api_v1_store_offers__record_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Offer */
+        patch: operations["update_offer_api_v1_store_offers__record_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/store/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Products */
+        get: operations["list_products_api_v1_store_products_get"];
+        put?: never;
+        /** Create Product */
+        post: operations["create_product_api_v1_store_products_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/products/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Product */
+        get: operations["get_product_api_v1_store_products__product_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Product */
+        delete: operations["delete_product_api_v1_store_products__product_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Product */
+        patch: operations["update_product_api_v1_store_products__product_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/store/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Store Profile */
+        get: operations["get_store_profile_api_v1_store_profile_get"];
+        put?: never;
+        /** Create Store Profile */
+        post: operations["create_store_profile_api_v1_store_profile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Store Profile */
+        patch: operations["update_store_profile_api_v1_store_profile_patch"];
+        trace?: never;
+    };
+    "/api/v1/store/{resource_type}/{record_id}/confirm-facts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Store Facts */
+        post: operations["confirm_store_facts_api_v1_store__resource_type___record_id__confirm_facts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/info": {
         parameters: {
             query?: never;
@@ -229,10 +432,306 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** AudienceProfileCreate */
+        AudienceProfileCreate: {
+            /** Audience Description */
+            audience_description?: string | null;
+            /** Common Objections Json */
+            common_objections_json?: string[] | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Consumption Periods Json */
+            consumption_periods_json?: string[] | null;
+            /** Consumption Scenarios Json */
+            consumption_scenarios_json?: string[] | null;
+            /** Name */
+            name: string;
+            /** Purchase Motivations Json */
+            purchase_motivations_json?: string[] | null;
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Sampled At */
+            sampled_at?: string | null;
+            /** Segment Type */
+            segment_type: string;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+        };
+        /** AudienceProfileList */
+        AudienceProfileList: {
+            /** Items */
+            items: components["schemas"]["AudienceProfileRead"][];
+            /** Total */
+            total: number;
+        };
+        /** AudienceProfileRead */
+        AudienceProfileRead: {
+            /** Audience Description */
+            audience_description?: string | null;
+            /** Common Objections Json */
+            common_objections_json?: string[] | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Consumption Periods Json */
+            consumption_periods_json?: string[] | null;
+            /** Consumption Scenarios Json */
+            consumption_scenarios_json?: string[] | null;
+            /** Current Version */
+            current_version: number;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Purchase Motivations Json */
+            purchase_motivations_json?: string[] | null;
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Sampled At */
+            sampled_at?: string | null;
+            /** Segment Type */
+            segment_type: string;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+        };
+        /** AudienceProfileUpdate */
+        AudienceProfileUpdate: {
+            /** Audience Description */
+            audience_description?: string | null;
+            /** Common Objections Json */
+            common_objections_json?: string[] | null;
+            /** Confidence Level */
+            confidence_level?: string | null;
+            /** Consumption Periods Json */
+            consumption_periods_json?: string[] | null;
+            /** Consumption Scenarios Json */
+            consumption_scenarios_json?: string[] | null;
+            /** Name */
+            name?: string | null;
+            /** Purchase Motivations Json */
+            purchase_motivations_json?: string[] | null;
+            /** Sample Size */
+            sample_size?: number | null;
+            /** Sampled At */
+            sampled_at?: string | null;
+            /** Segment Type */
+            segment_type?: string | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+        };
+        /** BrandGuidelineCreate */
+        BrandGuidelineCreate: {
+            /** Brand Story */
+            brand_story?: string | null;
+            /** Color Palette Json */
+            color_palette_json?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Common Phrases Json */
+            common_phrases_json?: string[] | null;
+            /** Core Values Json */
+            core_values_json?: string[] | null;
+            /** Cta Preferences Json */
+            cta_preferences_json?: string[] | null;
+            /** Differentiators */
+            differentiators?: string | null;
+            /** Font Preferences Json */
+            font_preferences_json?: string[] | null;
+            /** Logo Asset Id */
+            logo_asset_id?: string | null;
+            /** Positioning */
+            positioning?: string | null;
+            /** Prohibited Phrases Json */
+            prohibited_phrases_json?: string[] | null;
+            /** Tone Of Voice */
+            tone_of_voice?: string | null;
+            /** Visual Style */
+            visual_style?: string | null;
+        };
+        /** BrandGuidelineRead */
+        BrandGuidelineRead: {
+            /** Brand Story */
+            brand_story?: string | null;
+            /** Color Palette Json */
+            color_palette_json?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Common Phrases Json */
+            common_phrases_json?: string[] | null;
+            /** Core Values Json */
+            core_values_json?: string[] | null;
+            /** Cta Preferences Json */
+            cta_preferences_json?: string[] | null;
+            /** Current Version */
+            current_version: number;
+            /** Differentiators */
+            differentiators?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /** Font Preferences Json */
+            font_preferences_json?: string[] | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Logo Asset Id */
+            logo_asset_id?: string | null;
+            /** Positioning */
+            positioning?: string | null;
+            /** Prohibited Phrases Json */
+            prohibited_phrases_json?: string[] | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Tone Of Voice */
+            tone_of_voice?: string | null;
+            /** Visual Style */
+            visual_style?: string | null;
+        };
+        /** BrandGuidelineUpdate */
+        BrandGuidelineUpdate: {
+            /** Brand Story */
+            brand_story?: string | null;
+            /** Color Palette Json */
+            color_palette_json?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Common Phrases Json */
+            common_phrases_json?: string[] | null;
+            /** Core Values Json */
+            core_values_json?: string[] | null;
+            /** Cta Preferences Json */
+            cta_preferences_json?: string[] | null;
+            /** Differentiators */
+            differentiators?: string | null;
+            /** Font Preferences Json */
+            font_preferences_json?: string[] | null;
+            /** Logo Asset Id */
+            logo_asset_id?: string | null;
+            /** Positioning */
+            positioning?: string | null;
+            /** Prohibited Phrases Json */
+            prohibited_phrases_json?: string[] | null;
+            /** Tone Of Voice */
+            tone_of_voice?: string | null;
+            /** Visual Style */
+            visual_style?: string | null;
+        };
+        /** FactConfirmationRequest */
+        FactConfirmationRequest: {
+            /** Confirmation Note */
+            confirmation_note?: string | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** KnowledgeItemCreate */
+        KnowledgeItemCreate: {
+            /** Category */
+            category: string;
+            /** Content Hash */
+            content_hash?: string | null;
+            /** Content Ref */
+            content_ref?: string | null;
+            /** Content Text */
+            content_text?: string | null;
+            /** Effective At */
+            effective_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** KnowledgeItemList */
+        KnowledgeItemList: {
+            /** Items */
+            items: components["schemas"]["KnowledgeItemRead"][];
+            /** Total */
+            total: number;
+        };
+        /** KnowledgeItemRead */
+        KnowledgeItemRead: {
+            /** Category */
+            category: string;
+            /** Content Hash */
+            content_hash?: string | null;
+            /** Content Ref */
+            content_ref?: string | null;
+            /** Content Text */
+            content_text?: string | null;
+            /** Current Version */
+            current_version: number;
+            /** Effective At */
+            effective_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Title */
+            title: string;
+        };
+        /** KnowledgeItemUpdate */
+        KnowledgeItemUpdate: {
+            /** Category */
+            category?: string | null;
+            /** Content Hash */
+            content_hash?: string | null;
+            /** Content Ref */
+            content_ref?: string | null;
+            /** Content Text */
+            content_text?: string | null;
+            /** Effective At */
+            effective_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Source Ref */
+            source_ref?: string | null;
+            /** Source Type */
+            source_type?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -297,6 +796,234 @@ export interface components {
              */
             user_id: string;
         };
+        /** OfferCreate */
+        OfferCreate: {
+            /** Eligibility Rules Json */
+            eligibility_rules_json?: {
+                [key: string]: unknown;
+            };
+            /** Ends At */
+            ends_at?: string | null;
+            /** Offer Type */
+            offer_type: string;
+            /** Stacking Policy */
+            stacking_policy?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /**
+             * Status
+             * @default draft
+             */
+            status: string;
+            /** Terms Json */
+            terms_json: {
+                [key: string]: unknown;
+            };
+            /** Title */
+            title: string;
+            /** Usage Limit */
+            usage_limit?: number | null;
+        };
+        /** OfferList */
+        OfferList: {
+            /** Items */
+            items: components["schemas"]["OfferRead"][];
+            /** Total */
+            total: number;
+        };
+        /** OfferRead */
+        OfferRead: {
+            /** Current Version */
+            current_version: number;
+            /** Eligibility Rules Json */
+            eligibility_rules_json?: {
+                [key: string]: unknown;
+            };
+            /** Ends At */
+            ends_at?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Offer Type */
+            offer_type: string;
+            /** Stacking Policy */
+            stacking_policy?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /**
+             * Status
+             * @default draft
+             */
+            status: string;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Terms Json */
+            terms_json: {
+                [key: string]: unknown;
+            };
+            /** Title */
+            title: string;
+            /** Usage Limit */
+            usage_limit?: number | null;
+        };
+        /** OfferUpdate */
+        OfferUpdate: {
+            /** Eligibility Rules Json */
+            eligibility_rules_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Ends At */
+            ends_at?: string | null;
+            /** Offer Type */
+            offer_type?: string | null;
+            /** Stacking Policy */
+            stacking_policy?: string | null;
+            /** Starts At */
+            starts_at?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Terms Json */
+            terms_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Title */
+            title?: string | null;
+            /** Usage Limit */
+            usage_limit?: number | null;
+        };
+        /** ProductCreate */
+        ProductCreate: {
+            /** Allergens And Restrictions Json */
+            allergens_and_restrictions_json?: string[] | null;
+            /**
+             * Availability Status
+             * @default unknown
+             */
+            availability_status: string;
+            /** Category */
+            category?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Delivery Method */
+            delivery_method?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Ingredients Or Materials */
+            ingredients_or_materials?: string | null;
+            /** Inventory Quantity */
+            inventory_quantity?: number | string | null;
+            /** Key Selling Points Json */
+            key_selling_points_json?: string[] | null;
+            /** Name */
+            name: string;
+            /** Price Amount */
+            price_amount?: number | string | null;
+            /** Service Process */
+            service_process?: string | null;
+            /** Sku */
+            sku?: string | null;
+            /** Specification */
+            specification?: string | null;
+            /** Unit */
+            unit?: string | null;
+        };
+        /** ProductList */
+        ProductList: {
+            /** Items */
+            items: components["schemas"]["ProductRead"][];
+            /** Total */
+            total: number;
+        };
+        /** ProductRead */
+        ProductRead: {
+            /** Allergens And Restrictions Json */
+            allergens_and_restrictions_json?: string[] | null;
+            /**
+             * Availability Status
+             * @default unknown
+             */
+            availability_status: string;
+            /** Category */
+            category?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Current Version */
+            current_version: number;
+            /** Delivery Method */
+            delivery_method?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ingredients Or Materials */
+            ingredients_or_materials?: string | null;
+            /** Inventory Quantity */
+            inventory_quantity?: string | null;
+            /** Key Selling Points Json */
+            key_selling_points_json?: string[] | null;
+            /** Name */
+            name: string;
+            /** Price Amount */
+            price_amount?: string | null;
+            /** Service Process */
+            service_process?: string | null;
+            /** Sku */
+            sku?: string | null;
+            /** Specification */
+            specification?: string | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Unit */
+            unit?: string | null;
+        };
+        /** ProductUpdate */
+        ProductUpdate: {
+            /** Allergens And Restrictions Json */
+            allergens_and_restrictions_json?: string[] | null;
+            /** Availability Status */
+            availability_status?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Delivery Method */
+            delivery_method?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Ingredients Or Materials */
+            ingredients_or_materials?: string | null;
+            /** Inventory Quantity */
+            inventory_quantity?: number | string | null;
+            /** Key Selling Points Json */
+            key_selling_points_json?: string[] | null;
+            /** Name */
+            name?: string | null;
+            /** Price Amount */
+            price_amount?: number | string | null;
+            /** Service Process */
+            service_process?: string | null;
+            /** Sku */
+            sku?: string | null;
+            /** Specification */
+            specification?: string | null;
+            /** Unit */
+            unit?: string | null;
+        };
         /** SessionSummary */
         SessionSummary: {
             /**
@@ -319,6 +1046,137 @@ export interface components {
              * @enum {string}
              */
             role: "owner" | "member";
+        };
+        /** StoreProfileCreate */
+        StoreProfileCreate: {
+            /** Address */
+            address?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Business Type */
+            business_type?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country Code */
+            country_code?: string | null;
+            /** Display Name */
+            display_name: string;
+            /** District */
+            district?: string | null;
+            /** Industry Category */
+            industry_category?: string | null;
+            /** Introduction */
+            introduction?: string | null;
+            /** Opening Hours Json */
+            opening_hours_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Phone */
+            phone?: string | null;
+            /** Province */
+            province?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Service Capabilities Json */
+            service_capabilities_json?: string[] | null;
+            /** Service Radius */
+            service_radius?: string | null;
+            /** Temporary Closures Json */
+            temporary_closures_json?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        /** StoreProfileRead */
+        StoreProfileRead: {
+            /** Address */
+            address?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Business Type */
+            business_type?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country Code */
+            country_code?: string | null;
+            /** Current Version */
+            current_version: number;
+            /** Display Name */
+            display_name: string;
+            /** District */
+            district?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Industry Category */
+            industry_category?: string | null;
+            /** Introduction */
+            introduction?: string | null;
+            /** Opening Hours Json */
+            opening_hours_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Phone */
+            phone?: string | null;
+            /** Province */
+            province?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Service Capabilities Json */
+            service_capabilities_json?: string[] | null;
+            /** Service Radius */
+            service_radius?: string | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Temporary Closures Json */
+            temporary_closures_json?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        /** StoreProfileUpdate */
+        StoreProfileUpdate: {
+            /** Address */
+            address?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Business Type */
+            business_type?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country Code */
+            country_code?: string | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** District */
+            district?: string | null;
+            /** Industry Category */
+            industry_category?: string | null;
+            /** Introduction */
+            introduction?: string | null;
+            /** Opening Hours Json */
+            opening_hours_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Phone */
+            phone?: string | null;
+            /** Province */
+            province?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Service Capabilities Json */
+            service_capabilities_json?: string[] | null;
+            /** Service Radius */
+            service_radius?: string | null;
+            /** Temporary Closures Json */
+            temporary_closures_json?: {
+                [key: string]: unknown;
+            }[] | null;
         };
         /** StoreSummary */
         StoreSummary: {
@@ -628,6 +1486,945 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_audience_profiles_api_v1_store_audiences_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceProfileList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_audience_profile_api_v1_store_audiences_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AudienceProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_audience_profile_api_v1_store_audiences__record_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_audience_profile_api_v1_store_audiences__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_audience_profile_api_v1_store_audiences__record_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AudienceProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AudienceProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_brand_guideline_api_v1_store_brand_guideline_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandGuidelineRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_brand_guideline_api_v1_store_brand_guideline_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandGuidelineCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandGuidelineRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_brand_guideline_api_v1_store_brand_guideline_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrandGuidelineUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandGuidelineRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_knowledge_items_api_v1_store_knowledge_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_knowledge_item_api_v1_store_knowledge_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgeItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_knowledge_item_api_v1_store_knowledge__record_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_knowledge_item_api_v1_store_knowledge__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_knowledge_item_api_v1_store_knowledge__record_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgeItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeItemRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_offers_api_v1_store_offers_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_offer_api_v1_store_offers_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_offer_api_v1_store_offers__record_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_offer_api_v1_store_offers__record_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_offer_api_v1_store_offers__record_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfferUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_products_api_v1_store_products_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_product_api_v1_store_products_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_product_api_v1_store_products__product_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_product_api_v1_store_products__product_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_product_api_v1_store_products__product_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_store_profile_api_v1_store_profile_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_store_profile_api_v1_store_profile_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoreProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_store_profile_api_v1_store_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoreProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoreProfileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_store_facts_api_v1_store__resource_type___record_id__confirm_facts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                resource_type: string;
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactConfirmationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

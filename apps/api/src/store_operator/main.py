@@ -26,6 +26,7 @@ from store_operator.auth.router import router as auth_router
 from store_operator.config import settings
 from store_operator.db import engine, redis_client
 from store_operator.observability import configure_logging
+from store_operator.store_knowledge_router import router as store_knowledge_router
 from store_operator.store_router import router as store_router
 from store_operator.tracing import configure_tracing
 
@@ -185,6 +186,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(store_router, prefix="/api/v1")
+app.include_router(store_knowledge_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 
 

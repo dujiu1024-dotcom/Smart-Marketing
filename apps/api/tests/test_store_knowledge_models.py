@@ -18,6 +18,7 @@ def test_store_knowledge_tables_are_registered_with_tenant_keys() -> None:
         "product_media_assets",
         "knowledge_item_products",
         "audience_profile_products",
+        "idempotency_records",
     }
     assert expected <= set(Base.metadata.tables)
 
@@ -87,3 +88,17 @@ def test_media_derivatives_and_brand_logo_are_store_scoped() -> None:
         == ["store_id", "logo_asset_id"]
     ]
     assert len(logo_fk) == 1
+
+
+def test_idempotency_records_are_store_scoped_and_expirable() -> None:
+    table = Base.metadata.tables["idempotency_records"]
+    assert table.c.store_id.nullable is False
+    assert table.c.idempotency_key.nullable is False
+    assert table.c.request_hash.nullable is False
+    assert table.c.expires_at.nullable is False
+    assert any(
+        isinstance(constraint, UniqueConstraint)
+        and tuple(column.name for column in constraint.columns)
+        == ("store_id", "idempotency_key")
+        for constraint in table.constraints
+    )

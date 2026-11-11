@@ -1,5 +1,6 @@
 from store_operator.models.base import Base
 from store_operator.models.content_delivery import Artifact, ArtifactVersion, ReviewRecord
+from store_operator.models.prompt_management import PromptActivation, PromptTemplate, PromptVersion
 from store_operator.models.identity import (
     AuditEvent,
     AuthSession,
@@ -43,6 +44,9 @@ __all__ = [
     "Artifact",
     "ArtifactVersion",
     "ReviewRecord",
+    "PromptActivation",
+    "PromptTemplate",
+    "PromptVersion",
     "AIInvocation",
     "AIUsageRecord",
     "AuditEvent",

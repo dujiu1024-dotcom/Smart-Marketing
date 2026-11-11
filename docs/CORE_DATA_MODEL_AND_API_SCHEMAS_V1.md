@@ -115,12 +115,17 @@ erDiagram
   JOB ||--o{ JOB_EVENT : emits
   JOB ||--o{ AI_INVOCATION : invokes
   OUTBOX_EVENT }o..|| JOB : dispatches
+  PROMPT_TEMPLATE ||--o{ PROMPT_VERSION : versions
+  PROMPT_TEMPLATE ||--o{ PROMPT_ACTIVATION : activates
+  PROMPT_VERSION ||--o{ PROMPT_ACTIVATION : selected
   PROMPT_VERSION ||--o{ AI_INVOCATION : selected
 ```
 
 - PostgreSQL 是 Job/Attempt/Outbox 状态事实源；Celery + Redis 仅提供至少一次投递。
 - Job 状态按 PR #20 的待评审契约统一为 queued/running/retry_wait/succeeded/failed/needs_human/cancelled；Job 不单独使用 dead。OutboxEvent 可使用 dead 表示投递耗尽，不能映射为 Job 状态。
 - AIInvocation 与 Job 状态独立；PromptVersion 必须固定不可变版本引用。
+- PromptTemplate/PromptVersion/PromptActivation 是全局平台配置，不含 store_id；平台管理员写权限由 #5 授权，不能因此读取门店经营数据。PromptVersion 发布后不可变，回滚追加 PromptActivation。
+- AIInvocation 字段扩展建议（待 #9 联合评审）：provider_request_id 与 usage_json，用于供应商对账和分项计费；未批准前不视为冻结字段。
 - 发布超时等外部副作用结果不确定时进入 needs_human，对账前禁止盲目重发。
 
 ## 4. API 通用约定
@@ -349,6 +354,9 @@ erDiagram
 16. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
 17. QualityResolution 复合 FK 到同店 QualityReport，保存 quality_report_fingerprint；UNIQUE(store_id, quality_report_id, quality_report_fingerprint)，写入时校验报告 result=needs_human，并通过 idempotency_record_id 防重复。
 18. PublishConfirmation 以 (store_id,publish_package_id,package_fingerprint) 唯一；首期不提供撤销，确认记录不可 UPDATE/DELETE。
+19. PromptTemplate UNIQUE(industry_key, task_type, capability, template_key)；PromptVersion UNIQUE(prompt_template_id, version_no)，published 版本不可 UPDATE/DELETE。
+20. PromptActivation 追加写并按 idempotency_record_id 去重；只能引用同一 PromptTemplate 的 published PromptVersion。
+21. AIInvocation.prompt_version_id 必须引用精确 PromptVersion；历史调用不得动态读取 PromptTemplate.current_published_version_id。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

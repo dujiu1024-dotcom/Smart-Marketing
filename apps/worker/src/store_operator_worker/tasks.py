@@ -669,6 +669,40 @@ def execute_content_quality_check(
     }
 
 
+def _set_douyin_publish_state(
+    operation_id: UUID,
+    store_id: UUID,
+    *,
+    status: str,
+    error_code: str | None = None,
+    error_summary: str | None = None,
+    platform_item_id: str | None = None,
+    submitted: bool = False,
+    readback: bool = False,
+) -> None:
+    with SessionLocal.begin() as db:
+        operation = db.scalar(
+            select(PublishOperation)
+            .where(
+                PublishOperation.id == operation_id,
+                PublishOperation.store_id == store_id,
+            )
+            .with_for_update()
+        )
+        if operation is None:
+            return
+        operation.status = status
+        operation.last_error_code = error_code
+        operation.last_error_summary = error_summary
+        if platform_item_id is not None:
+            operation.platform_item_id = platform_item_id
+        if submitted and operation.submitted_at is None:
+            operation.submitted_at = datetime.now(UTC)
+        if readback:
+            operation.last_readback_at = datetime.now(UTC)
+            operation.next_attempt_at = None
+
+
 @register_job_handler("douyin.publish_image_text")
 def execute_douyin_image_text_publish(
     context: JobExecutionContext,
@@ -697,15 +731,14 @@ def execute_douyin_image_text_publish(
             "Douyin publish job payload is invalid.",
             retryable=False,
         ) from exc
+    store_id = context.store_id
 
-    with SessionLocal.begin() as db:
+    with SessionLocal() as db:
         operation = db.scalar(
-            select(PublishOperation)
-            .where(
+            select(PublishOperation).where(
                 PublishOperation.id == operation_id,
-                PublishOperation.store_id == context.store_id,
+                PublishOperation.store_id == store_id,
             )
-            .with_for_update()
         )
         if operation is None:
             raise JobExecutionError(
@@ -720,10 +753,12 @@ def execute_douyin_image_text_publish(
                 "platform_item_id": operation.platform_item_id or "",
             }
         if operation.platform_item_id is None and operation.status in {"submitting", "needs_human"}:
-            operation.status = "needs_human"
-            operation.last_error_code = "DOUYIN_CREATE_RESULT_UNKNOWN"
-            operation.last_error_summary = (
-                "The platform create result is unknown; automatic duplicate submission is blocked."
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="needs_human",
+                error_code="DOUYIN_CREATE_RESULT_UNKNOWN",
+                error_summary="The platform create result is unknown; duplicate submission is blocked.",
             )
             raise JobExecutionError(
                 "DOUYIN_CREATE_RESULT_UNKNOWN",
@@ -735,20 +770,20 @@ def execute_douyin_image_text_publish(
         package = db.scalar(
             select(PublishPackage).where(
                 PublishPackage.id == operation.publish_package_id,
-                PublishPackage.store_id == context.store_id,
+                PublishPackage.store_id == store_id,
             )
         )
         package_item = db.scalar(
             select(PublishPackageItem).where(
                 PublishPackageItem.id == operation.publish_package_item_id,
-                PublishPackageItem.store_id == context.store_id,
+                PublishPackageItem.store_id == store_id,
                 PublishPackageItem.publish_package_id == operation.publish_package_id,
             )
         )
         confirmation = db.scalar(
             select(PublishConfirmation).where(
                 PublishConfirmation.id == operation.publish_confirmation_id,
-                PublishConfirmation.store_id == context.store_id,
+                PublishConfirmation.store_id == store_id,
                 PublishConfirmation.publish_package_id == operation.publish_package_id,
                 PublishConfirmation.package_fingerprint == operation.confirmed_package_fingerprint,
             )
@@ -756,7 +791,7 @@ def execute_douyin_image_text_publish(
         account = db.scalar(
             select(ChannelAccount).where(
                 ChannelAccount.id == operation.channel_account_id,
-                ChannelAccount.store_id == context.store_id,
+                ChannelAccount.store_id == store_id,
                 ChannelAccount.provider == "douyin",
                 ChannelAccount.status == "active",
             )
@@ -771,134 +806,159 @@ def execute_douyin_image_text_publish(
             or package_item.channel_key != "douyin"
             or package_item.channel_account_id != account.id
         ):
-            operation.status = "needs_human"
-            operation.last_error_code = "DOUYIN_PUBLISH_PREREQUISITE_CHANGED"
-            operation.last_error_summary = "A frozen publish prerequisite changed or is unavailable."
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="needs_human",
+                error_code="DOUYIN_PUBLISH_PREREQUISITE_CHANGED",
+                error_summary="A frozen publish prerequisite changed or is unavailable.",
+            )
             raise JobExecutionError(
                 "DOUYIN_PUBLISH_PREREQUISITE_CHANGED",
                 "A frozen publish prerequisite changed or is unavailable.",
                 retryable=False,
             )
 
-        channel_content = db.scalar(
-            select(ChannelContent).where(
-                ChannelContent.id == package_item.channel_content_id,
-                ChannelContent.store_id == context.store_id,
-                ChannelContent.status == "ready",
-            )
-        )
-        copy_version = (
-            db.scalar(
-                select(ArtifactVersion).where(
-                    ArtifactVersion.id == channel_content.copy_version_id,
-                    ArtifactVersion.store_id == context.store_id,
-                )
-            )
-            if channel_content is not None
-            else None
-        )
-        if channel_content is None or copy_version is None or copy_version.content_json is None:
-            operation.status = "failed"
-            operation.last_error_code = "DOUYIN_COPY_CONTENT_MISSING"
-            operation.last_error_summary = "The frozen Douyin copy is unavailable."
-            raise JobExecutionError(
-                "DOUYIN_COPY_CONTENT_MISSING",
-                "The frozen Douyin copy is unavailable.",
-                retryable=False,
-            )
-
-        copy_data = copy_version.content_json
-        title = copy_data.get("title")
-        body = copy_data.get("body")
-        post_text = "\n\n".join(
-            part.strip() for part in (title, body) if isinstance(part, str) and part.strip()
-        )
-        if not post_text or len(post_text) > 1000:
-            operation.status = "failed"
-            operation.last_error_code = "DOUYIN_COPY_TEXT_INVALID"
-            operation.last_error_summary = "The frozen post text is empty or exceeds the platform limit."
-            raise JobExecutionError(
-                "DOUYIN_COPY_TEXT_INVALID",
-                "The frozen post text is empty or exceeds the platform limit.",
-                retryable=False,
-            )
-
-        image_refs = db.scalars(
-            select(ChannelContentArtifactRef)
-            .where(
-                ChannelContentArtifactRef.store_id == context.store_id,
-                ChannelContentArtifactRef.channel_content_id == channel_content.id,
-            )
-            .order_by(ChannelContentArtifactRef.position)
-        ).all()
-        if not 1 <= len(image_refs) <= 30:
-            operation.status = "failed"
-            operation.last_error_code = "DOUYIN_IMAGE_COUNT_INVALID"
-            operation.last_error_summary = "Douyin image-text posts require between 1 and 30 images."
-            raise JobExecutionError(
-                "DOUYIN_IMAGE_COUNT_INVALID",
-                "Douyin image-text posts require between 1 and 30 images.",
-                retryable=False,
-            )
-
-        media_items: list[tuple[str, str, str]] = []
-        for image_ref in image_refs:
-            image_version = db.scalar(
-                select(ArtifactVersion).where(
-                    ArtifactVersion.id == image_ref.artifact_version_id,
-                    ArtifactVersion.store_id == context.store_id,
-                )
-            )
-            if image_version is None or not image_version.content_ref:
-                operation.status = "failed"
-                operation.last_error_code = "DOUYIN_IMAGE_BINARY_MISSING"
-                operation.last_error_summary = "A frozen image has no private object reference."
-                raise JobExecutionError(
-                    "DOUYIN_IMAGE_BINARY_MISSING",
-                    "A frozen image has no private object reference.",
-                    retryable=False,
-                )
-            media_asset = db.scalar(
-                select(MediaAsset).where(
-                    MediaAsset.store_id == context.store_id,
-                    MediaAsset.object_key == image_version.content_ref,
-                    MediaAsset.status == "ready",
-                    MediaAsset.usage_rights_status == "confirmed_allowed",
-                )
-            )
-            if media_asset is None or media_asset.mime_type not in {
-                "image/jpeg",
-                "image/png",
-                "image/webp",
-            } or media_asset.byte_size > 20 * 1024 * 1024:
-                operation.status = "failed"
-                operation.last_error_code = "DOUYIN_IMAGE_NOT_ELIGIBLE"
-                operation.last_error_summary = (
-                    "A frozen image is not ready, lacks confirmed usage rights, or exceeds the image limit."
-                )
-                raise JobExecutionError(
-                    "DOUYIN_IMAGE_NOT_ELIGIBLE",
-                    "A frozen image is not eligible for Douyin image-text publishing.",
-                    retryable=False,
-                )
-            media_items.append(
-                (
-                    media_asset.object_key,
-                    media_asset.original_filename_sanitized or f"image-{image_ref.position}.jpg",
-                    media_asset.mime_type,
-                )
-            )
-
-        operation.attempt_count += 1
-        if operation.platform_item_id is None:
-            operation.status = "uploading"
-        secret_ref = account.access_token_secret_ref
+        account_id = account.id
+        account_secret_ref = account.access_token_secret_ref
         refresh_secret_ref = account.refresh_token_secret_ref
-        open_id = account.external_account_id
-        access_expires_at = account.access_token_expires_at
-        operation_id_value = str(operation.id)
-        store_id_value = str(context.store_id)
-        db.flush()
+        account_open_id = account.external_account_id
+        account_expires_at = account.access_token_expires_at
+
+        platform_item_id = operation.platform_item_id
+        media_items: list[tuple[str, str, str]] = []
+        post_text = ""
+        if platform_item_id is None:
+            channel_content = db.scalar(
+                select(ChannelContent).where(
+                    ChannelContent.id == package_item.channel_content_id,
+                    ChannelContent.store_id == store_id,
+                    ChannelContent.status == "ready",
+                )
+            )
+            copy_version = (
+                db.scalar(
+                    select(ArtifactVersion).where(
+                        ArtifactVersion.id == channel_content.copy_version_id,
+                        ArtifactVersion.store_id == store_id,
+                    )
+                )
+                if channel_content is not None
+                else None
+            )
+            if channel_content is None or copy_version is None or copy_version.content_json is None:
+                _set_douyin_publish_state(
+                    operation_id,
+                    store_id,
+                    status="failed",
+                    error_code="DOUYIN_COPY_CONTENT_MISSING",
+                    error_summary="The frozen Douyin copy is unavailable.",
+                )
+                raise JobExecutionError(
+                    "DOUYIN_COPY_CONTENT_MISSING",
+                    "The frozen Douyin copy is unavailable.",
+                    retryable=False,
+                )
+            copy_data = copy_version.content_json
+            title = copy_data.get("title")
+            body = copy_data.get("body")
+            post_text = "\n\n".join(
+                part.strip()
+                for part in (title, body)
+                if isinstance(part, str) and part.strip()
+            )
+            if not post_text or len(post_text) > 1000:
+                _set_douyin_publish_state(
+                    operation_id,
+                    store_id,
+                    status="failed",
+                    error_code="DOUYIN_COPY_TEXT_INVALID",
+                    error_summary="The frozen post text is empty or exceeds the platform limit.",
+                )
+                raise JobExecutionError(
+                    "DOUYIN_COPY_TEXT_INVALID",
+                    "The frozen post text is empty or exceeds the platform limit.",
+                    retryable=False,
+                )
+            image_refs = db.scalars(
+                select(ChannelContentArtifactRef)
+                .where(
+                    ChannelContentArtifactRef.store_id == store_id,
+                    ChannelContentArtifactRef.channel_content_id == channel_content.id,
+                )
+                .order_by(ChannelContentArtifactRef.position)
+            ).all()
+            if not 1 <= len(image_refs) <= 30:
+                _set_douyin_publish_state(
+                    operation_id,
+                    store_id,
+                    status="failed",
+                    error_code="DOUYIN_IMAGE_COUNT_INVALID",
+                    error_summary="Douyin image-text posts require between 1 and 30 images.",
+                )
+                raise JobExecutionError(
+                    "DOUYIN_IMAGE_COUNT_INVALID",
+                    "Douyin image-text posts require between 1 and 30 images.",
+                    retryable=False,
+                )
+            for image_ref in image_refs:
+                image_version = db.scalar(
+                    select(ArtifactVersion).where(
+                        ArtifactVersion.id == image_ref.artifact_version_id,
+                        ArtifactVersion.store_id == store_id,
+                    )
+                )
+                media_asset = (
+                    db.scalar(
+                        select(MediaAsset).where(
+                            MediaAsset.store_id == store_id,
+                            MediaAsset.object_key == image_version.content_ref,
+                            MediaAsset.status == "ready",
+                            MediaAsset.usage_rights_status == "confirmed_allowed",
+                        )
+                    )
+                    if image_version is not None and image_version.content_ref
+                    else None
+                )
+                if (
+                    media_asset is None
+                    or media_asset.mime_type not in {"image/jpeg", "image/png", "image/webp"}
+                    or media_asset.byte_size > 20 * 1024 * 1024
+                ):
+                    _set_douyin_publish_state(
+                        operation_id,
+                        store_id,
+                        status="failed",
+                        error_code="DOUYIN_IMAGE_NOT_ELIGIBLE",
+                        error_summary=(
+                            "A frozen image is not ready, lacks confirmed usage rights, "
+                            "or exceeds the image limit."
+                        ),
+                    )
+                    raise JobExecutionError(
+                        "DOUYIN_IMAGE_NOT_ELIGIBLE",
+                        "A frozen image is not eligible for Douyin image-text publishing.",
+                        retryable=False,
+                    )
+                media_items.append(
+                    (
+                        media_asset.object_key,
+                        media_asset.original_filename_sanitized
+                        or f"image-{image_ref.position}.jpg",
+                        media_asset.mime_type,
+                    )
+                )
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="uploading",
+            )
+        else:
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="processing",
+            )
 
     if not (
         settings.douyin_client_key
@@ -913,7 +973,7 @@ def execute_douyin_image_text_publish(
 
     secret_store = AwsSecretsManagerStore(region_name=settings.channel_secret_store_region)
     try:
-        secrets = secret_store.get_json(secret_ref)
+        secrets = secret_store.get_json(account_secret_ref)
     except SecretStoreError as exc:
         raise JobExecutionError(
             "DOUYIN_SECRET_UNAVAILABLE",
@@ -933,217 +993,251 @@ def execute_douyin_image_text_publish(
         client_key=settings.douyin_client_key,
         client_secret=settings.douyin_client_secret,
     )
-    client = DouyinOAuthClient(credentials)
-    try:
-        if access_expires_at <= datetime.now(UTC) + timedelta(seconds=90):
-            if not isinstance(refresh_token, str) or not refresh_token:
-                raise JobExecutionError(
-                    "DOUYIN_REAUTH_REQUIRED",
-                    "Douyin authorization has expired; reconnect the account.",
-                    retryable=False,
-                )
-            token_set = await_refresh = None
-            try:
-                token_set = asyncio.run(client.refresh_access_token(refresh_token))
-            except DouyinApiError as exc:
-                raise JobExecutionError(
-                    "DOUYIN_REAUTH_REQUIRED",
-                    "Douyin authorization could not be refreshed; reconnect the account.",
-                    retryable=False,
-                ) from exc
-            if token_set.open_id != open_id or not {
-                "user_info",
-                "video.create",
-                "video.list",
-            }.issubset(token_set.scope):
-                raise JobExecutionError(
-                    "DOUYIN_REAUTH_REQUIRED",
-                    "Refreshed Douyin authorization does not match the connected account.",
-                    retryable=False,
-                )
-            digest = hashlib.sha256(open_id.encode("utf-8")).hexdigest()
-            new_ref = secret_store.put_json(
-                f"{settings.channel_secret_store_prefix}/{store_id_value}/douyin/{digest}",
-                {
-                    "access_token": token_set.access_token,
-                    "refresh_token": token_set.refresh_token,
-                },
+    if account_expires_at <= datetime.now(UTC) + timedelta(seconds=90):
+        if not isinstance(refresh_token, str) or not refresh_token:
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="needs_human",
+                error_code="DOUYIN_REAUTH_REQUIRED",
+                error_summary="Douyin authorization has expired; reconnect the account.",
             )
-            with SessionLocal.begin() as db:
-                current_account = db.scalar(
-                    select(ChannelAccount)
-                    .where(
-                        ChannelAccount.id == UUID(operation_value if False else str(operation_id)),
-                    )
-                )
-            access_token = token_set.access_token
+            raise JobExecutionError(
+                "DOUYIN_REAUTH_REQUIRED",
+                "Douyin authorization has expired; reconnect the account.",
+                retryable=False,
+            )
 
-        if operation.platform_item_id is None:
-            uploaded_ids: list[str] = []
-            for index, (object_key, filename, mime_type) in enumerate(media_items):
-                context.check_control()
-                image_bytes = download_object_bytes(
-                    object_key=object_key,
-                    max_bytes=20 * 1024 * 1024,
+        async def refresh_token_set():
+            client = DouyinOAuthClient(credentials)
+            try:
+                return await client.refresh_access_token(refresh_token)
+            finally:
+                await client.aclose()
+
+        try:
+            token_set = asyncio.run(refresh_token_set())
+        except DouyinApiError as exc:
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="needs_human",
+                error_code="DOUYIN_REAUTH_REQUIRED",
+                error_summary="Douyin authorization could not be refreshed; reconnect the account.",
+            )
+            raise JobExecutionError(
+                "DOUYIN_REAUTH_REQUIRED",
+                "Douyin authorization could not be refreshed; reconnect the account.",
+                retryable=False,
+            ) from exc
+        if token_set.open_id != account_open_id or not {
+            "user_info",
+            "video.create",
+            "video.list",
+        }.issubset(token_set.scope):
+            raise JobExecutionError(
+                "DOUYIN_REAUTH_REQUIRED",
+                "Refreshed Douyin authorization does not match the connected account.",
+                retryable=False,
+            )
+        digest = hashlib.sha256(account_open_id.encode("utf-8")).hexdigest()
+        new_secret_ref = secret_store.put_json(
+            f"{settings.channel_secret_store_prefix}/{store_id}/douyin/{digest}",
+            {
+                "access_token": token_set.access_token,
+                "refresh_token": token_set.refresh_token,
+            },
+        )
+        with SessionLocal.begin() as db:
+            current_account = db.scalar(
+                select(ChannelAccount)
+                .where(
+                    ChannelAccount.id == account_id,
+                    ChannelAccount.store_id == store_id,
                 )
-                uploaded = asyncio.run(
-                    client.upload_image(
+                .with_for_update()
+            )
+            if (
+                current_account is None
+                or current_account.status != "active"
+                or current_account.access_token_secret_ref != account_secret_ref
+            ):
+                raise JobExecutionError(
+                    "DOUYIN_ACCOUNT_CHANGED",
+                    "The Douyin account changed during token refresh.",
+                    retryable=False,
+                )
+            now = datetime.now(UTC)
+            current_account.access_token_secret_ref = new_secret_ref
+            current_account.refresh_token_secret_ref = new_secret_ref
+            current_account.access_token_expires_at = now + timedelta(
+                seconds=token_set.expires_in
+            )
+            current_account.refresh_token_expires_at = (
+                now + timedelta(seconds=token_set.refresh_expires_in)
+                if token_set.refresh_expires_in > 0
+                else None
+            )
+            current_account.granted_scopes = sorted(token_set.scope)
+            current_account.last_verified_at = now
+        access_token = token_set.access_token
+
+    if platform_item_id is None:
+        try:
+            image_bytes = [
+                (
+                    filename,
+                    mime_type,
+                    download_object_bytes(
+                        object_key=object_key,
+                        max_bytes=20 * 1024 * 1024,
+                    ),
+                )
+                for object_key, filename, mime_type in media_items
+            ]
+        except (ObjectStorageNotConfigured, ValueError) as exc:
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="failed",
+                error_code="DOUYIN_MEDIA_UNAVAILABLE",
+                error_summary="A frozen image could not be retrieved from private object storage.",
+            )
+            raise JobExecutionError(
+                "DOUYIN_MEDIA_UNAVAILABLE",
+                "A frozen image could not be retrieved from private object storage.",
+                retryable=False,
+            ) from exc
+
+        async def upload_all_images() -> list[str]:
+            client = DouyinOAuthClient(credentials)
+            try:
+                uploaded_ids: list[str] = []
+                for index, (filename, mime_type, content) in enumerate(image_bytes):
+                    context.check_control()
+                    uploaded = await client.upload_image(
                         access_token=access_token,
                         filename=filename,
-                        content=image_bytes,
+                        content=content,
                         content_type=mime_type,
                     )
-                )
-                uploaded_ids.append(uploaded["image_id"])
-                context.update_progress(current=index + 1, total=len(media_items))
+                    uploaded_ids.append(uploaded["image_id"])
+                    context.update_progress(current=index + 1, total=len(image_bytes))
+                return uploaded_ids
+            finally:
+                await client.aclose()
 
-            with SessionLocal.begin() as db:
-                current = db.scalar(
-                    select(PublishOperation)
-                    .where(
-                        PublishOperation.id == UUID(operation_id_value),
-                        PublishOperation.store_id == context.store_id,
-                    )
-                    .with_for_update()
-                )
-                if current is None or current.platform_item_id is not None:
-                    raise JobExecutionError(
-                        "DOUYIN_PUBLISH_OPERATION_CHANGED",
-                        "The publish operation changed before platform submission.",
-                        retryable=False,
-                    )
-                current.status = "submitting"
-
-            try:
-                receipt = asyncio.run(
-                    client.publish_images(
-                        access_token=access_token,
-                        open_id=open_id,
-                        image_ids=uploaded_ids,
-                        text=post_text,
-                        merchant_confirmed=True,
-                    )
-                )
-            except DouyinApiError as exc:
-                with SessionLocal.begin() as db:
-                    current = db.scalar(
-                        select(PublishOperation)
-                        .where(
-                            PublishOperation.id == UUID(operation_id_value),
-                            PublishOperation.store_id == context.store_id,
-                        )
-                        .with_for_update()
-                    )
-                    if current is not None:
-                        current.status = "needs_human"
-                        current.last_error_code = "DOUYIN_CREATE_RESULT_UNKNOWN"
-                        current.last_error_summary = (
-                            "The platform create response was not confirmed; manual reconciliation is required."
-                        )
-                raise JobExecutionError(
-                    "DOUYIN_CREATE_RESULT_UNKNOWN",
-                    "The platform create response was not confirmed; manual reconciliation is required.",
-                    retryable=False,
-                    side_effect_state=SideEffectState.UNKNOWN,
-                ) from exc
-
-            with SessionLocal.begin() as db:
-                current = db.scalar(
-                    select(PublishOperation)
-                    .where(
-                        PublishOperation.id == UUID(operation_id_value),
-                        PublishOperation.store_id == context.store_id,
-                    )
-                    .with_for_update()
-                )
-                if current is None:
-                    raise JobExecutionError(
-                        "DOUYIN_PUBLISH_OPERATION_MISSING",
-                        "The publish operation disappeared after platform submission.",
-                        retryable=False,
-                        side_effect_state=SideEffectState.UNKNOWN,
-                    )
-                current.platform_item_id = receipt.item_id
-                current.status = "processing"
-                current.submitted_at = datetime.now(UTC)
-                current.last_error_code = None
-                current.last_error_summary = None
-
-        else:
-            receipt = None
-
-        context.check_control()
-        with SessionLocal() as db:
-            current = db.scalar(
-                select(PublishOperation).where(
-                    PublishOperation.id == UUID(operation_id_value),
-                    PublishOperation.store_id == context.store_id,
-                )
-            )
-            item_id = current.platform_item_id if current is not None else None
-        if not item_id:
-            raise JobExecutionError(
-                "DOUYIN_PLATFORM_ITEM_ID_MISSING",
-                "The platform item identifier is not available for readback.",
-                retryable=False,
-                side_effect_state=SideEffectState.UNKNOWN,
-            )
         try:
-            readback = asyncio.run(
-                client.verify_published_item(
-                    access_token=access_token,
-                    open_id=open_id,
-                    item_id=item_id,
-                )
-            )
+            uploaded_ids = asyncio.run(upload_all_images())
         except DouyinApiError as exc:
             raise JobExecutionError(
-                "DOUYIN_READBACK_FAILED",
-                "Douyin accepted the create request, but readback is temporarily unavailable.",
+                "DOUYIN_IMAGE_UPLOAD_FAILED",
+                "Douyin image upload failed; the publish operation can be retried safely.",
                 retryable=True,
-                side_effect_state=SideEffectState.KNOWN,
+                side_effect_state=SideEffectState.NONE,
                 retry_delay_seconds=30,
             ) from exc
-        if readback is None:
-            with SessionLocal.begin() as db:
-                current = db.scalar(
-                    select(PublishOperation)
-                    .where(
-                        PublishOperation.id == UUID(operation_id_value),
-                        PublishOperation.store_id == context.store_id,
-                    )
-                    .with_for_update()
+
+        _set_douyin_publish_state(
+            operation_id,
+            store_id,
+            status="submitting",
+        )
+
+        async def create_image_text_post():
+            client = DouyinOAuthClient(credentials)
+            try:
+                return await client.publish_images(
+                    access_token=access_token,
+                    open_id=account_open_id,
+                    image_ids=uploaded_ids,
+                    text=post_text,
+                    merchant_confirmed=True,
                 )
-                if current is not None:
-                    current.status = "processing"
-                    current.last_readback_at = datetime.now(UTC)
-                    current.next_attempt_at = datetime.now(UTC) + timedelta(seconds=30)
-            raise JobExecutionError(
-                "DOUYIN_READBACK_PENDING",
-                "Douyin has accepted the post; its item is not yet visible in account readback.",
-                retryable=True,
-                side_effect_state=SideEffectState.KNOWN,
-                retry_delay_seconds=30,
+            finally:
+                await client.aclose()
+
+        try:
+            receipt = asyncio.run(create_image_text_post())
+        except DouyinApiError as exc:
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="needs_human",
+                error_code="DOUYIN_CREATE_RESULT_UNKNOWN",
+                error_summary=(
+                    "The platform create response was not confirmed; manual reconciliation is required."
+                ),
             )
+            raise JobExecutionError(
+                "DOUYIN_CREATE_RESULT_UNKNOWN",
+                "The platform create response was not confirmed; manual reconciliation is required.",
+                retryable=False,
+                side_effect_state=SideEffectState.UNKNOWN,
+            ) from exc
+
+        _set_douyin_publish_state(
+            operation_id,
+            store_id,
+            status="processing",
+            platform_item_id=receipt.item_id,
+            submitted=True,
+        )
+        platform_item_id = receipt.item_id
+
+    async def read_back_post():
+        client = DouyinOAuthClient(credentials)
+        try:
+            return await client.verify_published_item(
+                access_token=access_token,
+                open_id=account_open_id,
+                item_id=platform_item_id,
+            )
+        finally:
+            await client.aclose()
+
+    try:
+        readback = asyncio.run(read_back_post())
+    except DouyinApiError as exc:
+        raise JobExecutionError(
+            "DOUYIN_READBACK_FAILED",
+            "Douyin accepted the post, but readback is temporarily unavailable.",
+            retryable=True,
+            side_effect_state=SideEffectState.KNOWN,
+            retry_delay_seconds=30,
+        ) from exc
+    if readback is None:
         with SessionLocal.begin() as db:
             current = db.scalar(
                 select(PublishOperation)
                 .where(
-                    PublishOperation.id == UUID(operation_id_value),
-                    PublishOperation.store_id == context.store_id,
+                    PublishOperation.id == operation_id,
+                    PublishOperation.store_id == store_id,
                 )
                 .with_for_update()
             )
             if current is not None:
                 current.status = "processing"
                 current.last_readback_at = datetime.now(UTC)
-                current.next_attempt_at = None
-        return {
-            "status": "processing",
-            "publish_operation_id": operation_id_value,
-            "platform_item_id": item_id,
-            "readback_verified": True,
-            "platform_review_state": "pending_or_not_public",
-        }
-    finally:
-        asyncio.run(client.aclose())
+                current.next_attempt_at = datetime.now(UTC) + timedelta(seconds=30)
+        raise JobExecutionError(
+            "DOUYIN_READBACK_PENDING",
+            "Douyin has accepted the post; its item is not yet visible in account readback.",
+            retryable=True,
+            side_effect_state=SideEffectState.KNOWN,
+            retry_delay_seconds=30,
+        )
+
+    _set_douyin_publish_state(
+        operation_id,
+        store_id,
+        status="processing",
+        readback=True,
+    )
+    return {
+        "status": "processing",
+        "publish_operation_id": str(operation_id),
+        "platform_item_id": platform_item_id,
+        "readback_verified": True,
+        "platform_review_state": "pending_or_not_public",
+    }

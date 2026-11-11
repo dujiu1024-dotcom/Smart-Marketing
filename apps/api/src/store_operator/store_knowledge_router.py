@@ -1129,7 +1129,7 @@ def confirm_store_facts(
 def _safe_filename(value: str) -> str:
     name = value.replace("\\", "/").split("/")[-1]
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._")
-    return (cleaned or "upload").slice(0, 255) if hasattr(cleaned, "slice") else (cleaned or "upload")[:255]
+    return (cleaned or "upload")[:255]
 
 
 @router.post(

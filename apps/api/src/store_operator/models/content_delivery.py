@@ -136,7 +136,7 @@ class ReviewRecord(Base):
             name="decision",
         ),
         CheckConstraint(
-            "decision <> 'revision_requested' OR length(trim(comment)) > 0",
+            "decision <> 'revision_requested' OR (comment IS NOT NULL AND length(trim(comment)) > 0)",
             name="revision_comment_required",
         ),
         Index("ix_review_records_store_version_created", "store_id", "artifact_version_id", "created_at"),

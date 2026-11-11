@@ -341,12 +341,23 @@ export interface paths {
         options?: never;
         head?: never;
         /** Update Store Profile */
-        patch: operations["update_store_profile_api_v1_store_profile_patch"];
-        trace?: never;
-    };
-    "/api/v1/system/info": {
+    "/api/v1/store/{resource_type}/{record_id}/confirm-facts": {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Store Facts */
+        post: operations["confirm_store_facts_api_v1_store__resource_type___record_id__confirm_facts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1387,13 +1398,7 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProductList"];
-                };
-            };
-            /** @description Validation Error */
+                    "application/json": components["schemas"]["AudienceProfileList"];
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1436,20 +1441,8 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
-            };
-        };
-    };
-    get_product_api_v1_store_products__product_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "X-Store-ID"?: string | null;
-            };
-            path: {
-                product_id: string;
-            };
-            cookie?: never;
-        };
+    get_audience_profile_api_v1_store_audiences__record_id__get: {
+                record_id: string;
         requestBody?: never;
         responses: {
             /** @description Successful Response */
@@ -1501,13 +1494,7 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
-            };
-        };
-    };
-    update_product_api_v1_store_products__product_id__patch: {
-        parameters: {
-            query?: never;
-            header?: {
+    update_audience_profile_api_v1_store_audiences__record_id__patch: {
                 "If-Match"?: string | null;
                 "X-Store-ID"?: string | null;
             };
@@ -1556,13 +1543,7 @@ export interface operations {
             /** @description Successful Response */
             200: {
                 headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StoreProfileRead"];
-                };
-            };
-            /** @description Validation Error */
+                    "application/json": components["schemas"]["BrandGuidelineRead"];
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1605,13 +1586,7 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
-            };
-        };
-    };
-    update_store_profile_api_v1_store_profile_patch: {
-        parameters: {
-            query?: never;
-            header?: {
+    update_brand_guideline_api_v1_store_brand_guideline_patch: {
                 "If-Match"?: string | null;
                 "X-Store-ID"?: string | null;
             };

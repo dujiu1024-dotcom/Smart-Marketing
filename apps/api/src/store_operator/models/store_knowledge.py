@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     CheckConstraint,
+    Column,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Table,
     Text,
     UniqueConstraint,
     func,
@@ -362,3 +364,80 @@ class StoreRecordRevision(StoreScoped, Base):
     )
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     change_reason: Mapped[str | None] = mapped_column(Text)
+
+
+offer_products = Table(
+    "offer_products",
+    Base.metadata,
+    Column("store_id", PGUUID(as_uuid=True), nullable=False),
+    Column("offer_id", PGUUID(as_uuid=True), nullable=False),
+    Column("product_id", PGUUID(as_uuid=True), nullable=False),
+    ForeignKeyConstraint(
+        ["store_id", "offer_id"], ["offers.store_id", "offers.id"],
+        ondelete="CASCADE", name="fk_offer_products_offer_same_store",
+    ),
+    ForeignKeyConstraint(
+        ["store_id", "product_id"], ["products.store_id", "products.id"],
+        ondelete="CASCADE", name="fk_offer_products_product_same_store",
+    ),
+    UniqueConstraint("store_id", "offer_id", "product_id", name="uq_offer_products_pair"),
+)
+
+product_media_assets = Table(
+    "product_media_assets",
+    Base.metadata,
+    Column("store_id", PGUUID(as_uuid=True), nullable=False),
+    Column("product_id", PGUUID(as_uuid=True), nullable=False),
+    Column("asset_id", PGUUID(as_uuid=True), nullable=False),
+    Column("role", String(24), nullable=False),
+    Column("sort_order", Integer, nullable=False, server_default="0"),
+    ForeignKeyConstraint(
+        ["store_id", "product_id"], ["products.store_id", "products.id"],
+        ondelete="CASCADE", name="fk_product_media_assets_product_same_store",
+    ),
+    ForeignKeyConstraint(
+        ["store_id", "asset_id"], ["media_assets.store_id", "media_assets.id"],
+        ondelete="RESTRICT", name="fk_product_media_assets_asset_same_store",
+    ),
+    UniqueConstraint("store_id", "product_id", "asset_id", name="uq_product_media_assets_pair"),
+)
+
+knowledge_item_products = Table(
+    "knowledge_item_products",
+    Base.metadata,
+    Column("store_id", PGUUID(as_uuid=True), nullable=False),
+    Column("knowledge_item_id", PGUUID(as_uuid=True), nullable=False),
+    Column("product_id", PGUUID(as_uuid=True), nullable=False),
+    ForeignKeyConstraint(
+        ["store_id", "knowledge_item_id"], ["knowledge_items.store_id", "knowledge_items.id"],
+        ondelete="CASCADE", name="fk_knowledge_item_products_item_same_store",
+    ),
+    ForeignKeyConstraint(
+        ["store_id", "product_id"], ["products.store_id", "products.id"],
+        ondelete="CASCADE", name="fk_knowledge_item_products_product_same_store",
+    ),
+    UniqueConstraint(
+        "store_id", "knowledge_item_id", "product_id",
+        name="uq_knowledge_item_products_pair",
+    ),
+)
+
+audience_profile_products = Table(
+    "audience_profile_products",
+    Base.metadata,
+    Column("store_id", PGUUID(as_uuid=True), nullable=False),
+    Column("audience_profile_id", PGUUID(as_uuid=True), nullable=False),
+    Column("product_id", PGUUID(as_uuid=True), nullable=False),
+    ForeignKeyConstraint(
+        ["store_id", "audience_profile_id"], ["audience_profiles.store_id", "audience_profiles.id"],
+        ondelete="CASCADE", name="fk_audience_profile_products_profile_same_store",
+    ),
+    ForeignKeyConstraint(
+        ["store_id", "product_id"], ["products.store_id", "products.id"],
+        ondelete="CASCADE", name="fk_audience_profile_products_product_same_store",
+    ),
+    UniqueConstraint(
+        "store_id", "audience_profile_id", "product_id",
+        name="uq_audience_profile_products_pair",
+    ),
+)

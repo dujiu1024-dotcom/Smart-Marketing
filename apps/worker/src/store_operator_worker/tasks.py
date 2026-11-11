@@ -713,6 +713,20 @@ def _set_douyin_publish_state(
             operation.next_attempt_at = datetime.now(UTC) + timedelta(seconds=30)
 
 
+def _mark_douyin_account_reauth_required(account_id: UUID, store_id: UUID) -> None:
+    with SessionLocal.begin() as db:
+        account = db.scalar(
+            select(ChannelAccount)
+            .where(
+                ChannelAccount.id == account_id,
+                ChannelAccount.store_id == store_id,
+            )
+            .with_for_update()
+        )
+        if account is not None and account.status == "active":
+            account.status = "reauth_required"
+
+
 @register_job_handler("douyin.publish_image_text")
 def execute_douyin_image_text_publish(
     context: JobExecutionContext,
@@ -834,6 +848,7 @@ def execute_douyin_image_text_publish(
         attempt_count = operation.attempt_count + 1
         account_open_id = account.external_account_id
         account_expires_at = account.access_token_expires_at
+        refresh_expires_at = account.refresh_token_expires_at
 
         platform_item_id = operation.platform_item_id
         media_items: list[tuple[str, str, str]] = []
@@ -1027,7 +1042,12 @@ def execute_douyin_image_text_publish(
         client_secret=settings.douyin_client_secret,
     )
     if account_expires_at <= datetime.now(UTC) + timedelta(seconds=90):
-        if not isinstance(refresh_token, str) or not refresh_token:
+        if (
+            not isinstance(refresh_token, str)
+            or not refresh_token
+            or (refresh_expires_at is not None and refresh_expires_at <= datetime.now(UTC))
+        ):
+            _mark_douyin_account_reauth_required(account_id, store_id)
             _set_douyin_publish_state(
                 operation_id,
                 store_id,
@@ -1051,6 +1071,7 @@ def execute_douyin_image_text_publish(
         try:
             token_set = asyncio.run(refresh_token_set())
         except DouyinApiError as exc:
+            _mark_douyin_account_reauth_required(account_id, store_id)
             _set_douyin_publish_state(
                 operation_id,
                 store_id,
@@ -1068,6 +1089,7 @@ def execute_douyin_image_text_publish(
             "video.create",
             "video.list",
         }.issubset(token_set.scope):
+            _mark_douyin_account_reauth_required(account_id, store_id)
             _set_douyin_publish_state(
                 operation_id,
                 store_id,

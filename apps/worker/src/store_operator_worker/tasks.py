@@ -22,7 +22,6 @@ from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
 )
 from store_operator.jobs.service import (  # type: ignore[import-untyped]
     InvalidJobTransition,
-    JobIdempotencyConflict,
     create_job,
     LeaseLostError,
     acknowledge_job_cancellation,
@@ -57,7 +56,6 @@ from store_operator.channels.douyin import (
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
 from store_operator.config import settings
 from store_operator.object_storage import read_object_bytes
-from store_operator.models.content_delivery import ChannelContentArtifactRef
 from store_operator_worker.celery_app import celery_app
 from store_operator_worker.handlers import (
     JobCancelled,

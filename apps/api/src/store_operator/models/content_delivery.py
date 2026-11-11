@@ -88,7 +88,12 @@ class ArtifactVersion(Base):
             "(content_json IS NOT NULL) OR (content_ref IS NOT NULL)",
             name="content_required",
         ),
-        Index("ix_artifact_versions_store_artifact_created", "store_id", "artifact_id", "created_at"),
+        Index(
+            "ix_artifact_versions_store_artifact_created",
+            "store_id",
+            "artifact_id",
+            "created_at",
+        ),
         Index("ix_artifact_versions_input_fingerprint", "store_id", "input_fingerprint"),
     )
 
@@ -136,11 +141,24 @@ class ReviewRecord(Base):
             name="decision",
         ),
         CheckConstraint(
-            "decision <> 'revision_requested' OR (comment IS NOT NULL AND length(trim(comment)) > 0)",
+            (
+                "decision <> 'revision_requested' OR "
+                "(comment IS NOT NULL AND length(trim(comment)) > 0)"
+            ),
             name="revision_comment_required",
         ),
-        Index("ix_review_records_store_version_created", "store_id", "artifact_version_id", "created_at"),
-        Index("ix_review_records_store_artifact_created", "store_id", "artifact_id", "created_at"),
+        Index(
+            "ix_review_records_store_version_created",
+            "store_id",
+            "artifact_version_id",
+            "created_at",
+        ),
+        Index(
+            "ix_review_records_store_artifact_created",
+            "store_id",
+            "artifact_id",
+            "created_at",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)

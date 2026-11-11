@@ -963,7 +963,7 @@ def _load_douyin_publish_context(
                 "Douyin post title and body must be text.",
                 retryable=False,
             )
-        post_text = "\\n".join(part.strip() for part in (title, body) if part.strip())
+        post_text = "\n".join(part.strip() for part in (title, body) if part.strip())
         if not post_text or len(post_text) > 1000:
             raise JobExecutionError(
                 "DOUYIN_CONTENT_TEXT_INVALID",
@@ -1155,12 +1155,7 @@ def execute_douyin_publish(
             store_id=context.store_id,
         )
     except JobExecutionError as exc:
-        if exc.code in {
-            "PUBLISH_PREREQUISITE_CHANGED",
-            "PUBLISH_PACKAGE_BINDING_INVALID",
-            "PUBLISH_PACKAGE_SUPERSEDED",
-            "PUBLISH_RESULT_UNKNOWN",
-        }:
+        if exc.code not in {"PUBLISH_OPERATION_NOT_FOUND", "PUBLISH_OPERATION_NOT_READY"}:
             _mark_douyin_operation(
                 operation_id,
                 status="needs_human",
@@ -1328,18 +1323,28 @@ def execute_douyin_readback(
                 ChannelAccount.status == "active",
             )
         )
-        if account is None or account.access_token_expires_at <= datetime.now(UTC):
-            operation.status = "needs_human"
-            operation.last_error_code = "DOUYIN_ACCOUNT_REAUTH_REQUIRED"
-            operation.last_error_summary = "The Douyin account requires reauthorization."
-            raise JobExecutionError(
-                "DOUYIN_ACCOUNT_REAUTH_REQUIRED",
-                "The Douyin account requires reauthorization before readback.",
-                retryable=False,
-            )
-        token_ref = account.access_token_secret_ref
-        open_id = account.external_account_id
+        account_requires_reauth = (
+            account is None or account.access_token_expires_at <= datetime.now(UTC)
+        )
+        if account_requires_reauth:
+            token_ref = ""
+            open_id = ""
+        else:
+            token_ref = account.access_token_secret_ref
+            open_id = account.external_account_id
         item_id = operation.platform_item_id
+    if account_requires_reauth:
+        _mark_douyin_operation(
+            operation_id,
+            status="needs_human",
+            error_code="DOUYIN_ACCOUNT_REAUTH_REQUIRED",
+            error_summary="The Douyin account requires reauthorization.",
+        )
+        raise JobExecutionError(
+            "DOUYIN_ACCOUNT_REAUTH_REQUIRED",
+            "The Douyin account requires reauthorization before readback.",
+            retryable=False,
+        )
     try:
         access_token = _load_douyin_access_token(token_ref)
         found = asyncio.run(

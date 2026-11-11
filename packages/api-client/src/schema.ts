@@ -353,6 +353,132 @@ export interface components {
              */
             user_id: string;
         };
+        /** ProductCreate */
+        ProductCreate: {
+            /** Allergens And Restrictions Json */
+            allergens_and_restrictions_json?: string[] | null;
+            /**
+             * Availability Status
+             * @default unknown
+             */
+            availability_status: string;
+            /** Category */
+            category?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Delivery Method */
+            delivery_method?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Ingredients Or Materials */
+            ingredients_or_materials?: string | null;
+            /** Inventory Quantity */
+            inventory_quantity?: number | string | null;
+            /** Key Selling Points Json */
+            key_selling_points_json?: string[] | null;
+            /** Name */
+            name: string;
+            /** Price Amount */
+            price_amount?: number | string | null;
+            /** Service Process */
+            service_process?: string | null;
+            /** Sku */
+            sku?: string | null;
+            /** Specification */
+            specification?: string | null;
+            /** Unit */
+            unit?: string | null;
+        };
+        /** ProductList */
+        ProductList: {
+            /** Items */
+            items: components["schemas"]["ProductRead"][];
+            /** Total */
+            total: number;
+        };
+        /** ProductRead */
+        ProductRead: {
+            /** Allergens And Restrictions Json */
+            allergens_and_restrictions_json?: string[] | null;
+            /**
+             * Availability Status
+             * @default unknown
+             */
+            availability_status: string;
+            /** Category */
+            category?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Current Version */
+            current_version: number;
+            /** Delivery Method */
+            delivery_method?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ingredients Or Materials */
+            ingredients_or_materials?: string | null;
+            /** Inventory Quantity */
+            inventory_quantity?: string | null;
+            /** Key Selling Points Json */
+            key_selling_points_json?: string[] | null;
+            /** Name */
+            name: string;
+            /** Price Amount */
+            price_amount?: string | null;
+            /** Service Process */
+            service_process?: string | null;
+            /** Sku */
+            sku?: string | null;
+            /** Specification */
+            specification?: string | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Unit */
+            unit?: string | null;
+        };
+        /** ProductUpdate */
+        ProductUpdate: {
+            /** Allergens And Restrictions Json */
+            allergens_and_restrictions_json?: string[] | null;
+            /** Availability Status */
+            availability_status?: string | null;
+            /** Category */
+            category?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Delivery Method */
+            delivery_method?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Ingredients Or Materials */
+            ingredients_or_materials?: string | null;
+            /** Inventory Quantity */
+            inventory_quantity?: number | string | null;
+            /** Key Selling Points Json */
+            key_selling_points_json?: string[] | null;
+            /** Name */
+            name?: string | null;
+            /** Price Amount */
+            price_amount?: number | string | null;
+            /** Service Process */
+            service_process?: string | null;
+            /** Sku */
+            sku?: string | null;
+            /** Specification */
+            specification?: string | null;
+            /** Unit */
+            unit?: string | null;
+        };
         /** SessionSummary */
         SessionSummary: {
             /**

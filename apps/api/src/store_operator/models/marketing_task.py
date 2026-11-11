@@ -142,10 +142,10 @@ class RequirementSnapshot(StoreTaskScoped, Base):
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     content_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     created_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
     confirmed_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -192,10 +192,10 @@ class StrategySnapshot(StoreTaskScoped, Base):
     schema_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     content_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     created_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
     confirmed_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -247,10 +247,10 @@ class BusinessFactSnapshot(StoreTaskScoped, Base):
         String(24), nullable=False, server_default="pending"
     )
     created_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
     confirmed_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -346,13 +346,13 @@ class StepDecision(StoreTaskScoped, Base):
     reason: Mapped[str | None] = mapped_column(Text)
     actor_type: Mapped[str] = mapped_column(String(24), nullable=False)
     actor_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
     evidence_json: Mapped[dict[str, object]] = mapped_column(
         JSONB, nullable=False, server_default="{}"
     )
     idempotency_record_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("idempotency_records.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
 
 
@@ -438,7 +438,7 @@ class TaskEvent(StoreTaskScoped, Base):
     aggregate_version: Mapped[int] = mapped_column(Integer, nullable=False)
     actor_type: Mapped[str] = mapped_column(String(24), nullable=False)
     actor_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True)
     )
     correlation_id: Mapped[str | None] = mapped_column(String(128))
     causation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))

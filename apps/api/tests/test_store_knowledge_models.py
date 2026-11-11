@@ -94,6 +94,7 @@ def test_idempotency_records_are_store_scoped_and_expirable() -> None:
     table = Base.metadata.tables["idempotency_records"]
     assert table.c.store_id.nullable is False
     assert table.c.idempotency_key.nullable is False
+    assert table.c.actor_user_id.nullable is True
     assert table.c.request_hash.nullable is False
     assert table.c.expires_at.nullable is False
     assert any(
@@ -101,4 +102,10 @@ def test_idempotency_records_are_store_scoped_and_expirable() -> None:
         and tuple(column.name for column in constraint.columns)
         == ("store_id", "idempotency_key")
         for constraint in table.constraints
+    )
+    assert any(
+        element.target_fullname == "users.id"
+        for foreign_key in table.foreign_keys
+        for element in [foreign_key]
+        if foreign_key.parent.name == "actor_user_id"
     )

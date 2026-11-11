@@ -491,6 +491,9 @@ class IdempotencyRecord(StoreScoped, Base):
     )
 
     idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
     operation: Mapped[str] = mapped_column(String(120), nullable=False)
     request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(

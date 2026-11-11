@@ -50,6 +50,7 @@ jobs:
           enable-cache: false
       - run: uv sync --locked --extra dev --directory apps/api
       - run: uv run --locked --directory apps/api ruff check .
+      - run: uv run --locked --directory apps/api mypy src
       - run: uv run --locked --directory apps/api alembic upgrade head
       - run: uv run --locked --directory apps/api alembic downgrade base
       - run: uv run --locked --directory apps/api alembic upgrade head
@@ -65,6 +66,7 @@ jobs:
       - run: uv sync --locked --extra dev --directory apps/api
       - run: uv sync --locked --directory apps/worker
       - run: uv run --locked --directory apps/api ruff check ../worker
+      - run: PYTHONPATH="$GITHUB_WORKSPACE/apps/worker/src" uv run --locked --directory apps/api mypy ../worker/src
       - run: |
           PYTHONPATH="$GITHUB_WORKSPACE/apps/worker/src" REDIS_URL=redis://localhost:6379/0 uv run --locked --directory apps/worker python -c 'from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {"status": "ok"}'
 

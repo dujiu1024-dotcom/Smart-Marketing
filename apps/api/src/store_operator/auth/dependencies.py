@@ -46,7 +46,6 @@ def validate_browser_origin(request: Request) -> None:
 
 def get_current_session(
     request: Request,
-    response: Response,
     db: Session = Depends(get_db),
 ) -> AuthenticatedSession:
     raw_token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -57,6 +56,7 @@ def get_current_session(
     try:
         auth_session = db.scalar(select(AuthSession).where(AuthSession.token_hash == verifier))
         if auth_session is None or auth_session.revoked_at is not None:
+            request.state.clear_session_cookie = True
             raise ApiError(401, "UNAUTHENTICATED", "Unauthenticated")
         user = db.get(User, auth_session.user_id)
         now = datetime.now(UTC)
@@ -71,9 +71,7 @@ def get_current_session(
                 auth_session.revoked_at = now
                 auth_session.revoke_reason = "expired_or_invalidated"
                 db.commit()
-            response.delete_cookie(
-                SESSION_COOKIE_NAME, path="/", secure=True, httponly=True, samesite="lax"
-            )
+            request.state.clear_session_cookie = True
             raise ApiError(401, "UNAUTHENTICATED", "Unauthenticated")
 
         if auth_session.last_seen_at <= now - timedelta(

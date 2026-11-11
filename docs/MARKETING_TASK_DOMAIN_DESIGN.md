@@ -316,7 +316,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 2. 任务类型、节点键、生命周期状态、TaskStep 状态及适用性矩阵以本文件第 2、3 节为准；前端不得自行推导迁移。
 3. #5 的 request-scoped AuthorizedStoreContext 是唯一门店授权来源；#6 的 StoreRecordRevision/MediaAsset 是经营事实与素材来源；#9 的 Job 状态不得映射为业务步骤状态。
 4. 所有快照、产物版本、审核记录、依赖边、事件、发布包和最终确认采用追加写/不可变语义；依赖失效按版本 ID + 内容指纹计算闭包。
-5. 用户写 API 使用共享幂等记录。数据库唯一范围保持 store_id + idempotency_key；记录 actor_user_id、operation 和 request_hash。同一操作者、同一操作、同一请求才允许重放；跨操作者或不同请求体复用 key 返回 409。#6 PR #49 实现该操作者绑定后，#7 直接复用，不另造幂等表。
+5. 用户写 API 使用共享幂等记录。数据库唯一范围保持 store_id + idempotency_key；记录 actor_user_id、operation 和 request_hash。同一操作者、同一操作、同一请求才允许重放；跨操作者或不同请求体复用 key 返回 409。#6 PR #49 已合并实现该操作者绑定，#7 直接复用，不另造幂等表。
 6. MarketingTask 当前快照指针与 Artifact 当前版本指针允许在创建事务中先为空，再在对应快照/版本插入后更新；复合外键保证 store/task/artifact 归属，不依赖全局 UUID 单列引用。
 7. 不选择具体渠道平台，不在 #7 实现平台 OAuth/SDK；不引入 n8n、ComfyUI 或微服务拆分。首期仍为模块化单体，平台专属能力由 #12 单独立项。
 8. 设计冻结不代表 ORM、Migration、API、Worker Handler、前端或生产验收已完成；这些仍由后续编码 PR 和验收矩阵交付。
@@ -416,13 +416,13 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | publish_confirmations | task_id, publish_package_id, package_fingerprint, confirmed_by_user_id, confirmed_at, confirmation_text | 不可变确认记录，绑定整个冻结包的精确指纹；首期不提供撤销 |
 | task_events | task_id, aggregate_version, event_type, actor_id, actor_type, correlation_id, causation_id, payload_json, schema_version, occurred_at | 追加写；event_id 唯一 |
 | audit_events | actor_id, actor_type, action, resource_type, resource_id, result, reason, request_id, correlation_id, metadata_json, occurred_at | 追加写；敏感凭据禁止进入 metadata |
-| idempotency_records | actor_id, operation, idempotency_key, request_hash, resource_type, resource_id, response_status, response_json, expires_at | (store_id,actor_id,operation,idempotency_key) 唯一 |
+| idempotency_records | actor_user_id, operation, idempotency_key, request_hash, resource_type, resource_id, response_status, response_json, expires_at | (store_id,idempotency_key) 唯一；actor/operation/hash 校验重放，跨操作者复用返回 409 |
 | outbox_events | event_id, aggregate_type, aggregate_id, event_type, payload_json, occurred_at, published_at, publish_attempts | event_id 唯一；投递失败可重试 |
 
 ### 15.3 外键与门店隔离关系
 
 - marketing_tasks 是任务聚合根；requirement_snapshots、strategy_snapshots、business_fact_snapshots、task_steps、artifacts、task_events 等均通过 (store_id, task_id) 引用任务。
-- strategy_snapshots 通过 (store_id, task_id, requirement_snapshot_id) 引用同一任务的需求快照；任务当前快照指针使用延迟约束或应用事务校验，避免循环建表依赖。
+- strategy_snapshots 通过 (store_id, task_id, requirement_snapshot_id) 引用同一任务的需求快照；任务当前快照指针在父对象、快照依次插入后于同一事务更新，并由 (store_id,task_id,snapshot_id) 复合外键校验归属。
 - artifact_versions 通过 (store_id, task_id, artifact_id) 引用产物；artifacts.current_version_id 必须引用同一 artifact 的版本。
 - review_records 与 revision_requests 必须引用同门店、同任务、同产物的精确版本；禁止只保存全局 artifact_version_id 而不验证归属链。
 - dependency_edges 两端都必须归属同门店同任务；若依赖门店资料快照，使用显式 upstream_type/source_ref 与来源版本快照，不建立跨域可写外键。

@@ -32,7 +32,7 @@ from store_operator.jobs.service import (
 from store_operator.models import AIInvocation, AIUsageRecord, Job, JobEvent
 
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(tags=["jobs"])
 
 
 def _store_id(context: AuthContext) -> UUID:
@@ -66,7 +66,7 @@ def _raise_job_error(exc: Exception) -> NoReturn:
     raise exc
 
 
-@router.get("/{job_id}", response_model=JobDetailRead)
+@router.get("/jobs/{job_id}", response_model=JobDetailRead)
 def get_job(
     job_id: UUID,
     context: Annotated[AuthContext, Depends(require_store_context)],
@@ -167,7 +167,7 @@ def resolve_human_job(
     return JobRead.model_validate(job)
 
 
-@router.get("/../ai/invocations/{invocation_id}", response_model=AIInvocationRead)
+@router.get("/ai/invocations/{invocation_id}", response_model=AIInvocationRead)
 def get_ai_invocation(
     invocation_id: UUID,
     context: Annotated[AuthContext, Depends(require_store_context)],

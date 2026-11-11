@@ -13,13 +13,26 @@ celery_app.conf.update(
     result_serializer="json",
     task_track_started=True,
     task_acks_late=True,
+    task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
     broker_transport_options={"visibility_timeout": 3600},
     task_default_queue="default",
+    beat_schedule={
+        "relay-postgres-outbox-every-second": {
+            "task": "jobs.relay_outbox",
+            "schedule": 1.0,
+        },
+        "recover-expired-job-leases-every-30-seconds": {
+            "task": "jobs.recover_expired_leases",
+            "schedule": 30.0,
+        },
+    },
 )
+
+from store_operator_worker import tasks as _tasks  # noqa: E402,F401
 
 
 @celery_app.task(name="system.healthcheck")  # type: ignore[untyped-decorator]
 def healthcheck() -> dict[str, str]:
-    """Infrastructure smoke task only; business job persistence is implemented in Issue #9."""
+    """Infrastructure smoke task."""
     return {"status": "ok"}

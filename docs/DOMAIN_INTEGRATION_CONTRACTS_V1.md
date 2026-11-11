@@ -119,12 +119,12 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 - Copy 与 Image review 分开保存和查询。
 
 ### ChannelContent
-`id, store_id, task_id, channel_key, channel_account_id, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。
+`id, store_id, task_id, channel_key, channel_account_id, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。每个渠道/输入指纹对应不可变快照；变更创建新记录。
 - 渠道规则与账号能力分开：spec_version 表示适配规格版本；账号授权和支持能力由 Channel Integration 持有。
 - 变体依赖指纹变化时标 stale。
 
 ### QualityReport
-`id, store_id, task_id, channel_content_id, rule_version, input_fingerprint, result(pass|fail|needs_human), issues_json, created_at`。
+`id, store_id, task_id, channel_content_id, rule_version, input_fingerprint, result(pass|fail|needs_human), issues_json, reviewer_id, resolution_reason, created_at`。
 - 硬性问题未解决不能冻结发布包；人工复核结果必须有操作者和理由。
 
 ### PublishPackage / PublishPackageItem / PublishConfirmation
@@ -232,7 +232,7 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 
 | Event | Owner | Consumers | 语义 |
 |---|---|---|---|
-| identity.store_user.activated/removed | #5 | #6–#10 | 成员授权变化，触发权限缓存失效/待执行操作重新评估 |
+| identity.store_membership.activated/removed | #5 | #6–#10 | 成员授权变化，触发权限缓存失效/待执行操作重新评估 |
 | identity.store.suspended | #5 | #6–#10 | 阻断新操作；发布副作用前重新验证 |
 | store.fact.confirmed/changed | #6 | #7–#10 | 事实版本变化，更新任务快照/依赖指纹 |
 | store.asset.created/versioned | #6 | #8/#10 | 新素材可被任务引用 |
@@ -245,6 +245,7 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 | content.publish_package_frozen | #8 | #7 | 多渠道交付包已冻结 |
 | content.publish_confirmed | #8 | #9 | 商家确认整个 package fingerprint，可请求发布 Job |
 | content.publish_command_requested | #8 | #12/#9 | 每个 official_api PackageItem 单独提交受控发布命令 |
+| channel.publish_operation_started/succeeded/failed/needs_human | #12 | #7/#8/#9 | 外部发布状态必须由平台证据确认 |
 | job.succeeded/failed/needs_human | #9 | 发起该 Job 的业务域 | 回传执行结果；业务域校验后更新自己的状态 |
 | ai.invocation.completed/failed | #9 | #7/#8/#10 | 调用审计/成本与任务关联 |
 

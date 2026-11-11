@@ -108,6 +108,9 @@ class PublishOperation(Base):
     __tablename__ = "publish_operations"
     __table_args__ = (
         UniqueConstraint("store_id", "idempotency_key", name="uq_publish_operations_store_key"),
+        UniqueConstraint(
+            "store_id", "publish_package_item_id", name="uq_publish_operations_package_item"
+        ),
         UniqueConstraint("store_id", "id", name="uq_publish_operations_store_id"),
         ForeignKeyConstraint(
             ["store_id", "publish_package_id"],

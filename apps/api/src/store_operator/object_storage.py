@@ -44,6 +44,7 @@ def create_upload_url(
             "Key": object_key,
             "ContentType": mime_type,
             "ContentLength": byte_size,
+            "IfNoneMatch": "*",
             "Metadata": {"sha256": sha256},
         },
         ExpiresIn=expires_in or settings.object_storage_upload_ttl_seconds,

@@ -656,6 +656,7 @@ def test_optional_step_can_be_skipped_but_required_review_cannot(
     payload["task_options"] = {
         "includes_copy": True,
         "includes_image": False,
+        "opportunity_applicable": True,
         "selected_channel_keys": [],
         "requires_external_delivery": False,
     }

@@ -29,7 +29,10 @@ class MarketingTaskCreate(BaseModel):
     @model_validator(mode="after")
     def validate_task_scope(self) -> "MarketingTaskCreate":
         options = self.task_options
-        if self.task_type is MarketingTaskType.COPY_ONLY:
+        if self.task_type is MarketingTaskType.FULL_MARKETING:
+            if options.includes_copy is False or options.includes_image is False:
+                raise ValueError("full_marketing tasks must include both copy and image")
+        elif self.task_type is MarketingTaskType.COPY_ONLY:
             if options.includes_copy is False or options.includes_image is True:
                 raise ValueError("copy_only tasks must include copy and cannot include image")
         elif self.task_type in {

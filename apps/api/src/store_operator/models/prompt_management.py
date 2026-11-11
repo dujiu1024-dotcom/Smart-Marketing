@@ -150,6 +150,7 @@ class PromptActivation(Base):
             "request_hash ~ '^[0-9a-f]{64}$'",
             name="hashes",
         ),
+    )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     prompt_template_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)

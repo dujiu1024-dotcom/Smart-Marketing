@@ -197,7 +197,7 @@ def create_job(
         if winner.request_hash != request_hash:
             raise JobIdempotencyConflict(
                 "Idempotency key was used for another request"
-            )
+            ) from exc
         return winner
 
     outbox_id = uuid4()

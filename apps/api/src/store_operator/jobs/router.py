@@ -31,7 +31,6 @@ from store_operator.jobs.service import (
 )
 from store_operator.models import AIInvocation, AIUsageRecord, Job, JobEvent
 
-
 router = APIRouter(tags=["jobs"])
 
 

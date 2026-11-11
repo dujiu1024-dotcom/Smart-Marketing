@@ -25,7 +25,7 @@
 - #5：认证、Session、门店成员关系、授权上下文和授权审计。
 - #6：门店经营资料、事实确认、知识条目、素材库和对象存储元数据。
 - #7：营销任务聚合、业务状态机、快照、依赖图、业务事件。
-- #8：文案/图片产物与独立审核、渠道内容、质检、冻结发布包、商家最终确认。
+- #8：文案/图片产物与独立审核、渠道内容、质检报告及人工复核决议、冻结发布包、商家最终确认。
 - #9：Job Runtime、Outbox、Worker 租约/重试/恢复、AI Gateway 调用契约与成本审计。
 - #10：真实 Text/Image/Vision/OCR Provider 适配、PromptTemplate/PromptVersion 版本管理。
 - #12：ChannelAccount、OAuth/授权凭据、平台能力矩阵、平台 API 与 PublishOperation。

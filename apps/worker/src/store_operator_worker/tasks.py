@@ -9,7 +9,6 @@ from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError  # type: ignore[import-untyped]
 from sqlalchemy import create_engine, or_, select
 from sqlalchemy.orm import sessionmaker
-
 from store_operator.jobs.service import claim_job, fail_job
 from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent
 

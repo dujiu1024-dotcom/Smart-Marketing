@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     LargeBinary,
@@ -108,6 +109,34 @@ class PublishOperation(Base):
     __table_args__ = (
         UniqueConstraint("store_id", "idempotency_key", name="uq_publish_operations_store_key"),
         UniqueConstraint("store_id", "id", name="uq_publish_operations_store_id"),
+        ForeignKeyConstraint(
+            ["store_id", "publish_package_id"],
+            ["publish_packages.store_id", "publish_packages.id"],
+            name="fk_publish_operations_package_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "publish_package_item_id"],
+            ["publish_package_items.store_id", "publish_package_items.id"],
+            name="fk_publish_operations_package_item_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "publish_package_id", "confirmed_package_fingerprint"],
+            [
+                "publish_confirmations.store_id",
+                "publish_confirmations.publish_package_id",
+                "publish_confirmations.package_fingerprint",
+            ],
+            name="fk_publish_operations_confirmation_same_package",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "channel_account_id"],
+            ["channel_accounts.store_id", "channel_accounts.id"],
+            name="fk_publish_operations_channel_account_same_store",
+            ondelete="RESTRICT",
+        ),
         Index("ix_publish_operations_status_available", "status", "next_attempt_at"),
         Index("ix_publish_operations_store_created", "store_id", "created_at"),
         CheckConstraint(
@@ -123,20 +152,18 @@ class PublishOperation(Base):
         PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False
     )
     publish_package_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("publish_packages.id", ondelete="RESTRICT"), nullable=False
+        PGUUID(as_uuid=True), nullable=False
     )
     publish_package_item_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("publish_package_items.id", ondelete="RESTRICT"),
         nullable=False,
     )
     publish_confirmation_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
-        ForeignKey("publish_confirmations.id", ondelete="RESTRICT"),
         nullable=False,
     )
     channel_account_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("channel_accounts.id", ondelete="RESTRICT"), nullable=False
+        PGUUID(as_uuid=True), nullable=False
     )
     idempotency_key: Mapped[str] = mapped_column(String(200), nullable=False)
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)

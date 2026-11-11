@@ -414,7 +414,9 @@ def rollback_prompt_version(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     _admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
     db: Annotated[Session, Depends(get_db)],
-    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    idempotency_key: Annotated[
+        str, Header(alias="Idempotency-Key", min_length=8, max_length=200)
+    ],
 ) -> dict[str, object]:
     key_hash = _idempotency_hash(template_id, idempotency_key)
     request_hash = _request_fingerprint(

@@ -5,10 +5,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Header, Query, Request
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from store_operator.auth.audit import record_audit
 from store_operator.auth.context import AuthContext
 from store_operator.auth.dependencies import (
     AuthenticatedSession,
@@ -22,7 +24,18 @@ from store_operator.channels.oauth_state import consume_oauth_state, new_oauth_s
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
 from store_operator.config import settings
 from store_operator.db import get_db
-from store_operator.models.channel_delivery import ChannelAccount, OAuthAuthorizationAttempt
+from store_operator.jobs.service import JobIdempotencyConflict, create_job
+from store_operator.models.channel_delivery import (
+    ChannelAccount,
+    OAuthAuthorizationAttempt,
+    PublishOperation,
+)
+from store_operator.models.content_delivery import (
+    PublishConfirmation,
+    PublishPackage,
+    PublishPackageItem,
+)
+from store_operator.models.job_runtime import Job
 from store_operator.models.identity import Store, StoreMembership
 
 router = APIRouter(prefix="/channels/douyin", tags=["channel-accounts"])
@@ -375,4 +388,216 @@ async def refresh_douyin_account_token(
             else None
         ),
         "last_verified_at": current.last_verified_at.isoformat(),
+    }
+
+
+class DouyinPublishOperationRequest(BaseModel):
+    publish_package_id: UUID
+    publish_package_item_id: UUID
+    package_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+@router.post("/publish-operations", status_code=202)
+def create_douyin_publish_operation(
+    payload: DouyinPublishOperationRequest,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> dict[str, object]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+    normalized_key = idempotency_key.strip()
+    if not normalized_key or len(normalized_key) > 200:
+        raise ApiError(400, "IDEMPOTENCY_KEY_INVALID", "A valid idempotency key is required")
+
+    package = db.scalar(
+        select(PublishPackage)
+        .where(
+            PublishPackage.id == payload.publish_package_id,
+            PublishPackage.store_id == store_id,
+        )
+        .with_for_update()
+    )
+    if package is None:
+        raise ApiError(404, "PUBLISH_PACKAGE_NOT_FOUND", "Publish package not found")
+    if package.package_fingerprint != payload.package_fingerprint:
+        raise ApiError(409, "PACKAGE_STALE", "Publish package fingerprint has changed")
+
+    item = db.scalar(
+        select(PublishPackageItem).where(
+            PublishPackageItem.id == payload.publish_package_item_id,
+            PublishPackageItem.store_id == store_id,
+            PublishPackageItem.publish_package_id == package.id,
+        )
+    )
+    if item is None:
+        raise ApiError(404, "PUBLISH_PACKAGE_ITEM_NOT_FOUND", "Publish package item not found")
+    if item.delivery_mode != "official_api" or item.channel_key != "douyin":
+        raise ApiError(
+            409,
+            "DOUYIN_OFFICIAL_DELIVERY_REQUIRED",
+            "Only a frozen Douyin official-API package item can be published here",
+        )
+    if item.channel_account_id is None:
+        raise ApiError(409, "DOUYIN_ACCOUNT_REQUIRED", "A Douyin account is required")
+
+    latest_version = db.scalar(
+        select(func.max(PublishPackage.package_version)).where(
+            PublishPackage.store_id == store_id,
+            PublishPackage.task_id == package.task_id,
+        )
+    )
+    if latest_version != package.package_version:
+        raise ApiError(409, "PACKAGE_STALE", "A newer publish package exists")
+
+    confirmation = db.scalar(
+        select(PublishConfirmation).where(
+            PublishConfirmation.store_id == store_id,
+            PublishConfirmation.publish_package_id == package.id,
+            PublishConfirmation.package_fingerprint == package.package_fingerprint,
+        )
+    )
+    if confirmation is None:
+        raise ApiError(
+            422,
+            "MERCHANT_CONFIRMATION_REQUIRED",
+            "The exact frozen package must be confirmed by a merchant before publishing",
+        )
+
+    account = db.scalar(
+        select(ChannelAccount).where(
+            ChannelAccount.id == item.channel_account_id,
+            ChannelAccount.store_id == store_id,
+            ChannelAccount.provider == "douyin",
+            ChannelAccount.status == "active",
+        )
+    )
+    if account is None:
+        raise ApiError(
+            409,
+            "DOUYIN_ACCOUNT_NOT_ACTIVE",
+            "The bound Douyin account is no longer active; reconnect it before publishing",
+        )
+
+    request_fingerprint = hashlib.sha256(
+        "|".join(
+            (
+                str(store_id),
+                str(package.id),
+                str(item.id),
+                package.package_fingerprint,
+                str(account.id),
+            )
+        ).encode("utf-8")
+    ).hexdigest()
+
+    existing = db.scalar(
+        select(PublishOperation)
+        .where(
+            PublishOperation.store_id == store_id,
+            PublishOperation.idempotency_key == normalized_key,
+        )
+        .with_for_update()
+    )
+    if existing is not None:
+        if existing.request_fingerprint != request_fingerprint:
+            raise ApiError(
+                409,
+                "PUBLISH_IDEMPOTENCY_CONFLICT",
+                "Idempotency key was used for a different publish request",
+            )
+        existing_job = db.scalar(
+            select(Job).where(
+                Job.idempotency_scope_type == "store",
+                Job.idempotency_scope_id == store_id,
+                Job.idempotency_key == f"douyin-publish-operation:{existing.id}",
+            )
+        )
+        return {
+            "publish_operation_id": str(existing.id),
+            "job_id": str(existing_job.id) if existing_job else None,
+            "status": existing.status,
+            "platform_item_id": existing.platform_item_id,
+            "idempotent_replay": True,
+        }
+
+    existing_item_operation = db.scalar(
+        select(PublishOperation).where(
+            PublishOperation.store_id == store_id,
+            PublishOperation.publish_package_item_id == item.id,
+        )
+    )
+    if existing_item_operation is not None:
+        raise ApiError(
+            409,
+            "PUBLISH_OPERATION_ALREADY_EXISTS",
+            "This frozen package item already has a publish operation",
+        )
+
+    operation = PublishOperation(
+        id=uuid4(),
+        store_id=store_id,
+        publish_package_id=package.id,
+        publish_package_item_id=item.id,
+        publish_confirmation_id=confirmation.id,
+        channel_account_id=account.id,
+        idempotency_key=normalized_key,
+        request_fingerprint=request_fingerprint,
+        status="queued",
+        attempt_count=0,
+        confirmed_by_user_id=confirmation.confirmed_by_user_id,
+        confirmed_package_fingerprint=package.package_fingerprint,
+    )
+    db.add(operation)
+    db.flush()
+
+    try:
+        job = create_job(
+            db,
+            job_type="channel.douyin.publish",
+            payload_ref={
+                "schema_version": 1,
+                "publish_operation_id": str(operation.id),
+            },
+            idempotency_key=f"douyin-publish-operation:{operation.id}",
+            store_id=store_id,
+            actor_type="user",
+            actor_user_id=auth.user.id,
+            marketing_task_id=package.task_id,
+            max_attempts=3,
+            timeout_seconds=600,
+        )
+    except JobIdempotencyConflict as exc:
+        raise ApiError(
+            409,
+            "PUBLISH_JOB_IDEMPOTENCY_CONFLICT",
+            "A conflicting publish job already exists",
+        ) from exc
+
+    record_audit(
+        db,
+        request,
+        action="channel.douyin.publish_operation.created",
+        target_type="publish_operation",
+        target_id=operation.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "publish_package_id": str(package.id),
+            "publish_package_item_id": str(item.id),
+            "channel_account_id": str(account.id),
+            "confirmation_id": str(confirmation.id),
+            "job_id": str(job.id),
+        },
+    )
+    db.commit()
+    return {
+        "publish_operation_id": str(operation.id),
+        "job_id": str(job.id),
+        "status": operation.status,
+        "platform_item_id": operation.platform_item_id,
+        "idempotent_replay": False,
     }

@@ -1,6 +1,9 @@
 import pytest
 
 from store_operator.domain.marketing_task import (
+    DependencyEdgeSnapshot,
+    DependencyGraphCycleError,
+    DependencyImpactPolicy,
     InvalidMarketingTaskTransition,
     InvalidTaskStepTransition,
     MarketingTaskStatus,
@@ -13,7 +16,9 @@ from store_operator.domain.marketing_task import (
     ensure_step_transition,
     ensure_task_can_complete,
     ensure_task_transition,
+    compute_stale_downstream,
     resolve_step_applicability,
+    validate_dependency_graph,
 )
 
 
@@ -350,4 +355,41 @@ def test_invalid_task_types_and_empty_merchant_content_are_rejected() -> None:
             TaskStepKey.CONTEXT_SNAPSHOT,
             includes_copy=False,
             includes_image=False,
+        )
+
+
+
+def test_dependency_invalidation_respects_impact_policy() -> None:
+    edges = [
+        DependencyEdgeSnapshot("requirement", "strategy"),
+        DependencyEdgeSnapshot("strategy", "copy"),
+        DependencyEdgeSnapshot(
+            "copy", "channel", DependencyImpactPolicy.RECHECK
+        ),
+        DependencyEdgeSnapshot("channel", "publish_package"),
+        DependencyEdgeSnapshot(
+            "strategy", "independent_image", DependencyImpactPolicy.IGNORE
+        ),
+    ]
+
+    assert compute_stale_downstream({"requirement"}, edges) == frozenset(
+        {"strategy", "copy", "channel"}
+    )
+
+
+def test_dependency_graph_rejects_cycles_and_invalid_policies() -> None:
+    with pytest.raises(DependencyGraphCycleError, match="acyclic"):
+        validate_dependency_graph(
+            [
+                DependencyEdgeSnapshot("requirement", "strategy"),
+                DependencyEdgeSnapshot("strategy", "requirement"),
+            ]
+        )
+
+    with pytest.raises(DependencyGraphCycleError, match="itself"):
+        validate_dependency_graph([DependencyEdgeSnapshot("copy", "copy")])
+
+    with pytest.raises(ValueError, match="Unknown dependency impact policy"):
+        validate_dependency_graph(
+            [DependencyEdgeSnapshot("copy", "channel", "unknown")]
         )

@@ -422,7 +422,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 - artifact_versions 通过 (store_id, task_id, artifact_id) 引用产物；artifacts.current_version_id 必须引用同一 artifact 的版本。
 - review_records 与 revision_requests 必须引用同门店、同任务、同产物的精确版本；禁止只保存全局 artifact_version_id 而不验证归属链。
 - dependency_edges 两端都必须归属同门店同任务；若依赖门店资料快照，使用显式 upstream_type/source_ref 与来源版本快照，不建立跨域可写外键。
-- channel_contents.copy_version_id 引用同任务已审核的文案版本；channel_content_artifact_refs 引用已审核图片版本；quality_reports 引用确切 ChannelContent；publish_packages 通过 publish_package_items 聚合渠道快照；publish_confirmations 引用冻结发布包。PublishOperation 由 #12 持有，不在 #7/#8 建立 publish_attempts 表。
+- channel_contents.copy_version_id 通过 (store_id,task_id,artifact_version_id) 复合 FK 引用同任务已审核的文案版本；channel_content_artifact_refs 通过 store_id 复合 FK 引用已审核图片版本；quality_reports 引用确切 ChannelContent；publish_package_items 的 channel_key 必须匹配 ChannelContent，且 QualityReport 必须属于同一 ChannelContent；publish_packages 通过 publish_package_items 聚合渠道快照；publish_confirmations 引用冻结发布包。PublishOperation 由 #12 持有，不在 #7/#8 建立 publish_attempts 表。
 - jobs 属于轨道 D 的异步基础设施模型，但必须携带 store_id、task_id、触发 actor、目标资源引用和输入指纹，并在领取/写回时校验归属。具体 Job 表不在本节重复定义。
 
 ### 15.4 必需索引（逻辑要求）
@@ -435,8 +435,9 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | artifact_versions | (store_id,artifact_id,version_no DESC) |
 | review_records | (store_id,task_id,artifact_version_id,reviewed_at DESC) |
 | dependency_edges | (store_id,task_id,upstream_type,upstream_id,upstream_version_id)；下游反向索引 |
-| channel_contents | (store_id,task_id,channel_key,input_fingerprint) |
-| quality_reports | (store_id,channel_content_id,rule_version,input_fingerprint) |
+| channel_contents | (store_id,task_id,channel_key,input_fingerprint)；(store_id,id,channel_key) |
+| channel_content_artifact_refs | (store_id,channel_content_id,position) |
+| quality_reports | (store_id,channel_content_id,rule_version,input_fingerprint)；(store_id,channel_content_id,id) |
 | publish_packages | (store_id,task_id,package_version DESC) |
 | publish_package_items | (store_id,publish_package_id,channel_key) |
 | task_events | (store_id,task_id,occurred_at) |
@@ -519,7 +520,7 @@ erDiagram
 为确保上图关系在数据库层可验证，除通用的 (store_id,id) 唯一键外，以下被引用表必须额外提供对应复合唯一键：
 
 - task 内子资源：父表提供 (store_id, task_id, id)，子表使用 (store_id, task_id, parent_id) 引用。
-- artifact_versions：提供 (store_id, task_id, artifact_id, id)，供 review_records、revision_requests、channel_contents、publish_package_items 等引用精确版本。
+- artifact_versions：提供 (store_id, task_id, artifact_id, id)，供 review_records、revision_requests、channel_contents.copy_version_id 和 channel_content_artifact_refs 引用精确版本。
 - review_records：提供 (store_id, task_id, artifact_id, artifact_version_id, id)，供 revision_requests 证明审核与源版本属于同一产物。
 - publish_packages：提供 (store_id, task_id, id, package_fingerprint)，供 publish_package_items 和 publish_confirmations 绑定包及指纹；PackageItem 另需 (store_id, publish_package_id, channel_key) 唯一键。
 - 当前版本指针（artifacts.current_version_id）需通过延迟约束触发器或事务内强校验，证明版本属于该 artifact；不得仅以 version_id 全局外键代替归属校验。

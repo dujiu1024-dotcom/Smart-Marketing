@@ -306,11 +306,19 @@ class BrandGuidelineFields(BaseModel):
 
 
 class BrandGuidelineCreate(BrandGuidelineFields):
-    pass
+    @model_validator(mode="after")
+    def require_content(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("At least one brand guideline field must be provided")
+        return self
 
 
 class BrandGuidelineUpdate(BrandGuidelineFields):
-    pass
+    @model_validator(mode="after")
+    def require_changes(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("At least one field must be provided")
+        return self
 
 
 class BrandGuidelineRead(BrandGuidelineFields):
@@ -335,3 +343,9 @@ class AudienceProfileList(BaseModel):
 class KnowledgeItemList(BaseModel):
     items: list[KnowledgeItemRead]
     total: int
+
+
+class FactConfirmationRequest(BaseModel):
+    source_type: str = Field(min_length=1, max_length=40)
+    source_ref: str | None = Field(default=None, max_length=500)
+    confirmation_note: str | None = Field(default=None, max_length=2000)

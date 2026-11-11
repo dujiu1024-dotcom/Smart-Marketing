@@ -6,6 +6,26 @@ from threading import Event
 from typing import Callable, Protocol
 from uuid import UUID
 
+from store_operator.ai_gateway.errors import SideEffectState  # type: ignore[import-untyped]
+
+
+class JobExecutionError(Exception):
+    def __init__(
+        self,
+        code: str,
+        safe_summary: str,
+        *,
+        retryable: bool,
+        side_effect_state: SideEffectState = SideEffectState.NONE,
+        retry_delay_seconds: int = 30,
+    ) -> None:
+        super().__init__(safe_summary)
+        self.code = code
+        self.safe_summary = safe_summary
+        self.retryable = retryable
+        self.side_effect_state = side_effect_state
+        self.retry_delay_seconds = retry_delay_seconds
+
 
 class JobCancelled(Exception):
     """Raised by a handler when the user requests cancellation."""

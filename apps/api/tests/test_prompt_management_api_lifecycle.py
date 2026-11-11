@@ -1,11 +1,9 @@
-from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
-from store_operator.main import app
 from store_operator.models.identity import PlatformAdminGrant, User
 from store_operator.models.prompt_management import PromptActivation, PromptTemplate
 

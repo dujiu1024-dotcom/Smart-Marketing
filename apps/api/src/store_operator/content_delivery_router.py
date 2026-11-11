@@ -84,7 +84,6 @@ def _version_payload(version: ArtifactVersion) -> dict[str, object]:
         "source_refs": version.source_refs_json,
         "instruction": version.instruction,
         "content_json": version.content_json,
-        "content_ref": version.content_ref,
         "content_hash": version.content_hash,
         "provider_id": version.provider_id,
         "model_id": version.model_id,

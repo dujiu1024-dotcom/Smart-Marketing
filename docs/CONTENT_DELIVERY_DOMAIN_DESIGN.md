@@ -256,3 +256,12 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - 已增加 API 入队、幂等重放、过期 fingerprint 拒绝测试。
 - 已增加规则集 pass / fail / needs_human / empty payload 单元测试。
 - Worker 端到端执行、数据库真实写入、QualityResolution 人工复核、发布包 Freeze 门禁和浏览器页面尚未验收；必须等待 PR CI 与后续集成测试。
+
+
+### 人工复核接口补充
+
+- API：`POST /api/v1/marketing-tasks/quality-reports/{report_id}/resolutions`
+- 请求字段：`decision(accepted|rejected)`、非空 `reason`、`expected_fingerprint`。
+- 仅允许对当前门店的 `needs_human` 报告追加一次决议；报告 fingerprint 不匹配时返回 409；hard fail/pass 返回 422。
+- QualityReport 本身保持不可变；accepted/rejected 作为独立 QualityResolution 记录，并写审计事件。
+- 当前实现沿用门店授权和 CSRF 写请求约束。更细粒度角色能力仍需与 #5 授权矩阵联动验收。

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -357,3 +357,68 @@ def test_audit_events_are_append_only(identity_client, db_session, monkeypatch):
     with pytest.raises(DBAPIError):
         db_session.flush()
     db_session.rollback()
+
+
+
+def test_expired_session_is_rejected_and_cookie_is_cleared(
+    identity_client, db_session, monkeypatch
+):
+    fake_redis(monkeypatch)
+    user = make_user(db_session, "expired@example.com")
+    make_store(db_session, "Expired Store", user)
+    login(identity_client, "expired@example.com")
+    raw_cookie = identity_client.cookies.get("__Host-ai_store_session")
+    from store_operator.config import settings
+
+    auth_session = db_session.scalar(
+        select(AuthSession).where(
+            AuthSession.token_hash == session_token_verifier(
+                raw_cookie, settings.session_token_pepper
+            )
+        )
+    )
+    assert auth_session is not None
+    auth_session.idle_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    db_session.commit()
+
+    response = identity_client.get("/api/v1/auth/me")
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHENTICATED"
+    assert "Max-Age=0" in response.headers.get("set-cookie", "")
+
+
+def test_logout_revokes_session_and_is_idempotent(identity_client, db_session, monkeypatch):
+    fake_redis(monkeypatch)
+    user = make_user(db_session, "logout@example.com")
+    make_store(db_session, "Logout Store", user)
+    payload = login(identity_client, "logout@example.com")
+
+    logged_out = identity_client.post(
+        "/api/v1/auth/logout",
+        headers={**ORIGIN, "X-CSRF-Token": payload["csrf_token"]},
+    )
+    assert logged_out.status_code == 204
+    assert identity_client.get("/api/v1/auth/me").status_code == 401
+
+    second_logout = identity_client.post("/api/v1/auth/logout", headers=ORIGIN)
+    assert second_logout.status_code == 204
+
+
+def test_two_tabs_use_their_own_store_selector(identity_client, db_session, monkeypatch):
+    fake_redis(monkeypatch)
+    user = make_user(db_session, "multistore@example.com")
+    store_a = make_store(db_session, "Tab A", user)
+    store_b = make_store(db_session, "Tab B", user, role="member")
+    login(identity_client, "multistore@example.com")
+
+    tab_a = identity_client.get(
+        "/_test/store-context", headers={"X-Store-ID": str(store_a.id)}
+    )
+    tab_b = identity_client.get(
+        "/_test/store-context", headers={"X-Store-ID": str(store_b.id)}
+    )
+    assert tab_a.status_code == tab_b.status_code == 200
+    assert tab_a.json()["store_id"] == str(store_a.id)
+    assert tab_a.json()["role"] == "owner"
+    assert tab_b.json()["store_id"] == str(store_b.id)
+    assert tab_b.json()["role"] == "member"

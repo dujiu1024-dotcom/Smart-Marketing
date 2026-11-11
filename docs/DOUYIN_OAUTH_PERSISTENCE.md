@@ -41,6 +41,16 @@ Set these deployment environment variables only after the Douyin website applica
 
 All three Douyin OAuth settings must be supplied together. The Secret Manager region is independently required before credentials can be persisted.
 
+## Frozen package account binding
+
+- Freeze items may select `delivery_mode=official_api` and a store-owned active Douyin account.
+- The API validates provider, active status and the required `user_info`, `video.create.bind` and `video.list` scopes.
+- `channel_account_id` is included in the item fingerprint and immutable frozen package payload.
+- Manual handoff rejects channel-account binding; official API mode rejects a missing account.
+- A composite same-store foreign key protects the package item account reference.
+- `GET /api/v1/channels/douyin/accounts` lists account metadata without exposing Secret Manager references or tokens.
+- `POST /api/v1/channels/douyin/accounts/{account_id}/refresh` refreshes credentials server-side and updates the secret only if the account has not changed concurrently.
+
 ## Remaining integration work
 
 - Add a secure channel-account listing/revoke endpoint and token refresh worker.

@@ -236,3 +236,23 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - 实现时必须先生成 Pydantic/OpenAPI/JSON Schema、SQLAlchemy/Alembic 约束和契约测试，再接 UI。
 - Demo 浏览器验收矩阵中的 FLOW-05/FLOW-06/FLOW-07、STATE-03/STATE-04、SIM-03/SIM-04/SIM-06 必须逐项回归。
 - 本文为设计准备；所有 CNT 测试待执行，不得标记为通过。
+
+
+## 2026-11-11 质检运行时第一阶段实现记录
+
+本阶段在 PR #61 的渠道内容快照 API 之后，增加异步质检请求和 Worker 结果持久化：
+
+- API：`POST /api/v1/marketing-tasks/{task_id}/channel-contents/{content_id}/quality-reports/run`
+- 请求字段：`rule_version`、`expected_fingerprint`；写请求要求 CSRF、当前门店授权和 `Idempotency-Key`。
+- API 校验 ChannelContent 的门店、任务和输入指纹；通过 #9 `create_job` 在同一事务写入 Job + Outbox，返回 202 和 job_id。
+- Job 类型：`content.quality_check`，payload 只包含资源 ID、指纹和规则版本，不包含 Prompt/Token/媒体内容。
+- Worker 再次校验门店归属、ChannelContent 指纹、当前文案/图片版本和各自审核状态，防止排队期间上游版本变化。
+- QualityReport 以 ChannelContent + rule_version + SHA-256 fingerprint 幂等创建，报告只追加，不更新覆盖。
+- 首期规则集 `content-structure-v1` 只做确定性结构检查：空内容/占位文案为 hard fail；包含价格、优惠、库存、地址、营业时间等经营事实表达时进入 needs_human；其余结构完整内容通过。
+- 此规则集不是 LLM 语义审核、图片 OCR/视觉质检、渠道官方规则校验，也不宣称验证经营事实。相关能力仍依赖 #6/#10/#12。
+
+### 验收状态
+
+- 已增加 API 入队、幂等重放、过期 fingerprint 拒绝测试。
+- 已增加规则集 pass / fail / needs_human / empty payload 单元测试。
+- Worker 端到端执行、数据库真实写入、QualityResolution 人工复核、发布包 Freeze 门禁和浏览器页面尚未验收；必须等待 PR CI 与后续集成测试。

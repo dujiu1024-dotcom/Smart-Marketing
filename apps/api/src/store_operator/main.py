@@ -20,7 +20,12 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from store_operator.application.system_info import get_system_info
+from store_operator.auth.errors import ApiError
+from store_operator.auth.router import router as auth_router
+from store_operator.admin_router import router as admin_router
 from store_operator.config import settings
+from store_operator.db import engine, redis_client
+from store_operator.store_router import router as store_router
 from store_operator.observability import configure_logging
 from store_operator.tracing import configure_tracing
 
@@ -44,9 +49,6 @@ app = FastAPI(
     openapi_url="/api/v1/openapi.json",
     lifespan=lifespan,
 )
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-redis_client = Redis.from_url(settings.redis_url, socket_connect_timeout=1)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()],
@@ -126,7 +128,10 @@ def _error_response(
 async def http_exception_handler(
     request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
-    error = {
+    if isinstance(exc, ApiError):
+        error = (exc.code, exc.public_message)
+    else:
+        error = {
         400: ("BAD_REQUEST", "Bad request"),
         401: ("UNAUTHENTICATED", "Unauthenticated"),
         403: ("FORBIDDEN", "Forbidden"),
@@ -135,7 +140,7 @@ async def http_exception_handler(
         409: ("CONFLICT", "Conflict"),
         429: ("RATE_LIMITED", "Rate limited"),
         503: ("SERVICE_UNAVAILABLE", "Service unavailable"),
-    }.get(exc.status_code, ("HTTP_ERROR", "Request failed"))
+        }.get(exc.status_code, ("HTTP_ERROR", "Request failed"))
     return _error_response(
         request, status_code=exc.status_code, code=error[0], message=error[1]
     )
@@ -161,6 +166,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         code="INTERNAL_ERROR",
         message="服务暂时不可用",
     )
+
+
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(store_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
 
 
 @app.get("/health/live", tags=["health"])

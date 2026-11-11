@@ -576,7 +576,7 @@ def create_review_record(
     )
     db.add(review)
     db.flush()
-    response = {
+    response: dict[str, object] = {
         "id": str(review.id),
         "artifact_id": str(artifact_id),
         "artifact_version_id": str(version_id),

@@ -2,7 +2,7 @@
 
 > 选择：抖音网站应用（Web OAuth 2.0）  
 > 记录日期：2026-11-11  
-> 当前状态：Adapter 代码初版已提交至 PR；真实应用审核、授权账号、Token 安全存储和真实平台联调仍阻塞。  
+> 当前状态：Adapter 代码初版已通过 PR #68 合并至 main；真实应用审核、授权账号、Token 安全存储和真实平台联调仍阻塞。  
 > 证据：仅引用抖音官方开放平台文档；MockTransport 测试不等于真实平台验收。
 
 ## 1. 项目决策与目标
@@ -124,3 +124,15 @@
 - `cd apps/api && uv run mypy src/store_operator/channels/douyin.py`
 
 以上命令尚未在本执行环境运行；以 PR CI 结果为准。真实平台调用、真实 OAuth、Secret Manager、数据库 migration、跨门店 IDOR、浏览器端到端均未执行。
+
+
+## 7. Adapter 合并与 CI 证据（2026-11-11）
+
+PR #68 已 squash merge 至 main，merge commit：`9a417f30e4da74496ad8e65d70588d130ac51139`。旧 PR #65 因基线落后关闭，由 PR #68 的基于最新 main 分支替代。
+
+CI Run [42998696426](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42998696426) 对精确 PR head 6/6 jobs 通过：
+- API：Ruff、MyPy、Alembic upgrade/downgrade/upgrade、129 pytest passed（1 条 Starlette/httpx deprecation warning）
+- Worker、Web、Contracts、E2E、Infrastructure 全部通过
+- E2E/Infrastructure 仅验证仓库应用与 Demo 路由/状态 smoke，不是抖音真实平台验收
+
+仍未完成：OAuth state 持久化与回调 Session/store 校验、Secret Manager/SecretRef、ChannelAccount 账号授权管理、PublishOperation 幂等/重试/未知结果恢复、冻结包与账号能力关联、真实抖音应用审核与账号授权、真实上传/发布/作品读回。Issue #12 保持 Open。

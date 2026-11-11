@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from store_operator.auth.audit import record_audit
-from store_operator.auth.dependencies import AuthenticatedSession, require_csrf, require_platform_admin
+from store_operator.auth.dependencies import (\n    AuthenticatedSession,\n    require_csrf,\n    require_platform_admin,\n)
 from store_operator.auth.errors import ApiError
 from store_operator.auth.schemas import MemberPatchRequest, MemberSummary
 from store_operator.db import get_db

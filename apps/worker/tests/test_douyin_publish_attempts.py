@@ -4,9 +4,6 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from uuid import uuid4
 
-from store_operator_worker import tasks
-
-
 class AttemptSession:
     def __init__(self, operation, attempts):
         self.operation = operation
@@ -38,6 +35,10 @@ class AttemptSessionFactory:
 
 
 def test_publish_api_attempt_is_persisted_and_finished(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    from store_operator_worker import tasks
+
     store_id = uuid4()
     operation_id = uuid4()
     operation = SimpleNamespace(

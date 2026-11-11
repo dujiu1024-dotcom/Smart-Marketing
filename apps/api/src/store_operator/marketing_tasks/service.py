@@ -26,7 +26,6 @@ from store_operator.domain.marketing_task import (
 )
 from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.marketing_tasks.schemas import (
-    BusinessFactReference,
     MarketingTaskAction,
     MarketingTaskCreate,
     MarketingTaskDetail,

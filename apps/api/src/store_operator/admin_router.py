@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -90,7 +91,7 @@ def update_store_member(
     membership.role = new_role
     membership.status = new_status
     if new_status == "active":
-        membership.joined_at = membership.joined_at or func.now()
+        membership.joined_at = membership.joined_at or datetime.now(UTC)
         membership.revoked_at = None
     elif new_status in {"suspended", "removed"}:
         from datetime import UTC, datetime

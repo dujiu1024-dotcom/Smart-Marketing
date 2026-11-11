@@ -1,5 +1,5 @@
 from store_operator.models.base import Base
-from store_operator.models.identity import (
+from store_operator.models.store_knowledge import (\n    AudienceProfile,\n    BrandGuideline,\n    KnowledgeItem,\n    MediaAsset,\n    Offer,\n    Product,\n    StoreProfile,\n    StoreRecordRevision,\n    UploadIntent,\n)\nfrom store_operator.models.identity import (
     AuditEvent,
     AuthSession,
     PlatformAdminGrant,
@@ -8,7 +8,7 @@ from store_operator.models.identity import (
     User,
 )
 
-__all__ = [
+__all__ = [\n    "AudienceProfile",\n    "BrandGuideline",\n    "KnowledgeItem",\n    "MediaAsset",\n    "Offer",\n    "Product",\n    "StoreProfile",\n    "StoreRecordRevision",\n    "UploadIntent",
     "AuditEvent",
     "AuthSession",
     "Base",

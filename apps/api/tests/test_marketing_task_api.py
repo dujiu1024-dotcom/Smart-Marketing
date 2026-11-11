@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from store_operator.auth.security import hash_password
 from store_operator.models import (
     BusinessFactSnapshot,
+    DependencyEdge,
     MarketingTask,
     RequirementSnapshot,
     StepDecision,
@@ -467,6 +468,10 @@ def test_requirement_and_strategy_confirmation_freeze_exact_source_versions(
     assert business_fact.source_version == 3
     assert business_fact.content_fingerprint == "b" * 64
     assert business_fact.confirmation_status == "confirmed"
+    fact_edges = db_session.scalars(
+        select(DependencyEdge).where(DependencyEdge.task_id == task_id)
+    ).all()
+    assert len(fact_edges) == 2
 
     strategy = identity_client.post(
         f"/api/v1/marketing-tasks/{task_id}/strategy/confirm",
@@ -493,6 +498,15 @@ def test_requirement_and_strategy_confirmation_freeze_exact_source_versions(
     )
     assert strategy_snapshot is not None
     assert strategy_snapshot.requirement_snapshot_id == requirement_snapshot.id
+    dependency_edges = db_session.scalars(
+        select(DependencyEdge).where(DependencyEdge.task_id == task_id)
+    ).all()
+    assert len(dependency_edges) == 3
+    assert any(
+        edge.upstream_type == "requirement_snapshot"
+        and edge.downstream_type == "strategy_snapshot"
+        for edge in dependency_edges
+    )
     strategy_step = next(
         step
         for step in strategy.json()["steps"]

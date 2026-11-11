@@ -98,3 +98,8 @@ pnpm api:generate
 生成文件位于 `packages/api-client/openapi.json` 和 `packages/api-client/src/schema.ts`。CI 会重新生成并检查是否与提交版本一致。
 
 生成的客户端类型通过 `@store-operator/api-client` 工作区包导出；修改 OpenAPI 后必须重新生成并提交两个生成文件，CI 会检查漂移。
+
+
+## API 数据库测试夹具
+
+API pytest 提供事务隔离的 `db_session` fixture：测试可在该 Session 中创建临时测试数据，测试结束后统一 rollback，不污染其他测试或开发数据。示例见 `apps/api/tests/test_database_fixtures.py`。业务实体和 factory 应随所属业务域 Issue 一起添加；工程骨架不预造门店或营销业务表。

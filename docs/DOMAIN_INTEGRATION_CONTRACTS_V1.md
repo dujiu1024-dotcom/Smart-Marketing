@@ -128,7 +128,7 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 - 硬性问题未解决不能冻结发布包；人工复核结果必须有操作者和理由。
 
 ### PublishPackage / PublishPackageItem / PublishConfirmation
-PublishPackage 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, fact_snapshot_ids, content_fingerprint, frozen_at, frozen_by`。
+PublishPackage 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, fact_snapshot_ids, package_fingerprint, frozen_at, frozen_by`。
 PublishPackageItem 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, copy_version_id, image_version_ids, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。
 PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at, confirmation_note`。
 - 一个 PublishPackage 至少包含一个 PackageItem；同一 package 的 channel_key 唯一。每个 item 精确绑定 ChannelContent、文案/图片版本和 QualityReport。

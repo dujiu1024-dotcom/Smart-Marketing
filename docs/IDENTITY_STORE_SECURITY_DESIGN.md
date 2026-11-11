@@ -208,3 +208,18 @@ Issue #4 合并并验收工程骨架、CI、PostgreSQL 测试服务、迁移入�
 ## 12. Store 时区权威字段
 
 `Store.timezone` 是门店时区的唯一权威字段，使用 IANA Time Zone Database 标识（例如 `Asia/Tokyo`）。门店初始化命令必须显式提供 `--timezone` 并通过 ZoneInfo 校验；不得静默默认 UTC 或依赖服务器所在时区。#6 的 StoreProfile、营业时间和 Offer 日期边界均引用该字段，不得重复保存时区。
+
+
+## 12. 登录态密码变更与 Session 轮换（2026-11-11）
+
+首期支持已登录用户主动修改密码，不等同于注册、邀请或忘记密码重置：
+
+- API：`POST /api/v1/auth/password/change`；必须有有效 Session、可信 Origin 和 CSRF Token。
+- 请求只接收 `current_password` 与 `new_password`；新密码长度 12–128，使用 Argon2id 存储。
+- 当前密码验证失败返回 `REAUTHENTICATION_REQUIRED`，不暴露账户状态。
+- 成功时在事务中锁定 User、更新密码哈希和 `auth_version`、撤销该用户所有现存 Session，并创建一条新 Session。
+- 新 Session 使用新的随机 token/CSRF token，数据库只保存 verifier/hash；`rotated_from_session_id` 指向旧 Session。当前有效门店上下文仅在 membership 与 Store 仍 active 时保留。
+- 所有其他浏览器/设备的旧 Session 在下一请求立即失效；响应只设置新 Cookie 并返回新 CSRF Token。
+- 审计事件记录 `auth.password.changed` 与撤销 Session 数量，不记录密码或 token。
+
+此 API 不提供密码找回邮件、注册、邀请或邮箱验证能力；这些流程仍需产品与邮件供应商决策。

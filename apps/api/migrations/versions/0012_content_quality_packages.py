@@ -503,15 +503,19 @@ def upgrade() -> None:
         CREATE FUNCTION enforce_channel_content_reviewed_versions() RETURNS trigger AS $$
         DECLARE
             artifact_type text;
+            artifact_task_id uuid;
         BEGIN
-            SELECT a.artifact_type INTO artifact_type
+            SELECT a.artifact_type, a.task_id
+              INTO artifact_type, artifact_task_id
             FROM artifact_versions av
             JOIN artifacts a
               ON a.store_id = av.store_id AND a.id = av.artifact_id
             WHERE av.store_id = NEW.store_id
               AND av.id = NEW.copy_version_id;
-            IF artifact_type IS DISTINCT FROM 'copy' THEN
-                RAISE EXCEPTION 'channel content requires a copy artifact version';
+            IF artifact_type IS DISTINCT FROM 'copy'
+               OR artifact_task_id IS DISTINCT FROM NEW.task_id THEN
+                RAISE EXCEPTION
+                    'channel content requires a copy version from the same task';
             END IF;
             IF NOT EXISTS (
                 SELECT 1 FROM review_records rr
@@ -539,16 +543,23 @@ def upgrade() -> None:
         CREATE FUNCTION enforce_channel_content_image_refs() RETURNS trigger AS $$
         DECLARE
             artifact_type text;
+            artifact_task_id uuid;
+            content_task_id uuid;
         BEGIN
-            SELECT a.artifact_type INTO artifact_type
+            SELECT a.artifact_type, a.task_id, cc.task_id
+              INTO artifact_type, artifact_task_id, content_task_id
             FROM artifact_versions av
             JOIN artifacts a
               ON a.store_id = av.store_id AND a.id = av.artifact_id
+            JOIN channel_contents cc
+              ON cc.store_id = NEW.store_id
+             AND cc.id = NEW.channel_content_id
             WHERE av.store_id = NEW.store_id
               AND av.id = NEW.artifact_version_id;
-            IF artifact_type IS DISTINCT FROM 'image' THEN
+            IF artifact_type IS DISTINCT FROM 'image'
+               OR artifact_task_id IS DISTINCT FROM content_task_id THEN
                 RAISE EXCEPTION
-                    'channel content image reference requires an image artifact version';
+                    'channel content image reference requires an image version from the same task';
             END IF;
             IF NOT EXISTS (
                 SELECT 1 FROM review_records rr
@@ -604,13 +615,33 @@ def upgrade() -> None:
         DECLARE
             report_result text;
             report_fingerprint text;
+            package_task_id uuid;
+            content_task_id uuid;
+            report_task_id uuid;
+            content_status text;
         BEGIN
-            SELECT result, input_fingerprint
-              INTO report_result, report_fingerprint
-            FROM quality_reports
-            WHERE store_id = NEW.store_id
-              AND channel_content_id = NEW.channel_content_id
-              AND id = NEW.quality_report_id;
+            SELECT pp.task_id, cc.task_id, qr.task_id, cc.status,
+                   qr.result, qr.input_fingerprint
+              INTO package_task_id, content_task_id, report_task_id,
+                   content_status, report_result, report_fingerprint
+            FROM publish_packages pp
+            JOIN channel_contents cc
+              ON cc.store_id = NEW.store_id
+             AND cc.id = NEW.channel_content_id
+            JOIN quality_reports qr
+              ON qr.store_id = NEW.store_id
+             AND qr.channel_content_id = NEW.channel_content_id
+             AND qr.id = NEW.quality_report_id
+            WHERE pp.store_id = NEW.store_id
+              AND pp.id = NEW.publish_package_id;
+            IF package_task_id IS DISTINCT FROM content_task_id
+               OR content_task_id IS DISTINCT FROM report_task_id THEN
+                RAISE EXCEPTION
+                    'package, channel content and quality report must belong to the same task';
+            END IF;
+            IF content_status IS DISTINCT FROM 'ready' THEN
+                RAISE EXCEPTION 'publish package requires ready channel content';
+            END IF;
             IF report_result = 'fail' OR report_result IS NULL THEN
                 RAISE EXCEPTION 'publish package requires a passing or accepted quality report';
             END IF;

@@ -151,6 +151,16 @@ async def http_exception_handler(
     return response
 
 
+@app.exception_handler(SQLAlchemyError)
+async def database_exception_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
+    return _error_response(
+        request,
+        status_code=503,
+        code="AUTHORIZATION_UNAVAILABLE",
+        message="Authorization service unavailable",
+    )
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError

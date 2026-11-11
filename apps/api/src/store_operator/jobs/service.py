@@ -116,11 +116,10 @@ def create_job(
         raise ValueError("job_type must contain 1-100 characters")
     if not queue_name or len(queue_name) > 100:
         raise ValueError("queue_name must contain 1-100 characters")
-    if not isinstance(payload_ref.get("schema_version"), int) or isinstance(
-        payload_ref.get("schema_version"), bool
-    ):
+    schema_version = payload_ref.get("schema_version")
+    if not isinstance(schema_version, int) or isinstance(schema_version, bool):
         raise ValueError("payload_ref must contain an integer schema_version")
-    if payload_ref["schema_version"] < 1:
+    if schema_version < 1:
         raise ValueError("payload schema_version must be positive")
     if not -100 <= priority <= 100:
         raise ValueError("priority must be between -100 and 100")

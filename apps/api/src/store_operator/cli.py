@@ -18,6 +18,44 @@ from store_operator.models.identity import (
 )
 
 
+def create_user(email: str) -> None:
+    normalized_email = normalize_email(email)
+    if not normalized_email or "@" not in normalized_email:
+        raise SystemExit("A valid email address is required")
+    password = getpass("Initial user password (12+ characters): ")
+    confirmation = getpass("Confirm password: ")
+    if len(password) < 12 or password != confirmation:
+        raise SystemExit("Password confirmation failed or password is too short")
+    with SessionLocal() as db:
+        existing = db.scalar(select(User).where(User.email_normalized == normalized_email))
+        if existing is not None:
+            raise SystemExit("User already exists")
+        user = User(
+            id=uuid4(),
+            email_normalized=normalized_email,
+            password_hash=hash_password(password),
+            status="active",
+        )
+        db.add(user)
+        db.flush()
+        db.add(
+            AuditEvent(
+                actor_type="system",
+                actor_id=None,
+                actor_user_id=None,
+                store_id=None,
+                action="bootstrap.user.created",
+                target_type="user",
+                target_id=str(user.id),
+                result="success",
+                request_id="bootstrap-cli",
+                metadata_json={"email_fingerprint_only": True},
+            )
+        )
+        db.commit()
+        print(f"Created user {user.id}.")
+
+
 def bootstrap_store_owner(email: str, store_name: str) -> None:
     normalized_email = normalize_email(email)
     if not normalized_email or "@" not in normalized_email:
@@ -157,6 +195,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="store-operator")
     commands = parser.add_subparsers(dest="command", required=True)
 
+    create = commands.add_parser("create-user")
+    create.add_argument("--email", required=True)
+
     owner = commands.add_parser("bootstrap-store-owner")
     owner.add_argument("--email", required=True)
     owner.add_argument("--store-name", required=True)
@@ -170,7 +211,9 @@ def main() -> None:
     revoke.add_argument("--reason", required=True)
 
     args = parser.parse_args()
-    if args.command == "bootstrap-store-owner":
+    if args.command == "create-user":
+        create_user(args.email)
+    elif args.command == "bootstrap-store-owner":
         bootstrap_store_owner(args.email, args.store_name)
     elif args.command == "grant-platform-admin":
         grant_platform_admin(args.email, args.reason)

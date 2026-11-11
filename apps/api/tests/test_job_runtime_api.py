@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from store_operator.ai_gateway.errors import SideEffectState
@@ -12,7 +11,6 @@ from store_operator.models import (
     AIInvocation,
     AIUsageRecord,
     Job,
-    JobEvent,
     Store,
     StoreMembership,
     User,

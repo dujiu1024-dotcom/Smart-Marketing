@@ -20,6 +20,7 @@ from store_operator.auth.dependencies import (
 from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
+from store_operator.jobs.service import JobIdempotencyConflict, create_job
 from store_operator.models.content_delivery import (
     Artifact,
     ArtifactVersion,
@@ -31,6 +32,11 @@ from store_operator.models.content_delivery import (
 from store_operator.models.marketing_task import MarketingTask
 
 router = APIRouter(prefix="/marketing-tasks", tags=["content-quality"])
+
+
+class QualityReportRun(BaseModel):
+    rule_version: str = Field(min_length=1, max_length=80)
+    expected_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class ChannelContentCreate(BaseModel):
@@ -324,3 +330,95 @@ def list_channel_contents(
         )
         result.append(_content_payload(content, refs, reports))
     return result
+
+
+@router.post("/{task_id}/channel-contents/{content_id}/quality-reports/run", status_code=202)
+def run_quality_report(
+    task_id: UUID,
+    content_id: UUID,
+    payload: QualityReportRun,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> dict[str, object]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+
+    idempotency, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="content.quality_report.run",
+        payload={"task_id": task_id, "content_id": content_id, **payload.model_dump()},
+    )
+    if replay is not None:
+        return replay
+
+    content = db.scalar(
+        select(ChannelContent).where(
+            ChannelContent.id == content_id,
+            ChannelContent.task_id == task_id,
+            ChannelContent.store_id == store_id,
+        )
+    )
+    if content is None:
+        raise ApiError(404, "CHANNEL_CONTENT_NOT_FOUND", "Channel content not found")
+    if content.input_fingerprint != payload.expected_fingerprint:
+        raise ApiError(409, "CHANNEL_CONTENT_STALE", "Channel content fingerprint has changed")
+
+    request_key = hashlib.sha256(
+        f"{store_id}:{auth.user.id}:content.quality_report.run:{idempotency_key}".encode()
+    ).hexdigest()
+    try:
+        job = create_job(
+            db,
+            job_type="content.quality_check",
+            payload_ref={
+                "schema_version": 1,
+                "channel_content_id": str(content.id),
+                "expected_fingerprint": content.input_fingerprint,
+                "rule_version": payload.rule_version,
+            },
+            idempotency_key=request_key,
+            store_id=store_id,
+            actor_type="user",
+            actor_user_id=auth.user.id,
+            marketing_task_id=task_id,
+            timeout_seconds=120,
+        )
+    except (JobIdempotencyConflict, ValueError) as exc:
+        raise ApiError(409, "QUALITY_JOB_CONFLICT", "Quality check request conflicts with an existing job") from exc
+
+    response: dict[str, object] = {
+        "job_id": str(job.id),
+        "job_status": job.status,
+        "channel_content_id": str(content.id),
+        "expected_fingerprint": content.input_fingerprint,
+        "rule_version": payload.rule_version,
+    }
+    complete_idempotency(
+        idempotency,
+        response=response,
+        resource_type="job",
+        resource_id=job.id,
+    )
+    record_audit(
+        db,
+        request,
+        action="content.quality_report.requested",
+        target_type="channel_content",
+        target_id=content.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "job_id": str(job.id),
+            "rule_version": payload.rule_version,
+            "input_fingerprint": content.input_fingerprint,
+        },
+    )
+    db.commit()
+    return response

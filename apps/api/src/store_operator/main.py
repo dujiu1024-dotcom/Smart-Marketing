@@ -1,4 +1,6 @@
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 import structlog
@@ -22,11 +24,20 @@ tracer_provider = configure_tracing(settings.app_name, settings.otel_exporter_ot
 tracer = trace.get_tracer("store_operator.api")
 logger = structlog.get_logger("http")
 
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        tracer_provider.shutdown()
+
+
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     docs_url="/api/v1/docs",
     openapi_url="/api/v1/openapi.json",
+    lifespan=lifespan,
 )
 engine = create_engine(settings.database_url, pool_pre_ping=True)
 redis_client = Redis.from_url(settings.redis_url, socket_connect_timeout=1)
@@ -140,5 +151,3 @@ def system_info():
         "api_version": "v1",
     }
 
-
-app.add_event_handler("shutdown", tracer_provider.shutdown)

@@ -803,9 +803,11 @@ def create_offer(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> OfferRead:
     result = _create_scoped_record(
-        db, request, auth, _store_id(context), Offer, OfferRead, payload, "offer"
+        db, request, auth, _store_id(context), Offer, OfferRead, payload, "offer",
+        idempotency_key, "store.offer.create",
     )
     return OfferRead.model_validate(result)
 
@@ -879,10 +881,12 @@ def create_audience_profile(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> AudienceProfileRead:
     result = _create_scoped_record(
         db, request, auth, _store_id(context),
         AudienceProfile, AudienceProfileRead, payload, "audience_profile",
+        idempotency_key, "store.audience_profile.create",
     )
     return AudienceProfileRead.model_validate(result)
 
@@ -956,10 +960,12 @@ def create_knowledge_item(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> KnowledgeItemRead:
     result = _create_scoped_record(
         db, request, auth, _store_id(context),
         KnowledgeItem, KnowledgeItemRead, payload, "knowledge_item",
+        idempotency_key, "store.knowledge_item.create",
     )
     return KnowledgeItemRead.model_validate(result)
 
@@ -1034,6 +1040,7 @@ def create_brand_guideline(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> BrandGuidelineRead:
     store_id = _store_id(context)
     if db.scalar(
@@ -1043,6 +1050,7 @@ def create_brand_guideline(
     result = _create_scoped_record(
         db, request, auth, store_id,
         BrandGuideline, BrandGuidelineRead, payload, "brand_guideline",
+        idempotency_key, "store.brand_guideline.create",
     )
     return BrandGuidelineRead.model_validate(result)
 

@@ -36,6 +36,7 @@ from store_operator.store_knowledge_schemas import (
     BrandGuidelineCreate,
     BrandGuidelineRead,
     BrandGuidelineUpdate,
+    FactConfirmationRequest,
     KnowledgeItemCreate,
     KnowledgeItemList,
     KnowledgeItemRead,
@@ -84,6 +85,11 @@ def _record_revision(
     snapshot: dict[str, object],
     fact_status: str,
     actor_id: UUID,
+    source_type: str | None = None,
+    source_ref: str | None = None,
+    confirmed_by_user_id: UUID | None = None,
+    confirmed_at: datetime | None = None,
+    change_reason: str | None = None,
 ) -> None:
     fingerprint = hashlib.sha256(
         json.dumps(snapshot, ensure_ascii=False, sort_keys=True).encode("utf-8")
@@ -100,6 +106,11 @@ def _record_revision(
             content_fingerprint=fingerprint,
             fact_status=fact_status,
             created_by_user_id=actor_id,
+            source_type=source_type,
+            source_ref=source_ref,
+            confirmed_by_user_id=confirmed_by_user_id,
+            confirmed_at=confirmed_at,
+            change_reason=change_reason,
         )
     )
 
@@ -245,6 +256,9 @@ def _update_scoped_record(
     if record.current_version != expected:
         raise ApiError(409, "VERSION_CONFLICT", "Record has changed")
     for field, value in payload.model_dump(exclude_unset=True).items():
+        column = record.__table__.columns.get(field)
+        if value is None and column is not None and not column.nullable:
+            raise ApiError(422, "NULL_NOT_ALLOWED", f"{field} cannot be null")
         setattr(record, field, value)
     record.current_version += 1
     record.fact_status = "pending_confirmation"
@@ -934,3 +948,79 @@ def update_brand_guideline(
         BrandGuideline, BrandGuidelineRead, payload, "brand_guideline",
     )
     return BrandGuidelineRead.model_validate(result)
+
+
+@router.post("/{resource_type}/{record_id}/confirm-facts")
+def confirm_store_facts(
+    resource_type: str,
+    record_id: UUID,
+    payload: FactConfirmationRequest,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> dict[str, object]:
+    resources: dict[str, tuple[type[Any], type[BaseModel], str]] = {
+        "profile": (StoreProfile, StoreProfileRead, "store_profile"),
+        "products": (Product, ProductRead, "product"),
+        "offers": (Offer, OfferRead, "offer"),
+        "audiences": (AudienceProfile, AudienceProfileRead, "audience_profile"),
+        "knowledge": (KnowledgeItem, KnowledgeItemRead, "knowledge_item"),
+        "brand-guideline": (BrandGuideline, BrandGuidelineRead, "brand_guideline"),
+    }
+    resource = resources.get(resource_type)
+    if resource is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
+    model, read_schema, record_type = resource
+    store_id = _store_id(context)
+    expected = _expected_version(if_match)
+    record = db.scalar(
+        select(model)
+        .where(model.id == record_id, model.store_id == store_id)
+        .with_for_update()
+    )
+    if record is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
+    if record.current_version != expected:
+        raise ApiError(409, "VERSION_CONFLICT", "Record has changed")
+    if record.fact_status == "confirmed":
+        raise ApiError(409, "FACT_ALREADY_CONFIRMED", "Facts are already confirmed")
+    now = datetime.now(UTC)
+    record.fact_status = "confirmed"
+    record.current_version += 1
+    if hasattr(record, "updated_by_user_id"):
+        record.updated_by_user_id = auth.user.id
+    db.flush()
+    snapshot = read_schema.model_validate(record).model_dump(mode="json")
+    _record_revision(
+        db,
+        store_id=store_id,
+        record_type=record_type,
+        record_id=record.id,
+        version=record.current_version,
+        snapshot=snapshot,
+        fact_status="confirmed",
+        actor_id=auth.user.id,
+        source_type=payload.source_type,
+        source_ref=payload.source_ref,
+        confirmed_by_user_id=auth.user.id,
+        confirmed_at=now,
+        change_reason=payload.confirmation_note,
+    )
+    _audit(
+        db,
+        request,
+        action=f"store.{record_type}.facts_confirmed",
+        record_type=record_type,
+        record_id=record.id,
+        actor_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "version": record.current_version,
+            "source_type": payload.source_type,
+        },
+    )
+    db.commit()
+    db.refresh(record)
+    return read_schema.model_validate(record).model_dump(mode="json")

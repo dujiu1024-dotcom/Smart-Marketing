@@ -250,18 +250,17 @@ class AIInvocation(Base):
     store_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT")
     )
-    marketing_task_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    task_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     job_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("jobs.id", ondelete="SET NULL")
     )
     attempt_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("job_attempts.id", ondelete="SET NULL")
     )
-    provider: Mapped[str] = mapped_column(String(100), nullable=False)
-    model: Mapped[str] = mapped_column(String(150), nullable=False)
+    provider_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    model_key: Mapped[str] = mapped_column(String(150), nullable=False)
     capability: Mapped[str] = mapped_column(String(24), nullable=False)
-    prompt_template_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
-    prompt_version: Mapped[str | None] = mapped_column(String(80))
+    prompt_version_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     parameter_snapshot_json: Mapped[dict[str, object]] = mapped_column(
         "parameter_snapshot", JSONB, nullable=False, server_default="{}"
     )
@@ -269,8 +268,11 @@ class AIInvocation(Base):
     output_schema_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     provider_request_id: Mapped[str | None] = mapped_column(String(200))
     request_fingerprint: Mapped[str | None] = mapped_column(String(64))
+    response_ref_json: Mapped[dict[str, object] | None] = mapped_column(
+        "response_ref", JSONB
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False)
-    latency_ms: Mapped[int | None] = mapped_column(BigInteger)
+    duration_ms: Mapped[int | None] = mapped_column(BigInteger)
     error_code: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

@@ -369,6 +369,7 @@ AIInvocation 扩展建议（待 #9 联合评审）：nullable `provider_request_
 19. PromptTemplate UNIQUE(industry_key, task_type, capability, template_key)；PromptVersion UNIQUE(prompt_template_id, version_no)，published 版本不可 UPDATE/DELETE。
 20. PromptActivation 追加写并按 idempotency_record_id 去重；只能引用同一 PromptTemplate 的 published PromptVersion。
 21. AIInvocation.prompt_version_id 必须引用精确 PromptVersion；历史调用不得动态读取 PromptTemplate.current_published_version_id。
+22. PromptTemplate.current_published_version_id 通过复合 FK 校验 PromptVersion 属于同一模板；PromptActivation 的 activated_version_id/previous_version_id 也必须属于该模板且为 published 版本。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

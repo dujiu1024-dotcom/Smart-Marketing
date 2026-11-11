@@ -50,11 +50,12 @@ def test_reviews_reference_the_exact_artifact_version_in_same_store() -> None:
         "artifact_id",
         "artifact_version_id",
     )
-    assert _named_constraint(
-        table,
-        CheckConstraint,
-        "ck_review_records_revision_comment_required",
-    )
+    checks = {
+        item.name
+        for item in table.constraints
+        if isinstance(item, CheckConstraint)
+    }
+    assert "ck_review_records_revision_comment_required" in checks
 
 
 def test_artifact_current_version_is_constrained_to_its_own_artifact() -> None:

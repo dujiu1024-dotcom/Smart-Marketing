@@ -438,6 +438,25 @@ def fail_job(
     elif retryable and job.attempt_count < job.max_attempts:
         job.status = "retry_wait"
         job.available_at = current_time + timedelta(seconds=retry_delay_seconds)
+        dispatch_event_id = uuid4()
+        db.add(
+            OutboxEvent(
+                id=dispatch_event_id,
+                aggregate_type="job",
+                aggregate_id=job.id,
+                event_type="job.dispatch_requested",
+                schema_version=1,
+                payload_json={
+                    "job_id": str(job.id),
+                    "dispatch_event_id": str(dispatch_event_id),
+                    "schema_version": 1,
+                },
+                dedupe_key=f"job.dispatch:{job.id}:attempt:{job.attempt_count + 1}",
+                status="pending",
+                available_at=job.available_at,
+                publish_attempts=0,
+            )
+        )
         event_type = "job.retry_scheduled"
     else:
         job.status = "failed"

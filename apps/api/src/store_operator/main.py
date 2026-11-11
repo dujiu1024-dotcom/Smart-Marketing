@@ -26,6 +26,7 @@ from store_operator.auth.router import router as auth_router
 from store_operator.config import settings
 from store_operator.content_delivery_router import router as content_delivery_router
 from store_operator.content_quality_router import router as content_quality_router
+from store_operator.content_publishing_router import router as content_publishing_router
 from store_operator.db import engine, redis_client
 from store_operator.jobs.router import router as jobs_router
 from store_operator.marketing_tasks.router import router as marketing_tasks_router
@@ -195,6 +196,7 @@ app.include_router(store_knowledge_router, prefix="/api/v1")
 app.include_router(marketing_tasks_router, prefix="/api/v1")
 app.include_router(content_delivery_router, prefix="/api/v1")
 app.include_router(content_quality_router, prefix="/api/v1")
+app.include_router(content_publishing_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(prompt_management_router, prefix="/api/v1")

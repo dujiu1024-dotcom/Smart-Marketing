@@ -1,8 +1,8 @@
 """Structured logging setup and recursive sensitive-field redaction."""
 
 import logging
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Mapping, MutableMapping
+from typing import Any, cast
 
 import structlog
 
@@ -23,8 +23,8 @@ _SENSITIVE_KEY_FRAGMENTS = (
 def redact_sensitive_fields(
     logger: Any,
     method_name: str,
-    event_dict: dict[str, Any],
-) -> dict[str, Any]:
+    event_dict: MutableMapping[str, Any],
+) -> MutableMapping[str, Any]:
     """Redact sensitive values recursively before JSON serialization."""
 
     def redact(value: Any) -> Any:
@@ -43,7 +43,7 @@ def redact_sensitive_fields(
             return [redact(item) for item in value]
         return value
 
-    return redact(event_dict)
+    return cast(MutableMapping[str, Any], redact(event_dict))
 
 
 def configure_logging() -> None:

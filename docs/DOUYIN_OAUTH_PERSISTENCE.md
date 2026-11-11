@@ -66,6 +66,7 @@ All three Douyin OAuth settings must be supplied together. The Secret Manager re
 - Upload is retryable before content creation. Immediately before `/image_text/create/`, the operation moves to `submitting`.
 - Once the create request may have reached Douyin, an unknown response moves the operation to `needs_human`; the worker will not blindly submit a second post.
 - On a confirmed response, the `item_id` is persisted before readback. Subsequent retries only call `/video/list/` readback; they never upload or create again.
+- Every image upload, image-text create and readback call is recorded in `publish_operation_attempts` with a request fingerprint, adapter version, normalized result, retryability, optional platform request ID and timestamps; raw tokens and request bodies are never stored.
 - A readback match records `processing` with `readback_verified=true`. This does not claim public visibility: Douyin says the post may remain self-visible while platform review is pending.
 - Repeated readback absence after bounded retries moves the operation to `needs_human` for reconciliation.
 

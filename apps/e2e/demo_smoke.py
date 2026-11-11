@@ -109,7 +109,7 @@ async def main() -> None:
         await page.locator('[data-action="admin-monitor-detail"]').first.click()
         await route_to("admin:monitor-detail", "AI 运行监控")
 
-        await route_to("admin:capabilities", "AI 能力配置")
+        await route_to("admin:capabilities", "AI 能力与提示词配置")
         await page.locator('[data-action="admin-edit-prompt"]').first.click()
         await route_to("admin:prompt-detail", "编辑提示词模板")
         await page.get_by_role("button", name="返回模板列表").wait_for(state="visible")

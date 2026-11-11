@@ -223,7 +223,11 @@ def resolve_step_applicability(
     applicability = _DEFAULT_APPLICABILITY[normalized_type][normalized_step]
 
     if normalized_type is MarketingTaskType.MERCHANT_CONTENT:
-        if includes_copy is False and includes_image is False:
+        if includes_copy is None or includes_image is None:
+            raise ValueError(
+                "Merchant content requires explicit copy and image applicability"
+            )
+        if not includes_copy and not includes_image:
             raise ValueError("Merchant content must include copy, image, or both")
 
     if normalized_step is TaskStepKey.COPY_PRODUCTION_REVIEW and includes_copy is not None:

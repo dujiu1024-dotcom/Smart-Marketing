@@ -163,3 +163,20 @@
 - #8/#12 确认 manual_handoff 首期交付形式与 PublishOperation 幂等边界。
 - #8/#9 确认 QualityResolution 的授权能力和事件消费者。
 - #8 产品负责人确认首期不提供 PublishConfirmation 撤销。
+
+
+## 12. Issue #10 AI Provider / Prompt 领域设计准备（2026-11-11）
+
+新增 `AI_PROVIDER_PROMPT_DOMAIN_DESIGN.md`，按 Demo `#admin:capabilities` / `#admin:prompt-detail` 定义平台级 Prompt 管理、Provider Adapter、安全和验收边界。
+
+关键权属：
+- #9 持有 Job/Outbox、AIInvocation、ModelConfig、Provider capability registry、模型路由、Secret reference、成本与错误归一化。
+- #10 持有 PromptTemplate/PromptVersion/PromptActivation 生命周期，并实现 Text/Image/Vision/OCR Provider Adapter。
+- #7 提供任务与 BusinessFactSnapshot；#6 提供 StoreRecordRevision/MediaAsset；#8 持有 Artifact/Review/QualityReport。
+- PromptTemplate/Version/Activation 为全局平台配置，不含 store_id；平台管理员权限经 #5 capability check，不能因此读取门店资料。
+
+提出待 #9 联合批准的 AIInvocation 扩展：provider_request_id 与 usage_json。当前 Provider 统一返回已包含 provider_request_id/normalized_usage，但 AIInvocation 字段表尚未显式持久化，需统一审计与供应商对账。
+
+首期不锁定 Provider 厂商；必须先核验部署区域、账号主体、数据处理条款、价格、速率限制和图像编辑/Vision/OCR能力，并由项目负责人确认。
+
+本轮只做设计准备；未接入真实 Provider、未执行 AI-01..AI-20，未创建生产迁移或运行时 API。

@@ -5,7 +5,7 @@ import socket
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from celery.exceptions import CeleryError  # type: ignore[import-untyped]
+from celery.exceptions import CeleryError
 from kombu.exceptions import OperationalError  # type: ignore[import-untyped]
 from sqlalchemy import create_engine, or_, select
 from sqlalchemy.orm import sessionmaker

@@ -154,7 +154,11 @@ def require_store_context(
         membership_id=membership.id,
         role=membership.role,
         capabilities=STORE_BUSINESS_CAPABILITIES,
-        authorization_version=auth.user.auth_version,
+        authorization_version=(
+            int(membership.updated_at.timestamp() * 1_000_000)
+            if membership.updated_at is not None
+            else 1
+        ),
         request_id=getattr(request.state, "request_id", "unavailable"),
     )
     request.state.auth_context = context

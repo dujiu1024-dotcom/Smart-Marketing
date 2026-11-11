@@ -1,6 +1,6 @@
 import os
 
-from celery import Celery
+from celery import Celery  # type: ignore[import-untyped]
 
 broker_url = os.environ.get("REDIS_URL")
 if not broker_url:
@@ -19,7 +19,7 @@ celery_app.conf.update(
 )
 
 
-@celery_app.task(name="system.healthcheck")
+@celery_app.task(name="system.healthcheck")  # type: ignore[untyped-decorator]
 def healthcheck() -> dict[str, str]:
     """Infrastructure smoke task only; business job persistence is implemented in Issue #9."""
     return {"status": "ok"}

@@ -41,7 +41,11 @@ def validate_browser_origin(request: Request) -> None:
         if referer:
             parsed = urlsplit(referer)
             origin = f"{parsed.scheme}://{parsed.netloc}"
-    allowed = {item.strip().rstrip("/") for item in settings.cors_origins.split(",") if item.strip()}
+    allowed = {
+        item.strip().rstrip("/")
+        for item in settings.cors_origins.split(",")
+        if item.strip()
+    }
     if not origin or origin.rstrip("/") not in allowed:
         raise ApiError(403, "CSRF_INVALID", "Request origin is not allowed")
 
@@ -111,9 +115,9 @@ def require_csrf(
 
 def require_store_context(
     request: Request,
-    store_id_header: Annotated[str | None, Header(alias="X-Store-ID")] = None,
     auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
     db: Annotated[Session, Depends(get_db)],
+    store_id_header: Annotated[str | None, Header(alias="X-Store-ID")] = None,
 ) -> AuthContext:
     if not store_id_header:
         raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
@@ -168,8 +172,8 @@ def require_store_context(
 
 def require_platform_admin(
     request: Request,
-    auth: AuthenticatedSession = Depends(get_current_session),
-    db: Session = Depends(get_db),
+    auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> AuthenticatedSession:
     try:
         grant = db.scalar(

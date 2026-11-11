@@ -51,8 +51,6 @@ def _safe_parameter_snapshot(
             safe[key] = value[:120] if isinstance(value, str) else value
     return safe
 
-
-
 def _safe_response_ref(
     values: dict[str, object] | None,
 ) -> dict[str, object] | None:
@@ -65,7 +63,9 @@ def _safe_response_ref(
         if key in allowed
         and (isinstance(value, (str, int, bool)) or value is None)
     }
-    if not isinstance(safe.get("schema_version"), int):
+    if not isinstance(safe.get("schema_version"), int) or isinstance(
+        safe.get("schema_version"), bool
+    ):
         raise ValueError("response_ref requires an integer schema_version")
     if not isinstance(safe.get("object_key"), str):
         raise ValueError("response_ref requires an object_key reference")
@@ -249,7 +249,7 @@ def fail_ai_invocation(
             0, int((current_time - invocation.created_at).total_seconds() * 1000)
         )
     if elapsed_ms < 0:
-        raise ValueError("latency_ms cannot be negative")
+        raise ValueError("duration_ms cannot be negative")
     invocation.status = "failed"
     invocation.error_code = error_code.strip()
     invocation.duration_ms = elapsed_ms

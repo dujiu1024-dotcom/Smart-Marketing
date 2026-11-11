@@ -230,7 +230,7 @@
 
 | 能力 | 生产 API/DB 状态 | Demo/浏览器状态 |
 |---|---|---|
-| 多渠道发布包冻结 | PR #63 开发中；事务创建 Package/Items/FactRefs，覆盖任务/内容/质检/事实指纹 | 发布包页面完整接入未完成 |
+| 多渠道发布包冻结 | PR #64 开发中；事务创建 Package/Items/FactRefs，覆盖任务/内容/质检/事实指纹 | 发布包页面完整接入未完成 |
 | 事实门禁 | 要求已确认 BusinessFactSnapshot，追溯到最新有效 StoreRecordRevision | 事实引用与过期提示未接入 |
 | 质检门禁 | hard fail 阻断；needs_human 必须有 accepted QualityResolution | 报告及复核交互未接入 |
 | 商家最终确认 | fingerprint-bound PublishConfirmation，不可变、幂等 | 确认摘要/二次确认 UI 未接入 |

@@ -9,6 +9,7 @@ import socket
 from datetime import UTC, datetime, timedelta
 from math import ceil
 from threading import Event, Thread
+from typing import Any
 from uuid import UUID, uuid4
 
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
@@ -20,6 +21,8 @@ from store_operator.channels.douyin import (
     DouyinApiError,
     DouyinAppCredentials,
     DouyinOAuthClient,
+    DouyinPublishReceipt,
+    DouyinTokenSet,
 )
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
 from store_operator.config import settings
@@ -679,6 +682,8 @@ def _set_douyin_publish_state(
     platform_item_id: str | None = None,
     submitted: bool = False,
     readback: bool = False,
+    increment_attempt: bool = False,
+    schedule_readback: bool = False,
 ) -> None:
     with SessionLocal.begin() as db:
         operation = db.scalar(
@@ -692,6 +697,8 @@ def _set_douyin_publish_state(
         if operation is None:
             return
         operation.status = status
+        if increment_attempt:
+            operation.attempt_count += 1
         operation.last_error_code = error_code
         operation.last_error_summary = error_summary
         if platform_item_id is not None:
@@ -701,6 +708,9 @@ def _set_douyin_publish_state(
         if readback:
             operation.last_readback_at = datetime.now(UTC)
             operation.next_attempt_at = None
+        elif schedule_readback:
+            operation.last_readback_at = datetime.now(UTC)
+            operation.next_attempt_at = datetime.now(UTC) + timedelta(seconds=30)
 
 
 @register_job_handler("douyin.publish_image_text")
@@ -821,7 +831,7 @@ def execute_douyin_image_text_publish(
 
         account_id = account.id
         account_secret_ref = account.access_token_secret_ref
-        refresh_secret_ref = account.refresh_token_secret_ref
+        attempt_count = operation.attempt_count + 1
         account_open_id = account.external_account_id
         account_expires_at = account.access_token_expires_at
 
@@ -952,12 +962,14 @@ def execute_douyin_image_text_publish(
                 operation_id,
                 store_id,
                 status="uploading",
+                increment_attempt=True,
             )
         else:
             _set_douyin_publish_state(
                 operation_id,
                 store_id,
                 status="processing",
+                increment_attempt=True,
             )
 
     if not (
@@ -1008,7 +1020,7 @@ def execute_douyin_image_text_publish(
                 retryable=False,
             )
 
-        async def refresh_token_set():
+        async def refresh_token_set() -> DouyinTokenSet:
             client = DouyinOAuthClient(credentials)
             try:
                 return await client.refresh_access_token(refresh_token)
@@ -1144,7 +1156,7 @@ def execute_douyin_image_text_publish(
             status="submitting",
         )
 
-        async def create_image_text_post():
+        async def create_image_text_post() -> DouyinPublishReceipt:
             client = DouyinOAuthClient(credentials)
             try:
                 return await client.publish_images(
@@ -1185,7 +1197,7 @@ def execute_douyin_image_text_publish(
         )
         platform_item_id = receipt.item_id
 
-    async def read_back_post():
+    async def read_back_post() -> dict[str, Any] | None:
         client = DouyinOAuthClient(credentials)
         try:
             return await client.verify_published_item(
@@ -1207,19 +1219,26 @@ def execute_douyin_image_text_publish(
             retry_delay_seconds=30,
         ) from exc
     if readback is None:
-        with SessionLocal.begin() as db:
-            current = db.scalar(
-                select(PublishOperation)
-                .where(
-                    PublishOperation.id == operation_id,
-                    PublishOperation.store_id == store_id,
-                )
-                .with_for_update()
+        if attempt_count >= 5:
+            _set_douyin_publish_state(
+                operation_id,
+                store_id,
+                status="needs_human",
+                error_code="DOUYIN_READBACK_PENDING",
+                error_summary="The accepted post was not visible after repeated readback checks.",
             )
-            if current is not None:
-                current.status = "processing"
-                current.last_readback_at = datetime.now(UTC)
-                current.next_attempt_at = datetime.now(UTC) + timedelta(seconds=30)
+            raise JobExecutionError(
+                "DOUYIN_READBACK_PENDING",
+                "The accepted post was not visible after repeated readback checks.",
+                retryable=False,
+                side_effect_state=SideEffectState.KNOWN,
+            )
+        _set_douyin_publish_state(
+            operation_id,
+            store_id,
+            status="processing",
+            schedule_readback=True,
+        )
         raise JobExecutionError(
             "DOUYIN_READBACK_PENDING",
             "Douyin has accepted the post; its item is not yet visible in account readback.",

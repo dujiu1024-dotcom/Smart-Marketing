@@ -291,6 +291,22 @@ def test_dynamic_applicability_follows_selected_outputs_and_delivery_scope() -> 
     assert (
         resolve_step_applicability(
             MarketingTaskType.FULL_MARKETING,
+            TaskStepKey.OPPORTUNITY_DECISION,
+            opportunity_applicable=True,
+        )
+        is StepApplicability.REQUIRED
+    )
+    assert (
+        resolve_step_applicability(
+            MarketingTaskType.FULL_MARKETING,
+            TaskStepKey.OPPORTUNITY_DECISION,
+            opportunity_applicable=False,
+        )
+        is StepApplicability.NOT_APPLICABLE
+    )
+    assert (
+        resolve_step_applicability(
+            MarketingTaskType.FULL_MARKETING,
             TaskStepKey.COPY_PRODUCTION_REVIEW,
             includes_copy=False,
         )

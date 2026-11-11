@@ -313,6 +313,8 @@ class TaskStep(StoreTaskScoped, Base):
     blocked_by_json: Mapped[list[dict[str, object]]] = mapped_column(
         JSONB, nullable=False, server_default="[]"
     )
+    block_code: Mapped[str | None] = mapped_column(String(60))
+    block_detail_json: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     skip_reason: Mapped[str | None] = mapped_column(Text)
     skipped_by_user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")

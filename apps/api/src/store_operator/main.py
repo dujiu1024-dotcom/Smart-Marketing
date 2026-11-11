@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import structlog
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from opentelemetry import trace
@@ -14,6 +15,7 @@ from opentelemetry.trace import Status, StatusCode
 from redis import Redis
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -102,18 +104,61 @@ async def request_id_logging_and_tracing_middleware(
         detach(context_token)
 
 
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+def _error_response(
+    request: Request,
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unavailable")
     return JSONResponse(
-        status_code=500,
+        status_code=status_code,
         content={
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "message": "服务暂时不可用",
-                "request_id": request_id,
-            }
+            "error": {"code": code, "message": message},
+            "request_id": request_id,
         },
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    error = {
+        400: ("BAD_REQUEST", "Bad request"),
+        401: ("UNAUTHENTICATED", "Unauthenticated"),
+        403: ("FORBIDDEN", "Forbidden"),
+        404: ("RESOURCE_NOT_FOUND", "Resource not found"),
+        405: ("METHOD_NOT_ALLOWED", "Method not allowed"),
+        409: ("CONFLICT", "Conflict"),
+        429: ("RATE_LIMITED", "Rate limited"),
+        503: ("SERVICE_UNAVAILABLE", "Service unavailable"),
+    }.get(exc.status_code, ("HTTP_ERROR", "Request failed"))
+    return _error_response(
+        request, status_code=exc.status_code, code=error[0], message=error[1]
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    return _error_response(
+        request,
+        status_code=422,
+        code="VALIDATION_ERROR",
+        message="Request validation failed",
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return _error_response(
+        request,
+        status_code=500,
+        code="INTERNAL_ERROR",
+        message="服务暂时不可用",
     )
 
 

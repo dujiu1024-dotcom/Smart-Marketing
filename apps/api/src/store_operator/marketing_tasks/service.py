@@ -91,7 +91,9 @@ def _summary(
         blocked_steps_count=sum(
             1
             for step in step_rows
-            if step.status in _BLOCKED_STEP_STATUSES or step.blocked_by_json
+            if step.status in _BLOCKED_STEP_STATUSES
+            or step.block_code is not None
+            or step.blocked_by_json
         ),
     )
 
@@ -117,6 +119,8 @@ def _detail(task: MarketingTask, steps: list[TaskStep]) -> MarketingTaskDetail:
                 input_fingerprint=step.input_fingerprint,
                 output_refs=step.output_refs_json,
                 blocked_by=step.blocked_by_json,
+                block_code=step.block_code,
+                block_detail=step.block_detail_json,
                 started_at=step.started_at,
                 finished_at=step.finished_at,
             )
@@ -531,6 +535,8 @@ def update_requirement_draft(
         step.input_fingerprint = None
         step.output_refs_json = []
         step.blocked_by_json = []
+        step.block_code = None
+        step.block_detail_json = None
 
     task.requirement_draft_json = validated.requirement_draft
     task.task_options_json = options_json
@@ -1155,6 +1161,8 @@ def recover_marketing_task(
     step.input_fingerprint = None
     step.output_refs_json = []
     step.blocked_by_json = []
+    step.block_code = None
+    step.block_detail_json = None
 
     decision = StepDecision(
         id=uuid4(),

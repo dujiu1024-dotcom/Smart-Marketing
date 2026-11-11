@@ -25,6 +25,7 @@ from store_operator.domain.marketing_task import (
     resolve_step_applicability,
 )
 from store_operator.idempotency import begin_idempotency, complete_idempotency
+from store_operator.jobs.service import JobIdempotencyConflict, create_job
 from store_operator.marketing_tasks.schemas import (
     MarketingTaskAction,
     MarketingTaskCreate,
@@ -36,6 +37,7 @@ from store_operator.marketing_tasks.schemas import (
     MarketingTaskRequirementUpdate,
     MarketingTaskStepSkip,
     MarketingTaskStrategyConfirm,
+    MarketingTaskStrategyUpdate,
     MarketingTaskSummary,
     TaskStepRead,
 )

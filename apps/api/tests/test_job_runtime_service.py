@@ -124,8 +124,12 @@ def test_claim_heartbeat_complete_and_stale_lease_fencing(db_session) -> None:
         lease_token=claim.attempt.lease_token,
         worker_id="worker-1",
         lease_seconds=120,
+        progress_current=2,
+        progress_total=5,
         now=now + timedelta(seconds=10),
     )
+    assert job.progress_current == 2
+    assert job.progress_total == 5
     completed = complete_job(
         db_session,
         job_id=job.id,

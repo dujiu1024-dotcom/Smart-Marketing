@@ -169,3 +169,84 @@ def test_store_knowledge_api_rejects_missing_store_context(
     response = identity_client.get("/api/v1/store/products")
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "STORE_CONTEXT_REQUIRED"
+
+
+def test_offer_knowledge_brand_and_audience_apis_support_fact_confirmation(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Knowledge Lifecycle")
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "knowledge@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": login.json()["csrf_token"],
+        "X-Store-ID": str(store.id),
+    }
+
+    offer_response = identity_client.post(
+        "/api/v1/store/offers",
+        headers=headers,
+        json={
+            "title": "Lunch set",
+            "offer_type": "bundle",
+            "terms_json": {"discount": "10%"},
+            "status": "draft",
+        },
+    )
+    assert offer_response.status_code == 201, offer_response.text
+    offer = offer_response.json()
+    confirmed = identity_client.post(
+        f"/api/v1/store/offers/{offer['id']}/confirm-facts",
+        headers={**headers, "If-Match": '"1"'},
+        json={"source_type": "merchant_confirmation", "confirmation_note": "Checked by owner"},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["fact_status"] == "confirmed"
+    assert confirmed.json()["current_version"] == 2
+
+    stale_update = identity_client.patch(
+        f"/api/v1/store/offers/{offer['id']}",
+        headers={**headers, "If-Match": '"1"'},
+        json={"title": "Changed lunch set"},
+    )
+    assert stale_update.status_code == 409
+
+    knowledge_response = identity_client.post(
+        "/api/v1/store/knowledge",
+        headers=headers,
+        json={
+            "title": "Store opening policy",
+            "category": "policy",
+            "content_text": "Open daily from 10:00 to 20:00",
+            "source_type": "merchant_input",
+        },
+    )
+    assert knowledge_response.status_code == 201, knowledge_response.text
+    assert knowledge_response.json()["fact_status"] == "pending_confirmation"
+
+    audience_response = identity_client.post(
+        "/api/v1/store/audiences",
+        headers=headers,
+        json={
+            "name": "Nearby office workers",
+            "segment_type": "core",
+            "audience_description": "Lunch customers within walking distance",
+        },
+    )
+    assert audience_response.status_code == 201, audience_response.text
+
+    brand_response = identity_client.post(
+        "/api/v1/store/brand-guideline",
+        headers=headers,
+        json={"tone_of_voice": "Clear, practical and restrained"},
+    )
+    assert brand_response.status_code == 201, brand_response.text
+    assert brand_response.json()["current_version"] == 1

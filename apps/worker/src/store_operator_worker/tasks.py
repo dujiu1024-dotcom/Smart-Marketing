@@ -238,6 +238,7 @@ def execute_job(job_id: str) -> dict[str, str]:
     )
     heartbeat_thread.start()
     try:
+        update_progress(None, None)
         context.check_control()
         result_ref = handler(context, payload_ref)
         context.check_control()
@@ -317,7 +318,7 @@ def execute_job(job_id: str) -> dict[str, str]:
             )
         return {"status": "failed", "reason": exc.code.value}
     except Exception as exc:
-        logger.exception(
+        logger.error(
             "job.execution.unexpected",
             extra={
                 "job_id": str(claimed_job_id),

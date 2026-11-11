@@ -10,4 +10,4 @@ COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY apps/worker/src ./src
 COPY apps/api/src ./api_src
-CMD ["celery", "-A", "store_operator_worker.celery_app:celery_app", "worker", "--loglevel=INFO", "--beat"]
+CMD ["celery", "-A", "store_operator_worker.celery_app:celery_app", "worker", "--loglevel=INFO"]

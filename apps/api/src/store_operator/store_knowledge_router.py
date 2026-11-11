@@ -1484,10 +1484,11 @@ def archive_media_asset(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
-    expected_version: Annotated[int, Header(alias="If-Match")],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> MediaAssetRead:
     store_id = _store_id(context)
+    expected_version = _expected_version(if_match)
     idempotency_record, replay = _begin_idempotency(
         db,
         store_id,

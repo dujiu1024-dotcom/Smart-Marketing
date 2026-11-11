@@ -25,6 +25,7 @@ from store_operator.models import (
     Artifact,
     ArtifactVersion,
     BusinessFactSnapshot,
+    ChannelAccount,
     ChannelContent,
     ChannelContentArtifactRef,
     MarketingTask,
@@ -46,11 +47,16 @@ router = APIRouter(prefix="/marketing-tasks", tags=["content-publishing"])
 class PublishPackageItemInput(BaseModel):
     channel_content_id: UUID
     quality_report_id: UUID
-    delivery_mode: Literal["manual_handoff"] = "manual_handoff"
+    delivery_mode: Literal["manual_handoff", "official_api"] = "manual_handoff"
+    channel_account_id: UUID | None = None
     planned_publish_at: datetime | None = None
 
     @model_validator(mode="after")
-    def require_timezone_for_schedule(self) -> PublishPackageItemInput:
+    def validate_delivery_target(self) -> PublishPackageItemInput:
+        if self.delivery_mode == "official_api" and self.channel_account_id is None:
+            raise ValueError("official_api delivery requires a channel_account_id")
+        if self.delivery_mode == "manual_handoff" and self.channel_account_id is not None:
+            raise ValueError("manual_handoff delivery cannot bind a channel account")
         if self.planned_publish_at is not None and self.planned_publish_at.tzinfo is None:
             raise ValueError("planned_publish_at must include a timezone")
         return self
@@ -244,6 +250,7 @@ def _package_payload(
                 "channel_content_id": str(item.channel_content_id),
                 "quality_report_id": str(item.quality_report_id),
                 "delivery_mode": item.delivery_mode,
+                "channel_account_id": (\n                    str(item.channel_account_id) if item.channel_account_id else None\n                ),
                 "planned_publish_at": (
                     item.planned_publish_at.isoformat()
                     if item.planned_publish_at
@@ -379,6 +386,34 @@ def freeze_publish_package(
                 "A package can contain one item per channel",
             )
         channel_keys.add(content.channel_key)
+        if item_input.delivery_mode == "official_api":
+            if content.channel_key != "douyin":
+                raise ApiError(
+                    422,
+                    "CHANNEL_PROVIDER_MISMATCH",
+                    "Official API delivery is currently enabled only for Douyin content",
+                )
+            channel_account = db.scalar(
+                select(ChannelAccount).where(
+                    ChannelAccount.id == item_input.channel_account_id,
+                    ChannelAccount.store_id == store_id,
+                    ChannelAccount.provider == "douyin",
+                    ChannelAccount.status == "active",
+                )
+            )
+            if channel_account is None:
+                raise ApiError(
+                    409,
+                    "CHANNEL_ACCOUNT_UNAVAILABLE",
+                    "The selected Douyin account is not active for this store",
+                )
+            required_scopes = {"user_info", "video.create.bind", "video.list"}
+            if not required_scopes.issubset(set(channel_account.granted_scopes)):
+                raise ApiError(
+                    409,
+                    "CHANNEL_ACCOUNT_SCOPE_INSUFFICIENT",
+                    "The selected Douyin account lacks required publishing or readback scopes",
+                )
         _require_approved_artifacts(db, store_id=store_id, content=content)
 
         report = db.scalar(
@@ -422,7 +457,7 @@ def freeze_publish_package(
                 "quality_report_id": str(report.id),
                 "quality_report_fingerprint": report.input_fingerprint,
                 "delivery_mode": item_input.delivery_mode,
-                "channel_account_id": None,
+                "channel_account_id": (\n                    str(item_input.channel_account_id) if item_input.channel_account_id else None\n                ),
                 "planned_publish_at": (
                     item_input.planned_publish_at.astimezone(UTC).isoformat()
                     if item_input.planned_publish_at
@@ -473,7 +508,7 @@ def freeze_publish_package(
             channel_key=content.channel_key,
             channel_content_id=content.id,
             quality_report_id=report.id,
-            channel_account_id=None,
+            channel_account_id=item_input.channel_account_id,
             delivery_mode=item_input.delivery_mode,
             planned_publish_at=item_input.planned_publish_at,
             item_fingerprint=item_fingerprint,

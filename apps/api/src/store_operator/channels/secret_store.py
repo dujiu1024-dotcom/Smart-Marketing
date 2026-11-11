@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-from typing import Protocol
+from typing import Any, Protocol
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
+import boto3  # type: ignore[import-untyped]
+from botocore.exceptions import BotoCoreError, ClientError  # type: ignore[import-untyped]
 
 
 class SecretStoreError(RuntimeError):
@@ -30,17 +30,17 @@ class UnavailableSecretStore:
 class AwsSecretsManagerStore:
     """Store OAuth credentials in AWS Secrets Manager, never in application tables."""
 
-    def __init__(self, *, region_name: str, client: object | None = None) -> None:
+    def __init__(self, *, region_name: str, client: Any | None = None) -> None:
         if not region_name.strip():
             raise ValueError("A Secrets Manager region is required")
-        self._client = client or boto3.client("secretsmanager", region_name=region_name)
+        self._client: Any = client or boto3.client("secretsmanager", region_name=region_name)
 
     def put_json(self, secret_name: str, value: dict[str, str]) -> str:
         if not secret_name.strip() or not value:
             raise ValueError("Secret name and value are required")
         serialized = json.dumps(value, sort_keys=True, separators=(",", ":"))
         try:
-            response = self._client.create_secret(Name=secret_name, SecretString=serialized)  # type: ignore[attr-defined]
+            response = self._client.create_secret(Name=secret_name, SecretString=serialized)
         except ClientError as exc:
             code = exc.response.get("Error", {}).get("Code")
             if code != "ResourceExistsException":

@@ -890,13 +890,6 @@ def create_douyin_publish_operation(
             "CHANNEL_ACCOUNT_SCOPE_INSUFFICIENT",
             "The bound Douyin account lacks required publishing or readback scopes",
         )
-    if account.access_token_expires_at <= datetime.now(UTC):
-        raise ApiError(
-            409,
-            "CHANNEL_ACCOUNT_TOKEN_EXPIRED",
-            "Refresh the Douyin account authorization before publishing",
-        )
-
     content = db.scalar(
         select(ChannelContent).where(
             ChannelContent.id == item.channel_content_id,

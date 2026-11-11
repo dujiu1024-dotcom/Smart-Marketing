@@ -30,30 +30,20 @@ def upgrade() -> None:
         ondelete="SET NULL",
     )
 
-    # Preserve the owner of already completed responses where the created
-    # resource is still present. These records remain replayable by that actor.
-    backfills = (
-        ("store_profile", "store_profiles"),
-        ("product", "products"),
-        ("offer", "offers"),
-        ("audience_profile", "audience_profiles"),
-        ("knowledge_item", "knowledge_items"),
-        ("brand_guideline", "brand_guidelines"),
+    # StoreRecordRevision is the common source for all store-knowledge
+    # create operations, including singleton BrandGuideline records.
+    op.execute(
+        """
+        UPDATE idempotency_records AS idem
+        SET actor_user_id = revision.created_by_user_id
+        FROM store_record_revisions AS revision
+        WHERE idem.store_id = revision.store_id
+          AND idem.resource_id = revision.record_id
+          AND idem.resource_type = revision.record_type
+          AND revision.version_no = 1
+          AND revision.created_by_user_id IS NOT NULL
+        """
     )
-    for resource_type, table_name in backfills:
-        op.execute(
-            sa.text(
-                f"""
-                UPDATE idempotency_records AS idem
-                SET actor_user_id = resource.created_by_user_id
-                FROM {table_name} AS resource
-                WHERE idem.resource_type = :resource_type
-                  AND idem.resource_id = resource.id
-                  AND idem.store_id = resource.store_id
-                  AND resource.created_by_user_id IS NOT NULL
-                """
-            ).bindparams(resource_type=resource_type)
-        )
 
 
 def downgrade() -> None:

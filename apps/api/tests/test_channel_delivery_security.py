@@ -6,12 +6,12 @@ import pytest
 from botocore.exceptions import ClientError
 
 from store_operator.channels.oauth_state import new_oauth_state
-from store_operator.content_publishing_router import PublishPackageItemInput
 from store_operator.channels.secret_store import (
     AwsSecretsManagerStore,
     SecretStoreError,
     UnavailableSecretStore,
 )
+from store_operator.content_publishing_router import PublishPackageItemInput
 
 
 class FakeSecretsManager:

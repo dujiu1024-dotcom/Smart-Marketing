@@ -23,8 +23,8 @@ from store_operator.application.system_info import get_system_info
 from store_operator.auth.dependencies import SESSION_COOKIE_NAME
 from store_operator.auth.errors import ApiError
 from store_operator.auth.router import router as auth_router
-from store_operator.config import settings
 from store_operator.channel_douyin_router import router as channel_douyin_router
+from store_operator.config import settings
 from store_operator.content_delivery_router import router as content_delivery_router
 from store_operator.content_publishing_router import router as content_publishing_router
 from store_operator.content_quality_router import router as content_quality_router

@@ -186,3 +186,20 @@ Issue #4 合并并验收工程骨架、CI、PostgreSQL 测试服务、迁移入�
 - Session.active_store_id 只作为 UI 默认门店选择和恢复提示。切换该字段不得改变其他标签页的请求授权。
 - AuthContext 只暴露 request_store_id，不提供可被业务代码误用的 active_store_id 授权字段。
 - 请求 selector 缺失时返回 400 STORE_CONTEXT_REQUIRED；selector 指向非成员/停用门店时统一 404 STORE_NOT_FOUND。
+
+
+## 11. Issue #5 首轮实现边界（2026-11-11）
+
+首轮实现采用以下可验证约束：
+
+- 密码采用 Argon2id；Session Cookie 固定为 `__Host-ai_store_session`（Secure、HttpOnly、SameSite=Lax、Path=/、不设置 Domain）；数据库只保存 HMAC-SHA256 Session token verifier，不保存原始 token。
+- CSRF synchronizer token 由 CSPRNG 生成，数据库仅保存 SHA-256 hash；所有已认证写请求同时验证 Origin/Referer allowlist 与 `X-CSRF-Token`。登录/CSRF token refresh 也必须验证可信 Origin。
+- 登录失败使用通用 `INVALID_CREDENTIALS`；Redis 按 IP 和账号指纹两个维度限流；Redis 授权依赖不可用时 fail closed。
+- Session 使用 idle 与 absolute expiry；本地开发默认 1 小时 idle / 24 小时 absolute，仅用于本地验收。生产环境必须显式配置两个值，且 `SESSION_TOKEN_PEPPER` 必须为独立 32+ 字符随机值。此前提出的 12h/7d 仍是待安全评审参数，不被本次代码默认批准。
+- `Session.active_store_id` 只作为 UI 默认选择；所有门店业务请求按本次 `X-Store-ID` 重新查询 Store 与 active StoreMembership。无 selector 400，非成员/停用门店统一 404。
+- owner/member 仅暴露共同的 `store.business.use` 基础能力；成员邀请/邮箱验证流程未冻结，不暴露邀请 API。被 removed 的 membership 不能直接重新激活。
+- PlatformAdminGrant 与 StoreMembership 分离。平台管理员通过离线 CLI 授予/撤销固定能力 `platform.store_members.manage`；该 grant 不构成门店成员关系。CLI 操作写系统审计。
+- AuditEvent 通过 PostgreSQL trigger 禁止 UPDATE、DELETE 和 TRUNCATE；应用层只追加。
+- 不启用 PostgreSQL RLS；先完成应用层 request-scoped 授权与 PostgreSQL 集成测试，再单独评估 RLS 和连接池隔离。
+
+未完成项：生产 Session 时限安全审批、邀请/注册/密码重置产品流程、平台管理员紧急恢复流程评审、#6–#12 资源 API 的完整 IDOR 覆盖、密码变更后的 Session 轮换以及全量安全矩阵。Issue #5 不得因首轮认证路由可用而关闭。

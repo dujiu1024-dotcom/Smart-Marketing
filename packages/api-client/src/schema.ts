@@ -329,6 +329,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketing-tasks/publish-packages/{package_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Publish Package */
+        post: operations["confirm_publish_package_api_v1_marketing_tasks_publish_packages__package_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/marketing-tasks/quality-reports/{report_id}/resolutions": {
         parameters: {
             query?: never;
@@ -478,6 +495,40 @@ export interface paths {
         put?: never;
         /** Run Quality Report */
         post: operations["run_quality_report_api_v1_marketing_tasks__task_id__channel_contents__content_id__quality_reports_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketing-tasks/{task_id}/publish-packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Publish Packages */
+        get: operations["list_publish_packages_api_v1_marketing_tasks__task_id__publish_packages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketing-tasks/{task_id}/publish-packages/freeze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Freeze Publish Package */
+        post: operations["freeze_publish_package_api_v1_marketing_tasks__task_id__publish_packages_freeze_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2153,6 +2204,43 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** PublishPackageConfirmRequest */
+        PublishPackageConfirmRequest: {
+            /** Confirmation Note */
+            confirmation_note?: string | null;
+            /** Package Fingerprint */
+            package_fingerprint: string;
+        };
+        /** PublishPackageFreezeRequest */
+        PublishPackageFreezeRequest: {
+            /** Expected Task Version */
+            expected_task_version: number;
+            /** Fact Snapshot Ids */
+            fact_snapshot_ids: string[];
+            /** Items */
+            items: components["schemas"]["PublishPackageItemInput"][];
+        };
+        /** PublishPackageItemInput */
+        PublishPackageItemInput: {
+            /**
+             * Channel Content Id
+             * Format: uuid
+             */
+            channel_content_id: string;
+            /**
+             * Delivery Mode
+             * @default manual_handoff
+             * @constant
+             */
+            delivery_mode: "manual_handoff";
+            /** Planned Publish At */
+            planned_publish_at?: string | null;
+            /**
+             * Quality Report Id
+             * Format: uuid
+             */
+            quality_report_id: string;
+        };
         /** QualityReportRun */
         QualityReportRun: {
             /** Expected Fingerprint */
@@ -3140,6 +3228,46 @@ export interface operations {
             };
         };
     };
+    confirm_publish_package_api_v1_marketing_tasks_publish_packages__package_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                package_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishPackageConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_quality_resolution_api_v1_marketing_tasks_quality_reports__report_id__resolutions_post: {
         parameters: {
             query?: never;
@@ -3543,6 +3671,81 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_publish_packages_api_v1_marketing_tasks__task_id__publish_packages_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    freeze_publish_package_api_v1_marketing_tasks__task_id__publish_packages_freeze_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishPackageFreezeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

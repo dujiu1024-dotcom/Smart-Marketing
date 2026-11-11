@@ -444,3 +444,38 @@ def test_needs_human_resolution_is_audited_and_idempotent(db_session) -> None:
     assert event is not None
     assert event.actor_id == user.id
     assert event.data_json["reason"].startswith("Operator checked")
+
+
+def test_expired_worker_lease_fences_heartbeat_and_completion(db_session) -> None:
+    user, store = create_actor_and_store(db_session)
+    job = create_store_job(
+        db_session, user, store, idempotency_key="expired-lease", timeout_seconds=30
+    )
+    now = datetime.now(UTC)
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="worker-stale",
+        lease_seconds=5,
+        now=now,
+    )
+    assert claim is not None
+    expired_at = now + timedelta(seconds=6)
+
+    with pytest.raises(LeaseLostError):
+        heartbeat_job(
+            db_session,
+            job_id=job.id,
+            lease_token=claim.attempt.lease_token,
+            worker_id="worker-stale",
+            now=expired_at,
+        )
+    with pytest.raises(LeaseLostError):
+        complete_job(
+            db_session,
+            job_id=job.id,
+            lease_token=claim.attempt.lease_token,
+            worker_id="worker-stale",
+            result_ref={"artifact_id": "late-result"},
+            now=expired_at,
+        )

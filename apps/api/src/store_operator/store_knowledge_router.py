@@ -274,7 +274,9 @@ def create_product(
         db.flush()
     except IntegrityError as exc:
         db.rollback()
-        raise ApiError(409, "PRODUCT_CONFLICT", "Product conflicts with an existing record") from exc
+        raise ApiError(
+            409, "PRODUCT_CONFLICT", "Product conflicts with an existing record"
+        ) from exc
     result = ProductRead.model_validate(product)
     _record_revision(
         db,

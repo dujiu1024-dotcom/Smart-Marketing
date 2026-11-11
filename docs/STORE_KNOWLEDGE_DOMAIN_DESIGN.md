@@ -328,7 +328,7 @@ UploadIntent：
 
 ## 2026-11-11 素材授权确认与归档 API 补充
 
-PR #66 补齐两项此前仅存在于领域契约、尚未落地的素材生命周期操作：
+PR #66 已合并至 main（commit `d2f0b5e839ba04676ae9f51e9f51a456d3540bfd`） 补齐两项此前仅存在于领域契约、尚未落地的素材生命周期操作：
 
 - `POST /api/v1/store/assets/{asset_id}/confirm-usage-rights`：要求当前门店授权、CSRF、Idempotency-Key、expected_version、expected_sha256 和商家授权说明；仅允许扫描通过的 ready 资产记录 `confirmed_allowed` 或 `restricted`，授权记录绑定当前内容哈希，不能由客户端修改哈希或直接跳过扫描。
 - `POST /api/v1/store/assets/{asset_id}/archive`：要求 If-Match + Idempotency-Key；仅归档 ready/rejected 资产，不删除对象；仍被当前 BrandGuideline.logo_asset_id 引用时返回 409 MEDIA_ASSET_IN_USE。
@@ -336,3 +336,14 @@ PR #66 补齐两项此前仅存在于领域契约、尚未落地的素材生命�
 新增 API 测试覆盖授权确认幂等、版本冲突、下载门禁、品牌 Logo 引用阻断和归档状态。
 
 边界：上传完成仍进入 quarantined/scanning；ClamAV/恶意文件扫描、缩略图/尺寸元数据处理、Worker 回写 ready/rejected、过期 UploadIntent sweeper 和素材库前端接入仍未完成。不得将哈希/MIME 校验称为恶意文件扫描。
+
+
+### PR #66 合并验证证据（2026-11-11）
+
+CI Run [42997147535](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42997147535) 在合并前对精确 head `d7c57f776da1dd48b8e3e28a9dd47ff882623d66` 全部 6 个 Job 通过：
+- API：Ruff、MyPy、Alembic upgrade/downgrade/upgrade、121 pytest passed（1 条依赖弃用警告）
+- Worker、Web、Contracts：通过
+- E2E：浏览器 smoke 和冻结 Demo 路由/状态 smoke 通过
+- Infrastructure：完整 Compose 启动、API/Web readiness、PostgreSQL volume restart persistence 通过
+
+Issue #6 仍 Open。恶意文件扫描、缩略图/尺寸元数据、Worker 扫描状态回写、UploadIntent 过期清理和素材库前端仍未实现。

@@ -273,7 +273,6 @@ def create_artifact(
 @router.get("/{task_id}/artifacts")
 def list_task_artifacts(
     task_id: UUID,
-    _auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[dict[str, object]]:
@@ -451,7 +450,11 @@ def create_review_record(
             "Review type must match the artifact type",
         )
     if version.id != artifact.current_version_id:
-        raise ApiError(409, "STALE_ARTIFACT_VERSION", "Only the current artifact version can be reviewed")
+        raise ApiError(
+            409,
+            "STALE_ARTIFACT_VERSION",
+            "Only the current artifact version can be reviewed",
+        )
     latest = db.scalar(
         select(ReviewRecord)
         .where(

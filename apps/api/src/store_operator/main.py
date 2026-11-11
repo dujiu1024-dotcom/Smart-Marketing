@@ -193,6 +193,7 @@ app.include_router(store_knowledge_router, prefix="/api/v1")
 app.include_router(marketing_tasks_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+app.include_router(prompt_management_router, prefix="/api/v1")
 
 
 @app.get("/health/live", tags=["health"])

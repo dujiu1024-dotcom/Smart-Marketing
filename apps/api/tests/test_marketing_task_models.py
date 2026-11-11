@@ -123,3 +123,9 @@ def test_task_event_and_dependency_constraints_are_versioned() -> None:
         BusinessFactSnapshot.__table__,
         "uq_business_fact_snapshots_task_fact_version",
     ) == ("store_id", "task_id", "fact_key", "version_no")
+
+
+
+def test_task_steps_expose_structured_block_diagnostics() -> None:
+    assert "block_code" in TaskStep.__table__.columns
+    assert "block_detail_json" in TaskStep.__table__.columns

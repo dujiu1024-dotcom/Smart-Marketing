@@ -6,7 +6,6 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import delete, update
 from sqlalchemy.exc import DBAPIError
-
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password

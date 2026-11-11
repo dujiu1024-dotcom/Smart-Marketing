@@ -397,6 +397,7 @@ PublishOperation.published 必须有 external_post_id 或等价平台证据；Jo
 28. PublishOperation.status=published 时必须有 external_post_id 或平台等价成功证据；draft_saved 必须有平台草稿证据。
 29. ChannelSpec UNIQUE(channel_key)；ChannelSpecVersion UNIQUE(channel_spec_id,spec_version)，current_version_id 通过复合 FK 指向同一 ChannelSpec 的不可变版本。
 30. ChannelCapabilitySnapshot 复合 FK 到同店 ChannelAccount 和 ChannelSpecVersion；历史能力快照禁止覆盖。
+31. ChannelContent.channel_spec_version_id 必须 FK 到精确 ChannelSpecVersion；PublishPackage/PackageItem 冻结时将其纳入 item/package fingerprint。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

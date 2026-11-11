@@ -27,7 +27,7 @@ from store_operator.models.identity import Store, StoreMembership
 
 router = APIRouter(prefix="/channels/douyin", tags=["channel-accounts"])
 
-DOUYIN_REQUIRED_SCOPES = frozenset({"user_info", "video.create.bind", "video.list"})
+DOUYIN_REQUIRED_SCOPES = frozenset({"user_info", "video.create", "video.list"})
 
 
 def _require_oauth_configuration() -> tuple[DouyinAppCredentials, str]:

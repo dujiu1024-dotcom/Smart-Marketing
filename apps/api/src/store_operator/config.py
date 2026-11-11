@@ -12,4 +12,4 @@ class Settings(BaseSettings):
     otel_exporter_otlp_traces_endpoint: str | None = None
 
 
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]  # Values are supplied by environment variables.

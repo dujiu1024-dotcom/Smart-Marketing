@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from store_operator.auth.context import AuthContext
 from store_operator.auth.dependencies import require_store_context
 from store_operator.auth.security import hash_password, session_token_verifier
+from store_operator.config import settings
 from store_operator.main import app
 from store_operator.models.identity import (
     AuditEvent,
@@ -451,3 +452,53 @@ def test_two_tabs_use_their_own_store_selector(identity_client, db_session, monk
     assert tab_b.json()["store_id"] == str(store_b.id)
     assert tab_b.json()["role"] == "member"
     assert tab_a.json()["capabilities"] == tab_b.json()["capabilities"] == "store.business.use"
+
+
+def test_password_change_rotates_current_session_and_revokes_other_sessions(
+    identity_client, db_session, monkeypatch
+):
+    fake_redis(monkeypatch)
+    user = make_user(db_session, "password-change@example.com")
+    store = make_store(db_session, "Password Change Store", user)
+    first_login = login(identity_client, "password-change@example.com")
+    other_client = TestClient(app, base_url="https://testserver")
+    login(other_client, "password-change@example.com")
+
+    old_token = identity_client.cookies.get("__Host-ai_store_session")
+    assert old_token
+    old_verifier = session_token_verifier(old_token, settings.session_token_pepper)
+
+    changed = identity_client.post(
+        "/api/v1/auth/password/change",
+        json={
+            "current_password": "test-password-123",
+            "new_password": "new-secure-password-456",
+        },
+        headers={**ORIGIN, "X-CSRF-Token": first_login["csrf_token"]},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["csrf_token"]
+    assert identity_client.get("/api/v1/auth/me").status_code == 200
+    assert identity_client.get("/api/v1/auth/me").json()["active_store"]["id"] == str(store.id)
+
+    revoked = db_session.scalar(
+        select(AuthSession).where(AuthSession.token_hash == old_verifier)
+    )
+    assert revoked is not None
+    assert revoked.revoked_at is not None
+    assert revoked.revoke_reason == "password_changed"
+    assert other_client.get("/api/v1/auth/me").status_code == 401
+
+    old_password_login = other_client.post(
+        "/api/v1/auth/login",
+        json={"email": "password-change@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert old_password_login.status_code == 401
+    new_password_login = other_client.post(
+        "/api/v1/auth/login",
+        json={"email": "password-change@example.com", "password": "new-secure-password-456"},
+        headers=ORIGIN,
+    )
+    assert new_password_login.status_code == 200
+    other_client.close()

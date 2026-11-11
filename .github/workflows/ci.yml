@@ -6,11 +6,13 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   contracts:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/ci
       REDIS_URL: redis://localhost:6379/0

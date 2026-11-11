@@ -137,3 +137,34 @@ def test_ai_invocation_failure_and_cancellation_are_terminal_and_idempotent(
             invocation_id=cancelled.id,
             error_code="LATE_FAILURE",
         )
+
+
+def test_ai_invocation_cannot_reference_a_job_from_another_store(db_session) -> None:
+    from store_operator.jobs import create_job
+    from store_operator.models import Store, User
+
+    user = User(
+        email_normalized="ai-invocation-owner@example.test",
+        password_hash="test-password-hash",
+    )
+    store = Store(name="Invocation Owner Store", timezone="Asia/Tokyo")
+    other_store = Store(name="Other Invocation Store", timezone="Asia/Tokyo")
+    db_session.add_all([user, store, other_store])
+    db_session.flush()
+    job = create_job(
+        db_session,
+        job_type="copy.generate",
+        payload_ref={"schema_version": 1},
+        idempotency_key="ai-invocation-job",
+        store_id=store.id,
+        actor_type="user",
+        actor_user_id=user.id,
+    )
+
+    with pytest.raises(LookupError):
+        start_invocation(
+            db_session,
+            store_id=other_store.id,
+            job_id=job.id,
+            request_fingerprint="c" * 64,
+        )

@@ -95,7 +95,9 @@ erDiagram
   CHANNEL_ACCOUNT ||--o{ PUBLISH_OPERATION : uses
   PUBLISH_OPERATION ||--o{ PUBLISH_OPERATION_ATTEMPT : attempts
   CHANNEL_ACCOUNT ||--o{ OAUTH_AUTHORIZATION_ATTEMPT : authorizes
+  CHANNEL_SPEC ||--o{ CHANNEL_SPEC_VERSION : versions
   CHANNEL_ACCOUNT ||--o{ CHANNEL_CAPABILITY_SNAPSHOT : discovers
+  CHANNEL_SPEC_VERSION ||--o{ CHANNEL_CAPABILITY_SNAPSHOT : evaluated_against
   CHANNEL_SPEC_VERSION ||--o{ CHANNEL_CAPABILITY_SNAPSHOT : constrains
   PUBLISH_PACKAGE ||--o{ PUBLISH_CONFIRMATION : confirms
   MARKETING_TASK ||--o{ DEPENDENCY_EDGE : links
@@ -150,8 +152,8 @@ AIInvocation 扩展建议（待 #9 联合评审）：nullable `provider_request_
 
 - ChannelAccount（门店级）：id、store_id、channel_key、external_account_id、display_name、authorization_status、granted_scopes_json、access_token_secret_ref、refresh_token_secret_ref、token_expires_at、authorized_by_user_id、authorized_at、last_verified_at、version。Token 不存明文。
 - OAuthAuthorizationAttempt：store_id、channel_key、requested_by_user_id、state_hash、nonce、pkce_verifier_secret_ref、redirect_uri_key、expires_at、consumed_at；state 单次使用且短 TTL。
-- ChannelSpecVersion（全局无 store_id）：channel_key、spec_version、文本/媒体/标签/链接/排期约束、draft/publish capability、官方来源证据；版本不可变。
-- ChannelCapabilitySnapshot（门店账号级）：store_id、channel_account_id、spec_version、capability_key、support_status、evidence_ref、checked_at、expires_at；unsupported/pending_verification 不得伪装已接通。
+- ChannelSpec/ChannelSpecVersion（全局无 store_id）：ChannelSpec 持有 channel_key/current_version_id；ChannelSpecVersion 保存 spec_version、文本/媒体/标签/链接/排期约束、draft/publish capability、官方来源证据；版本不可变。
+- ChannelCapabilitySnapshot（门店账号级）：store_id、channel_account_id、channel_spec_version_id、capability_key、support_status、evidence_ref、checked_at、expires_at；必须绑定确切规格版本，unsupported/pending_verification 不得伪装已接通。
 - PublishOperation：store_id、publish_package_id、package_item_id、package_fingerprint、channel_account_id、action(save_draft|publish)、status(requested|queued|submitting|processing|draft_saved|published|failed|needs_human|cancelled)、idempotency_key、request_fingerprint、external_request_id、external_post_id、external_url、response_evidence_ref、error_code、timestamps。
 - PublishOperationAttempt：publish_operation_id、attempt_no、adapter_version、request_fingerprint、external_request_id、response_evidence_ref、normalized_status、error_code、retryable、timestamps。与 #9 JobAttempt 分离。
 
@@ -393,6 +395,8 @@ PublishOperation.published 必须有 external_post_id 或等价平台证据；Jo
 26. PublishOperation UNIQUE(store_id, package_item_id, channel_account_id, action, package_fingerprint)；idempotency_key 唯一，且复合 FK 到同店 PublishPackage/PackageItem/ChannelAccount。
 27. PublishOperationAttempt UNIQUE(publish_operation_id, attempt_no)，外部请求证据按受控引用保存。
 28. PublishOperation.status=published 时必须有 external_post_id 或平台等价成功证据；draft_saved 必须有平台草稿证据。
+29. ChannelSpec UNIQUE(channel_key)；ChannelSpecVersion UNIQUE(channel_spec_id,spec_version)，current_version_id 通过复合 FK 指向同一 ChannelSpec 的不可变版本。
+30. ChannelCapabilitySnapshot 复合 FK 到同店 ChannelAccount 和 ChannelSpecVersion；历史能力快照禁止覆盖。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

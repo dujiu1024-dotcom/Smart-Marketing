@@ -104,7 +104,7 @@ def test_job_api_is_store_scoped_and_does_not_return_payload_or_lease_data(
     store_a = create_store(db_session, user, "Jobs A")
     store_b = create_store(db_session, user, "Jobs B")
     job = create_job_for_store(db_session, user, store_a, "job-api-read-1")
-    csrf = login(identity_client, monkeypatch)
+    login(identity_client, monkeypatch)
 
     response = identity_client.get(
         f"/api/v1/jobs/{job.id}",

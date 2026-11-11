@@ -1818,6 +1818,12 @@ export interface components {
         /** TaskStepRead */
         TaskStepRead: {
             applicability: components["schemas"]["StepApplicability"];
+            /** Block Code */
+            block_code: string | null;
+            /** Block Detail */
+            block_detail: {
+                [key: string]: unknown;
+            } | null;
             /** Blocked By */
             blocked_by: {
                 [key: string]: unknown;

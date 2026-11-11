@@ -4432,6 +4432,29 @@
           "applicability": {
             "$ref": "#/components/schemas/StepApplicability"
           },
+          "block_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Code"
+          },
+          "block_detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Detail"
+          },
           "blocked_by": {
             "items": {
               "additionalProperties": true,
@@ -4520,6 +4543,8 @@
           "input_fingerprint",
           "output_refs",
           "blocked_by",
+          "block_code",
+          "block_detail",
           "started_at",
           "finished_at"
         ],

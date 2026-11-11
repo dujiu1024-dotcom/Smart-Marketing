@@ -146,8 +146,10 @@ class PromptActivation(Base):
         CheckConstraint("length(trim(reason)) > 0", name="reason_required"),
         UniqueConstraint("idempotency_key_hash", name="uq_prompt_activations_idempotency_hash"),
         CheckConstraint(
-            "idempotency_key_hash ~ '^[0-9a-f]{64}
-    )
+            "idempotency_key_hash ~ '^[0-9a-f]{64}$' AND "
+            "request_hash ~ '^[0-9a-f]{64}$'",
+            name="hashes",
+        ),
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     prompt_template_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)

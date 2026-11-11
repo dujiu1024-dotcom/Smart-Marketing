@@ -1160,7 +1160,7 @@ def create_asset_upload_intent(
             raise ApiError(409, "UPLOAD_INTENT_NOT_AVAILABLE", "Upload intent is no longer available")
     else:
         now = datetime.now(UTC)
-        object_key = f"stores/{store_id}/quarantine/{uuid4()}"
+        object_key = f"stores/{store_id}/quarantine/{uuid4()}/{_safe_filename(payload.original_filename)}"
         intent = UploadIntent(
             id=uuid4(),
             store_id=store_id,
@@ -1278,7 +1278,7 @@ def complete_asset_upload(
         sha256=actual_sha256,
         mime_type=actual_mime,
         byte_size=actual_size,
-        original_filename_sanitized=_safe_filename("upload"),
+        original_filename_sanitized=intent.object_key.rsplit("/", 1)[-1],
         asset_type="image",
         source_type="merchant_upload",
         usage_rights_status="unknown",

@@ -9,7 +9,7 @@ import socket
 from datetime import UTC, datetime, timedelta
 from math import ceil
 from threading import Event, Thread
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
@@ -21,15 +21,15 @@ from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
     ProviderError,
     SideEffectState,
 )
-from store_operator.channels.douyin import (
+from store_operator.channels.douyin import (  # type: ignore[import-untyped]
     DouyinApiError,
     DouyinAppCredentials,
     DouyinOAuthClient,
     DouyinPublishReceipt,
     DouyinTokenSet,
 )
-from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
-from store_operator.config import settings
+from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError  # type: ignore[import-untyped]
+from store_operator.config import settings  # type: ignore[import-untyped]
 from store_operator.jobs.service import (  # type: ignore[import-untyped]
     InvalidJobTransition,
     LeaseLostError,
@@ -57,7 +57,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
     QualityReport,
     ReviewRecord,
 )
-from store_operator.object_storage import (
+from store_operator.object_storage import (  # type: ignore[import-untyped]
     ObjectStorageNotConfigured,
     download_object_bytes,
 )
@@ -1272,10 +1272,13 @@ def execute_douyin_image_text_publish(
     async def read_back_post() -> dict[str, Any] | None:
         client = DouyinOAuthClient(credentials)
         try:
-            return await client.verify_published_item(
-                access_token=access_token,
-                open_id=account_open_id,
-                item_id=platform_item_id,
+            return cast(
+                dict[str, Any] | None,
+                await client.verify_published_item(
+                    access_token=access_token,
+                    open_id=account_open_id,
+                    item_id=platform_item_id,
+                ),
             )
         finally:
             await client.aclose()

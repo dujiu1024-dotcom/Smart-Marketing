@@ -68,17 +68,27 @@ def _login_rate_limit_keys(request: Request, email: str) -> tuple[str, str]:
     return f"auth:login:ip:{ip_hash}", f"auth:login:account:{email_hash}"
 
 
-def _check_login_rate_limit(keys: tuple[str, str]) -> None:
-    counts = redis_client.mget(keys)
-    if any(int(value or 0) >= settings.auth_login_max_attempts for value in counts):
+_LOGIN_RATE_LIMIT_SCRIPT = """
+local ip_count = redis.call("INCR", KEYS[1])
+if ip_count == 1 then redis.call("EXPIRE", KEYS[1], ARGV[1]) end
+local account_count = redis.call("INCR", KEYS[2])
+if account_count == 1 then redis.call("EXPIRE", KEYS[2], ARGV[1]) end
+return {ip_count, account_count}
+"""
+
+
+def _consume_login_attempt(keys: tuple[str, str]) -> None:
+    # Reserve both buckets atomically before password verification so concurrent
+    # requests cannot all pass a stale MGET check.
+    counts = redis_client.eval(
+        _LOGIN_RATE_LIMIT_SCRIPT,
+        2,
+        keys[0],
+        keys[1],
+        settings.auth_login_window_seconds,
+    )
+    if any(int(value) > settings.auth_login_max_attempts for value in counts):
         raise ApiError(429, "RATE_LIMITED", "Too many login attempts")
-
-
-def _record_login_failure(keys: tuple[str, str]) -> None:
-    for key in keys:
-        attempts = redis_client.incr(key)
-        if attempts == 1:
-            redis_client.expire(key, settings.auth_login_window_seconds)
 
 
 @router.post("/auth/login", response_model=LoginResponse)
@@ -92,7 +102,7 @@ def login(
     email = normalize_email(payload.email)
     rate_keys = _login_rate_limit_keys(request, email)
     try:
-        _check_login_rate_limit(rate_keys)
+        _consume_login_attempt(rate_keys)
     except RedisError as exc:
         raise ApiError(
             503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
@@ -114,12 +124,6 @@ def login(
                 metadata={"reason": "invalid_credentials"},
             )
             db.commit()
-            try:
-                _record_login_failure(rate_keys)
-            except RedisError as exc:
-                raise ApiError(
-                    503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
-                ) from exc
             raise ApiError(401, "INVALID_CREDENTIALS", "Invalid email or password")
 
         try:

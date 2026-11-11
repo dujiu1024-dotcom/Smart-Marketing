@@ -13,6 +13,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    PrimaryKeyConstraint,
     String,
     Table,
     Text,
@@ -380,7 +381,7 @@ offer_products = Table(
         ["store_id", "product_id"], ["products.store_id", "products.id"],
         ondelete="CASCADE", name="fk_offer_products_product_same_store",
     ),
-    UniqueConstraint("store_id", "offer_id", "product_id", name="uq_offer_products_pair"),
+    PrimaryKeyConstraint("store_id", "offer_id", "product_id", name="pk_offer_products"),
 )
 
 product_media_assets = Table(
@@ -399,7 +400,7 @@ product_media_assets = Table(
         ["store_id", "asset_id"], ["media_assets.store_id", "media_assets.id"],
         ondelete="RESTRICT", name="fk_product_media_assets_asset_same_store",
     ),
-    UniqueConstraint("store_id", "product_id", "asset_id", name="uq_product_media_assets_pair"),
+    PrimaryKeyConstraint("store_id", "product_id", "asset_id", name="pk_product_media_assets"),
 )
 
 knowledge_item_products = Table(
@@ -416,9 +417,9 @@ knowledge_item_products = Table(
         ["store_id", "product_id"], ["products.store_id", "products.id"],
         ondelete="CASCADE", name="fk_knowledge_item_products_product_same_store",
     ),
-    UniqueConstraint(
+    PrimaryKeyConstraint(
         "store_id", "knowledge_item_id", "product_id",
-        name="uq_knowledge_item_products_pair",
+        name="pk_knowledge_item_products",
     ),
 )
 
@@ -436,8 +437,8 @@ audience_profile_products = Table(
         ["store_id", "product_id"], ["products.store_id", "products.id"],
         ondelete="CASCADE", name="fk_audience_profile_products_product_same_store",
     ),
-    UniqueConstraint(
+    PrimaryKeyConstraint(
         "store_id", "audience_profile_id", "product_id",
-        name="uq_audience_profile_products_pair",
+        name="pk_audience_profile_products",
     ),
 )

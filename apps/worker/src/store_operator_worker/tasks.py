@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine, or_, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from store_operator.ai_gateway.errors import (
     ProviderError,
@@ -20,6 +21,8 @@ from store_operator.jobs.service import (
     acknowledge_job_cancellation,
     claim_job,
     complete_job,
+    InvalidJobTransition,
+    LeaseLostError,
     fail_job,
     heartbeat_job,
 )  # type: ignore[import-untyped]
@@ -231,7 +234,7 @@ def execute_job(job_id: str) -> dict[str, str]:
                             retryable=False,
                             side_effect_state=SideEffectState.UNKNOWN,
                         )
-                except Exception as exc:
+                except (InvalidJobTransition, LeaseLostError, SQLAlchemyError) as exc:
                     logger.warning(
                         "job.timeout.persist_failed",
                         extra={
@@ -245,7 +248,7 @@ def execute_job(job_id: str) -> dict[str, str]:
                 return
             try:
                 update_progress(None, None)
-            except Exception as exc:
+            except (LeaseLostError, SQLAlchemyError, ValueError) as exc:
                 lease_lost.set()
                 logger.warning(
                     "job.heartbeat.lost",
@@ -297,7 +300,7 @@ def execute_job(job_id: str) -> dict[str, str]:
                     lease_token=lease_token,
                     worker_id=WORKER_ID,
                 )
-        except Exception as exc:
+        except (InvalidJobTransition, LeaseLostError, SQLAlchemyError) as exc:
             logger.warning(
                 "job.cancel_acknowledgement_failed",
                 extra={
@@ -354,7 +357,7 @@ def execute_job(job_id: str) -> dict[str, str]:
                 ),
             )
         return {"status": "failed", "reason": exc.code.value}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - final sanitized execution boundary
         logger.error(
             "job.execution.unexpected",
             extra={
@@ -377,7 +380,7 @@ def execute_job(job_id: str) -> dict[str, str]:
                     retryable=False,
                     side_effect_state=SideEffectState.UNKNOWN,
                 )
-        except Exception as persist_exc:
+        except (InvalidJobTransition, LeaseLostError, SQLAlchemyError) as persist_exc:
             logger.error(
                 "job.failure_persist.failed",
                 extra={

@@ -6,7 +6,6 @@ from urllib.parse import urlencode
 
 import httpx
 
-
 DOUYIN_API_BASE = "https://open.douyin.com"
 DOUYIN_AUTHORIZE_URL = f"{DOUYIN_API_BASE}/platform/oauth/connect/"
 DOUYIN_TOKEN_URL = f"{DOUYIN_API_BASE}/oauth/access_token/"

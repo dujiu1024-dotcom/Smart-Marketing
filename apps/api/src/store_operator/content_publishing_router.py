@@ -157,7 +157,7 @@ def _require_approved_artifacts(
 
 
 def _validate_confirmed_fact(
-    db: Session, *, store_id: UUID, task_id: UUID, fact: BusinessFactSnapshot, now: datetime
+    db: Session, *, store_id: UUID, fact: BusinessFactSnapshot, now: datetime
 ) -> None:
     if (
         fact.confirmation_status != "confirmed"
@@ -334,11 +334,11 @@ def freeze_publish_package(
     now = datetime.now(UTC)
     for fact in facts:
         _validate_confirmed_fact(
-            db, store_id=store_id, task_id=task.id, fact=fact, now=now
+            db, store_id=store_id, fact=fact, now=now
         )
 
     channel_keys: set[str] = set()
-    package_items: list[dict[str, object]] = []
+    package_items: list[tuple[ChannelContent, QualityReport, PublishPackageItemInput, str]] = []
     for item_input in payload.items:
         content = db.scalar(
             select(ChannelContent).where(
@@ -403,18 +403,9 @@ def freeze_publish_package(
                 ),
             }
         )
-        package_items.append(
-            {
-                "channel_key": content.channel_key,
-                "channel_content_id": content.id,
-                "quality_report_id": report.id,
-                "delivery_mode": item_input.delivery_mode,
-                "planned_publish_at": item_input.planned_publish_at,
-                "item_fingerprint": item_fingerprint,
-            }
-        )
+        package_items.append((content, report, item_input, item_fingerprint))
 
-    package_items.sort(key=lambda item: str(item["channel_key"]))
+    package_items.sort(key=lambda item: item[0].channel_key)
     fact_ids = [fact.id for fact in facts]
     package_fingerprint = _fingerprint(
         {
@@ -422,7 +413,7 @@ def freeze_publish_package(
             "task_version": task.version,
             "requirement_snapshot_id": str(requirement.id),
             "strategy_snapshot_id": str(strategy.id),
-            "item_fingerprints": [item["item_fingerprint"] for item in package_items],
+            "item_fingerprints": [item[3] for item in package_items],
             "fact_snapshot_ids": sorted(str(item) for item in fact_ids),
         }
     )
@@ -447,18 +438,18 @@ def freeze_publish_package(
     db.flush()
 
     stored_items: list[PublishPackageItem] = []
-    for item in package_items:
+    for content, report, item_input, item_fingerprint in package_items:
         stored = PublishPackageItem(
             id=uuid4(),
             store_id=store_id,
             publish_package_id=package.id,
-            channel_key=str(item["channel_key"]),
-            channel_content_id=item["channel_content_id"],
-            quality_report_id=item["quality_report_id"],
+            channel_key=content.channel_key,
+            channel_content_id=content.id,
+            quality_report_id=report.id,
             channel_account_id=None,
-            delivery_mode=str(item["delivery_mode"]),
-            planned_publish_at=item["planned_publish_at"],
-            item_fingerprint=str(item["item_fingerprint"]),
+            delivery_mode=item_input.delivery_mode,
+            planned_publish_at=item_input.planned_publish_at,
+            item_fingerprint=item_fingerprint,
         )
         db.add(stored)
         stored_items.append(stored)

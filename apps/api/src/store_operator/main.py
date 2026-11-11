@@ -26,8 +26,8 @@ from store_operator.auth.router import router as auth_router
 from store_operator.config import settings
 from store_operator.db import engine, redis_client
 from store_operator.observability import configure_logging
-from store_operator.store_router import router as store_router
 from store_operator.store_knowledge_router import router as store_knowledge_router
+from store_operator.store_router import router as store_router
 from store_operator.tracing import configure_tracing
 
 configure_logging()

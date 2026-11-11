@@ -320,3 +320,18 @@ class BrandGuidelineRead(BrandGuidelineFields):
     store_id: UUID
     fact_status: str
     current_version: int
+
+
+class OfferList(BaseModel):
+    items: list[OfferRead]
+    total: int
+
+
+class AudienceProfileList(BaseModel):
+    items: list[AudienceProfileRead]
+    total: int
+
+
+class KnowledgeItemList(BaseModel):
+    items: list[KnowledgeItemRead]
+    total: int

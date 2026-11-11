@@ -110,3 +110,31 @@
 | #1 | 旧开发计划 PR | 已关闭（被现行 DEVELOPMENT_PLAN.md 取代） | 不涉及关闭 Issue |
 
 本次没有关闭 #2/#4/#5/#6/#7/#8/#9/#10 等生产交付 Issue。Issue #3 已是 Closed。关闭任何 P0 生产 Issue 必须有其 DoD 对应的代码、迁移、自动化测试和可复核验收证据。
+
+
+## 10. Issue #8 内容生产与发布交付领域审查（2026-11-11）
+
+审查基线：PRODUCT_DESIGN.md v1.8、Demo `#task` 的 copy/image/channel/quality/publish 步骤、DOMAIN_INTEGRATION_CONTRACTS_V1.md §6/§9/§10、CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md。
+
+### 已明确的责任边界
+- #7 拥有 MarketingTask、需求/策略快照、TaskStep、依赖图和业务状态；#8 不复制任务状态机。
+- #8 拥有 Artifact/ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage/Item/Confirmation。
+- #6 拥有 MediaAsset 和已确认经营事实；#8 只引用资产 ID/hash，不拥有源素材。
+- #9 拥有 Job/Outbox/Worker；#8 只提交命令并校验结果指纹。
+- #10 拥有真实 AI Provider 和 PromptVersion；#8 不持有 Provider 凭据。
+- #12 拥有 ChannelAccount、OAuth/平台凭据、能力发现、PublishOperation 和外部发布证据；#8 只拥有发布门禁和业务意图。
+
+### 本轮发现并修正的契约缺口
+1. Demo 的最终发布确认一次汇总多个渠道，但旧 PublishPackage 字段只有单个 channel_content_id。现已提出 `PublishPackage + PublishPackageItem` 聚合模型：一个任务交付包、多条渠道 item，整包 fingerprint 与最终确认原子绑定。
+2. ChannelContent 必须是按渠道和输入指纹生成的不可变快照；QualityReport 必须绑定 ChannelContent、规则版本和指纹。
+3. manual_handoff 与 official_api 必须分开；无账号连接时不能伪造 PublishOperation 或已发布状态。
+4. #8 发布请求是受门禁约束的命令；外部发布状态只由 #12 的 PublishOperation 证据确认，#9 Job succeeded 不等于渠道发布成功。
+5. 文案/图片审核按确切 ArtifactVersion 独立进行；旧版本通过不能批准新版本。
+
+### 本轮交付
+- 新增 `CONTENT_DELIVERY_DOMAIN_DESIGN.md`：Demo 映射、实体、状态、指纹、API/事件、事务/幂等、数据库约束和 CNT-01 至 CNT-26 测试矩阵。
+- 更新 `DOMAIN_INTEGRATION_CONTRACTS_V1.md` §6/§10/§11/§12/§13。
+- 更新 `CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md` 的 Content ERD、多渠道 Freeze Schema 和数据库约束。
+- 该方案仍需 #7/#9/#12 联合评审；PackageItem 聚合、manual_handoff 和人工质检复核规则不得未经评审直接进入生产实现。
+
+**验证状态：** 仅完成静态文档交叉审查；CNT-01 至 CNT-26、OpenAPI Schema、Alembic 约束、API/Worker 集成和浏览器回归均待执行。

@@ -86,7 +86,8 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 
 Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须支持多渠道聚合，而不是把一个 `channel_content_id` 塞进单个包后丢失其他渠道。
 
-- `PublishPackage` 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, fact_snapshot_ids, package_fingerprint, frozen_at, frozen_by`。
+- `PublishPackage` 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, package_fingerprint, frozen_at, frozen_by`。事实快照通过 `PublishPackageFactRef` 子表引用，API 可投影为 fact_snapshot_ids[]。
+- `PublishPackageFactRef`：`id, store_id, publish_package_id, business_fact_snapshot_id, position`；通过复合 FK 引用 #6 的已确认 BusinessFactSnapshot。
 - `PublishPackageItem` 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。文案/图片版本通过不可变 ChannelContent 间接绑定，避免在 PackageItem 重复存储版本数组。
 - `PublishConfirmation`：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at, confirmation_note`。
 - 一个 PublishPackage 至少包含一个 PackageItem；同一 package 的 channel_key 唯一。PackageItem 精确绑定 ChannelContent、QualityReport 和可选 ChannelAccount；Copy/Image 版本由 ChannelContent 的直接/子表引用间接冻结。

@@ -62,7 +62,7 @@ class AwsSecretsManagerStore:
         if not secret_ref.strip():
             raise ValueError("Secret reference is required")
         try:
-            response = self._client.get_secret_value(SecretId=secret_ref)  # type: ignore[attr-defined]
+            response = self._client.get_secret_value(SecretId=secret_ref)
             raw = response.get("SecretString")
             if not isinstance(raw, str):
                 raise SecretStoreError("Secret backend returned an unsupported payload")

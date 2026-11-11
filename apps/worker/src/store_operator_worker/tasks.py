@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError
+import httpx
 from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
@@ -1267,12 +1268,12 @@ def execute_douyin_image_text_publish(
                             content=content,
                             content_type=mime_type,
                         )
-                    except DouyinApiError as exc:
+                    except (DouyinApiError, httpx.HTTPError) as exc:
                         _finish_douyin_publish_attempt(
                             attempt_id,
                             normalized_status="failed",
                             retryable=True,
-                            error_code=exc.code,
+                            error_code=(exc.code if isinstance(exc, DouyinApiError) else "HTTP_TRANSPORT_ERROR"),
                         )
                         raise
                     _finish_douyin_publish_attempt(
@@ -1320,12 +1321,12 @@ def execute_douyin_image_text_publish(
                         text=post_text,
                         merchant_confirmed=True,
                     )
-                except DouyinApiError as exc:
+                except (DouyinApiError, httpx.HTTPError) as exc:
                     _finish_douyin_publish_attempt(
                         attempt_id,
                         normalized_status="unknown",
                         retryable=False,
-                        error_code=exc.code,
+                        error_code=(exc.code if isinstance(exc, DouyinApiError) else "HTTP_TRANSPORT_ERROR"),
                     )
                     raise
                 _finish_douyin_publish_attempt(
@@ -1407,7 +1408,7 @@ def execute_douyin_image_text_publish(
 
     try:
         readback = asyncio.run(read_back_post())
-    except DouyinApiError as exc:
+    except (DouyinApiError, httpx.HTTPError) as exc:
         raise JobExecutionError(
             "DOUYIN_READBACK_FAILED",
             "Douyin accepted the post, but readback is temporarily unavailable.",

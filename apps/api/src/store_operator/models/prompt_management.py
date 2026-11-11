@@ -60,7 +60,12 @@ class PromptTemplate(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")
     current_published_version_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     created_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True),
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+            name="fk_prompt_templates_created_by_user",
+        ),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -111,13 +116,23 @@ class PromptVersion(Base):
     changelog: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="draft")
     created_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True),
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+            name="fk_prompt_versions_created_by_user",
+        ),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     published_by_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+        PGUUID(as_uuid=True),
+        ForeignKey(
+            "users.id",
+            ondelete="RESTRICT",
+            name="fk_prompt_versions_published_by_user",
+        ),
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

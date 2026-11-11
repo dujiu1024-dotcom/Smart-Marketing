@@ -117,3 +117,12 @@ PRODUCT_DESIGN.md v1.8 将门店用户管理明确归属平台管理员的门店
 成员管理端点使用独立的 PlatformAdminGrant。请求必须通过正常 User/Session 认证，再验证 PlatformAdminGrant.status=active 与固定能力 platform.store_members.manage。该权限只覆盖门店成员关系管理，不授予 StoreMembership，不允许通过该身份访问门店任务、经营资料、文案、图片或素材内容。成员管理响应严格字段最小化。
 
 成员邀请接口在开户/邀请、邮箱验证、一次性 token、邮件交付与撤销流程未冻结前不得实现；设计端点不构成已批准上线能力。
+
+
+## 10. 实现补充
+
+- `POST /auth/login` 没有既有 Session CSRF token，因此以严格 Origin allowlist 验证抵御 login CSRF；认证后的所有写请求必须同时携带 `X-CSRF-Token`。
+- `POST /auth/csrf` 只允许已认证 Session 和可信 Origin；它会轮换并返回新 token，不接受 URL 参数。
+- `POST /auth/logout-all` 请求体为 `password`，通过当前密码即时重新认证后递增 `User.auth_version` 并撤销全部 Session。
+- 初始门店 owner 通过离线命令 `python -m store_operator.cli bootstrap-store-owner --email <email> --store-name <name>` 建立；初始/紧急平台管理员通过 `grant-platform-admin` / `revoke-platform-admin` 命令管理，必须提供 reason。CLI 不发送邀请邮件、不替代未来邀请流程。
+- Session 时限的本地开发默认值不是生产策略；生产必须显式配置 `SESSION_IDLE_TIMEOUT_SECONDS`、`SESSION_ABSOLUTE_TIMEOUT_SECONDS` 与强随机 `SESSION_TOKEN_PEPPER`。

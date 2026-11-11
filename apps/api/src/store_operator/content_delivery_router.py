@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
@@ -21,6 +22,7 @@ from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.models.content_delivery import Artifact, ArtifactVersion, ReviewRecord
 from store_operator.models.marketing_task import MarketingTask
+from store_operator.models.store_knowledge import MediaAsset
 
 router = APIRouter(prefix="/marketing-tasks", tags=["content-delivery"])
 
@@ -30,17 +32,17 @@ class ArtifactVersionInput(BaseModel):
     source_refs: list[dict[str, object]] = Field(default_factory=list, max_length=50)
     instruction: str | None = Field(default=None, max_length=10000)
     content_json: dict[str, object] | None = None
-    content_ref: str | None = Field(default=None, max_length=700)
-    content_hash: str = Field(pattern="^[a-f0-9]{64}$")
+    media_asset_id: UUID | None = None
     provider_id: str | None = Field(default=None, max_length=100)
     model_id: str | None = Field(default=None, max_length=160)
     prompt_version_id: UUID | None = None
-    input_fingerprint: str = Field(pattern="^[a-f0-9]{64}$")
 
     @model_validator(mode="after")
     def require_content_reference(self) -> "ArtifactVersionInput":
-        if self.content_json is None and not self.content_ref:
-            raise ValueError("content_json or content_ref is required")
+        if self.content_json is None and self.media_asset_id is None:
+            raise ValueError("content_json or media_asset_id is required")
+        if self.content_json is not None and self.media_asset_id is not None:
+            raise ValueError("content_json and media_asset_id are mutually exclusive")
         if self.source_type == "ai_generated" and (
             not self.provider_id or not self.model_id
         ):
@@ -112,28 +114,82 @@ def _artifact_payload(
 
 
 def _new_version(
+    db: Session,
     *,
     store_id: UUID,
     artifact_id: UUID,
+    artifact_type: str,
     version_no: int,
     payload: ArtifactVersionInput,
     actor_user_id: UUID,
 ) -> ArtifactVersion:
+    content_ref = None
+    source_refs = list(payload.source_refs)
+    if payload.media_asset_id is not None:
+        asset = db.scalar(
+            select(MediaAsset).where(
+                MediaAsset.id == payload.media_asset_id,
+                MediaAsset.store_id == store_id,
+            )
+        )
+        if (
+            asset is None
+            or asset.status != "ready"
+            or asset.usage_rights_status != "confirmed_allowed"
+            or (artifact_type == "image" and not asset.mime_type.startswith("image/"))
+        ):
+            raise ApiError(
+                422,
+                "MEDIA_ASSET_NOT_USABLE",
+                "Media asset must belong to this store, be ready, and have confirmed usage rights",
+            )
+        content_ref = asset.object_key
+        content_hash = asset.sha256
+        source_refs.append({"type": "media_asset", "id": str(asset.id)})
+    else:
+        canonical = json.dumps(
+            payload.content_json,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        content_hash = hashlib.sha256(canonical).hexdigest()
+    fingerprint_payload = {
+        "artifact_id": str(artifact_id),
+        "artifact_type": artifact_type,
+        "source_type": payload.source_type,
+        "source_refs": source_refs,
+        "instruction": payload.instruction,
+        "content_hash": content_hash,
+        "provider_id": payload.provider_id,
+        "model_id": payload.model_id,
+        "prompt_version_id": (
+            str(payload.prompt_version_id) if payload.prompt_version_id else None
+        ),
+    }
+    input_fingerprint = hashlib.sha256(
+        json.dumps(
+            fingerprint_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
     return ArtifactVersion(
         id=uuid4(),
         store_id=store_id,
         artifact_id=artifact_id,
         version_no=version_no,
         source_type=payload.source_type,
-        source_refs_json=payload.source_refs,
+        source_refs_json=source_refs,
         instruction=payload.instruction,
         content_json=payload.content_json,
-        content_ref=payload.content_ref,
-        content_hash=payload.content_hash,
+        content_ref=content_ref,
+        content_hash=content_hash,
         provider_id=payload.provider_id,
         model_id=payload.model_id,
         prompt_version_id=payload.prompt_version_id,
-        input_fingerprint=payload.input_fingerprint,
+        input_fingerprint=input_fingerprint,
         created_by_user_id=actor_user_id,
     )
 
@@ -177,15 +233,19 @@ def create_artifact(
     )
     db.add(artifact)
     db.flush()
+    if payload.artifact_type == "copy" and payload.version.content_json is None:
+        raise ApiError(422, "COPY_CONTENT_REQUIRED", "Copy artifacts require content_json")
+    if payload.artifact_type == "image" and payload.version.media_asset_id is None:
+        raise ApiError(422, "IMAGE_ASSET_REQUIRED", "Image artifacts require a ready media asset")
     version = _new_version(
+        db,
         store_id=store_id,
         artifact_id=artifact.id,
+        artifact_type=artifact.artifact_type,
         version_no=1,
         payload=payload.version,
         actor_user_id=auth.user.id,
     )
-    if artifact.artifact_type != payload.version.source_type and False:
-        raise ApiError(422, "ARTIFACT_SOURCE_INVALID", "Artifact source is invalid")
     db.add(version)
     db.flush()
     artifact.current_version_id = version.id
@@ -302,9 +362,15 @@ def create_artifact_version(
         )
         or 0
     ) + 1
+    if artifact.artifact_type == "copy" and payload.content_json is None:
+        raise ApiError(422, "COPY_CONTENT_REQUIRED", "Copy artifacts require content_json")
+    if artifact.artifact_type == "image" and payload.media_asset_id is None:
+        raise ApiError(422, "IMAGE_ASSET_REQUIRED", "Image artifacts require a ready media asset")
     version = _new_version(
+        db,
         store_id=store_id,
         artifact_id=artifact_id,
+        artifact_type=artifact.artifact_type,
         version_no=version_no,
         payload=payload,
         actor_user_id=auth.user.id,
@@ -359,11 +425,13 @@ def create_review_record(
     if replay is not None:
         return replay
     artifact = db.scalar(
-        select(Artifact).where(
+        select(Artifact)
+        .where(
             Artifact.id == artifact_id,
             Artifact.task_id == task_id,
             Artifact.store_id == store_id,
         )
+        .with_for_update()
     )
     if artifact is None:
         raise ApiError(404, "ARTIFACT_NOT_FOUND", "Artifact not found")

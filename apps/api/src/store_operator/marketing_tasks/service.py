@@ -797,10 +797,60 @@ def confirm_requirement(
     _ensure_task_transition(
         MarketingTaskStatus.DRAFT, MarketingTaskStatus.ACTIVE
     )
+    strategy_step = steps[TaskStepKey.STRATEGY_CONFIRMATION.value]
+    if TaskStepStatus(strategy_step.status) is not TaskStepStatus.PENDING:
+        raise ApiError(
+            409,
+            "STRATEGY_STEP_NOT_PENDING",
+            "Strategy generation step is not pending",
+        )
+    strategy_applicability = StepApplicability(strategy_step.applicability)
+    _ensure_step_transition(
+        TaskStepStatus.PENDING,
+        TaskStepStatus.RUNNING,
+        applicability=strategy_applicability,
+    )
+    strategy_step.status = TaskStepStatus.RUNNING.value
+    strategy_step.version += 1
+    strategy_step.started_at = now
+    strategy_step.finished_at = None
+    strategy_step.input_fingerprint = requirement_fingerprint
+    strategy_step.output_refs_json = []
+    strategy_step.blocked_by_json = []
+    strategy_step.block_code = None
+    strategy_step.block_detail_json = None
+    strategy_step.skip_reason = None
+
     task.current_requirement_snapshot_id = requirement_snapshot.id
     task.lifecycle_status = MarketingTaskStatus.ACTIVE.value
     task.activated_at = now
     task.version += 1
+    try:
+        strategy_job = create_job(
+            db,
+            job_type="marketing_task.generate_strategy",
+            payload_ref={
+                "schema_version": 1,
+                "marketing_task_id": str(task.id),
+                "requirement_snapshot_id": str(requirement_snapshot.id),
+                "requirement_fingerprint": requirement_fingerprint,
+            },
+            idempotency_key=(
+                f"marketing-task:{task.id}:strategy:{requirement_snapshot.id}"
+            ),
+            store_id=store_id,
+            actor_type="user",
+            actor_user_id=auth.user.id,
+            marketing_task_id=task.id,
+            max_attempts=3,
+            timeout_seconds=600,
+        )
+    except JobIdempotencyConflict as exc:
+        raise ApiError(
+            409,
+            "STRATEGY_JOB_IDEMPOTENCY_CONFLICT",
+            "A conflicting strategy generation job already exists",
+        ) from exc
     return _finish_task_write(
         db,
         request,
@@ -812,12 +862,14 @@ def confirm_requirement(
         event_payload={
             "requirement_snapshot_id": str(requirement_snapshot.id),
             "business_fact_snapshot_ids": [str(item.id) for item in fact_snapshots],
+            "strategy_job_id": str(strategy_job.id),
             "snapshot_no": snapshot_no,
         },
         audit_action="marketing_task.requirement.confirmed",
         audit_metadata={
             "requirement_snapshot_id": str(requirement_snapshot.id),
             "business_fact_count": len(fact_snapshots),
+            "strategy_job_id": str(strategy_job.id),
         },
     )
 

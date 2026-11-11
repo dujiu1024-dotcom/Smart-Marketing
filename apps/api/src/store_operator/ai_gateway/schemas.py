@@ -1,9 +1,8 @@
+from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
-
-from store_operator.ai_gateway.errors import ProviderErrorCode
 
 
 class GatewaySchema(BaseModel):

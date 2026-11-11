@@ -17,7 +17,7 @@ from store_operator.auth.dependencies import (
     require_store_context,
 )
 from store_operator.auth.errors import ApiError
-from store_operator.channels.douyin import DouyinAppCredentials, DouyinOAuthClient
+from store_operator.channels.douyin import DouyinApiError, DouyinAppCredentials, DouyinOAuthClient
 from store_operator.channels.oauth_state import consume_oauth_state, new_oauth_state
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
 from store_operator.config import settings
@@ -223,4 +223,156 @@ async def complete_douyin_authorization(
         "channel_account_id": str(account.id),
         "store_id": str(attempt.store_id),
         "external_account_id": token_set.open_id,
+    }
+
+
+@router.get("/accounts")
+def list_douyin_accounts(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[dict[str, object]]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+    accounts = db.scalars(
+        select(ChannelAccount)
+        .where(
+            ChannelAccount.store_id == store_id,
+            ChannelAccount.provider == "douyin",
+        )
+        .order_by(ChannelAccount.connected_at.desc())
+    ).all()
+    return [
+        {
+            "id": str(account.id),
+            "provider": account.provider,
+            "external_account_id": account.external_account_id,
+            "display_name": account.display_name,
+            "avatar_url": account.avatar_url,
+            "granted_scopes": account.granted_scopes,
+            "access_token_expires_at": account.access_token_expires_at.isoformat(),
+            "refresh_token_expires_at": (
+                account.refresh_token_expires_at.isoformat()
+                if account.refresh_token_expires_at
+                else None
+            ),
+            "status": account.status,
+            "connected_at": account.connected_at.isoformat(),
+            "last_verified_at": (
+                account.last_verified_at.isoformat() if account.last_verified_at else None
+            ),
+        }
+        for account in accounts
+    ]
+
+
+@router.post("/accounts/{account_id}/refresh")
+async def refresh_douyin_account_token(
+    account_id: UUID,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+    credentials, _ = _require_oauth_configuration()
+    account = db.scalar(
+        select(ChannelAccount)
+        .where(
+            ChannelAccount.id == account_id,
+            ChannelAccount.store_id == store_id,
+            ChannelAccount.provider == "douyin",
+            ChannelAccount.status == "active",
+        )
+    )
+    if account is None:
+        raise ApiError(404, "CHANNEL_ACCOUNT_NOT_FOUND", "Active Douyin account not found")
+    secret_ref = account.access_token_secret_ref
+    expected_open_id = account.external_account_id
+    db.commit()
+
+    try:
+        secret_store = _secret_store()
+        secrets = secret_store.get_json(secret_ref)
+        refresh_token = secrets.get("refresh_token")
+        if not isinstance(refresh_token, str) or not refresh_token:
+            raise SecretStoreError("Stored refresh credential is invalid")
+        client = DouyinOAuthClient(credentials)
+        try:
+            token_set = await client.refresh_access_token(refresh_token)
+        finally:
+            await client.aclose()
+        if token_set.open_id != expected_open_id:
+            raise ApiError(
+                502,
+                "OAUTH_ACCOUNT_MISMATCH",
+                "Refreshed credentials do not match the connected Douyin account",
+            )
+        required_scopes = DOUYIN_REQUIRED_SCOPES
+        if not required_scopes.issubset(token_set.scope):
+            raise ApiError(
+                403,
+                "OAUTH_SCOPE_INSUFFICIENT",
+                "Refreshed credentials lack required publishing or readback scopes",
+            )
+        new_secret_ref = secret_store.put_json(
+            f"{settings.channel_secret_store_prefix}/{store_id}/douyin/"
+            f"{hashlib.sha256(expected_open_id.encode('utf-8')).hexdigest()}",
+            {
+                "access_token": token_set.access_token,
+                "refresh_token": token_set.refresh_token,
+            },
+        )
+    except SecretStoreError as exc:
+        raise ApiError(
+            503, "SECRET_STORE_UNAVAILABLE", "Channel credentials could not be refreshed"
+        ) from exc
+    except DouyinApiError as exc:
+        raise ApiError(
+            502, "CHANNEL_TOKEN_REFRESH_FAILED", "Douyin token refresh failed"
+        ) from exc
+
+    current = db.scalar(
+        select(ChannelAccount)
+        .where(
+            ChannelAccount.id == account_id,
+            ChannelAccount.store_id == store_id,
+        )
+        .with_for_update()
+    )
+    if (
+        current is None
+        or current.status != "active"
+        or current.access_token_secret_ref != secret_ref
+    ):
+        db.rollback()
+        raise ApiError(
+            409,
+            "CHANNEL_ACCOUNT_CHANGED",
+            "Channel account changed while credentials were refreshing; retry",
+        )
+    now = datetime.now(UTC)
+    current.access_token_secret_ref = new_secret_ref
+    current.refresh_token_secret_ref = new_secret_ref
+    current.access_token_expires_at = now + timedelta(seconds=token_set.expires_in)
+    current.refresh_token_expires_at = (
+        now + timedelta(seconds=token_set.refresh_expires_in)
+        if token_set.refresh_expires_in > 0
+        else None
+    )
+    current.granted_scopes = sorted(token_set.scope)
+    current.last_verified_at = now
+    current.updated_at = now
+    db.commit()
+    return {
+        "id": str(current.id),
+        "status": current.status,
+        "access_token_expires_at": current.access_token_expires_at.isoformat(),
+        "refresh_token_expires_at": (
+            current.refresh_token_expires_at.isoformat()
+            if current.refresh_token_expires_at
+            else None
+        ),
+        "last_verified_at": current.last_verified_at.isoformat(),
     }

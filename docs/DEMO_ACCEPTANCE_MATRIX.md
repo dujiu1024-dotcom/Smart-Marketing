@@ -211,3 +211,16 @@
 - Infrastructure 完成完整 Compose 启动、API readiness、Web HTTP 和 PostgreSQL volume restart persistence 检查。
 - 因此 ENG-DEMO-02 的“路由/页面壳冒烟”子项可标记通过；这不改变 ENG-DEMO-03 和 ENG-DEMO-04 的未完成状态。
 - 完整业务流程、字段级交互、异常恢复、移动端/响应式、可访问性和冻结 Demo 正式验收仍未完成；Issue #4 不关闭。
+
+
+## 17. #8 内容质检服务接入进度（2026-11-11）
+
+| 能力 | 生产 API/Worker 状态 | Demo/浏览器状态 |
+|---|---|---|
+| 渠道内容快照 | PR #61 已合并；按已审核文案/图片版本创建快照 | 页面完整接入未完成 |
+| 异步质检请求 | PR #62 开发中；使用 #9 Job + Outbox，要求 expected fingerprint | 页面入口、进度和错误反馈未接入 |
+| 结构规则检查 | `content-structure-v1`：占位/空内容 hard fail；经营事实表达 needs_human | 规则说明和报告展示未接入 |
+| 人工复核 | QualityResolution API 开发中；仅 needs_human 可追加决议，hard fail 不可覆盖 | 复核页面和角色权限验收未完成 |
+| 质检报告新鲜度 | Worker 执行前校验 ChannelContent 指纹、当前文案/图片版本和独立审核 | 上游修改后 UI stale 状态未验收 |
+
+说明：PR #62 的确定性规则不是 LLM 语义质检、图片 OCR/视觉检查或渠道官方规范校验；也不构成经营事实验证。PR CI 通过只证明本轮 API/Worker/构建/基础设施检查，不代表 Demo 的完整质量检查流程通过。发布包冻结、商家最终确认、真实浏览器业务流程仍未完成。

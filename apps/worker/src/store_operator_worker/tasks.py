@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import socket
@@ -27,10 +29,16 @@ from store_operator.jobs.service import (  # type: ignore[import-untyped]
     heartbeat_job,
 )
 from store_operator.models import (  # type: ignore[import-untyped]
+    Artifact,
+    ArtifactVersion,
+    ChannelContent,
+    ChannelContentArtifactRef,
     Job,
     JobAttempt,
     JobEvent,
     OutboxEvent,
+    QualityReport,
+    ReviewRecord,
 )
 
 from store_operator_worker.celery_app import celery_app
@@ -40,6 +48,7 @@ from store_operator_worker.handlers import (
     JobExecutionError,
     JobLeaseLost,
     JobTimedOut,
+    register_job_handler,
     resolve_job_handler,
 )
 
@@ -450,3 +459,185 @@ def recover_expired_leases(batch_size: int = 100) -> int:
             )
             recovered += 1
     return recovered
+
+
+
+@register_job_handler("content.quality_check")
+def execute_content_quality_check(
+    context: JobExecutionContext,
+    payload_ref: dict[str, object],
+) -> dict[str, object]:
+    """Persist an immutable, fingerprint-bound deterministic content quality report."""
+    from store_operator_worker.quality_rules import RULE_VERSION, evaluate_content
+
+    context.check_control()
+    if context.store_id is None:
+        raise JobExecutionError(
+            "QUALITY_STORE_REQUIRED",
+            "Quality checks require a store-scoped job.",
+            retryable=False,
+        )
+    if payload_ref.get("schema_version") != 1:
+        raise JobExecutionError(
+            "QUALITY_SCHEMA_UNSUPPORTED",
+            "Quality check payload schema is unsupported.",
+            retryable=False,
+        )
+    content_id_value = payload_ref.get("channel_content_id")
+    expected_fingerprint = payload_ref.get("expected_fingerprint")
+    rule_version = payload_ref.get("rule_version")
+    if not isinstance(content_id_value, str) or not isinstance(expected_fingerprint, str):
+        raise JobExecutionError(
+            "QUALITY_PAYLOAD_INVALID",
+            "Quality check payload is invalid.",
+            retryable=False,
+        )
+    if rule_version != RULE_VERSION:
+        raise JobExecutionError(
+            "QUALITY_RULE_VERSION_UNSUPPORTED",
+            "Requested quality rule version is not installed.",
+            retryable=False,
+        )
+
+    try:
+        content_id = UUID(content_id_value)
+    except ValueError as exc:
+        raise JobExecutionError(
+            "QUALITY_PAYLOAD_INVALID",
+            "Quality check payload is invalid.",
+            retryable=False,
+        ) from exc
+
+    with SessionLocal.begin() as db:
+        channel_content = db.scalar(
+            select(ChannelContent).where(
+                ChannelContent.id == content_id,
+                ChannelContent.store_id == context.store_id,
+            )
+        )
+        if (
+            channel_content is None
+            or channel_content.input_fingerprint != expected_fingerprint
+        ):
+            raise JobExecutionError(
+                "CHANNEL_CONTENT_STALE",
+                "Channel content changed before quality checking.",
+                retryable=False,
+            )
+
+        copy_version = db.scalar(
+            select(ArtifactVersion)
+            .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
+            .where(
+                ArtifactVersion.id == channel_content.copy_version_id,
+                ArtifactVersion.store_id == context.store_id,
+                Artifact.store_id == context.store_id,
+                Artifact.current_version_id == ArtifactVersion.id,
+                Artifact.artifact_type == "copy",
+            )
+        )
+        if copy_version is None:
+            raise JobExecutionError(
+                "COPY_VERSION_STALE",
+                "The approved copy version is no longer current.",
+                retryable=False,
+            )
+        approved_copy = db.scalar(
+            select(ReviewRecord.id).where(
+                ReviewRecord.store_id == context.store_id,
+                ReviewRecord.artifact_id == copy_version.artifact_id,
+                ReviewRecord.artifact_version_id == copy_version.id,
+                ReviewRecord.review_type == "copy",
+                ReviewRecord.decision == "approved",
+            )
+        )
+        if approved_copy is None:
+            raise JobExecutionError(
+                "COPY_REVIEW_REQUIRED",
+                "The copy version is not approved.",
+                retryable=False,
+            )
+
+        image_refs = db.scalars(
+            select(ChannelContentArtifactRef).where(
+                ChannelContentArtifactRef.store_id == context.store_id,
+                ChannelContentArtifactRef.channel_content_id == channel_content.id,
+            )
+        ).all()
+        for image_ref in image_refs:
+            image_version = db.scalar(
+                select(ArtifactVersion)
+                .join(Artifact, Artifact.id == ArtifactVersion.artifact_id)
+                .where(
+                    ArtifactVersion.id == image_ref.artifact_version_id,
+                    ArtifactVersion.store_id == context.store_id,
+                    Artifact.store_id == context.store_id,
+                    Artifact.current_version_id == ArtifactVersion.id,
+                    Artifact.artifact_type == "image",
+                )
+            )
+            approved_image = (
+                db.scalar(
+                    select(ReviewRecord.id).where(
+                        ReviewRecord.store_id == context.store_id,
+                        ReviewRecord.artifact_id == image_version.artifact_id,
+                        ReviewRecord.artifact_version_id == image_version.id,
+                        ReviewRecord.review_type == "image",
+                        ReviewRecord.decision == "approved",
+                    )
+                )
+                if image_version is not None
+                else None
+            )
+            if approved_image is None:
+                raise JobExecutionError(
+                    "IMAGE_REVIEW_REQUIRED",
+                    "A referenced image version is no longer approved and current.",
+                    retryable=False,
+                )
+
+        fingerprint_payload = {
+            "channel_content_id": str(channel_content.id),
+            "channel_content_fingerprint": channel_content.input_fingerprint,
+            "rule_version": RULE_VERSION,
+        }
+        canonical = json.dumps(
+            fingerprint_payload, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        report_fingerprint = hashlib.sha256(canonical).hexdigest()
+        report = db.scalar(
+            select(QualityReport).where(
+                QualityReport.store_id == context.store_id,
+                QualityReport.channel_content_id == channel_content.id,
+                QualityReport.rule_version == RULE_VERSION,
+                QualityReport.input_fingerprint == report_fingerprint,
+            )
+        )
+        if report is None:
+            merged_content = dict(copy_version.content_json or {})
+            merged_content.update(channel_content.payload_json)
+            result, issues = evaluate_content(merged_content)
+            report = QualityReport(
+                id=uuid4(),
+                store_id=context.store_id,
+                task_id=channel_content.task_id,
+                channel_content_id=channel_content.id,
+                rule_version=RULE_VERSION,
+                input_fingerprint=report_fingerprint,
+                result=result,
+                issues_json=issues,
+            )
+            db.add(report)
+            db.flush()
+        report_id = report.id
+        report_result = report.result
+        report_fingerprint = report.input_fingerprint
+
+    context.check_control()
+    return {
+        "schema_version": 1,
+        "quality_report_id": str(report_id),
+        "result": report_result,
+        "input_fingerprint": report_fingerprint,
+        "rule_version": RULE_VERSION,
+    }

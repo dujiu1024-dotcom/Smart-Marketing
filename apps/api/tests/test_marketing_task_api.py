@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -128,7 +128,7 @@ def test_create_marketing_task_initializes_fixed_steps_and_event(
     assert steps["quality_check"]["status"] == "skipped"
     assert steps["delivery"]["status"] == "skipped"
 
-    task_id = result["id"]
+    task_id = UUID(result["id"])
     task = db_session.get(MarketingTask, task_id)
     assert task is not None
     assert task.store_id == store.id

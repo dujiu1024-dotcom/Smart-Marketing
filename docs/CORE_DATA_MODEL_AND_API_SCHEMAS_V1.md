@@ -85,6 +85,8 @@ erDiagram
   ARTIFACT_VERSION ||--o{ CHANNEL_CONTENT_ARTIFACT_REF : image_ref
   CHANNEL_CONTENT ||--o{ QUALITY_REPORT : validates
   MARKETING_TASK ||--o{ PUBLISH_PACKAGE : freezes
+  PUBLISH_PACKAGE ||--o{ PUBLISH_PACKAGE_FACT_REF : snapshots
+  BUSINESS_FACT_SNAPSHOT ||--o{ PUBLISH_PACKAGE_FACT_REF : freezes
   PUBLISH_PACKAGE ||--|{ PUBLISH_PACKAGE_ITEM : contains
   PUBLISH_PACKAGE_ITEM }o--|| CHANNEL_CONTENT : references
   PUBLISH_PACKAGE_ITEM }o--|| QUALITY_REPORT : binds
@@ -94,7 +96,7 @@ erDiagram
 ```
 
 - MarketingTask 是业务聚合根；Artifact/Review/ChannelContent/QualityReport/Package 由 #8 持有，Job/Outbox 由 #9 持有。
-- RequirementSnapshot、StrategySnapshot、BusinessFactSnapshot、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishPackageItem、PublishConfirmation 均按不可变记录处理。
+- RequirementSnapshot、StrategySnapshot、BusinessFactSnapshot、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishPackageFactRef、PublishPackageItem、PublishConfirmation 均按不可变记录处理。
 - 文案与图片审核分别按 artifact_type/version 绑定；审核旧版本不能批准新版本。
 - 一个 PublishPackage 聚合一次任务交付，PublishPackageItem 每个渠道一条；冻结/确认以整个 package fingerprint 为单位。
 - 依赖边记录上游版本 ID + fingerprint；失效只沿真实依赖闭包传播。
@@ -317,13 +319,14 @@ erDiagram
 6. 依赖边需支持上游与下游两个方向索引；同一版本依赖边唯一。
 7. Job 尝试唯一：`UNIQUE(job_id, attempt_no)`；租约领取用原子 UPDATE/SELECT FOR UPDATE SKIP LOCKED。
 8. Outbox 消费端持久化 event_id 去重；Relay 通过租约/锁避免并发重复 claim。
-9. PublishPackage 与 PublishPackageItem 冻结后禁止 UPDATE；PublishConfirmation 绑定整个 package fingerprint。
-10. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 复合 FK 校验 channel_key 与 ChannelContent 一致，并保证 QualityReport 属于同一 ChannelContent，所有复合 FK 包含 store_id。
-11. ChannelContent.copy_version_id 使用 store_id 复合 FK；ChannelContentArtifactRef 以 (store_id, channel_content_id, position) 唯一，并对 ChannelContent/ArtifactVersion 使用包含 store_id 的复合 FK；图片数组仅是 API projection。
-12. 一个 PublishPackage 至少有一个 PackageItem；manual_handoff 时 channel_account_id 允许 NULL，official_api 时必须非 NULL。
-13. PublishOperation（#12）对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
-14. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
-15. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
+9. PublishPackage、PublishPackageFactRef 与 PublishPackageItem 冻结后禁止 UPDATE；PublishConfirmation 绑定整个 package fingerprint。
+10. PublishPackageFactRef 以 (store_id,publish_package_id,business_fact_snapshot_id) 唯一，并复合 FK 到已确认 BusinessFactSnapshot。
+11. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 复合 FK 校验 channel_key 与 ChannelContent 一致，并保证 QualityReport 属于同一 ChannelContent，所有复合 FK 包含 store_id。
+12. ChannelContent.copy_version_id 使用 store_id 复合 FK；ChannelContentArtifactRef 以 (store_id, channel_content_id, position) 唯一，并对 ChannelContent/ArtifactVersion 使用包含 store_id 的复合 FK；图片数组仅是 API projection。
+13. 一个 PublishPackage 至少有一个 PackageItem；manual_handoff 时 channel_account_id 允许 NULL，official_api 时必须非 NULL。
+14. PublishOperation（#12）对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
+15. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
+16. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

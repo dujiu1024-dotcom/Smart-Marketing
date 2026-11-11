@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import Event
-from typing import Callable, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from store_operator.ai_gateway.errors import SideEffectState  # type: ignore[import-untyped]

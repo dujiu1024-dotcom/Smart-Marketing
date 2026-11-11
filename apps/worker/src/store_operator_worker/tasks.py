@@ -13,11 +13,11 @@ from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
-from store_operator.ai_gateway.errors import (
+from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
     ProviderError,
     SideEffectState,
-)  # type: ignore[import-untyped]
-from store_operator.jobs.service import (
+)
+from store_operator.jobs.service import (  # type: ignore[import-untyped]
     InvalidJobTransition,
     LeaseLostError,
     acknowledge_job_cancellation,
@@ -25,13 +25,13 @@ from store_operator.jobs.service import (
     complete_job,
     fail_job,
     heartbeat_job,
-)  # type: ignore[import-untyped]
-from store_operator.models import (
+)
+from store_operator.models import (  # type: ignore[import-untyped]
     Job,
     JobAttempt,
     JobEvent,
     OutboxEvent,
-)  # type: ignore[import-untyped]
+)
 
 from store_operator_worker.celery_app import celery_app
 from store_operator_worker.handlers import (

@@ -1156,7 +1156,6 @@ def execute_douyin_image_text_publish(
             )
             current_account.granted_scopes = sorted(token_set.scope)
             current_account.last_verified_at = now
-            current_account.last_verified_at = now
         access_token = token_set.access_token
 
     if platform_item_id is None:

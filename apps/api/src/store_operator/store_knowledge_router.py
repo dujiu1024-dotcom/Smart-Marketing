@@ -1,5 +1,6 @@
 import hashlib
 import json
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -26,7 +27,6 @@ from store_operator.models.store_knowledge import (
     Product,
     StoreProfile,
     StoreRecordRevision,
-    StoreScoped,
 )
 from store_operator.store_knowledge_schemas import (
     AudienceProfileCreate,

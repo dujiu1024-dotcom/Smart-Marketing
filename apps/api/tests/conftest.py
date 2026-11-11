@@ -1,16 +1,15 @@
+from collections.abc import Iterator
 import os
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 os.environ.setdefault(
     "DATABASE_URL",
     "postgresql+psycopg://test:test@localhost:5432/test",
 )
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-
-
-import pytest
-from collections.abc import Iterator
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 
 
 @pytest.fixture

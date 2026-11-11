@@ -388,7 +388,11 @@ def run_quality_report(
     if content.input_fingerprint != payload.expected_fingerprint:
         raise ApiError(409, "CHANNEL_CONTENT_STALE", "Channel content fingerprint has changed")
     if payload.rule_version != "content-structure-v1":
-        raise ApiError(422, "QUALITY_RULE_VERSION_UNSUPPORTED", "Quality rule version is not installed")
+        raise ApiError(
+            422,
+            "QUALITY_RULE_VERSION_UNSUPPORTED",
+            "Quality rule version is not installed",
+        )
 
     request_key = hashlib.sha256(
         f"{store_id}:{auth.user.id}:content.quality_report.run:{idempotency_key}".encode()

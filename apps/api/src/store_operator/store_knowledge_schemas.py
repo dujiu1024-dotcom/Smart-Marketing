@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Self
+from typing import Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -386,6 +386,24 @@ class MediaAssetRead(BaseModel):
 class MediaAssetList(BaseModel):
     items: list[MediaAssetRead]
     total: int
+
+
+class MediaAssetUsageRightsConfirm(BaseModel):
+    expected_version: int = Field(ge=1)
+    expected_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    usage_rights_status: Literal["confirmed_allowed", "restricted"]
+    license_note: str = Field(min_length=3, max_length=2000)
+
+
+class MediaAssetUsageRightsIdempotency(BaseModel):
+    asset_id: UUID
+    request: MediaAssetUsageRightsConfirm
+
+
+class MediaAssetArchiveIdempotency(BaseModel):
+    asset_id: UUID
+    expected_version: int = Field(ge=1)
+    action: Literal["archive"] = "archive"
 
 
 class AssetUploadCompleteRead(BaseModel):

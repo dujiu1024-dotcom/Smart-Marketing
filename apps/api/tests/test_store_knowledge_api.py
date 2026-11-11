@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
-from store_operator.models.store_knowledge import MediaAsset, UploadIntent
+from store_operator.models.store_knowledge import BrandGuideline, MediaAsset, UploadIntent
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -461,3 +461,149 @@ def test_media_asset_upload_rejects_server_metadata_mismatch(
     assert rejected.json()["error"]["code"] == "UPLOAD_OBJECT_MISMATCH"
     db_session.refresh(db_session.get(UploadIntent, intent_id))
     assert db_session.get(UploadIntent, intent_id).status == "rejected"
+
+
+
+def test_media_asset_usage_rights_are_version_bound_and_idempotent(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+    import store_operator.store_knowledge_router as knowledge_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    monkeypatch.setattr(
+        knowledge_router,
+        "create_download_url",
+        lambda **kwargs: "https://private-storage.invalid/download",
+    )
+    user = create_user(db_session, "asset-rights@example.com")
+    store = create_store(db_session, user, "Asset Rights Store")
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "asset-rights@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": login.json()["csrf_token"],
+        "X-Store-ID": str(store.id),
+    }
+    asset = MediaAsset(
+        id=uuid4(),
+        store_id=store.id,
+        object_key=f"stores/{store.id}/quarantine/test/menu.png",
+        sha256="a" * 64,
+        mime_type="image/png",
+        byte_size=1024,
+        asset_type="image",
+        source_type="merchant_upload",
+        usage_rights_status="unknown",
+        status="ready",
+        version_no=1,
+        created_by_user_id=user.id,
+    )
+    db_session.add(asset)
+    db_session.flush()
+
+    url = f"/api/v1/store/assets/{asset.id}/confirm-usage-rights"
+    payload = {
+        "expected_version": 1,
+        "expected_sha256": asset.sha256,
+        "usage_rights_status": "confirmed_allowed",
+        "license_note": "Merchant confirms ownership or permission for store marketing use.",
+    }
+    request_headers = {**headers, "Idempotency-Key": "asset-rights-confirm-1"}
+    confirmed = identity_client.post(url, headers=request_headers, json=payload)
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["usage_rights_status"] == "confirmed_allowed"
+
+    replay = identity_client.post(url, headers=request_headers, json=payload)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["id"] == confirmed.json()["id"]
+
+    stale = identity_client.post(
+        url,
+        headers={**headers, "Idempotency-Key": "asset-rights-confirm-2"},
+        json={**payload, "expected_version": 2},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "VERSION_CONFLICT"
+
+    download = identity_client.get(
+        f"/api/v1/store/assets/{asset.id}/download-url",
+        headers={"X-Store-ID": str(store.id)},
+    )
+    assert download.status_code == 200, download.text
+    assert download.json()["url"] == "https://private-storage.invalid/download"
+
+
+def test_media_asset_archive_checks_references_and_is_audited(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = create_user(db_session, "asset-archive@example.com")
+    store = create_store(db_session, user, "Asset Archive Store")
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "asset-archive@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": login.json()["csrf_token"],
+        "X-Store-ID": str(store.id),
+    }
+    asset = MediaAsset(
+        id=uuid4(),
+        store_id=store.id,
+        object_key=f"stores/{store.id}/quarantine/archive/menu.png",
+        sha256="b" * 64,
+        mime_type="image/png",
+        byte_size=2048,
+        asset_type="image",
+        source_type="merchant_upload",
+        usage_rights_status="confirmed_allowed",
+        license_note="Merchant-owned original image.",
+        status="ready",
+        version_no=1,
+        created_by_user_id=user.id,
+    )
+    db_session.add(asset)
+    db_session.flush()
+    guideline = BrandGuideline(
+        id=uuid4(),
+        store_id=store.id,
+        logo_asset_id=asset.id,
+    )
+    db_session.add(guideline)
+    db_session.flush()
+
+    url = f"/api/v1/store/assets/{asset.id}/archive"
+    blocked = identity_client.post(
+        url,
+        headers={
+            **headers,
+            "If-Match": '"1"',
+            "Idempotency-Key": "asset-archive-blocked",
+        },
+    )
+    assert blocked.status_code == 409, blocked.text
+    assert blocked.json()["error"]["code"] == "MEDIA_ASSET_IN_USE"
+
+    guideline.logo_asset_id = None
+    db_session.flush()
+    archived = identity_client.post(
+        url,
+        headers={
+            **headers,
+            "If-Match": '"1"',
+            "Idempotency-Key": "asset-archive-1",
+        },
+    )
+    assert archived.status_code == 200, archived.text
+    assert archived.json()["status"] == "archived"
+    assert db_session.get(MediaAsset, asset.id).status == "archived"

@@ -723,6 +723,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/store/assets/{asset_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Media Asset */
+        post: operations["archive_media_asset_api_v1_store_assets__asset_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/assets/{asset_id}/confirm-usage-rights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Media Asset Usage Rights */
+        post: operations["confirm_media_asset_usage_rights_api_v1_store_assets__asset_id__confirm_usage_rights_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/store/assets/{asset_id}/download-url": {
         parameters: {
             query?: never;
@@ -1889,6 +1923,20 @@ export interface components {
             usage_rights_status: string;
             /** Version No */
             version_no: number;
+        };
+        /** MediaAssetUsageRightsConfirm */
+        MediaAssetUsageRightsConfirm: {
+            /** Expected Sha256 */
+            expected_sha256: string;
+            /** Expected Version */
+            expected_version: number;
+            /** License Note */
+            license_note: string;
+            /**
+             * Usage Rights Status
+             * @enum {string}
+             */
+            usage_rights_status: "confirmed_allowed" | "restricted";
         };
         /** MemberPatchRequest */
         MemberPatchRequest: {
@@ -4156,6 +4204,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssetUploadCompleteRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_media_asset_api_v1_store_assets__asset_id__archive_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "If-Match"?: string | null;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaAssetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_media_asset_usage_rights_api_v1_store_assets__asset_id__confirm_usage_rights_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MediaAssetUsageRightsConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaAssetRead"];
                 };
             };
             /** @description Validation Error */

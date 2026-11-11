@@ -324,3 +324,15 @@ UploadIntent：
 - 确认端点只允许确认服务端当前版本；请求必须携带 expected_version 或 If-Match。
 - Offer 激活必须要求当前 revision confirmed、商品关联同店、规则 Schema 校验通过且有效期未结束。
 - UploadIntent complete 的目标是 intent_id，不是 asset_id；Asset 只有通过对象校验和扫描后才创建为 ready。
+
+
+## 2026-11-11 素材授权确认与归档 API 补充
+
+PR #66 补齐两项此前仅存在于领域契约、尚未落地的素材生命周期操作：
+
+- `POST /api/v1/store/assets/{asset_id}/confirm-usage-rights`：要求当前门店授权、CSRF、Idempotency-Key、expected_version、expected_sha256 和商家授权说明；仅允许扫描通过的 ready 资产记录 `confirmed_allowed` 或 `restricted`，授权记录绑定当前内容哈希，不能由客户端修改哈希或直接跳过扫描。
+- `POST /api/v1/store/assets/{asset_id}/archive`：要求 If-Match + Idempotency-Key；仅归档 ready/rejected 资产，不删除对象；仍被当前 BrandGuideline.logo_asset_id 引用时返回 409 MEDIA_ASSET_IN_USE。
+
+新增 API 测试覆盖授权确认幂等、版本冲突、下载门禁、品牌 Logo 引用阻断和归档状态。
+
+边界：上传完成仍进入 quarantined/scanning；ClamAV/恶意文件扫描、缩略图/尺寸元数据处理、Worker 回写 ready/rejected、过期 UploadIntent sweeper 和素材库前端接入仍未完成。不得将哈希/MIME 校验称为恶意文件扫描。

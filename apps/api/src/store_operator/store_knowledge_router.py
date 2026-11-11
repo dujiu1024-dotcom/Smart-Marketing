@@ -56,8 +56,11 @@ from store_operator.store_knowledge_schemas import (
     KnowledgeItemList,
     KnowledgeItemRead,
     KnowledgeItemUpdate,
+    MediaAssetArchiveIdempotency,
     MediaAssetList,
     MediaAssetRead,
+    MediaAssetUsageRightsConfirm,
+    MediaAssetUsageRightsIdempotency,
     OfferCreate,
     OfferList,
     OfferRead,
@@ -1390,3 +1393,164 @@ def get_media_asset_download_url(
             "Private object storage is not configured",
         ) from exc
     return {"url": url}
+
+
+@router.post(
+    "/assets/{asset_id}/confirm-usage-rights",
+    response_model=MediaAssetRead,
+    status_code=status.HTTP_200_OK,
+)
+def confirm_media_asset_usage_rights(
+    asset_id: UUID,
+    payload: MediaAssetUsageRightsConfirm,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MediaAssetRead:
+    store_id = _store_id(context)
+    idempotency_record, replay = _begin_idempotency(
+        db,
+        store_id,
+        auth.user.id,
+        idempotency_key,
+        "store.asset.confirm_usage_rights",
+        MediaAssetUsageRightsIdempotency(asset_id=asset_id, request=payload),
+    )
+    if replay is not None:
+        return MediaAssetRead.model_validate(replay)
+
+    asset = db.scalar(
+        select(MediaAsset)
+        .where(MediaAsset.id == asset_id, MediaAsset.store_id == store_id)
+        .with_for_update()
+    )
+    if asset is None:
+        raise ApiError(404, "MEDIA_ASSET_NOT_FOUND", "Media asset not found")
+    if asset.version_no != payload.expected_version:
+        raise ApiError(409, "VERSION_CONFLICT", "Media asset version has changed")
+    if asset.status != "ready":
+        raise ApiError(
+            409,
+            "MEDIA_ASSET_NOT_SCANNED",
+            "Usage rights can only be confirmed after the asset passes scanning",
+        )
+    if asset.sha256 != payload.expected_sha256.lower():
+        raise ApiError(409, "MEDIA_ASSET_CHANGED", "Media asset fingerprint has changed")
+    if asset.usage_rights_status != "unknown":
+        raise ApiError(
+            409,
+            "MEDIA_ASSET_RIGHTS_ALREADY_RECORDED",
+            "Usage rights have already been recorded for this asset version",
+        )
+
+    asset.usage_rights_status = payload.usage_rights_status
+    asset.license_note = payload.license_note.strip()
+    result = MediaAssetRead.model_validate(asset)
+    _audit(
+        db,
+        request,
+        action="store.asset.usage_rights_recorded",
+        record_type="media_asset",
+        record_id=asset.id,
+        actor_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "sha256": asset.sha256,
+            "usage_rights_status": asset.usage_rights_status,
+            "version_no": asset.version_no,
+        },
+    )
+    _complete_idempotency(
+        idempotency_record,
+        result.model_dump(mode="json"),
+        "media_asset",
+        asset.id,
+    )
+    db.commit()
+    db.refresh(asset)
+    return MediaAssetRead.model_validate(asset)
+
+
+@router.post(
+    "/assets/{asset_id}/archive",
+    response_model=MediaAssetRead,
+    status_code=status.HTTP_200_OK,
+)
+def archive_media_asset(
+    asset_id: UUID,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> MediaAssetRead:
+    store_id = _store_id(context)
+    expected_version = _expected_version(if_match)
+    idempotency_record, replay = _begin_idempotency(
+        db,
+        store_id,
+        auth.user.id,
+        idempotency_key,
+        "store.asset.archive",
+        MediaAssetArchiveIdempotency(
+            asset_id=asset_id,
+            expected_version=expected_version,
+        ),
+    )
+    if replay is not None:
+        return MediaAssetRead.model_validate(replay)
+
+    asset = db.scalar(
+        select(MediaAsset)
+        .where(MediaAsset.id == asset_id, MediaAsset.store_id == store_id)
+        .with_for_update()
+    )
+    if asset is None:
+        raise ApiError(404, "MEDIA_ASSET_NOT_FOUND", "Media asset not found")
+    if asset.version_no != expected_version:
+        raise ApiError(409, "VERSION_CONFLICT", "Media asset version has changed")
+    if asset.status == "archived":
+        raise ApiError(409, "MEDIA_ASSET_ALREADY_ARCHIVED", "Media asset is already archived")
+    if asset.status not in {"ready", "rejected"}:
+        raise ApiError(
+            409,
+            "MEDIA_ASSET_NOT_ARCHIVABLE",
+            "Only scanned or rejected assets can be archived",
+        )
+    logo_reference = db.scalar(
+        select(BrandGuideline.id).where(
+            BrandGuideline.store_id == store_id,
+            BrandGuideline.logo_asset_id == asset.id,
+        )
+    )
+    if logo_reference is not None:
+        raise ApiError(
+            409,
+            "MEDIA_ASSET_IN_USE",
+            "Remove the asset from the current brand guideline before archiving it",
+        )
+
+    asset.status = "archived"
+    result = MediaAssetRead.model_validate(asset)
+    _audit(
+        db,
+        request,
+        action="store.asset.archived",
+        record_type="media_asset",
+        record_id=asset.id,
+        actor_id=auth.user.id,
+        store_id=store_id,
+        metadata={"sha256": asset.sha256, "version_no": asset.version_no},
+    )
+    _complete_idempotency(
+        idempotency_record,
+        result.model_dump(mode="json"),
+        "media_asset",
+        asset.id,
+    )
+    db.commit()
+    db.refresh(asset)
+    return MediaAssetRead.model_validate(asset)

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from uuid import uuid4
 
+
 class AttemptSession:
     def __init__(self, operation, attempts):
         self.operation = operation

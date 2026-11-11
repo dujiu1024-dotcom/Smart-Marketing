@@ -72,7 +72,12 @@ def upgrade() -> None:
         sa.Column("prompt_version_id", UUID, nullable=True),
         sa.Column("input_fingerprint", sa.String(length=64), nullable=False),
         sa.Column("created_by_user_id", UUID, nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id", name="pk_artifact_versions"),
         sa.UniqueConstraint(
             "store_id", "artifact_id", "version_no",
@@ -134,7 +139,12 @@ def upgrade() -> None:
         sa.Column("comment", sa.Text(), nullable=True),
         sa.Column("target_json", JSONB, nullable=True),
         sa.Column("reviewer_user_id", UUID, nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id", name="pk_review_records"),
         sa.UniqueConstraint("store_id", "id", name="uq_review_records_store_id"),
         sa.ForeignKeyConstraint(

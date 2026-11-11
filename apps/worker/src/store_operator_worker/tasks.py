@@ -105,7 +105,7 @@ def relay_outbox(batch_size: int = 50) -> int:
                 .where(OutboxEvent.id == event_id)
                 .with_for_update()
             )
-            if event is None or event.locked_by != WORKER_ID:
+            if event is None or event.locked_by != relay_id:
                 continue
             event.status = "published"
             event.published_at = datetime.now(UTC)

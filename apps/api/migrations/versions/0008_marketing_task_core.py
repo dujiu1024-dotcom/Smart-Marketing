@@ -374,6 +374,18 @@ def upgrade() -> None:
             "applicability IN ('required', 'optional', 'not_applicable')",
             name="ck_task_steps_applicability",
         ),
+        sa.CheckConstraint(
+            "status != 'skipped' OR (skip_reason IS NOT NULL AND length(btrim(skip_reason)) > 0)",
+            name="ck_task_steps_skipped_reason",
+        ),
+        sa.CheckConstraint(
+            "applicability != 'required' OR status != 'skipped'",
+            name="ck_task_steps_required_not_skipped",
+        ),
+        sa.CheckConstraint(
+            "applicability != 'not_applicable' OR status IN ('skipped', 'stale')",
+            name="ck_task_steps_not_applicable_status",
+        ),
         sa.CheckConstraint("version >= 1", name="ck_task_steps_version_positive"),
         sa.ForeignKeyConstraint(
             ["store_id"],

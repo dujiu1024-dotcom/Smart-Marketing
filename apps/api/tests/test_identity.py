@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from fastapi import Depends
+from typing import Annotated
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError
@@ -57,7 +57,7 @@ class FakeRedis:
 
 @app.get("/_test/store-context")
 def store_context_probe(
-    context: AuthContext = Depends(require_store_context),
+    context: Annotated[AuthContext, Depends(require_store_context)],
 ) -> dict[str, str | None]:
     return {
         "store_id": str(context.request_store_id),

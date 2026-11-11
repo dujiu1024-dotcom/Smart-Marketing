@@ -502,3 +502,23 @@ def test_password_change_rotates_current_session_and_revokes_other_sessions(
     )
     assert new_password_login.status_code == 200
     other_client.close()
+
+
+def test_password_change_requires_current_password_without_revoking_session(
+    identity_client, db_session, monkeypatch
+):
+    fake_redis(monkeypatch)
+    make_user(db_session, "password-change-invalid@example.com")
+    first_login = login(identity_client, "password-change-invalid@example.com")
+
+    changed = identity_client.post(
+        "/api/v1/auth/password/change",
+        json={
+            "current_password": "incorrect-current-password",
+            "new_password": "new-secure-password-456",
+        },
+        headers={**ORIGIN, "X-CSRF-Token": first_login["csrf_token"]},
+    )
+    assert changed.status_code == 401
+    assert changed.json()["error"]["code"] == "REAUTHENTICATION_REQUIRED"
+    assert identity_client.get("/api/v1/auth/me").status_code == 200

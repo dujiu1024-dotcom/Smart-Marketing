@@ -414,12 +414,14 @@ def ensure_step_transition(
             raise InvalidTaskStepTransition("Approval task steps cannot be skipped")
         if not skip_reason or not skip_reason.strip():
             raise InvalidTaskStepTransition("Skipping a task step requires a reason")
+        if step_applicability is StepApplicability.REQUIRED:
+            raise InvalidTaskStepTransition("Required task steps cannot be skipped")
         if (
-            step_applicability is not StepApplicability.NOT_APPLICABLE
+            step_applicability is StepApplicability.OPTIONAL
             and not allow_explicit_skip
         ):
             raise InvalidTaskStepTransition(
-                "An applicable task step requires an explicit skip decision"
+                "An optional task step requires an explicit skip decision"
             )
 
 

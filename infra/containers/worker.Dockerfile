@@ -6,7 +6,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PYTHONPATH=/app/src:/app/api_src \
     PATH="/app/.venv/bin:$PATH"
-COPY apps/worker/pyproject.toml apps/worker/uv.lock ./
+COPY apps/api/pyproject.toml apps/api/uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY apps/worker/src ./src
 COPY apps/api/src ./api_src

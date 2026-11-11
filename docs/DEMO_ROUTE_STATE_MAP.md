@@ -71,7 +71,7 @@ Demo 使用 `location.hash` 作为页面路由；`demo/app.js` 监听 `hashchang
 | `#admin:overview` | 运营总览 | 平台状态与能力摘要；演示指标须明确标注 |
 | `#admin:stores` | 门店管理 | 门店列表；进入门店详情 |
 | `#admin:monitoring` | AI 运行监控 | 任务运行列表；进入单任务运行详情 |
-| `#admin:capabilities` | AI 能力配置 | 业态与提示词模板列表；进入提示词独立编辑页 |
+| `#admin:capabilities` | AI 能力配置（导航标签）；页面标题为“AI 能力与提示词配置” | 业态与提示词模板列表；进入提示词独立编辑页 |
 | `#admin:costs` | 用量与成本 | 展示调用样例；真实账单未接入 |
 | `#admin:audit` | 审计日志 | 平台管理操作记录 |
 | `#admin:settings` | 系统配置 | 平台名称、默认时区、保留周期和业态分类 |

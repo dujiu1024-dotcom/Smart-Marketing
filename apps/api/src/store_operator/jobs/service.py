@@ -555,3 +555,203 @@ def acknowledge_job_cancellation(
     )
     db.flush()
     return job
+
+
+def _manual_retry(
+    db: Session,
+    job: Job,
+    *,
+    actor_user_id: UUID,
+    idempotency_key: str,
+    reason: str,
+    event_type: str,
+    now: datetime,
+) -> Job:
+    normalized_key = idempotency_key.strip()
+    if not normalized_key or len(normalized_key) > 200:
+        raise ValueError("Idempotency-Key must contain 1-200 characters")
+    safe_reason = " ".join(reason.split())[:500]
+    if not safe_reason:
+        raise ValueError("A recovery reason is required")
+    key_hash = hashlib.sha256(normalized_key.encode("utf-8")).hexdigest()
+    request_hash = hashlib.sha256(
+        f"{event_type}:{safe_reason}".encode("utf-8")
+    ).hexdigest()
+
+    prior_events = db.scalars(
+        select(JobEvent).where(
+            JobEvent.job_id == job.id,
+            JobEvent.event_type == event_type,
+        )
+    ).all()
+    for prior in prior_events:
+        if prior.data_json.get("idempotency_key_hash") == key_hash:
+            if prior.data_json.get("request_hash") != request_hash:
+                raise JobIdempotencyConflict(
+                    "Idempotency-Key was reused with a different recovery request"
+                )
+            return job
+
+    job.max_attempts = max(job.max_attempts, job.attempt_count + 1)
+    job.status = "queued"
+    job.available_at = now
+    job.finished_at = None
+    job.cancel_requested_at = None
+    job.cancelled_at = None
+    job.error_code = None
+    job.error_summary = None
+    job.result_ref = None
+
+    dispatch_event_id = uuid4()
+    db.add(
+        OutboxEvent(
+            id=dispatch_event_id,
+            aggregate_type="job",
+            aggregate_id=job.id,
+            event_type="job.dispatch_requested",
+            schema_version=1,
+            payload_json={
+                "job_id": str(job.id),
+                "dispatch_event_id": str(dispatch_event_id),
+                "schema_version": 1,
+            },
+            dedupe_key=f"job.manual_retry:{job.id}:{key_hash}",
+            status="pending",
+            available_at=now,
+            publish_attempts=0,
+        )
+    )
+    _append_event(
+        db,
+        job,
+        event_type,
+        actor_type="user",
+        actor_id=actor_user_id,
+        data={
+            "idempotency_key_hash": key_hash,
+            "request_hash": request_hash,
+            "reason": safe_reason,
+            "attempt_budget": job.max_attempts,
+        },
+    )
+    db.flush()
+    return job
+
+
+def retry_failed_job(
+    db: Session,
+    *,
+    job_id: UUID,
+    store_id: UUID,
+    actor_user_id: UUID,
+    idempotency_key: str,
+    reason: str,
+    side_effects_confirmed_absent: bool,
+    now: datetime | None = None,
+) -> Job:
+    current_time = now or datetime.now(UTC)
+    job = db.scalar(
+        select(Job)
+        .where(Job.id == job_id, Job.store_id == store_id)
+        .with_for_update()
+    )
+    if job is None:
+        raise LookupError("Job not found")
+    if job.status != "failed":
+        raise InvalidJobTransition("Only failed jobs can be manually retried")
+    if not side_effects_confirmed_absent:
+        raise InvalidJobTransition(
+            "Manual retry requires confirmation that no external side effect occurred"
+        )
+    return _manual_retry(
+        db,
+        job,
+        actor_user_id=actor_user_id,
+        idempotency_key=idempotency_key,
+        reason=reason,
+        event_type="job.manual_retry_requested",
+        now=current_time,
+    )
+
+
+def resolve_job(
+    db: Session,
+    *,
+    job_id: UUID,
+    store_id: UUID,
+    actor_user_id: UUID,
+    idempotency_key: str,
+    resolution: str,
+    reason: str,
+    side_effects_confirmed_absent: bool = False,
+    now: datetime | None = None,
+) -> Job:
+    current_time = now or datetime.now(UTC)
+    job = db.scalar(
+        select(Job)
+        .where(Job.id == job_id, Job.store_id == store_id)
+        .with_for_update()
+    )
+    if job is None:
+        raise LookupError("Job not found")
+    if job.status != "needs_human":
+        raise InvalidJobTransition("Only needs_human jobs can be resolved")
+    if resolution == "retry":
+        if not side_effects_confirmed_absent:
+            raise InvalidJobTransition(
+                "Retry resolution requires confirmation that no external side effect occurred"
+            )
+        return _manual_retry(
+            db,
+            job,
+            actor_user_id=actor_user_id,
+            idempotency_key=idempotency_key,
+            reason=reason,
+            event_type="job.manual_resolution_retry",
+            now=current_time,
+        )
+    if resolution != "fail":
+        raise ValueError("resolution must be retry or fail")
+
+    normalized_key = idempotency_key.strip()
+    if not normalized_key or len(normalized_key) > 200:
+        raise ValueError("Idempotency-Key must contain 1-200 characters")
+    safe_reason = " ".join(reason.split())[:500]
+    if not safe_reason:
+        raise ValueError("A resolution reason is required")
+    key_hash = hashlib.sha256(normalized_key.encode("utf-8")).hexdigest()
+    request_hash = hashlib.sha256(
+        f"job.manual_resolution_fail:{safe_reason}".encode("utf-8")
+    ).hexdigest()
+    prior_events = db.scalars(
+        select(JobEvent).where(
+            JobEvent.job_id == job.id,
+            JobEvent.event_type == "job.manual_resolution_failed",
+        )
+    ).all()
+    for prior in prior_events:
+        if prior.data_json.get("idempotency_key_hash") == key_hash:
+            if prior.data_json.get("request_hash") != request_hash:
+                raise JobIdempotencyConflict(
+                    "Idempotency-Key was reused with a different recovery request"
+                )
+            return job
+
+    job.status = "failed"
+    job.finished_at = current_time
+    job.error_code = "MANUALLY_RESOLVED_FAILED"
+    job.error_summary = safe_reason
+    _append_event(
+        db,
+        job,
+        "job.manual_resolution_failed",
+        actor_type="user",
+        actor_id=actor_user_id,
+        data={
+            "idempotency_key_hash": key_hash,
+            "request_hash": request_hash,
+            "reason": safe_reason,
+        },
+    )
+    db.flush()
+    return job

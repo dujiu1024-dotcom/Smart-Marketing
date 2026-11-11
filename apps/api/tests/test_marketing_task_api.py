@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
@@ -20,6 +20,7 @@ from store_operator.models import (
     TaskStep,
     User,
 )
+from store_operator.jobs.service import create_job
 from store_operator.models.store_knowledge import IdempotencyRecord, StoreRecordRevision
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -809,6 +810,33 @@ def test_failed_step_recovery_cancel_and_archive_transitions(
     )
     assert recovered_step["status"] == "running"
 
+    queued_job = create_job(
+        db_session,
+        job_type="marketing_task.generate_copy",
+        payload_ref={"schema_version": 1, "marketing_task_id": str(task_id)},
+        idempotency_key="task-cancel-queued-job",
+        store_id=store.id,
+        actor_type="user",
+        actor_user_id=user.id,
+        marketing_task_id=task_id,
+    )
+    running_job = create_job(
+        db_session,
+        job_type="marketing_task.generate_image",
+        payload_ref={"schema_version": 1, "marketing_task_id": str(task_id)},
+        idempotency_key="task-cancel-running-job",
+        store_id=store.id,
+        actor_type="user",
+        actor_user_id=user.id,
+        marketing_task_id=task_id,
+    )
+    running_job.status = "running"
+    running_job.lease_owner = "test-worker"
+    running_job.lease_token = uuid4()
+    running_job.lease_expires_at = datetime.now(UTC) + timedelta(minutes=5)
+    running_job.heartbeat_at = datetime.now(UTC)
+    db_session.flush()
+
     cancelled = identity_client.post(
         f"/api/v1/marketing-tasks/{task_id}/cancel",
         headers={
@@ -825,6 +853,14 @@ def test_failed_step_recovery_cancel_and_archive_transitions(
     assert cancelled.status_code == 200, cancelled.text
     assert cancelled.json()["lifecycle_status"] == "cancelled"
     assert cancelled.json()["version"] == 4
+    db_session.refresh(queued_job)
+    db_session.refresh(running_job)
+    assert queued_job.status == "cancelled"
+    assert queued_job.cancelled_at is not None
+    assert queued_job.lease_token is None
+    assert running_job.status == "running"
+    assert running_job.cancel_requested_at is not None
+    assert running_job.lease_token is not None
 
     archived = identity_client.post(
         f"/api/v1/marketing-tasks/{task_id}/archive",

@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from store_operator.ai_gateway.errors import SideEffectState
+from store_operator.models.identity import Store
 from store_operator.models.job_runtime import Job, JobAttempt, JobEvent, OutboxEvent
 
 SYSTEM_SCOPE_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -234,18 +235,66 @@ def create_job(
     return job
 
 
+
+
+def _defer_for_store_capacity(
+    db: Session,
+    job: Job,
+    *,
+    now: datetime,
+    defer_seconds: int,
+    running_limit: int,
+) -> None:
+    available_at = now + timedelta(seconds=defer_seconds)
+    job.available_at = available_at
+    event_id = uuid4()
+    dedupe_stamp = int(available_at.timestamp() * 1_000_000)
+    db.add(
+        OutboxEvent(
+            id=event_id,
+            aggregate_type="job",
+            aggregate_id=job.id,
+            event_type="job.dispatch_requested",
+            schema_version=1,
+            payload_json={
+                "job_id": str(job.id),
+                "dispatch_event_id": str(event_id),
+                "schema_version": 1,
+            },
+            dedupe_key=f"job.dispatch.defer:{job.id}:{job.attempt_count}:{dedupe_stamp}",
+            status="pending",
+            available_at=available_at,
+            publish_attempts=0,
+        )
+    )
+    _append_event(
+        db,
+        job,
+        "job.deferred_for_concurrency",
+        data={
+            "reason": "store_concurrency_limit",
+            "running_limit": running_limit,
+            "available_at": available_at.isoformat(),
+        },
+    )
+    db.flush()
+
 def claim_job(
     db: Session,
     *,
     job_id: UUID,
     worker_id: str,
     lease_seconds: int = 90,
+    max_running_per_store: int = 3,
+    concurrency_defer_seconds: int = 10,
     now: datetime | None = None,
 ) -> JobClaim | None:
     if not worker_id or len(worker_id) > 200:
         raise ValueError("worker_id must contain 1-200 characters")
     if lease_seconds < 1:
         raise ValueError("lease_seconds must be positive")
+    if max_running_per_store < 1 or concurrency_defer_seconds < 1:
+        raise ValueError("Store concurrency limit and defer interval must be positive")
     current_time = now or datetime.now(UTC)
     job = db.scalar(
         select(Job)
@@ -267,6 +316,28 @@ def claim_job(
         _append_event(job=job, db=db, event_type="job.failed", data={"reason": "max_attempts"})
         db.flush()
         return None
+
+    if job.store_id is not None:
+        store_id = db.scalar(
+            select(Store.id).where(Store.id == job.store_id).with_for_update()
+        )
+        if store_id is None:
+            raise LookupError("Job store no longer exists")
+        running_count = db.scalar(
+            select(func.count(Job.id)).where(
+                Job.store_id == job.store_id,
+                Job.status == "running",
+            )
+        ) or 0
+        if running_count >= max_running_per_store:
+            _defer_for_store_capacity(
+                db,
+                job,
+                now=current_time,
+                defer_seconds=concurrency_defer_seconds,
+                running_limit=max_running_per_store,
+            )
+            return None
 
     lease_token = uuid4()
     attempt_no = job.attempt_count + 1

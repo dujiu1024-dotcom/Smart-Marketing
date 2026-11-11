@@ -264,3 +264,8 @@
 | 抖音原生草稿箱 | 不作为首期阻塞条件；本地冻结包不得命名为抖音草稿 | 产品负责人已批准替代验收方案 |
 
 本批准仅解除“抖音原生草稿箱 API 不可用”这一产品决策阻塞，不等于真实 OAuth、密钥托管、官方发布、作品读回或完整浏览器流程已经验收。MockTransport 测试不替代真实平台验收。
+
+
+### PR #68 合并状态（2026-11-11）
+
+抖音官方 OAuth/视频 API Adapter 已合并至 main（`9a417f30e4da74496ad8e65d70588d130ac51139`）。CI Run [42998696426](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42998696426) 6/6 jobs 通过，API 129 pytest passed。当前仅为可测试的服务端 Adapter；没有 OAuth state/Secret Manager/ChannelAccount/PublishOperation 的完整生产集成，也未完成真实应用审核、真实账号授权、视频上传/发布和作品读回。Issue #12 继续保持 Open。

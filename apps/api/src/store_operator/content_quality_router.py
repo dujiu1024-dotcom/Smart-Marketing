@@ -72,6 +72,7 @@ def _content_payload(
     content: ChannelContent,
     refs: list[ChannelContentArtifactRef],
     reports: list[QualityReport],
+    resolutions: list[QualityResolution] | None = None,
 ) -> dict[str, object]:
     return {
         "id": str(content.id),
@@ -91,6 +92,16 @@ def _content_payload(
                 "result": item.result,
                 "issues": item.issues_json,
                 "created_at": item.created_at.isoformat(),
+                "resolutions": [
+                    {
+                        "id": str(resolution.id),
+                        "decision": resolution.decision,
+                        "reason": resolution.reason,
+                        "created_at": resolution.created_at.isoformat(),
+                    }
+                    for resolution in resolutions or []
+                    if resolution.quality_report_id == item.id
+                ],
             }
             for item in reports
         ],
@@ -234,7 +245,20 @@ def create_channel_content(
                 )
             ).all()
         )
-        response = _content_payload(existing, existing_refs, reports)
+        report_ids = [item.id for item in reports]
+        resolutions = (
+            list(
+                db.scalars(
+                    select(QualityResolution).where(
+                        QualityResolution.store_id == store_id,
+                        QualityResolution.quality_report_id.in_(report_ids),
+                    )
+                ).all()
+            )
+            if report_ids
+            else []
+        )
+        response = _content_payload(existing, existing_refs, reports, resolutions)
         complete_idempotency(
             idempotency,
             response=response,
@@ -342,7 +366,20 @@ def list_channel_contents(
                 .order_by(QualityReport.created_at, QualityReport.id)
             ).all()
         )
-        result.append(_content_payload(content, refs, reports))
+        report_ids = [item.id for item in reports]
+        resolutions = (
+            list(
+                db.scalars(
+                    select(QualityResolution).where(
+                        QualityResolution.store_id == store_id,
+                        QualityResolution.quality_report_id.in_(report_ids),
+                    )
+                ).all()
+            )
+            if report_ids
+            else []
+        )
+        result.append(_content_payload(content, refs, reports, resolutions))
     return result
 
 

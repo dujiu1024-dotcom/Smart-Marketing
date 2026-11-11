@@ -269,7 +269,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 
 ## 2026-11-11 发布包冻结与商家确认第一阶段
 
-新增后端 API（PR #63）：
+新增后端 API（PR #64）：
 
 - `POST /api/v1/marketing-tasks/{task_id}/publish-packages/freeze`
 - `POST /api/v1/marketing-tasks/publish-packages/{package_id}/confirm`
@@ -287,4 +287,4 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 
 首阶段仅开放 `manual_handoff`。#12 尚未实现 ChannelAccount/真实 OAuth/平台 Adapter，因此 API 不接受 `official_api`，也不会创建 PublishOperation 或显示“已发布”。人工交付确认只代表商家确认冻结内容，不代表渠道发布成功。
 
-验收边界：后端门禁/API/DB 测试正在 PR #63 中验证；Demo 页面、完整浏览器业务流程和真实渠道发布仍未完成。
+验收边界：后端门禁/API/DB 测试正在 PR #64 中验证；Demo 页面、完整浏览器业务流程和真实渠道发布仍未完成。

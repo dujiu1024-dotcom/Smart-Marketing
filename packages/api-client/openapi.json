@@ -2533,16 +2533,10 @@
             "minimum": 1.0,
             "title": "Expected Version",
             "type": "integer"
-          },
-          "strategy": {
-            "additionalProperties": true,
-            "title": "Strategy",
-            "type": "object"
           }
         },
         "required": [
-          "expected_version",
-          "strategy"
+          "expected_version"
         ],
         "title": "MarketingTaskStrategyConfirm",
         "type": "object"

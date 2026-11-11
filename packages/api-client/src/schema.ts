@@ -1321,10 +1321,6 @@ export interface components {
         MarketingTaskStrategyConfirm: {
             /** Expected Version */
             expected_version: number;
-            /** Strategy */
-            strategy: {
-                [key: string]: unknown;
-            };
         };
         /** MarketingTaskSummary */
         MarketingTaskSummary: {

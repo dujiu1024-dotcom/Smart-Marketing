@@ -84,6 +84,7 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 
 `QualityResolution`：`id, store_id, quality_report_id, quality_report_fingerprint, decision(accepted|rejected), reviewer_user_id, reason, created_at, idempotency_record_id`。
 - 仅允许对 `result=needs_human` 的报告追加 QualityResolution；decision=accepted 才允许该报告参与冻结，rejected 继续阻断。
+- 复核权限必须经 #5 AuthorizedStoreContext 的 capability check；具体 capability key 由 #5 联合评审确定，#8 不自行按 role 字符串授权。
 - `result=fail` 是 hard fail，不允许通过 QualityResolution 覆盖；必须修正输入并生成新报告。
 - QualityResolution 是追加式记录；不得回写 QualityReport 的 result、reviewer 或 resolution_reason。
 
@@ -168,6 +169,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - Freeze：单事务校验所有 PackageItem 的版本归属、审核、质检、事实快照、渠道规格和 package fingerprint；写入 Package + Items；禁止部分冻结。
 - Confirm：锁定 package，比较 package_fingerprint，追加 PublishConfirmation；同一确认请求幂等。
 - Publish：再次校验包确认、门店状态、当前操作者授权、#12 账号状态和能力；同一 package/item/action 使用稳定幂等键。
+- QualityResolution 与 PublishConfirmation 的操作者权限均由 #5 授权上下文决定；#8 不缓存/重定义角色能力。
 - 应用层幂等范围沿用 #7：store_id + actor_id + operation + idempotency_key；Job 幂等键映射与重试规则由 #9 管理。
 
 ## 9. 数据库约束候选

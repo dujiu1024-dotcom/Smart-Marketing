@@ -61,3 +61,17 @@ All three Douyin OAuth settings must be supplied together. The Secret Manager re
 - Add full DB/API tests and browser acceptance, then execute a real test-account OAuth/upload/create/readback flow after platform credentials, scopes and account are supplied.
 
 This change adds the persistence migration, models, one-time OAuth state consumption, Secret Manager adapter, OAuth routes, account listing/refresh, and official-API package/account binding. It does not complete publishing or prove a real OAuth grant.
+
+
+## Merchant-confirmed publish operation and Worker execution (under review)
+
+The follow-up implementation adds:
+
+- `POST /api/v1/channels/douyin/publish-operations`, requiring the exact package fingerprint, an `official_api` Douyin package item, an active same-store account, and an existing merchant confirmation for that exact frozen package.
+- Store-scoped idempotency plus a database uniqueness constraint on `(store_id, publish_package_item_id)`, so the same frozen item cannot be submitted through two different idempotency keys.
+- PublishOperation creation and Job/Outbox enqueue in the same PostgreSQL transaction.
+- Worker job types `channel.douyin.publish` and `channel.douyin.readback`.
+- Image-text pilot execution: load immutable image artifact object keys from the private object store, enforce the 20 MiB/image limit and SHA-256 match, upload images through the official API, submit only after the operation enters `submitting`, then read the account's video list by returned `item_id`.
+- If create submission has an uncertain outcome, the operation moves to `needs_human`; the Worker never blindly repeats the create call. If the item is not immediately visible, delayed readback Jobs are scheduled with bounded backoff; after 12 unsuccessful observations the operation moves to `needs_human`.
+
+Current scope limitation: this Worker path supports Douyin image-text posts with 1–30 image artifacts. Video publishing remains unsupported until #8 has an immutable video artifact/reference contract and corresponding size/multipart handling. A valid code path and passing CI do not prove that a real Douyin application, account scope or platform publish has been accepted; real OAuth/publish/readback remains a separate acceptance gate.

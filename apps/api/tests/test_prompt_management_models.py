@@ -1,6 +1,6 @@
 from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint
 
-from store_operator.models import PromptActivation, PromptTemplate, PromptVersion
+from store_operator.models import AIInvocation, PromptActivation, PromptTemplate, PromptVersion
 
 
 def _named(table, kind, name: str):
@@ -62,3 +62,11 @@ def test_prompt_activation_is_bound_to_versions_of_same_template_and_idempotent(
         if isinstance(item, CheckConstraint)
     }
     assert "ck_prompt_activations_hashes" in checks
+
+
+def test_ai_invocation_retains_exact_prompt_version_reference() -> None:
+    foreign_keys = {
+        item.name
+        for item in AIInvocation.__table__.foreign_key_constraints
+    }
+    assert "fk_ai_invocations_prompt_version" in foreign_keys

@@ -25,8 +25,8 @@ from store_operator.auth.errors import ApiError
 from store_operator.auth.router import router as auth_router
 from store_operator.config import settings
 from store_operator.content_delivery_router import router as content_delivery_router
-from store_operator.content_quality_router import router as content_quality_router
 from store_operator.content_publishing_router import router as content_publishing_router
+from store_operator.content_quality_router import router as content_quality_router
 from store_operator.db import engine, redis_client
 from store_operator.jobs.router import router as jobs_router
 from store_operator.marketing_tasks.router import router as marketing_tasks_router

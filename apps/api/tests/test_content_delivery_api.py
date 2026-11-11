@@ -1,11 +1,11 @@
 import hashlib
 import json
+from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import delete, update
 from sqlalchemy.exc import DBAPIError
-from datetime import UTC, datetime
-from uuid import uuid4
 
 from sqlalchemy.orm import Session
 

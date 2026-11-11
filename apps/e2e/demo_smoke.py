@@ -73,9 +73,9 @@ async def main() -> None:
 
         # Product and offer editors are independent second-level pages.
         await route_to("store-editor:product:p1", "编辑商品")
-        await page.get_by_role("button", name="返回列表").wait_for(state="visible")
+        await page.get_by_role("button", name="返回列表", exact=True).wait_for(state="visible")
         await route_to("store-editor:offer:o1", "编辑活动与优惠")
-        await page.get_by_role("button", name="返回列表").wait_for(state="visible")
+        await page.get_by_role("button", name="返回列表", exact=True).wait_for(state="visible")
 
         # Platform administration top-level pages.
         admin_pages = {

@@ -25,9 +25,11 @@ async def main() -> None:
 
         async def route_to(route: str, expected_heading: str) -> None:
             await page.evaluate("(value) => { location.hash = value; }", route)
-            heading = page.locator("main h1")
-            await heading.wait_for(state="visible")
-            actual = await heading.inner_text()
+            await page.wait_for_function(
+                "(expected) => document.querySelector('main h1')?.innerText.includes(expected)",
+                expected_heading,
+            )
+            actual = await page.locator("main h1").inner_text()
             assert expected_heading in actual, (
                 f"Route #{route}: expected heading containing {expected_heading!r}, got {actual!r}"
             )
@@ -42,6 +44,9 @@ async def main() -> None:
         await route_to("effects", "经营效果")
         await route_to("account-ops", "账号运营监测")
         await route_to("account-register", "登记已发布作品")
+
+        # Return to the task workspace before exercising its internal tabs.
+        await route_to("task", "当季草莓鲜奶新品推广")
 
         # The seven marketing task stages are distinct interactive tabs.
         task_tabs = ["brief", "strategy", "copy", "image", "channel", "quality", "publish"]

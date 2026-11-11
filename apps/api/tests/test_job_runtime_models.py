@@ -25,7 +25,11 @@ def test_job_idempotency_scope_is_non_nullable_and_store_aware() -> None:
         for constraint in jobs.constraints
         if constraint.__class__.__name__ == "UniqueConstraint"
     )
-    assert any("idempotency_scope_type" in str(constraint.sqltext) for constraint in jobs.constraints if hasattr(constraint, "sqltext"))
+    assert any(
+        "idempotency_scope_type" in str(constraint.sqltext)
+        for constraint in jobs.constraints
+        if hasattr(constraint, "sqltext")
+    )
 
 
 def test_job_attempt_history_is_append_only_and_unique_per_attempt_number() -> None:

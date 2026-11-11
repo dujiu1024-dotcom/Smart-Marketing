@@ -1,7 +1,7 @@
-from typing import Annotated
+from typing import Annotated, NoReturn
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -32,7 +32,7 @@ from store_operator.jobs.service import (
 from store_operator.models import AIInvocation, AIUsageRecord, Job, JobEvent
 
 
-router = APIRouter(tags=["jobs"])
+router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 def _store_id(context: AuthContext) -> UUID:
@@ -56,7 +56,7 @@ def _get_scoped_job(db: Session, job_id: UUID, store_id: UUID) -> Job:
     return job
 
 
-def _raise_job_error(exc: Exception) -> None:
+def _raise_job_error(exc: Exception) -> NoReturn:
     if isinstance(exc, LookupError):
         raise ApiError(404, "JOB_NOT_FOUND", "Job not found") from exc
     if isinstance(exc, (InvalidJobTransition, JobIdempotencyConflict)):
@@ -66,7 +66,7 @@ def _raise_job_error(exc: Exception) -> None:
     raise exc
 
 
-@router.get("/api/v1/jobs/{job_id}", response_model=JobDetailRead)
+@router.get("/{job_id}", response_model=JobDetailRead)
 def get_job(
     job_id: UUID,
     context: Annotated[AuthContext, Depends(require_store_context)],
@@ -118,7 +118,6 @@ def retry_job(
 @router.post("/api/v1/jobs/{job_id}/cancel", response_model=JobRead)
 def cancel_job(
     job_id: UUID,
-    request: Request,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
@@ -168,7 +167,7 @@ def resolve_human_job(
     return JobRead.model_validate(job)
 
 
-@router.get("/api/v1/ai/invocations/{invocation_id}", response_model=AIInvocationRead)
+@router.get("/../ai/invocations/{invocation_id}", response_model=AIInvocationRead)
 def get_ai_invocation(
     invocation_id: UUID,
     context: Annotated[AuthContext, Depends(require_store_context)],
@@ -184,19 +183,17 @@ def get_ai_invocation(
         raise ApiError(404, "AI_INVOCATION_NOT_FOUND", "AI invocation not found")
     usage = db.get(AIUsageRecord, invocation.id)
     return AIInvocationRead(
-        **{
-            "id": invocation.id,
-            "marketing_task_id": invocation.marketing_task_id,
-            "job_id": invocation.job_id,
-            "provider": invocation.provider,
-            "model": invocation.model,
-            "capability": invocation.capability,
-            "prompt_version": invocation.prompt_version,
-            "provider_request_id": invocation.provider_request_id,
-            "status": invocation.status,
-            "latency_ms": invocation.latency_ms,
-            "error_code": invocation.error_code,
-            "created_at": invocation.created_at,
-        },
+        id=invocation.id,
+        marketing_task_id=invocation.marketing_task_id,
+        job_id=invocation.job_id,
+        provider=invocation.provider,
+        model=invocation.model,
+        capability=invocation.capability,
+        prompt_version=invocation.prompt_version,
+        provider_request_id=invocation.provider_request_id,
+        status=invocation.status,
+        latency_ms=invocation.latency_ms,
+        error_code=invocation.error_code,
+        created_at=invocation.created_at,
         usage=AIUsageRead.model_validate(usage) if usage is not None else None,
     )

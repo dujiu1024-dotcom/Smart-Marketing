@@ -7,13 +7,33 @@ from store_operator.models.identity import (
     StoreMembership,
     User,
 )
+from store_operator.models.store_knowledge import (
+    AudienceProfile,
+    BrandGuideline,
+    KnowledgeItem,
+    MediaAsset,
+    Offer,
+    Product,
+    StoreProfile,
+    StoreRecordRevision,
+    UploadIntent,
+)
 
 __all__ = [
     "AuditEvent",
+    "AudienceProfile",
     "AuthSession",
     "Base",
+    "BrandGuideline",
+    "KnowledgeItem",
+    "MediaAsset",
+    "Offer",
     "PlatformAdminGrant",
+    "Product",
     "Store",
     "StoreMembership",
+    "StoreProfile",
+    "StoreRecordRevision",
+    "UploadIntent",
     "User",
 ]

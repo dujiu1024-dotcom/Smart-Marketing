@@ -296,3 +296,27 @@ def test_merchant_content_requires_explicit_content_scope(
         },
     )
     assert empty_scope.status_code == 422
+
+
+
+def test_full_marketing_requires_copy_and_image_scope(
+    identity_client, db_session, monkeypatch
+):
+    user = create_user(db_session, "full-marketing-scope@example.com")
+    store = create_store(db_session, user, "Full Marketing Scope Store")
+    csrf = login(identity_client, monkeypatch, "full-marketing-scope@example.com")
+    response = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers={
+            **ORIGIN,
+            "X-CSRF-Token": csrf,
+            "X-Store-ID": str(store.id),
+            "Idempotency-Key": "full-marketing-scope-1",
+        },
+        json={
+            "task_type": "full_marketing",
+            "title": "Complete campaign",
+            "task_options": {"includes_copy": False, "includes_image": True},
+        },
+    )
+    assert response.status_code == 422

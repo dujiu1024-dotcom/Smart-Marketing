@@ -427,6 +427,11 @@ def upgrade() -> None:
             "actor_type IN ('user', 'platform_admin', 'system')",
             name="ck_step_decisions_actor_type",
         ),
+        sa.CheckConstraint(
+            "(actor_type = 'system' AND actor_user_id IS NULL) OR "
+            "(actor_type IN ('user', 'platform_admin') AND actor_user_id IS NOT NULL)",
+            name="ck_step_decisions_actor_reference",
+        ),
         sa.ForeignKeyConstraint(
             ["store_id"],
             ["stores.id"],
@@ -562,6 +567,11 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "actor_type IN ('user', 'platform_admin', 'system')",
             name="ck_task_events_actor_type",
+        ),
+        sa.CheckConstraint(
+            "(actor_type = 'system' AND actor_user_id IS NULL) OR "
+            "(actor_type IN ('user', 'platform_admin') AND actor_user_id IS NOT NULL)",
+            name="ck_task_events_actor_reference",
         ),
         sa.ForeignKeyConstraint(
             ["store_id"],

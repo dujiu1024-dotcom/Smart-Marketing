@@ -150,13 +150,23 @@ def complete_ai_invocation(
     }
     usage = db.get(AIUsageRecord, invocation.id)
     if invocation.status == "succeeded":
-        if usage is None or any(getattr(usage, key) != value for key, value in values.items()):
+        if (
+            usage is None
+            or any(getattr(usage, key) != value for key, value in values.items())
+            or invocation.provider_request_id != provider_request_id
+        ):
             raise AIInvocationTransitionError(
                 "A completed AI invocation cannot be completed with different usage"
             )
         return invocation
     if invocation.status != "running":
         raise AIInvocationTransitionError("Only running AI invocations can succeed")
+    if usage is not None and any(
+        getattr(usage, key) != value for key, value in values.items()
+    ):
+        raise AIInvocationTransitionError(
+            "Existing AI usage cannot be overwritten with different values"
+        )
 
     invocation.status = "succeeded"
     invocation.provider_request_id = provider_request_id

@@ -70,6 +70,12 @@ def update_store_member(
 
     new_role = payload.role if payload.role is not None else membership.role
     new_status = payload.status if payload.status is not None else membership.status
+    if membership.status in {"invited", "removed"} and new_status == "active":
+        raise ApiError(
+            409,
+            "MEMBERSHIP_REINVITE_REQUIRED",
+            "A new invitation is required to activate this membership",
+        )
     removes_last_owner = (
         membership.role == "owner"
         and membership.status == "active"
@@ -86,6 +92,19 @@ def update_store_member(
             )
         ) or 0
         if active_owner_count <= 1:
+            record_audit(
+                db,
+                request,
+                action="store.membership.update",
+                target_type="store_membership",
+                target_id=membership.id,
+                actor_user_id=auth.user.id,
+                store_id=store_id,
+                actor_type="platform_admin",
+                result="denied",
+                metadata={"attempted_role": new_role, "attempted_status": new_status},
+            )
+            db.commit()
             raise ApiError(409, "LAST_OWNER_REQUIRED", "At least one active owner is required")
 
     membership.role = new_role

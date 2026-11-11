@@ -228,4 +228,7 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
 
     listed = identity_client.get(content_url, headers=headers)
     assert listed.status_code == 200, listed.text
-    assert [item["id"] for item in listed.json()] == [created.json()["id"]]
+    assert [item["id"] for item in listed.json()] == [
+        image_created.json()["id"],
+        created.json()["id"],
+    ]

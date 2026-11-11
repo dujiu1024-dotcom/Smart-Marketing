@@ -30,6 +30,7 @@ from store_operator.models import (
     ChannelContent,
     ChannelContentArtifactRef,
     MarketingTask,
+    MediaAsset,
     PublishConfirmation,
     PublishPackage,
     PublishPackageFactRef,
@@ -430,6 +431,48 @@ def freeze_publish_package(
                     "CHANNEL_ACCOUNT_SCOPE_INSUFFICIENT",
                     "The selected Douyin account lacks required publishing or readback scopes",
                 )
+        if item_input.delivery_mode == "official_api":
+            image_refs = db.scalars(
+                select(ChannelContentArtifactRef).where(
+                    ChannelContentArtifactRef.store_id == store_id,
+                    ChannelContentArtifactRef.channel_content_id == content.id,
+                )
+            ).all()
+            if not 1 <= len(image_refs) <= 30:
+                raise ApiError(
+                    422,
+                    "DOUYIN_IMAGE_COUNT_INVALID",
+                    "Douyin image-text delivery requires between 1 and 30 images",
+                )
+            for image_ref in image_refs:
+                image_version = db.scalar(
+                    select(ArtifactVersion).where(
+                        ArtifactVersion.id == image_ref.artifact_version_id,
+                        ArtifactVersion.store_id == store_id,
+                    )
+                )
+                media_asset = (
+                    db.scalar(
+                        select(MediaAsset).where(
+                            MediaAsset.store_id == store_id,
+                            MediaAsset.object_key == image_version.content_ref,
+                            MediaAsset.status == "ready",
+                            MediaAsset.usage_rights_status == "confirmed_allowed",
+                        )
+                    )
+                    if image_version is not None and image_version.content_ref
+                    else None
+                )
+                if (
+                    media_asset is None
+                    or media_asset.mime_type not in {"image/jpeg", "image/png", "image/webp"}
+                    or media_asset.byte_size > 20 * 1024 * 1024
+                ):
+                    raise ApiError(
+                        422,
+                        "DOUYIN_IMAGE_NOT_ELIGIBLE",
+                        "Every frozen Douyin image must be ready, rights-approved, supported, and at most 20 MiB",
+                    )
         _require_approved_artifacts(db, store_id=store_id, content=content)
 
         report = db.scalar(
@@ -650,7 +693,17 @@ def confirm_publish_package(
         "confirmed_by_user_id": str(auth.user.id),
         "confirmed_at": confirmation.confirmed_at.isoformat(),
         "confirmation_note": confirmation.confirmation_note,
-        "delivery_mode": "manual_handoff",
+        "delivery_mode": (
+            next(iter(delivery_modes)) if len(delivery_modes := {
+                item.delivery_mode
+                for item in db.scalars(
+                    select(PublishPackageItem).where(
+                        PublishPackageItem.store_id == store_id,
+                        PublishPackageItem.publish_package_id == package.id,
+                    )
+                ).all()
+            }) == 1 else "mixed"
+        ),
         "published": False,
     }
     complete_idempotency(

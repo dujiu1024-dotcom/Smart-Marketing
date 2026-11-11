@@ -367,6 +367,8 @@ class AssetUploadIntentRead(BaseModel):
 
 
 class MediaAssetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     store_id: UUID
     asset_type: str

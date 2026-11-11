@@ -653,10 +653,10 @@ def test_optional_step_can_be_skipped_but_required_review_cannot(
     store = create_store(db_session, user, "Task Step Skip Store")
     csrf = login(identity_client, monkeypatch, "task-step-skip@example.com")
     payload = task_payload()
+    payload["task_type"] = "full_marketing"
     payload["task_options"] = {
         "includes_copy": True,
-        "includes_image": False,
-        "opportunity_applicable": True,
+        "includes_image": True,
         "selected_channel_keys": [],
         "requires_external_delivery": False,
     }
@@ -712,7 +712,7 @@ def test_optional_step_can_be_skipped_but_required_review_cannot(
     assert confirmed.status_code == 200, confirmed.text
 
     skipped = identity_client.post(
-        f"/api/v1/marketing-tasks/{task_id}/steps/quality_check/skip",
+        f"/api/v1/marketing-tasks/{task_id}/steps/opportunity_decision/skip",
         headers={
             **ORIGIN,
             "X-CSRF-Token": csrf,

@@ -338,7 +338,9 @@ def publish_prompt_version(
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> dict[str, object]:
     key_hash = _idempotency_hash(idempotency_key)
-    request_hash = _request_fingerprint(str(template_id), str(version_id), "publish", payload.reason)
+    request_hash = _request_fingerprint(
+        str(template_id), str(version_id), "publish", payload.reason
+    )
     replay = _existing_activation(db, key_hash, request_hash)
     if replay is not None:
         return _activation_read(replay)
@@ -356,7 +358,11 @@ def publish_prompt_version(
     if template is None or version is None:
         raise ApiError(404, "PROMPT_VERSION_NOT_FOUND", "Prompt version not found")
     if template.status != "active" or version.status != "draft":
-        raise ApiError(409, "PROMPT_VERSION_NOT_DRAFT", "Only active templates and draft versions can be published")
+        raise ApiError(
+            409,
+            "PROMPT_VERSION_NOT_DRAFT",
+            "Only active templates and draft versions can be published",
+        )
     _validate_prompt_version(version)
     previous_id = template.current_published_version_id
     now = datetime.now(UTC)
@@ -384,7 +390,10 @@ def publish_prompt_version(
         target_id=version.id,
         actor_user_id=auth.user.id,
         actor_type="platform_admin",
-        metadata={"prompt_template_id": str(template_id), "previous_version_id": str(previous_id) if previous_id else None},
+        metadata={
+            "prompt_template_id": str(template_id),
+            "previous_version_id": str(previous_id) if previous_id else None,
+        },
     )
     db.commit()
     db.refresh(activation)
@@ -403,7 +412,9 @@ def rollback_prompt_version(
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> dict[str, object]:
     key_hash = _idempotency_hash(idempotency_key)
-    request_hash = _request_fingerprint(str(template_id), str(version_id), "rollback", payload.reason)
+    request_hash = _request_fingerprint(
+        str(template_id), str(version_id), "rollback", payload.reason
+    )
     replay = _existing_activation(db, key_hash, request_hash)
     if replay is not None:
         return _activation_read(replay)
@@ -442,7 +453,10 @@ def rollback_prompt_version(
         target_id=target.id,
         actor_user_id=auth.user.id,
         actor_type="platform_admin",
-        metadata={"prompt_template_id": str(template_id), "previous_version_id": str(previous_id) if previous_id else None},
+        metadata={
+            "prompt_template_id": str(template_id),
+            "previous_version_id": str(previous_id) if previous_id else None,
+        },
     )
     db.commit()
     db.refresh(activation)

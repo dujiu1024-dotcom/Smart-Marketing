@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 from store_operator.ai_gateway.errors import SideEffectState
+
 from store_operator_worker.handlers import JobExecutionContext, JobExecutionError
 
 

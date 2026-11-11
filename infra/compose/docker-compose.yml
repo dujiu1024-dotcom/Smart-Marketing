@@ -72,6 +72,24 @@ services:
       retries: 5
       start_period: 20s
 
+  scheduler:
+    build:
+      context: ../..
+      dockerfile: infra/containers/worker.Dockerfile
+    command:
+      - celery
+      - -A
+      - store_operator_worker.celery_app:celery_app
+      - beat
+      - --loglevel=INFO
+      - --pidfile=/tmp/celerybeat.pid
+    environment:
+      DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
   web:
     build:
       context: ../..

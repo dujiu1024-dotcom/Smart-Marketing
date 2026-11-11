@@ -56,5 +56,7 @@ class ProviderRegistry:
     def descriptors(self) -> tuple[ProviderDescriptor, ...]:
         return tuple(
             descriptor
-            for descriptor, _ in sorted(self._providers.values(), key=lambda item: item[0].provider_id)
+            for descriptor, _ in sorted(
+                self._providers.values(), key=lambda item: item[0].provider_id
+            )
         )

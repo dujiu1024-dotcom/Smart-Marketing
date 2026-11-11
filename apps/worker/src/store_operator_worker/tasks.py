@@ -1273,7 +1273,7 @@ def execute_douyin_image_text_publish(
                             attempt_id,
                             normalized_status="failed",
                             retryable=True,
-                            error_code=(exc.code if isinstance(exc, DouyinApiError) else "HTTP_TRANSPORT_ERROR"),
+                            error_code=(\n                                exc.code\n                                if isinstance(exc, DouyinApiError)\n                                else "HTTP_TRANSPORT_ERROR"\n                            ),
                         )
                         raise
                     _finish_douyin_publish_attempt(
@@ -1290,7 +1290,7 @@ def execute_douyin_image_text_publish(
 
         try:
             uploaded_ids = asyncio.run(upload_all_images())
-        except DouyinApiError as exc:
+        except (DouyinApiError, httpx.HTTPError) as exc:
             raise JobExecutionError(
                 "DOUYIN_IMAGE_UPLOAD_FAILED",
                 "Douyin image upload failed; the publish operation can be retried safely.",
@@ -1326,7 +1326,7 @@ def execute_douyin_image_text_publish(
                         attempt_id,
                         normalized_status="unknown",
                         retryable=False,
-                        error_code=(exc.code if isinstance(exc, DouyinApiError) else "HTTP_TRANSPORT_ERROR"),
+                        error_code=(\n                            exc.code\n                            if isinstance(exc, DouyinApiError)\n                            else "HTTP_TRANSPORT_ERROR"\n                        ),
                     )
                     raise
                 _finish_douyin_publish_attempt(
@@ -1341,7 +1341,7 @@ def execute_douyin_image_text_publish(
 
         try:
             receipt = asyncio.run(create_image_text_post())
-        except DouyinApiError as exc:
+        except (DouyinApiError, httpx.HTTPError) as exc:
             _set_douyin_publish_state(
                 operation_id,
                 store_id,

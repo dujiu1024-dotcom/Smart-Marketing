@@ -27,6 +27,7 @@ from store_operator.models.store_knowledge import (
     StoreRecordRevision,
     UploadIntent,
 )
+
 __all__ = [
     "AIInvocation",
     "AIUsageRecord",

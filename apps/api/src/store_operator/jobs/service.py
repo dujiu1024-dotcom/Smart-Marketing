@@ -565,6 +565,7 @@ def _manual_retry(
     idempotency_key: str,
     reason: str,
     event_type: str,
+    expected_status: str,
     now: datetime,
 ) -> Job:
     normalized_key = idempotency_key.strip()
@@ -591,6 +592,11 @@ def _manual_retry(
                     "Idempotency-Key was reused with a different recovery request"
                 )
             return job
+
+    if job.status != expected_status:
+        raise InvalidJobTransition(
+            f"Only {expected_status} jobs can use this recovery action"
+        )
 
     job.max_attempts = max(job.max_attempts, job.attempt_count + 1)
     job.status = "queued"
@@ -657,8 +663,6 @@ def retry_failed_job(
     )
     if job is None:
         raise LookupError("Job not found")
-    if job.status != "failed":
-        raise InvalidJobTransition("Only failed jobs can be manually retried")
     if not side_effects_confirmed_absent:
         raise InvalidJobTransition(
             "Manual retry requires confirmation that no external side effect occurred"
@@ -670,6 +674,7 @@ def retry_failed_job(
         idempotency_key=idempotency_key,
         reason=reason,
         event_type="job.manual_retry_requested",
+        expected_status="failed",
         now=current_time,
     )
 
@@ -694,8 +699,6 @@ def resolve_job(
     )
     if job is None:
         raise LookupError("Job not found")
-    if job.status != "needs_human":
-        raise InvalidJobTransition("Only needs_human jobs can be resolved")
     if resolution == "retry":
         if not side_effects_confirmed_absent:
             raise InvalidJobTransition(
@@ -708,6 +711,7 @@ def resolve_job(
             idempotency_key=idempotency_key,
             reason=reason,
             event_type="job.manual_resolution_retry",
+            expected_status="needs_human",
             now=current_time,
         )
     if resolution != "fail":
@@ -737,6 +741,8 @@ def resolve_job(
                 )
             return job
 
+    if job.status != "needs_human":
+        raise InvalidJobTransition("Only needs_human jobs can be resolved")
     job.status = "failed"
     job.finished_at = current_time
     job.error_code = "MANUALLY_RESOLVED_FAILED"

@@ -33,7 +33,7 @@
 | BusinessFactSnapshot | 本任务使用的关键事实值、来源对象/版本、商家确认状态、确认人/时间；价格、折扣、库存、有效期等不得由模型臆造 |
 | TaskStep | 固定流程节点实例；step_key、status、applicability、skip_reason、input_fingerprint、output_refs、block_reason、started_at、finished_at |
 | StepDecision | 节点采纳/跳过/继续等决策；决策人、原因、依据快照、时间 |
-| Artifact / ArtifactVersion | 文案、图片、渠道变体等逻辑产物及不可变版本；version_no、source_type、source_refs、instruction、content_hash、provider metadata、created_by |
+| Artifact / ArtifactVersion | 文案、图片逻辑产物及不可变版本；artifact_type 仅 copy/image；渠道适配快照由 #8 ChannelContent 独立持有 |
 | ReviewRecord | 文案或图片的独立审核记录；artifact_type、artifact_version_id、decision、reviewer、comment、target/region、time |
 | RevisionRequest | 针对某一版本的整改意见；目标段落/图片区域、指令、状态、对应新版本 |
 | DependencyEdge | 上游对象版本/指纹到下游产物的依赖边；dependency_type、impact_policy、observed_fingerprint |
@@ -231,19 +231,26 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 
 ## 8. 事件与审计
 
-建议领域事件：
+建议领域事件按所有权拆分：
 
+**#7 MarketingTask**
 - `marketing_task.created / activated / waiting_for_user / blocked / completed / cancelled / archived`
 - `requirement.snapshot_created / requirement.confirmed`
 - `strategy.snapshot_created / strategy.confirmed`
 - `task_step.started / succeeded / failed / skipped / stale`
-- `copy.version_created / copy.review_requested / copy.revision_requested / copy.approved`
-- `image.version_created / image.review_requested / image.revision_requested / image.approved`
-- `artifact.marked_stale`
-- `publish_package.frozen / publish.confirmed / publish.requested / publish.completed / publish.failed / publish.needs_human`
-- `job.queued / job.claimed / job.retry_scheduled / job.failed / job.recovered`
 
-事件至少包含 event_id、task_id、store_id、aggregate_version、event_type、actor_type/id、correlation_id、causation_id、occurred_at、payload schema version。事件与审计日志追加写入，不以覆盖更新替代历史。
+**#8 Content / Publishing**
+- `content.artifact_version_created / content.review_recorded / content.channel_content_created`
+- `content.quality_report_completed / content.publish_package_frozen / content.publish_confirmed`
+- `content.publish_command_requested`（只表示向 #12 提交官方发布命令，不表示已发布）
+
+**#9 Job Runtime**
+- `job.queued / job.claimed / job.retry_scheduled / job.succeeded / job.failed / job.needs_human / job.recovered`
+
+**#12 Channel Integration**
+- `channel.publish_operation_started / channel.publish_operation_succeeded / channel.publish_operation_failed / channel.publish_operation_needs_human`（以平台证据为准）
+
+事件至少包含 event_id、store_id、aggregate_type/id、aggregate_version、event_type、actor_type/id、correlation_id、causation_id、occurred_at、schema_version。事件与审计日志追加写入，不以覆盖更新替代历史。#7 只消费 #8/#9/#12 事件并校验版本/指纹后更新 TaskStep；不得自行创建审核或发布记录。
 
 ## 9. API 契约草案
 
@@ -258,16 +265,11 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | POST | /api/v1/marketing-tasks/{task_id}/requirement/confirm | 生成并确认需求快照 |
 | POST | /api/v1/marketing-tasks/{task_id}/strategy/confirm | 确认策略快照 |
 | POST | /api/v1/marketing-tasks/{task_id}/steps/{step_key}/skip | 提交允许的跳过决策与原因 |
-| POST | /api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/reviews | 针对明确版本提交审核结论/意见 |
-| POST | /api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/revisions | 创建整改请求与异步 Job |
-| POST | /api/v1/marketing-tasks/{task_id}/publish-packages | 校验并冻结发布包 |
-| POST | /api/v1/marketing-tasks/{task_id}/publish-packages/{package_id}/confirm | 商家最终确认 |
-| POST | /api/v1/marketing-tasks/{task_id}/publish-packages/{package_id}/deliver | 创建发布/草稿 Job |
 | POST | /api/v1/marketing-tasks/{task_id}/recover | 对失败节点进行显式恢复 |
 | POST | /api/v1/marketing-tasks/{task_id}/cancel | 取消任务 |
 | POST | /api/v1/marketing-tasks/{task_id}/archive | 归档任务 |
 
-写接口统一支持 Idempotency-Key；并发更新支持 expected_version/If-Match。API 返回 task lifecycle、task version、各 step 状态、文案审核状态、图片审核状态、当前版本 ID、stale 原因、blocked_by 和 pending_actions。审核接口必须明确传入 artifact_version_id。
+写接口统一支持 Idempotency-Key；并发更新支持 expected_version/If-Match。API 返回 task lifecycle、task version、各 step 状态、文案/图片审核摘要、当前版本 ID、stale 原因、blocked_by 和 pending_actions。Artifact/Review/ChannelContent/QualityReport/PublishPackage 的写 API 由 #8 持有，详见 DOMAIN_INTEGRATION_CONTRACTS_V1.md §6/§10 与 CONTENT_DELIVERY_DOMAIN_DESIGN.md；#7 只通过版本化事件消费其结果并推进 TaskStep。
 
 ## 10. 数据库约束建议
 
@@ -397,15 +399,19 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | business_fact_snapshots | task_id, fact_key, source_type, source_id, source_version, value_json, confirmation_status, confirmed_at, confirmed_by_actor_id, fingerprint | 来源及值快照不可覆盖；可追溯原始资料版本 |
 | task_steps | task_id, step_key, status, applicability, skip_reason, input_fingerprint, block_code, block_detail_json, started_at, finished_at, version | (store_id,task_id,step_key) 唯一；不适用节点必须有显式 skipped 决策 |
 | step_decisions | task_id, step_key, decision, reason, actor_id, actor_type, input_snapshot_ref, decided_at, idempotency_record_id | 追加写；决策引用对应 task_step |
-| artifacts | task_id, artifact_type, logical_key, current_version_id, lifecycle_status, created_by_actor_id | (store_id,task_id,artifact_type,logical_key) 唯一；当前版本必须属于该 artifact |
+| artifacts | task_id, artifact_type(copy/image), logical_key, current_version_id, lifecycle_status, created_by_actor_id | (store_id,task_id,artifact_type,logical_key) 唯一；当前版本必须属于该 artifact；ChannelContent 是 #8 独立实体，不是 Artifact 类型 |
 | artifact_versions | task_id, artifact_id, version_no, source_type, source_instruction, content_text, asset_id, content_hash, dependency_fingerprint, provider_key, model_key, provider_metadata_json, created_by_actor_id | (store_id,artifact_id,version_no) 唯一；版本不可变；文案/图片通过 artifact_type 区分 |
 | review_records | task_id, artifact_id, artifact_version_id, review_type, decision, comment, target_json, reviewer_actor_id, reviewed_at | 必须引用精确 artifact_version；审核记录追加写；类型与产物类型匹配 |
 | revision_requests | task_id, artifact_id, source_artifact_version_id, review_record_id, instruction, target_json, status, resulting_artifact_version_id, created_by_actor_id | 源版本与审核记录一致；结果版本创建后只追加关联 |
 | dependency_edges | task_id, upstream_type, upstream_id, upstream_version_id, upstream_fingerprint, downstream_type, downstream_id, downstream_version_id, impact_policy | 同一上下游版本边唯一；两端属于同任务/门店 |
-| quality_checks | task_id, target_type, target_id, target_version_id, rule_set_version, result, findings_json, input_fingerprint, checked_at | 结果绑定目标精确版本和规则集版本；输入变化后旧结果 stale |
-| publish_packages | task_id, channel_key, package_no, payload_json, copy_version_id, image_version_id, channel_variant_version_id, quality_check_id, dependency_fingerprint, frozen_at, frozen_by_actor_id, status | (store_id,task_id,channel_key,package_no) 唯一；冻结后 payload 不可变 |
-| publish_confirmations | task_id, publish_package_id, package_fingerprint, confirmed_by_actor_id, confirmed_at, confirmation_text | 确认绑定冻结包的精确指纹；新包不得复用旧确认 |
-| publish_attempts | task_id, publish_package_id, channel_account_ref, idempotency_key, status, external_request_ref, external_content_ref, requested_at, completed_at, outcome_evidence_json | 门店/渠道账号/发布包/幂等键组合唯一；不确定结果进入 needs_human |
+| channel_contents | task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status | 每个渠道/输入快照独立；文案版本直接引用，图片版本由关系表引用 |
+| channel_content_artifact_refs | channel_content_id, artifact_version_id, role, position | 只保存图片版本引用；复合 FK 校验同店和精确版本 |
+| quality_reports | task_id, channel_content_id, rule_version, result(pass/fail/needs_human), issues_json, input_fingerprint, created_at | 结果绑定精确 ChannelContent 与规则版本；输入变化后旧报告 stale，报告不可变 |
+| quality_resolutions | quality_report_id, quality_report_fingerprint, decision(accepted/rejected), reviewer_user_id, reason, idempotency_record_id, created_at | 仅对 needs_human 报告追加；hard fail 不可覆盖；同一报告指纹最多一条决议 |
+| publish_packages | task_id, package_version, package_fingerprint, frozen_at, frozen_by_actor_id | (store_id,task_id,package_version) 唯一；聚合一次多渠道交付并冻结 |
+| publish_package_fact_refs | publish_package_id, business_fact_snapshot_id, position | (store_id,publish_package_id,business_fact_snapshot_id) 唯一；引用 #7 任务级已确认事实快照，其来源追溯 #6 StoreRecordRevision |
+| publish_package_items | task_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode, planned_publish_at, item_fingerprint | (store_id,publish_package_id,channel_key) 唯一；每个渠道一条 |
+| publish_confirmations | task_id, publish_package_id, package_fingerprint, confirmed_by_user_id, confirmed_at, confirmation_text | 不可变确认记录，绑定整个冻结包的精确指纹；首期不提供撤销 |
 | task_events | task_id, aggregate_version, event_type, actor_id, actor_type, correlation_id, causation_id, payload_json, schema_version, occurred_at | 追加写；event_id 唯一 |
 | audit_events | actor_id, actor_type, action, resource_type, resource_id, result, reason, request_id, correlation_id, metadata_json, occurred_at | 追加写；敏感凭据禁止进入 metadata |
 | idempotency_records | actor_id, operation, idempotency_key, request_hash, resource_type, resource_id, response_status, response_json, expires_at | (store_id,actor_id,operation,idempotency_key) 唯一 |
@@ -418,7 +424,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 - artifact_versions 通过 (store_id, task_id, artifact_id) 引用产物；artifacts.current_version_id 必须引用同一 artifact 的版本。
 - review_records 与 revision_requests 必须引用同门店、同任务、同产物的精确版本；禁止只保存全局 artifact_version_id 而不验证归属链。
 - dependency_edges 两端都必须归属同门店同任务；若依赖门店资料快照，使用显式 upstream_type/source_ref 与来源版本快照，不建立跨域可写外键。
-- publish_packages 引用同任务的产物版本、渠道变体和质检记录；publish_confirmations 引用冻结发布包；publish_attempts 引用发布包。
+- publish_package_fact_refs 复合 FK 到同店已确认 BusinessFactSnapshot；channel_contents.copy_version_id 通过 (store_id,task_id,artifact_version_id) 复合 FK 引用同任务已审核的文案版本；channel_content_artifact_refs 通过 store_id 复合 FK 引用已审核图片版本；quality_reports 引用确切 ChannelContent；publish_package_items 的 channel_key 必须匹配 ChannelContent，且 QualityReport 必须属于同一 ChannelContent；publish_packages 通过 publish_package_items 聚合渠道快照；publish_confirmations 引用冻结发布包。PublishOperation 由 #12 持有，不在 #7/#8 建立 publish_attempts 表。
 - jobs 属于轨道 D 的异步基础设施模型，但必须携带 store_id、task_id、触发 actor、目标资源引用和输入指纹，并在领取/写回时校验归属。具体 Job 表不在本节重复定义。
 
 ### 15.4 必需索引（逻辑要求）
@@ -431,8 +437,12 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | artifact_versions | (store_id,artifact_id,version_no DESC) |
 | review_records | (store_id,task_id,artifact_version_id,reviewed_at DESC) |
 | dependency_edges | (store_id,task_id,upstream_type,upstream_id,upstream_version_id)；下游反向索引 |
-| publish_packages | (store_id,task_id,channel_key,package_no DESC) |
-| publish_attempts | (store_id,status,requested_at)；外部引用按渠道范围建立部分唯一索引（若渠道语义支持） |
+| channel_contents | (store_id,task_id,channel_key,input_fingerprint)；(store_id,id,channel_key) |
+| channel_content_artifact_refs | (store_id,channel_content_id,position) |
+| quality_reports | (store_id,channel_content_id,rule_version,input_fingerprint)；(store_id,channel_content_id,id) |
+| publish_packages | (store_id,task_id,package_version DESC) |
+| publish_package_fact_refs | (store_id,publish_package_id,business_fact_snapshot_id) |
+| publish_package_items | (store_id,publish_package_id,channel_key) |
 | task_events | (store_id,task_id,occurred_at) |
 | audit_events | (store_id,occurred_at DESC)；(actor_id,occurred_at DESC) |
 | idempotency_records | 唯一作用域索引；expires_at 清理索引 |
@@ -446,7 +456,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 4. 审核：审核事务锁定或乐观校验 artifact_version；确认该版本仍为允许审核的目标版本；追加 ReviewRecord 和事件。
 5. 冻结发布包：单事务校验所有审核、渠道规格、质检、事实快照均有效；写不可变 PublishPackage。
 6. 最终确认：确认人权限、包状态和 fingerprint 同时校验；写追加式 PublishConfirmation。
-7. 发布：先持久化唯一 publish_attempt/idempotency key，再由 Worker 执行；外部结果不确定时保留 needs_human，不自动创建新 attempt。
+7. 发布：#8 先持久化 PublishPackage/Item/Confirmation 并通过 Outbox 发出 publish command；#12 创建唯一 PublishOperation/idempotency key，#9 Worker 执行；外部结果不确定时进入 needs_human，不创建新的逻辑发布动作。
 8. 所有聚合根写操作采用 version 乐观锁；不可变记录不允许 UPDATE/DELETE（保留合规删除例外时必须单独定义审计与数据保留政策）。
 9. store_id 一致性由复合外键兜底，授权仍由应用服务执行；RLS 仅作纵深防御。
 10. Outbox 与业务写入同事务；消费者按 event_id 幂等处理。
@@ -493,11 +503,19 @@ erDiagram
     ARTIFACT_VERSION ||--o{ REVIEW_RECORD : reviewed_by
     ARTIFACT_VERSION ||--o{ REVISION_REQUEST : revised_from
     REVIEW_RECORD ||--o{ REVISION_REQUEST : initiates
+    MARKETING_TASK ||--o{ CHANNEL_CONTENT : adapts
+    ARTIFACT_VERSION ||--o{ CHANNEL_CONTENT : copy_version
+    CHANNEL_CONTENT ||--o{ CHANNEL_CONTENT_ARTIFACT_REF : contains
+    ARTIFACT_VERSION ||--o{ CHANNEL_CONTENT_ARTIFACT_REF : image_ref
+    CHANNEL_CONTENT ||--o{ QUALITY_REPORT : checks
     MARKETING_TASK ||--o{ DEPENDENCY_EDGE : depends
-    MARKETING_TASK ||--o{ QUALITY_CHECK : validates
     MARKETING_TASK ||--o{ PUBLISH_PACKAGE : freezes
+    PUBLISH_PACKAGE ||--o{ PUBLISH_PACKAGE_FACT_REF : snapshots
+    BUSINESS_FACT_SNAPSHOT ||--o{ PUBLISH_PACKAGE_FACT_REF : freezes
+    PUBLISH_PACKAGE ||--|{ PUBLISH_PACKAGE_ITEM : contains
+    PUBLISH_PACKAGE_ITEM }o--|| CHANNEL_CONTENT : references
+    PUBLISH_PACKAGE_ITEM }o--|| QUALITY_REPORT : binds
     PUBLISH_PACKAGE ||--o{ PUBLISH_CONFIRMATION : confirmed_by
-    PUBLISH_PACKAGE ||--o{ PUBLISH_ATTEMPT : delivered_by
     MARKETING_TASK ||--o{ TASK_EVENT : emits
     MARKETING_TASK ||--o{ AUDIT_EVENT : audited_by
 ```
@@ -507,9 +525,9 @@ erDiagram
 为确保上图关系在数据库层可验证，除通用的 (store_id,id) 唯一键外，以下被引用表必须额外提供对应复合唯一键：
 
 - task 内子资源：父表提供 (store_id, task_id, id)，子表使用 (store_id, task_id, parent_id) 引用。
-- artifact_versions：提供 (store_id, task_id, artifact_id, id)，供 review_records、revision_requests、publish_packages 等引用精确版本。
+- artifact_versions：提供 (store_id, task_id, artifact_id, id)，供 review_records、revision_requests、channel_contents.copy_version_id 和 channel_content_artifact_refs 引用精确版本。
 - review_records：提供 (store_id, task_id, artifact_id, artifact_version_id, id)，供 revision_requests 证明审核与源版本属于同一产物。
-- publish_packages：提供 (store_id, task_id, id, dependency_fingerprint)，供 publish_confirmations 绑定包及指纹；或使用包 ID 外键并在事务中强校验指纹。
+- publish_packages：提供 (store_id, task_id, id, package_fingerprint)，供 publish_package_items 和 publish_confirmations 绑定包及指纹；PackageItem 另需 (store_id, publish_package_id, channel_key) 唯一键。
 - 当前版本指针（artifacts.current_version_id）需通过延迟约束触发器或事务内强校验，证明版本属于该 artifact；不得仅以 version_id 全局外键代替归属校验。
 - 依赖图允许同任务内跨产物依赖，但不允许跨 store/task 建边；若未来需要跨任务复用素材，必须通过独立、显式的共享资产授权关系，不得放宽任务外键。
 
@@ -517,7 +535,7 @@ erDiagram
 
 1. 表清单中的 JSONB payload 必须有 schema_version，并在应用层执行结构校验；不能将业务必填字段全部藏入 JSONB。
 2. artifacts 与 artifact_versions 的当前指针形成逻辑循环，迁移顺序和一致性校验必须单独设计。
-3. publish_attempts 的唯一键必须区分一次逻辑发布与平台重试；平台查询/对账不能误创建新的逻辑发布动作。
+3. PublishOperation（#12）的唯一键必须区分一次逻辑发布与平台重试；平台查询/对账不能误创建新的逻辑发布动作。#8 不保存平台凭据或外部请求尝试表。
 4. idempotency_records 的 actor 作用域要兼容轨道 B 最终确认的主体类型；系统触发任务不能伪装成用户 actor。
 5. task_events 与 audit_events 的保留期限、敏感字段脱敏和删除合规要求需在安全/数据治理基线中明确。
 6. business_fact_snapshots 的 source_id/source_version 是来源引用，不保证源资料仍可读取；快照 value_json 与 fingerprint 才是历史还原依据。

@@ -15,7 +15,7 @@
 | User、Store 生命周期、StoreMembership、Session、AuthorizedStoreContext | #5 Identity & Store | #6–#10 |
 | StoreProfile、Product、Offer、BrandGuideline、KnowledgeItem、MediaAsset | #6 Store Knowledge | #7–#10 |
 | MarketingTask、RequirementSnapshot、StrategySnapshot、TaskStep、DependencyEdge、TaskEvent | #7 Marketing Orchestrator | #8–#10 |
-| CopyArtifact、ImageArtifact、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishConfirmation | #8 Content/Media/Publishing | #7、#9、#10、#12 |
+| Artifact/ArtifactVersion（copy/image）、ReviewRecord、ChannelContent、QualityReport/QualityResolution、PublishPackage/Item/Confirmation | #8 Content/Media/Publishing | #7、#9、#10、#12 |
 | ChannelAccount、平台授权凭据、平台能力状态、PublishOperation | #12 Channel Integration | #8 只引用账号/能力，不持有平台凭据 |
 | Job、JobAttempt、JobEvent、OutboxEvent、JobType、lease/retry/recovery | #9 Job Runtime | #7、#8、#10、#11、#12 |
 | AIInvocation、ModelConfig、Provider capability registry、usage/cost | #9 AI Gateway | #7、#8、#10、#11 |
@@ -109,7 +109,7 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 ## 6. Content / Media / Publishing（#8）实体契约
 
 ### Artifact / ArtifactVersion
-逻辑 Artifact 与不可变版本分离。Artifact 保存 `id, store_id, task_id, artifact_type(copy|image|channel_content), current_version_id, created_at`；ArtifactVersion 保存 `id, store_id, artifact_id, version_no, source_type(ai_generated|merchant_upload|manual_edit), source_refs_json, instruction, content_ref/content_json, content_hash, provider_id, model_id, prompt_version_id, input_fingerprint, created_by, created_at`。
+逻辑 Artifact 与不可变版本分离。Artifact 保存 `id, store_id, task_id, artifact_type(copy|image), current_version_id, created_at`；ArtifactVersion 保存 `id, store_id, artifact_id, version_no, source_type(ai_generated|merchant_upload|manual_edit), source_refs_json, instruction, content_ref/content_json, content_hash, provider_id, model_id, prompt_version_id, input_fingerprint, created_by, created_at`。
 - 大图片二进制放 SeaweedFS/S3；DB 仅保存 object key、hash、MIME、尺寸与版本元数据。
 - 新版本不能覆盖旧版本；current_version_id 只是当前展示指针，不是历史事实。
 
@@ -119,19 +119,25 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 - Copy 与 Image review 分开保存和查询。
 
 ### ChannelContent
-`id, store_id, task_id, channel_key, channel_account_id, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。
-- 渠道规则与账号能力分开：spec_version 表示适配规格版本；账号授权和支持能力由 Channel Integration 持有。
+`id, store_id, task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。图片版本通过 ChannelContentArtifactRef 子表按 position 引用。每个渠道/输入指纹对应不可变快照；变更创建新记录。
+- 渠道规则与账号能力分开：spec_version 表示 #12 发布的适配规格版本；ChannelContent 不绑定具体账号，目标账号只在 PublishPackageItem 中引用，账号授权和支持能力由 Channel Integration 持有。
 - 变体依赖指纹变化时标 stale。
 
 ### QualityReport
 `id, store_id, task_id, channel_content_id, rule_version, input_fingerprint, result(pass|fail|needs_human), issues_json, created_at`。
-- 硬性问题未解决不能冻结发布包；人工复核结果必须有操作者和理由。
 
-### PublishPackage / PublishConfirmation
-PublishPackage：`id, store_id, task_id, package_version, channel_content_id, copy_version_id, image_version_ids, quality_report_id, fact_snapshot_ids, content_fingerprint, frozen_at, frozen_by`。
-PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at`。
-- PublishPackage 冻结后不可变；任何上游变更生成新包。
-- 最终确认必须绑定包 ID + fingerprint；新包不能继承旧确认。
+QualityResolution：`id, store_id, quality_report_id, quality_report_fingerprint, decision(accepted|rejected), reviewer_user_id, reason, created_at, idempotency_record_id`。仅对 needs_human 报告追加；hard fail 不可覆盖。
+- 硬性问题未解决不能冻结发布包；needs_human 必须追加 QualityResolution，accepted 才允许冻结，rejected 继续阻断；hard fail 不允许人工覆盖。原 QualityReport 保持不可变。
+
+### PublishPackage / PublishPackageItem / PublishConfirmation
+PublishPackage 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, package_fingerprint, frozen_at, frozen_by`。事实快照通过 PublishPackageFactRef 子表引用。
+PublishPackageFactRef：`id, store_id, publish_package_id, business_fact_snapshot_id, position`；以复合 FK 引用 #7 任务级 BusinessFactSnapshot；该快照的来源必须追溯至 #6 已确认的 StoreRecordRevision。
+PublishPackageItem 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。文案/图片版本由不可变 ChannelContent 间接绑定。
+PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, confirmed_by_user_id, confirmed_at, confirmation_note`。确认记录不可变，首期不提供撤销接口。
+- 一个 PublishPackage 至少包含一个 PackageItem 和一条已确认 BusinessFactSnapshot 引用；同一 package 的 channel_key 唯一。每个 item 精确绑定 ChannelContent、文案/图片版本和 QualityReport。
+- channel_account_id 仅引用 #12 的 ChannelAccount；official_api 必须绑定已授权账号，manual_handoff 时允许为空且不得显示已发布。
+- Package 与 PackageItem 冻结后不可变；任何上游变化生成新 package_version 和新 fingerprint。
+- 最终确认绑定整个 package ID + fingerprint；任一 item 变化都必须重新冻结并重新确认。
 - #8 负责发布门禁和发布业务意图；#12 执行官方渠道 Adapter/PublishOperation，#9 仅提供异步 Job Runtime。
 
 ## 7. Job Runtime（#9）实体与状态契约
@@ -212,10 +218,11 @@ Provider 统一返回：provider_key、model_key、provider_request_id、status�
 - POST /api/v1/artifact-versions/{version_id}/reviews
 - POST /api/v1/channel-content
 - POST /api/v1/quality-reports/run
-- POST /api/v1/publish-packages/freeze
-- POST /api/v1/publish-packages/{package_id}/confirm
-- POST /api/v1/publish-packages/{package_id}/publish
-发布 API 必须在服务端重新校验审核、质检指纹、最终确认、门店状态、账号授权和发布幂等键。
+- POST /api/v1/quality-reports/{quality_report_id}/resolutions
+- POST /api/v1/publish-packages/freeze（items[] 多渠道原子冻结）
+- POST /api/v1/publish-packages/{package_id}/confirm（确认整个 package fingerprint）
+- POST /api/v1/publish-packages/{package_id}/publish（为 official_api PackageItem 创建发布命令）
+发布 API 必须在服务端重新校验每个 item 的审核、质检指纹、最终确认、门店状态、账号授权和发布幂等键；外部成功状态由 #12 PublishOperation 证据回传。
 
 ### #9 Job / AI Gateway
 - GET /api/v1/jobs/{job_id}
@@ -229,16 +236,21 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 
 | Event | Owner | Consumers | 语义 |
 |---|---|---|---|
-| identity.store_user.activated/removed | #5 | #6–#10 | 成员授权变化，触发权限缓存失效/待执行操作重新评估 |
+| identity.store_membership.activated/removed | #5 | #6–#10 | 成员授权变化，触发权限缓存失效/待执行操作重新评估 |
 | identity.store.suspended | #5 | #6–#10 | 阻断新操作；发布副作用前重新验证 |
 | store.fact.confirmed/changed | #6 | #7–#10 | 事实版本变化，更新任务快照/依赖指纹 |
 | store.asset.created/versioned | #6 | #8/#10 | 新素材可被任务引用 |
 | marketing_task.created/activated | #7 | #9 | 业务动作需要异步执行时创建 Job |
 | marketing_task.snapshot_changed | #7 | #8/#10 | 依赖变化，按 DependencyEdge 传播 stale |
-| artifact.version_created | #8 | #7/#9 | 产物版本变化，更新任务步骤/提交后续 Job |
-| artifact.review_decided | #8 | #7 | 审核决定回写任务步骤视图 |
-| quality_report.completed | #8 | #7/#9 | 质检完成，领域服务校验输入指纹后推进步骤 |
-| publish_package.frozen/confirmed | #8 | #9 | 冻结/确认后可请求草稿或发布 Job |
+| content.artifact_version_created | #8 | #7/#9 | 产物版本变化，更新任务步骤/提交后续 Job |
+| content.review_recorded | #8 | #7 | 指定版本审核决定回写任务步骤视图 |
+| content.channel_content_created | #8 | #7/#9 | 渠道快照生成，输入指纹校验后可继续质检 |
+| content.quality_report_completed | #8 | #7/#9 | 质检完成，领域服务校验输入指纹后推进步骤 |
+| content.quality_resolution_recorded | #8 | #7 | 人工复核结论追加记录；#7 重新评估发布门禁 |
+| content.publish_package_frozen | #8 | #7 | 多渠道交付包已冻结 |
+| content.publish_confirmed | #8 | #9 | 商家确认整个 package fingerprint，可请求发布 Job |
+| content.publish_command_requested | #8 | #12/#9 | 每个 official_api PackageItem 单独提交受控发布命令 |
+| channel.publish_operation_started/succeeded/failed/needs_human | #12 | #7/#8/#9 | 外部发布状态必须由平台证据确认 |
 | job.succeeded/failed/needs_human | #9 | 发起该 Job 的业务域 | 回传执行结果；业务域校验后更新自己的状态 |
 | ai.invocation.completed/failed | #9 | #7/#8/#10 | 调用审计/成本与任务关联 |
 
@@ -259,6 +271,7 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 11. AI Provider 429/超时/无效 JSON：Job 按错误类别重试或转人工，AIInvocation 保留失败审计。
 12. AI 返回未经确认的价格/优惠/门店事实：事实校验失败，不进入正式产物。
 13. 旧 PublishPackage 确认后上游版本变化：旧包不可修改，新包必须重新确认。
+15. 多渠道 PublishPackage 的任一 PackageItem 缺少审核/质检或跨店引用：整个 Freeze 原子失败，不得产生半包。
 14. 平台管理员访问门店内容：默认拒绝，必要支持访问必须有独立受审计授权。
 
 ## 13. 冻结清单与阻塞项
@@ -271,11 +284,12 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 - [ ] #6：Offer 结构化优惠规则 schema、库存/产能字段语义、事实确认生命周期。
 - [ ] #6：素材上传 intent/complete、签名 URL TTL、对象隔离和原图保留策略。
 - [ ] #7：营销状态与 TaskStep 状态、Job 状态完全分离。
-- [ ] #8：Artifact 类型/版本/审核单元、质检硬阻断与人工复核规则、发布包 fingerprint 组成。
+- [ ] #8：Artifact 类型/版本/审核单元、质检硬阻断与人工复核规则、多渠道 PublishPackage/PackageItem 聚合、package fingerprint 组成。
 - [ ] #9：Job 状态枚举唯一化、lease token、重试/死信/人工恢复语义、Outbox Relay/Sweeper。
 - [ ] #9/#10：AIInvocation 与 Job 分离、Provider 接口与真实适配器边界、Prompt 版本所有权。
 - [ ] 所有门店资源复合外键、统一错误语义、幂等和乐观锁约定。
 - [ ] API 路径、请求/响应 Schema 和事件 schema_version 进入 OpenAPI/契约测试。
+- [ ] #8 多渠道 PackageItem、manual_handoff 与 official_api 发布命令边界完成 #12 联合评审。
 
 
 ## 14. Identity request context and platform-admin boundary alignment

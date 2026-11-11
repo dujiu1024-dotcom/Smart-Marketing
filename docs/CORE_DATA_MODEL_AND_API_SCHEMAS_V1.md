@@ -80,18 +80,29 @@ erDiagram
   MARKETING_TASK ||--o{ ARTIFACT : produces
   ARTIFACT ||--o{ ARTIFACT_VERSION : versions
   ARTIFACT_VERSION ||--o{ REVIEW_RECORD : reviewed
-  ARTIFACT_VERSION ||--o{ REVISION_REQUEST : revised
-  MARKETING_TASK ||--o{ DEPENDENCY_EDGE : links
-  MARKETING_TASK ||--o{ QUALITY_CHECK : validates
+  MARKETING_TASK ||--o{ CHANNEL_CONTENT : adapts
+  CHANNEL_CONTENT ||--o{ CHANNEL_CONTENT_ARTIFACT_REF : contains
+  ARTIFACT_VERSION ||--o{ CHANNEL_CONTENT_ARTIFACT_REF : image_ref
+  CHANNEL_CONTENT ||--o{ QUALITY_REPORT : validates
+  QUALITY_REPORT ||--o{ QUALITY_RESOLUTION : resolved_by
   MARKETING_TASK ||--o{ PUBLISH_PACKAGE : freezes
+  PUBLISH_PACKAGE ||--o{ PUBLISH_PACKAGE_FACT_REF : snapshots
+  BUSINESS_FACT_SNAPSHOT ||--o{ PUBLISH_PACKAGE_FACT_REF : freezes
+  PUBLISH_PACKAGE ||--|{ PUBLISH_PACKAGE_ITEM : contains
+  PUBLISH_PACKAGE_ITEM }o--|| CHANNEL_CONTENT : references
+  PUBLISH_PACKAGE_ITEM }o--|| QUALITY_REPORT : binds
   PUBLISH_PACKAGE ||--o{ PUBLISH_CONFIRMATION : confirms
-  PUBLISH_PACKAGE ||--o{ PUBLISH_ATTEMPT : publishes
+  MARKETING_TASK ||--o{ DEPENDENCY_EDGE : links
   MARKETING_TASK ||--o{ TASK_EVENT : emits
 ```
 
-- MarketingTask 是业务聚合根；Artifact/Review/Package 由 #8 持有，Job/Outbox 由 #9 持有。
-- RequirementSnapshot、StrategySnapshot、BusinessFactSnapshot、ArtifactVersion、ReviewRecord、PublishPackage、PublishConfirmation 均按不可变记录处理。
+- MarketingTask 是业务聚合根；Artifact/Review/ChannelContent/QualityReport/Package 由 #8 持有，Job/Outbox 由 #9 持有。
+- RequirementSnapshot、StrategySnapshot、BusinessFactSnapshot、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、QualityResolution、PublishPackage、PublishPackageFactRef、PublishPackageItem、PublishConfirmation 均按不可变记录处理。
 - 文案与图片审核分别按 artifact_type/version 绑定；审核旧版本不能批准新版本。
+- 一个 PublishPackage 聚合一次任务交付，至少包含一条 PackageItem 和一条 #7 BusinessFactSnapshot 引用；PublishPackageItem 每个渠道一条；冻结/确认以整个 package fingerprint 为单位。
+- BusinessFactSnapshot 由 #7 MarketingTask 持有，记录任务实际使用的事实快照；其来源版本追溯到 #6 StoreRecordRevision。#8 不直接拥有或重写 #6 事实版本。
+- QualityReport 只记录自动/规则质检结果；needs_human 的人工决定写入独立追加式 QualityResolution。hard fail 不可覆盖。
+- PublishConfirmation 不可变，首期不提供撤销；若未来允许撤销，使用独立追加式记录，不更新确认行。
 - 依赖边记录上游版本 ID + fingerprint；失效只沿真实依赖闭包传播。
 - 发布确认必须绑定冻结包的确切 fingerprint。
 
@@ -216,23 +227,55 @@ erDiagram
 - ReviewRecord 绑定精确 artifact_version_id；旧版本审核不能作用于新版本。
 - 通过审核的版本一旦生成新版本，新版本必须重新审核。
 
-### 5.4 冻结发布包与最终确认
+### 5.3.1 质检人工复核决议
 
 ```json
 {
-  "channel_key": "wechat_official_account",
-  "expected_task_version": 8,
-  "copy_version_id": "7e8c9a10-0000-4000-8000-000000000003",
-  "image_version_ids": ["7e8c9a10-0000-4000-8000-000000000004"],
-  "quality_check_id": "7e8c9a10-0000-4000-8000-000000000005"
+  "decision": "accepted",
+  "reason": "已人工核验该软性风险，不涉及事实错误或平台硬性限制",
+  "expected_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 }
 ```
 
 规则：
-- Freeze 时重新校验审核、渠道规格、事实快照、质检指纹和所有版本归属。
-- 冻结包不可变；最终确认只接受 package_id + fingerprint。
-- 任一上游变化产生新包，旧确认不继承。
-- 发布请求只接受已确认的包；#12 渠道 Adapter 执行外部副作用。
+- 仅 `QualityReport.result=needs_human` 可追加 QualityResolution。
+- `accepted` 才允许该报告参与冻结；`rejected` 继续阻断。
+- `fail` 是 hard fail，不允许人工覆盖；修正输入后重新运行质检。
+- 决议记录绑定 reviewer_user_id、reason 和原报告 fingerprint，追加写且幂等。
+
+### 5.4 冻结发布包与最终确认
+
+```json
+{
+  "expected_task_version": 8,
+  "fact_snapshot_ids": ["7e8c9a10-0000-4000-8000-000000000010"],
+  "items": [
+    {
+      "channel_key": "wechat_official_account",
+      "channel_content_id": "7e8c9a10-0000-4000-8000-000000000006",
+      "quality_report_id": "7e8c9a10-0000-4000-8000-000000000005",
+      "channel_account_id": "7e8c9a10-0000-4000-8000-000000000007",
+      "delivery_mode": "official_api",
+      "planned_publish_at": null
+    },
+    {
+      "channel_key": "douyin",
+      "channel_content_id": "7e8c9a10-0000-4000-8000-000000000008",
+      "quality_report_id": "7e8c9a10-0000-4000-8000-000000000011",
+      "channel_account_id": null,
+      "delivery_mode": "manual_handoff",
+      "planned_publish_at": null
+    }
+  ]
+}
+```
+
+规则：
+- Freeze 时逐项重新校验审核、渠道规格、事实快照、质检指纹和所有版本归属；items[] 必须至少一项且 channel_key 不重复。
+- 一个 PublishPackage 聚合多个 PublishPackageItem；冻结包与所有 items 在同一事务写入，不允许部分冻结。
+- 冻结包不可变；最终确认只接受 package_id + package_fingerprint，任一上游变化产生新包，旧确认不继承。
+- official_api item 必须绑定 #12 已授权 ChannelAccount；manual_handoff item 不得伪造发布成功。
+- 发布请求只接受已确认的包；#8 为每个 official_api item 创建受控命令，#12 渠道 Adapter 执行外部副作用。
 
 ### 5.5 Job 人工恢复/处理
 
@@ -296,10 +339,16 @@ erDiagram
 6. 依赖边需支持上游与下游两个方向索引；同一版本依赖边唯一。
 7. Job 尝试唯一：`UNIQUE(job_id, attempt_no)`；租约领取用原子 UPDATE/SELECT FOR UPDATE SKIP LOCKED。
 8. Outbox 消费端持久化 event_id 去重；Relay 通过租约/锁避免并发重复 claim。
-9. PublishPackage 冻结后禁止 UPDATE；PublishConfirmation 绑定 package fingerprint。
-10. PublishOperation 对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
-11. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
-12. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
+9. PublishPackage、PublishPackageFactRef 与 PublishPackageItem 冻结后禁止 UPDATE；PublishConfirmation 为不可变记录并绑定整个 package fingerprint，首期不提供撤销。
+10. PublishPackageFactRef 以 (store_id,publish_package_id,business_fact_snapshot_id) 唯一，并复合 FK 到 #7 任务级 BusinessFactSnapshot；该快照来源追溯至 #6 已确认 StoreRecordRevision。
+11. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 复合 FK 校验 channel_key 与 ChannelContent 一致，并保证 QualityReport 属于同一 ChannelContent，所有复合 FK 包含 store_id。
+12. ChannelContent.copy_version_id 使用 store_id 复合 FK；ChannelContentArtifactRef 以 (store_id, channel_content_id, position) 唯一，并对 ChannelContent/ArtifactVersion 使用包含 store_id 的复合 FK；图片数组仅是 API projection。
+13. 一个 PublishPackage 至少有一个 PackageItem 和一个已确认 BusinessFactSnapshot 引用；manual_handoff 时 channel_account_id 允许 NULL，official_api 时必须非 NULL。
+14. PublishOperation（#12）对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
+15. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
+16. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
+17. QualityResolution 复合 FK 到同店 QualityReport，保存 quality_report_fingerprint；UNIQUE(store_id, quality_report_id, quality_report_fingerprint)，写入时校验报告 result=needs_human，并通过 idempotency_record_id 防重复。
+18. PublishConfirmation 以 (store_id,publish_package_id,package_fingerprint) 唯一；首期不提供撤销，确认记录不可 UPDATE/DELETE。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

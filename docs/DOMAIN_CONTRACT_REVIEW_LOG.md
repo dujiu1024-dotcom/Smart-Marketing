@@ -25,7 +25,7 @@
 - #5：认证、Session、门店成员关系、授权上下文和授权审计。
 - #6：门店经营资料、事实确认、知识条目、素材库和对象存储元数据。
 - #7：营销任务聚合、业务状态机、快照、依赖图、业务事件。
-- #8：文案/图片产物与独立审核、渠道内容、质检、冻结发布包、商家最终确认。
+- #8：文案/图片产物与独立审核、渠道内容、质检报告及人工复核决议、冻结发布包、商家最终确认。
 - #9：Job Runtime、Outbox、Worker 租约/重试/恢复、AI Gateway 调用契约与成本审计。
 - #10：真实 Text/Image/Vision/OCR Provider 适配、PromptTemplate/PromptVersion 版本管理。
 - #12：ChannelAccount、OAuth/授权凭据、平台能力矩阵、平台 API 与 PublishOperation。
@@ -110,3 +110,56 @@
 | #1 | 旧开发计划 PR | 已关闭（被现行 DEVELOPMENT_PLAN.md 取代） | 不涉及关闭 Issue |
 
 本次没有关闭 #2/#4/#5/#6/#7/#8/#9/#10 等生产交付 Issue。Issue #3 已是 Closed。关闭任何 P0 生产 Issue 必须有其 DoD 对应的代码、迁移、自动化测试和可复核验收证据。
+
+
+## 10. Issue #8 内容生产与发布交付领域审查（2026-11-11）
+
+审查基线：PRODUCT_DESIGN.md v1.8、Demo `#task` 的 copy/image/channel/quality/publish 步骤、DOMAIN_INTEGRATION_CONTRACTS_V1.md §6/§9/§10、CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md。
+
+### 已明确的责任边界
+- #7 拥有 MarketingTask、需求/策略快照、TaskStep、依赖图和业务状态；#8 不复制任务状态机。
+- #8 拥有 Artifact/ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage/Item/Confirmation。
+- #6 拥有 MediaAsset 和已确认经营事实；#8 只引用资产 ID/hash，不拥有源素材。
+- #9 拥有 Job/Outbox/Worker；#8 只提交命令并校验结果指纹。
+- #10 拥有真实 AI Provider 和 PromptVersion；#8 不持有 Provider 凭据。
+- #12 拥有 ChannelAccount、OAuth/平台凭据、能力发现、PublishOperation 和外部发布证据；#8 只拥有发布门禁和业务意图。
+
+### 本轮发现并修正的契约缺口
+1. Demo 的最终发布确认一次汇总多个渠道，但旧 PublishPackage 字段只有单个 channel_content_id。现已提出 `PublishPackage + PublishPackageItem` 聚合模型：一个任务交付包、多条渠道 item，整包 fingerprint 与最终确认原子绑定。
+2. ChannelContent 必须是按渠道和输入指纹生成的不可变快照；QualityReport 必须绑定 ChannelContent、规则版本和指纹。
+3. manual_handoff 与 official_api 必须分开；无账号连接时不能伪造 PublishOperation 或已发布状态。
+4. #8 发布请求是受门禁约束的命令；外部发布状态只由 #12 的 PublishOperation 证据确认，#9 Job succeeded 不等于渠道发布成功。
+5. 文案/图片审核按确切 ArtifactVersion 独立进行；旧版本通过不能批准新版本。
+
+### 本轮交付
+- 新增 `CONTENT_DELIVERY_DOMAIN_DESIGN.md`：Demo 映射、实体、状态、指纹、API/事件、事务/幂等、数据库约束和 CNT-01 至 CNT-26 测试矩阵。
+- 更新 `DOMAIN_INTEGRATION_CONTRACTS_V1.md` §6/§10/§11/§12/§13。
+- 更新 `CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md` 的 Content ERD、多渠道 Freeze Schema 和数据库约束。
+- 该方案仍需 #7/#9/#12 联合评审；PackageItem 聚合、manual_handoff 和人工质检复核规则不得未经评审直接进入生产实现。
+
+**验证状态：** 仅完成静态文档交叉审查；CNT-01 至 CNT-26、OpenAPI Schema、Alembic 约束、API/Worker 集成和浏览器回归均待执行。
+
+
+## 11. Issue #8 联合契约静态复核补充（2026-11-11）
+
+本轮在 PR #30 初稿上发现并修正四项一致性问题：
+
+1. **Artifact 类型重复：** ChannelContent 已是独立渠道快照实体，不应同时作为 Artifact.artifact_type。Artifact 类型收敛为 copy/image；ChannelContent 单独持有渠道规格、适配 payload 和输入指纹。
+2. **BusinessFactSnapshot 权属错误：** BusinessFactSnapshot 属于 #7 MarketingTask 的任务级不可变快照，不属于 #6。其 source revision 追溯到 #6 已确认 StoreRecordRevision；#8 的 PublishPackageFactRef 只引用 #7 快照。
+3. **QualityReport 人工复核可变性冲突：** QualityReport 作为不可变质检结果，不再写 reviewer_id/resolution_reason。新增追加式 QualityResolution，绑定 report fingerprint；仅 needs_human 可接受/拒绝，hard fail 不可覆盖。Freeze 只接受 pass 或带 accepted QualityResolution 的 needs_human。
+4. **PublishConfirmation 撤销字段冲突：** 核心模型将确认记录定义为不可变，故移除 revoked_at；首期不提供撤销接口。未来若开放撤销，必须另建追加式撤销记录并定义已提交发布命令的处理边界。
+
+同时统一了 PublishPackage 最低条件：至少一个 PackageItem 和一个已确认 BusinessFactSnapshot 引用。该门槛是安全提案，仍需 #7/#8 联合确认。
+
+### 同步文档
+- CONTENT_DELIVERY_DOMAIN_DESIGN.md
+- DOMAIN_INTEGRATION_CONTRACTS_V1.md
+- CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md
+- README.md 索引保持不变
+
+### 仍需联合决议
+- #7/#8 确认 BusinessFactSnapshot 的必需性和引用粒度。
+- #8/#12 决议 ChannelSpec/ChannelCapability 的版本快照与失效事件。
+- #8/#12 确认 manual_handoff 首期交付形式与 PublishOperation 幂等边界。
+- #8/#9 确认 QualityResolution 的授权能力和事件消费者。
+- #8 产品负责人确认首期不提供 PublishConfirmation 撤销。

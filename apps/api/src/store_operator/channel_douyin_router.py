@@ -112,7 +112,7 @@ async def complete_douyin_authorization(
         )
     )
     if attempt is None:
-        raise ApiError(400, "OAUTH_STATE_INVALID", "OAuth authorization state is invalid or expired")
+        raise ApiError(400, "OAUTH_STATE_INVALID", "OAuth authorization state is invalid or expired")  # noqa: E501
     if attempt.redirect_uri != redirect_uri:
         raise ApiError(400, "OAUTH_REDIRECT_MISMATCH", "OAuth redirect URI does not match")
     store = db.scalar(
@@ -138,7 +138,7 @@ async def complete_douyin_authorization(
     )
     if consumed is None:
         db.rollback()
-        raise ApiError(400, "OAUTH_STATE_INVALID", "OAuth authorization state is invalid or expired")
+        raise ApiError(400, "OAUTH_STATE_INVALID", "OAuth authorization state is invalid or expired")  # noqa: E501
     db.commit()
 
     client = DouyinOAuthClient(credentials)
@@ -149,7 +149,7 @@ async def complete_douyin_authorization(
         await client.aclose()
 
     if profile["open_id"] != token_set.open_id:
-        raise ApiError(502, "OAUTH_ACCOUNT_MISMATCH", "Douyin account identity could not be verified")
+        raise ApiError(502, "OAUTH_ACCOUNT_MISMATCH", "Douyin account identity could not be verified")  # noqa: E501
     if not DOUYIN_REQUIRED_SCOPES.issubset(token_set.scope):
         raise ApiError(
             403,
@@ -161,7 +161,7 @@ async def complete_douyin_authorization(
         secret_store = _secret_store()
         external_id_digest = hashlib.sha256(token_set.open_id.encode("utf-8")).hexdigest()
         secret_ref = secret_store.put_json(
-            f"{settings.channel_secret_store_prefix}/{attempt.store_id}/douyin/{external_id_digest}",
+            f"{settings.channel_secret_store_prefix}/{attempt.store_id}/douyin/{external_id_digest}",  # noqa: E501
             {
                 "access_token": token_set.access_token,
                 "refresh_token": token_set.refresh_token,

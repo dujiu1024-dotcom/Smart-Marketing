@@ -187,7 +187,7 @@
 | ID | 验收项 | 当前状态 | 证据/边界 |
 |---|---|---|---|
 | ENG-DEMO-01 | Demo 页面、hash 路由、页面内 Tab 与二级编辑页映射 | 已形成文档 | 见 [DEMO_ROUTE_STATE_MAP.md](DEMO_ROUTE_STATE_MAP.md)，映射来自 `demo/app.js`、`demo/store-renderers.js`、`demo/admin.js` |
-| ENG-DEMO-02 | 冻结 Demo 路由与页面壳 Chromium 冒烟 | 已加入 CI，待最新 head 执行 | `apps/e2e/demo_smoke.py`；覆盖门店端一级路由、8 个门店资料 Tab、7 个任务步骤、平台管理一级/二级页面、商品/活动编辑和浏览器历史 |
+| ENG-DEMO-02 | 冻结 Demo 路由与页面壳 Chromium 冒烟 | **路由级冒烟已通过** | `apps/e2e/demo_smoke.py`；最新完整 CI Run [42938223781](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42938223781) 6/6 Job 通过；覆盖门店端一级路由、8 个门店资料 Tab、7 个任务步骤、平台管理一级/二级页面、商品/活动编辑和浏览器历史 |
 | ENG-DEMO-03 | 完整业务流程与字段级浏览器验收 | 未完成 | 冒烟不验证完整表单提交、状态机正反路径、异常恢复、所有字段、移动端、可访问性或真实生产服务 |
 | ENG-DEMO-04 | 冻结 Demo 正式验收 | 未通过 | 必须完成本矩阵 P0/P1/P2 适用项和真实浏览器证据；不得因路由冒烟通过而关闭 Issue #4 |
 
@@ -202,3 +202,12 @@
 - 修复：E2E 标题断言改为页面实际 H1；`DEMO_ROUTE_STATE_MAP.md` 明确区分导航标签与页面标题。
 - 新提交的 CI 结果尚待执行；修复未通过新一轮 CI 前不得标记 ENG-DEMO-02 通过。
 - ENG-DEMO-03 完整业务流程/字段级浏览器验收仍未完成；ENG-DEMO-04 Demo 正式验收仍未通过。
+
+
+## 16. 最新完整 CI 与 Demo 路由冒烟结果（2026-11-11）
+
+- PR CI Run [42938223781](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions/runs/42938223781)，head `eedbebca7968d12f2d2e20d1194bb7c1a9873e13`：6/6 Job 全部成功（Web、API、Worker、Contracts、Infrastructure、E2E）。
+- Demo E2E 输出：`Frozen Demo Playwright smoke passed: 9 store routes, 8 store tabs, 7 task stages, 7 admin pages, admin detail pages, editors and browser history.`
+- Infrastructure 完成完整 Compose 启动、API readiness、Web HTTP 和 PostgreSQL volume restart persistence 检查。
+- 因此 ENG-DEMO-02 的“路由/页面壳冒烟”子项可标记通过；这不改变 ENG-DEMO-03 和 ENG-DEMO-04 的未完成状态。
+- 完整业务流程、字段级交互、异常恢复、移动端/响应式、可访问性和冻结 Demo 正式验收仍未完成；Issue #4 不关闭。

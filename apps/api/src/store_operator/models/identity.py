@@ -14,7 +14,8 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from store_operator.models.base import Base
@@ -25,7 +26,9 @@ class User(Base):
     __table_args__ = (
         UniqueConstraint("email_normalized", name="uq_users_email_normalized"),
         CheckConstraint("status IN ('active', 'locked', 'disabled')", name="status"),
-        CheckConstraint("email_normalized = lower(email_normalized)", name="email_normalized_lower"),
+        CheckConstraint(
+            "email_normalized = lower(email_normalized)", name="email_normalized_lower"
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -47,7 +50,9 @@ class User(Base):
 
 class Store(Base):
     __tablename__ = "stores"
-    __table_args__ = (CheckConstraint("status IN ('active', 'suspended', 'closed')", name="status"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'suspended', 'closed')", name="status"),
+    )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -130,11 +135,16 @@ class AuthSession(Base):
 
 class PlatformAdminGrant(Base):
     __tablename__ = "platform_admin_grants"
-    __table_args__ = (CheckConstraint("status IN ('active', 'revoked')", name="status"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'suspended', 'closed')", name="status"),
+    )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, unique=True
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")
     granted_by_user_id: Mapped[UUID | None] = mapped_column(

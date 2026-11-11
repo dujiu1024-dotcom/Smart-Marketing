@@ -1,9 +1,10 @@
 import hashlib
 import json
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, Request, Response, status
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -18,11 +19,28 @@ from store_operator.auth.dependencies import (
 from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.models.store_knowledge import (
+    AudienceProfile,
+    BrandGuideline,
+    KnowledgeItem,
+    Offer,
     Product,
     StoreProfile,
     StoreRecordRevision,
+    StoreScoped,
 )
 from store_operator.store_knowledge_schemas import (
+    AudienceProfileCreate,
+    AudienceProfileRead,
+    AudienceProfileUpdate,
+    BrandGuidelineCreate,
+    BrandGuidelineRead,
+    BrandGuidelineUpdate,
+    KnowledgeItemCreate,
+    KnowledgeItemRead,
+    KnowledgeItemUpdate,
+    OfferCreate,
+    OfferRead,
+    OfferUpdate,
     ProductCreate,
     ProductList,
     ProductRead,

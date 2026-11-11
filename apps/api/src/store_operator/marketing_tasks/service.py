@@ -1,3 +1,5 @@
+import hashlib
+import json
 from collections import defaultdict
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -11,26 +13,42 @@ from store_operator.auth.context import AuthContext
 from store_operator.auth.dependencies import AuthenticatedSession
 from store_operator.auth.errors import ApiError
 from store_operator.domain.marketing_task import (
+    InvalidMarketingTaskTransition,
+    InvalidTaskStepTransition,
     MarketingTaskStatus,
     MarketingTaskType,
     StepApplicability,
     TaskStepKey,
     TaskStepStatus,
+    ensure_step_transition,
+    ensure_task_transition,
     resolve_step_applicability,
 )
 from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.marketing_tasks.schemas import (
+    BusinessFactReference,
+    MarketingTaskAction,
     MarketingTaskCreate,
     MarketingTaskDetail,
     MarketingTaskList,
+    MarketingTaskRecover,
+    MarketingTaskRequirementConfirm,
+    MarketingTaskRequirementUpdate,
+    MarketingTaskStrategyConfirm,
+    MarketingTaskStepSkip,
     MarketingTaskSummary,
     TaskStepRead,
 )
 from store_operator.models.marketing_task import (
+    BusinessFactSnapshot,
     MarketingTask,
+    RequirementSnapshot,
+    StepDecision,
+    StrategySnapshot,
     TaskEvent,
     TaskStep,
 )
+from store_operator.models.store_knowledge import StoreRecordRevision
 
 _PENDING_STEP_STATUSES = {
     TaskStepStatus.PENDING.value,

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from store_operator.auth.context import AuthContext
 from store_operator.auth.dependencies import require_store_context
 from store_operator.auth.security import hash_password, session_token_verifier
+from store_operator.config import settings
 from store_operator.main import app
 from store_operator.models.identity import (
     AuditEvent,
@@ -465,9 +466,7 @@ def test_password_change_rotates_current_session_and_revokes_other_sessions(
 
     old_token = identity_client.cookies.get("__Host-ai_store_session")
     assert old_token
-    old_verifier = session_token_verifier(old_token, __import__(
-        "store_operator.config", fromlist=["settings"]
-    ).settings.session_token_pepper)
+    old_verifier = session_token_verifier(old_token, settings.session_token_pepper)
 
     changed = identity_client.post(
         "/api/v1/auth/password/change",

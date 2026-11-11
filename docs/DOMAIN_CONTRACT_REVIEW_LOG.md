@@ -15,7 +15,7 @@
 | 营销流程 | MarketingTask/RequirementSnapshot/StrategySnapshot/TaskStep/DependencyEdge 由 #7 持有 | MARKETING_TASK_DOMAIN_DESIGN.md |
 | 内容审核与发布包 | Artifact/ArtifactVersion/ReviewRecord/ChannelContent/QualityReport/PublishPackage/PublishConfirmation 由 #8 持有 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | 渠道账号与发布执行 | ChannelAccount/平台凭据/能力状态/PublishOperation 由 #12 持有；#8 只负责门禁与业务命令 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
-| Job 状态 | PR #20 提案：queued/running/retry_wait/succeeded/failed/needs_human/cancelled；OutboxEvent 可独立 dead；待 #7/#9 联合冻结 | ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md |
+| Job 状态 | 已合并 PR #29：Job 使用 queued/running/retry_wait/succeeded/failed/needs_human/cancelled；Outbox 投递状态独立管理；#7/#9 仍需冻结 terminal_reason、调度阈值等实现参数 | ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md |
 | CSRF 与门店上下文 | Cookie Session 写请求采用 Session 绑定 synchronizer token + Origin/Referer 校验；所有门店 API 要求服务端校验的 X-Store-Id | IDENTITY_STORE_SECURITY_DESIGN.md |
 | AI Gateway | #9 定义 AIInvocation、调用审计、成本、错误归一化与 Provider 接口；#10 实现真实 Provider 和 PromptVersion 管理 | DOMAIN_INTEGRATION_CONTRACTS_V1.md |
 | 数据库/队列 | PostgreSQL 是 Job/Attempt/Outbox 事实源；Celery + Redis 仅做至少一次投递；必须有 Outbox Relay 与 Sweeper | TECH_STACK_SELECTION.md + DOMAIN_INTEGRATION_CONTRACTS_V1.md |
@@ -84,7 +84,7 @@
 3. 平台管理员按产品文档负责在门店详情管理门店成员。owner/member 不额外获得成员管理权限或新增审批层级。
 4. 平台管理员通过独立 PlatformAdminGrant 获得 platform.store_members.manage；该权限不自动授予 StoreMembership，也不授予门店营销正文、素材或经营资料读取权。
 5. 12h idle / 7d absolute 是待安全评审的建议值；邀请/注册/密码重置流程、管理员 bootstrap/恢复和 RLS 启用策略仍待决议。
-6. PR #22 因基线过期由 PR #26 替代；PR #26 从最新 main 重建，设计和安全测试矩阵仍待审查。
+6. PR #22/#23 为过期版本；PR #26 从最新 main 重建并已合并。安全测试矩阵仍待实现阶段执行。
 
 对营销域的影响：#7/#8/#9 只能消费 AuthContext.request_store_id 与 actor_user_id；不得读取 Session.active_store_id 决定资源归属。营销任务、产物、Job、资产的所有权仍以持久化 store_id + 服务端授权上下文双重校验为准。
 
@@ -95,4 +95,18 @@
 - Async Runtime 的 PR #20 已按 PR #26 的 AuthorizedStoreContext 字段补充 Worker 映射：user_id、request_store_id、membership_id；Session.active_store_id 仅为 UI 默认选择。
 - 用户触发 Job 的 store_id/created_by_user_id 从可信上下文注入；system Job 使用显式 system scope 与 actor_type=system，不伪造用户。
 - PlatformAdminGrant 的成员管理能力不等于 StoreMembership，也不授予 Job、营销任务、产物或门店资料访问权限。
-- PR #20 与 PR #26 均为待评审设计，未合并前这些映射仍是提案；安全测试全部待执行。
+- PR #26（Identity）、PR #27（Store Knowledge）、PR #25（Marketing Task）、PR #29（Async Runtime）均已合并进入 main。它们只完成设计契约入库，不表示认证、经营资料 CRUD、营销状态机、Job Runtime 或 AI Provider 已实现；对应 Issues #5/#6/#7/#9 保持 Open。安全、数据库和故障恢复测试仍待执行。
+
+
+## 9. PR 合并与 Issue 关闭核对（2026-11-11）
+
+| PR | 领域 | 合并状态 | Issue 状态与关闭理由 |
+|---|---|---|---|
+| #26 | #5 Identity / Store Security | 已合并 | #5 保持 Open：仅设计契约，生产认证/授权和 IDOR 测试未实现 |
+| #27 | #6 Store Knowledge | 已合并 | #6 保持 Open：仅领域设计，CRUD/迁移/上传未实现 |
+| #25 | #7 Marketing Task | 已合并 | #7 保持 Open：仅状态机/版本契约修订，生产实现未完成 |
+| #29 | #9 Async Runtime / AI Gateway | 已合并 | #9 保持 Open：仅运行时设计，Job/Outbox/Worker/Provider 未实现 |
+| #16 | #4 Engineering Foundation | Draft，CI 最新运行中 | #4 保持 Open：最新 CI 尚未结束，OTel/干净环境验收仍待证据 |
+| #1 | 旧开发计划 PR | 已关闭（被现行 DEVELOPMENT_PLAN.md 取代） | 不涉及关闭 Issue |
+
+本次没有关闭 #2/#4/#5/#6/#7/#8/#9/#10 等生产交付 Issue。Issue #3 已是 Closed。关闭任何 P0 生产 Issue 必须有其 DoD 对应的代码、迁移、自动化测试和可复核验收证据。

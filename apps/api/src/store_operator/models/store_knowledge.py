@@ -475,3 +475,29 @@ audience_profile_products = Table(
         name="pk_audience_profile_products",
     ),
 )
+
+
+class IdempotencyRecord(StoreScoped, Base):
+    __tablename__ = "idempotency_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "store_id", "idempotency_key", name="uq_idempotency_records_store_key"
+        ),
+        CheckConstraint(
+            "status IN ('in_progress', 'completed')",
+            name="status",
+        ),
+        Index("ix_idempotency_records_expires_at", "expires_at"),
+    )
+
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    operation: Mapped[str] = mapped_column(String(120), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="in_progress"
+    )
+    response_status: Mapped[int | None] = mapped_column(Integer)
+    response_json: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    resource_type: Mapped[str | None] = mapped_column(String(60))
+    resource_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

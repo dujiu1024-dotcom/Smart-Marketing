@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from store_operator.jobs.service import claim_job, fail_job
 from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent
+
 from store_operator_worker.celery_app import celery_app
 
 database_url = os.environ.get("DATABASE_URL")

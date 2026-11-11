@@ -43,7 +43,7 @@ erDiagram
 核心约束：
 - `users.email_normalized` UNIQUE；密码只存 Argon2id hash。
 - `store_memberships(store_id,user_id)` UNIQUE；成员状态为 invited/active/suspended/removed。
-- Session 只存 Token hash/verifier；不保存可绕过成员校验的 current_store_id。
+- Session 只存 HMAC Token verifier 与 CSRF token hash；保存 auth_version、last_seen_at、idle_expires_at、absolute expires_at、revoked_at 和仅供 UI 默认选择的 active_store_id。该字段不参与授权。
 - `X-Store-ID` 是请求的门店选择，不是授权凭证；每个请求实时验证 active Store + active StoreMembership。
 - 平台管理员身份不得混入 StoreMembership.role，也不得默认读取门店业务内容。
 

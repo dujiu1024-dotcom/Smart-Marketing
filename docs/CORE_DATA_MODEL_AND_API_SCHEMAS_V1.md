@@ -128,6 +128,18 @@ erDiagram
 - AIInvocation 字段扩展建议（待 #9 联合评审）：provider_request_id 与 usage_json，用于供应商对账和分项计费；未批准前不视为冻结字段。
 - 发布超时等外部副作用结果不确定时进入 needs_human，对账前禁止盲目重发。
 
+### 3.5 Prompt 管理（#10）
+
+PromptTemplate/PromptVersion/PromptActivation 是全局平台配置，不含 store_id；平台管理员写权限由 #5 capability 授权，不能因此读取门店业务数据。
+
+- PromptTemplate：`id, template_key, display_name, industry_key, task_type, capability, description, status(active|archived), current_published_version_id, created_by_user_id, created_at, updated_at`；UNIQUE(industry_key, task_type, capability, template_key)。
+- PromptVersion：`id, prompt_template_id, version_no, system_prompt, user_prompt_template, variables_schema_json, output_schema_json, schema_version, input_policy_json, changelog, status(draft|published), created_by_user_id, created_at, published_by_user_id, published_at`；UNIQUE(prompt_template_id, version_no)。Draft 可编辑，published 不可 UPDATE/DELETE。
+- PromptActivation：`id, prompt_template_id, activated_version_id, previous_version_id, action(publish|rollback), reason, actor_user_id, created_at, idempotency_record_id`；追加写，必须引用同一模板的 published 版本。
+- Prompt rollback 只改变 PromptTemplate.current_published_version_id 并追加 PromptActivation；不修改 PromptVersion 历史。
+- AIInvocation.prompt_version_id 固定引用实际 PromptVersion；历史调用不得读取当前模板指针。
+
+AIInvocation 扩展建议（待 #9 联合评审）：nullable `provider_request_id` 与 `usage_json`，用于供应商任务对账和分项 usage/成本复算；未批准前不视为冻结字段。
+
 ## 4. API 通用约定
 
 ### 4.1 请求头

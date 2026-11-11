@@ -1,8 +1,8 @@
 import hashlib
-from typing import Any
+from typing import Any, cast
 
-import boto3
-from botocore.config import Config
+import boto3  # type: ignore[import-untyped]
+from botocore.config import Config  # type: ignore[import-untyped]
 
 from store_operator.config import settings
 
@@ -37,7 +37,9 @@ def create_upload_url(
     expires_in: int | None = None,
 ) -> str:
     client = _client()
-    return client.generate_presigned_url(
+    return cast(
+        str,
+        client.generate_presigned_url(
         "put_object",
         Params={
             "Bucket": settings.object_storage_bucket,
@@ -49,22 +51,29 @@ def create_upload_url(
         },
         ExpiresIn=expires_in or settings.object_storage_upload_ttl_seconds,
         HttpMethod="PUT",
+        ),
     )
 
 
 def head_object(*, object_key: str) -> dict[str, Any]:
-    return _client().head_object(
-        Bucket=settings.object_storage_bucket,
-        Key=object_key,
+    return cast(
+        dict[str, Any],
+        _client().head_object(
+            Bucket=settings.object_storage_bucket,
+            Key=object_key,
+        ),
     )
 
 
 def create_download_url(*, object_key: str, expires_in: int | None = None) -> str:
-    return _client().generate_presigned_url(
-        "get_object",
-        Params={"Bucket": settings.object_storage_bucket, "Key": object_key},
-        ExpiresIn=expires_in or settings.object_storage_download_ttl_seconds,
-        HttpMethod="GET",
+    return cast(
+        str,
+        _client().generate_presigned_url(
+            "get_object",
+            Params={"Bucket": settings.object_storage_bucket, "Key": object_key},
+            ExpiresIn=expires_in or settings.object_storage_download_ttl_seconds,
+            HttpMethod="GET",
+        ),
     )
 
 

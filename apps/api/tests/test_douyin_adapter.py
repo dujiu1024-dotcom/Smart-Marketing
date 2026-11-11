@@ -24,12 +24,12 @@ def test_authorization_url_encodes_scopes_state_and_redirect(credentials):
     url = client.build_authorization_url(
         redirect_uri="https://app.example.com/api/v1/channel-oauth/douyin/callback",
         state="s" * 48,
-        scopes=frozenset({"user_info", "video.create.bind"}),
+        scopes=frozenset({"user_info", "video.create"}),
     )
     query = parse_qs(urlsplit(url).query)
     assert query["client_key"] == ["test-client"]
     assert query["response_type"] == ["code"]
-    assert query["scope"] == ["user_info,video.create.bind"]
+    assert query["scope"] == ["user_info,video.create"]
     assert query["state"] == ["s" * 48]
 
 
@@ -64,7 +64,7 @@ def test_exchange_code_uses_form_post_and_parses_token_response(credentials):
                         "open_id": "open-123",
                         "access_token": "access-secret",
                         "refresh_token": "refresh-secret",
-                        "scope": "user_info,video.create.bind",
+                        "scope": "user_info,video.create",
                         "expires_in": 1296000,
                         "refresh_expires_in": 2592000,
                     }
@@ -75,7 +75,7 @@ def test_exchange_code_uses_form_post_and_parses_token_response(credentials):
         client = DouyinOAuthClient(credentials, http_client=http)
         tokens = await client.exchange_code("one-time-code")
         assert tokens.open_id == "open-123"
-        assert tokens.scope == frozenset({"user_info", "video.create.bind"})
+        assert tokens.scope == frozenset({"user_info", "video.create"})
         assert tokens.expires_in == 1296000
         assert "access-secret" not in repr(tokens)
         await http.aclose()
@@ -156,7 +156,7 @@ def test_upload_and_publish_requires_explicit_confirmation(credentials):
 
         def handler(request: httpx.Request) -> httpx.Response:
             calls.append(request)
-            if request.url.path == "/api/douyin/v1/video/upload_video/":
+            if request.url.path == "/video/upload/":
                 assert request.method == "POST"
                 assert request.headers["access-token"] == "user-access"
                 assert b"name=\"video\"" in request.content
@@ -164,7 +164,7 @@ def test_upload_and_publish_requires_explicit_confirmation(credentials):
                     200,
                     json={"data": {"error_code": 0, "video": {"video_id": "encrypted-video-id"}}},
                 )
-            assert request.url.path == "/api/douyin/v1/video/create_video/"
+            assert request.url.path == "/video/create/"
             assert request.url.params["open_id"] == "open-123"
             assert request.headers["access-token"] == "user-access"
             assert b'"video_id":"encrypted-video-id"' in request.content
@@ -246,5 +246,78 @@ def test_platform_error_is_sanitized(credentials):
             await client.exchange_code("code")
         assert "test-secret" not in str(error.value)
         await http.aclose()
+
+    asyncio.run(run())
+
+
+def test_upload_and_publish_image_text_requires_confirmation(credentials):
+    async def run():
+        calls: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls.append(request)
+            if request.url.path == "/image/upload/":
+                assert request.headers["access-token"] == "user-access"
+                assert b'name="image"' in request.content
+                return httpx.Response(
+                    200,
+                    json={
+                        "data": {
+                            "error_code": 0,
+                            "image": {"image_id": "douyin-image-id", "width": 1080, "height": 1440},
+                        }
+                    },
+                )
+            assert request.url.path == "/image_text/create/"
+            assert request.url.params["open_id"] == "open-123"
+            assert request.headers["access-token"] == "user-access"
+            assert b'"image_list":["douyin-image-id"]' in request.content
+            return httpx.Response(
+                200, json={"data": {"error_code": 0, "item_id": "image-post-item-id"}}
+            )
+
+        http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        client = DouyinOAuthClient(credentials, http_client=http)
+        with pytest.raises(ValueError):
+            await client.publish_images(
+                access_token="user-access",
+                open_id="open-123",
+                image_ids=["douyin-image-id"],
+                text="新品上架",
+                merchant_confirmed=False,
+            )
+        assert calls == []
+        uploaded = await client.upload_image(
+            access_token="user-access",
+            filename="promo.png",
+            content=b"image-bytes",
+            content_type="image/png",
+        )
+        receipt = await client.publish_images(
+            access_token="user-access",
+            open_id="open-123",
+            image_ids=[uploaded["image_id"]],
+            text="新品上架",
+            merchant_confirmed=True,
+        )
+        assert receipt.item_id == "image-post-item-id"
+        assert receipt.normalized_status == "processing"
+        await http.aclose()
+
+    asyncio.run(run())
+
+
+def test_image_text_rejects_more_than_30_images(credentials):
+    async def run():
+        client = DouyinOAuthClient(credentials, http_client=httpx.AsyncClient())
+        with pytest.raises(ValueError, match="between 1 and 30"):
+            await client.publish_images(
+                access_token="user-access",
+                open_id="open-123",
+                image_ids=[f"image-{index}" for index in range(31)],
+                text="图文内容",
+                merchant_confirmed=True,
+            )
+        await client.aclose()
 
     asyncio.run(run())

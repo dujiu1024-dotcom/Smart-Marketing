@@ -27,6 +27,7 @@ from store_operator.models.content_delivery import (
     ChannelContent,
     ChannelContentArtifactRef,
     QualityReport,
+    QualityResolution,
     ReviewRecord,
 )
 from store_operator.models.marketing_task import MarketingTask
@@ -44,6 +45,12 @@ class QualityReportRunIdempotency(BaseModel):
     content_id: UUID
     rule_version: str
     expected_fingerprint: str
+
+
+class QualityResolutionCreate(BaseModel):
+    decision: str = Field(pattern=r"^(accepted|rejected)$")
+    reason: str = Field(min_length=1, max_length=5000)
+    expected_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class ChannelContentCreate(BaseModel):
@@ -433,6 +440,110 @@ def run_quality_report(
             "job_id": str(job.id),
             "rule_version": payload.rule_version,
             "input_fingerprint": content.input_fingerprint,
+        },
+    )
+    db.commit()
+    return response
+
+
+
+@router.post("/quality-reports/{report_id}/resolutions", status_code=201)
+def create_quality_resolution(
+    report_id: UUID,
+    payload: QualityResolutionCreate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> dict[str, object]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+
+    idempotency, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="content.quality_resolution.create",
+        payload=payload,
+    )
+    if replay is not None:
+        return replay
+
+    report = db.scalar(
+        select(QualityReport)
+        .where(
+            QualityReport.id == report_id,
+            QualityReport.store_id == store_id,
+        )
+        .with_for_update()
+    )
+    if report is None:
+        raise ApiError(404, "QUALITY_REPORT_NOT_FOUND", "Quality report not found")
+    if report.input_fingerprint != payload.expected_fingerprint:
+        raise ApiError(409, "QUALITY_REPORT_STALE", "Quality report fingerprint has changed")
+    if report.result != "needs_human":
+        raise ApiError(
+            422,
+            "QUALITY_RESOLUTION_NOT_ALLOWED",
+            "Only needs_human quality reports can receive a human resolution",
+        )
+    if not payload.reason.strip():
+        raise ApiError(422, "QUALITY_RESOLUTION_REASON_REQUIRED", "A resolution reason is required")
+
+    existing = db.scalar(
+        select(QualityResolution).where(
+            QualityResolution.store_id == store_id,
+            QualityResolution.quality_report_id == report.id,
+            QualityResolution.quality_report_fingerprint == report.input_fingerprint,
+        )
+    )
+    if existing is not None:
+        raise ApiError(
+            409,
+            "QUALITY_REPORT_ALREADY_RESOLVED",
+            "A resolution already exists for this quality report",
+        )
+
+    resolution = QualityResolution(
+        id=uuid4(),
+        store_id=store_id,
+        quality_report_id=report.id,
+        quality_report_fingerprint=report.input_fingerprint,
+        decision=payload.decision,
+        reviewer_user_id=auth.user.id,
+        reason=payload.reason.strip(),
+    )
+    db.add(resolution)
+    db.flush()
+    response: dict[str, object] = {
+        "id": str(resolution.id),
+        "quality_report_id": str(report.id),
+        "quality_report_fingerprint": resolution.quality_report_fingerprint,
+        "decision": resolution.decision,
+        "reason": resolution.reason,
+        "created_at": resolution.created_at.isoformat(),
+    }
+    complete_idempotency(
+        idempotency,
+        response=response,
+        resource_type="quality_resolution",
+        resource_id=resolution.id,
+    )
+    record_audit(
+        db,
+        request,
+        action="content.quality_resolution.recorded",
+        target_type="quality_report",
+        target_id=report.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "resolution_id": str(resolution.id),
+            "decision": resolution.decision,
+            "report_fingerprint": report.input_fingerprint,
         },
     )
     db.commit()

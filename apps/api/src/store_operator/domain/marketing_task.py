@@ -307,6 +307,11 @@ def ensure_task_can_complete(steps: Iterable[TaskStepSnapshot]) -> None:
                 f"Task step {step.key} has an unknown status or applicability"
             ) from exc
 
+        if status is TaskStepStatus.SKIPPED and step.approval_required:
+            raise TaskCompletionBlocked(
+                f"Approval task step {step.key} cannot be skipped"
+            )
+
         if applicability is StepApplicability.REQUIRED:
             if status is not TaskStepStatus.SUCCEEDED:
                 raise TaskCompletionBlocked(

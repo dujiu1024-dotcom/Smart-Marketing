@@ -250,7 +250,9 @@ def _package_payload(
                 "channel_content_id": str(item.channel_content_id),
                 "quality_report_id": str(item.quality_report_id),
                 "delivery_mode": item.delivery_mode,
-                "channel_account_id": (\n                    str(item.channel_account_id) if item.channel_account_id else None\n                ),
+                "channel_account_id": (
+                    str(item.channel_account_id) if item.channel_account_id else None
+                ),
                 "planned_publish_at": (
                     item.planned_publish_at.isoformat()
                     if item.planned_publish_at
@@ -457,7 +459,9 @@ def freeze_publish_package(
                 "quality_report_id": str(report.id),
                 "quality_report_fingerprint": report.input_fingerprint,
                 "delivery_mode": item_input.delivery_mode,
-                "channel_account_id": (\n                    str(item_input.channel_account_id) if item_input.channel_account_id else None\n                ),
+                "channel_account_id": (
+                    str(item_input.channel_account_id) if item_input.channel_account_id else None
+                ),
                 "planned_publish_at": (
                     item_input.planned_publish_at.astimezone(UTC).isoformat()
                     if item_input.planned_publish_at

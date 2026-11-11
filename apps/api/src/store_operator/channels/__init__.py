@@ -1,1 +1,0 @@
-"""Official channel provider adapters."""

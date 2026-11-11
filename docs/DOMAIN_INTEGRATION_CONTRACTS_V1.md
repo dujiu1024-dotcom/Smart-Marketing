@@ -288,4 +288,4 @@ Pending review of Identity PR #26, the canonical request context for store-scope
 - PlatformAdminGrant is separate from StoreMembership. The initial `platform.store_members.manage` capability is limited to membership administration and does not grant access to store business content, MarketingTask, Artifact, Asset, Job result, or publishing operations.
 - Worker execution must reload Job and resource ownership from PostgreSQL. It does not inherit a user's Session or a platform administrator's grant.
 
-PR #26 and Async Runtime PR #20 are still under review. This section records the cross-domain target contract and does not claim production authorization is implemented.
+PR #26 (Identity & Store Security) and PR #29 (Async Runtime) are merged design contracts. This section remains a target contract; production authorization is implemented only by the Issue #5 implementation PR and must be verified by its tests.

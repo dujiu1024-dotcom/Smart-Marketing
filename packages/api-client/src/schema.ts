@@ -158,6 +158,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/store/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Products */
+        get: operations["list_products_api_v1_store_products_get"];
+        put?: never;
+        /** Create Product */
+        post: operations["create_product_api_v1_store_products_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/products/{product_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Product */
+        get: operations["get_product_api_v1_store_products__product_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Product */
+        delete: operations["delete_product_api_v1_store_products__product_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Product */
+        patch: operations["update_product_api_v1_store_products__product_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/store/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Store Profile */
+        get: operations["get_store_profile_api_v1_store_profile_get"];
+        put?: never;
+        /** Create Store Profile */
+        post: operations["create_store_profile_api_v1_store_profile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Store Profile */
+        patch: operations["update_store_profile_api_v1_store_profile_patch"];
+        trace?: never;
+    };
     "/api/v1/system/info": {
         parameters: {
             query?: never;
@@ -319,6 +375,137 @@ export interface components {
              * @enum {string}
              */
             role: "owner" | "member";
+        };
+        /** StoreProfileCreate */
+        StoreProfileCreate: {
+            /** Address */
+            address?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Business Type */
+            business_type?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country Code */
+            country_code?: string | null;
+            /** Display Name */
+            display_name: string;
+            /** District */
+            district?: string | null;
+            /** Industry Category */
+            industry_category?: string | null;
+            /** Introduction */
+            introduction?: string | null;
+            /** Opening Hours Json */
+            opening_hours_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Phone */
+            phone?: string | null;
+            /** Province */
+            province?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Service Capabilities Json */
+            service_capabilities_json?: string[] | null;
+            /** Service Radius */
+            service_radius?: string | null;
+            /** Temporary Closures Json */
+            temporary_closures_json?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        /** StoreProfileRead */
+        StoreProfileRead: {
+            /** Address */
+            address?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Business Type */
+            business_type?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country Code */
+            country_code?: string | null;
+            /** Current Version */
+            current_version: number;
+            /** Display Name */
+            display_name: string;
+            /** District */
+            district?: string | null;
+            /** Fact Status */
+            fact_status: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Industry Category */
+            industry_category?: string | null;
+            /** Introduction */
+            introduction?: string | null;
+            /** Opening Hours Json */
+            opening_hours_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Phone */
+            phone?: string | null;
+            /** Province */
+            province?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Service Capabilities Json */
+            service_capabilities_json?: string[] | null;
+            /** Service Radius */
+            service_radius?: string | null;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Temporary Closures Json */
+            temporary_closures_json?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        /** StoreProfileUpdate */
+        StoreProfileUpdate: {
+            /** Address */
+            address?: string | null;
+            /** Brand Name */
+            brand_name?: string | null;
+            /** Business Type */
+            business_type?: string | null;
+            /** City */
+            city?: string | null;
+            /** Country Code */
+            country_code?: string | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** District */
+            district?: string | null;
+            /** Industry Category */
+            industry_category?: string | null;
+            /** Introduction */
+            introduction?: string | null;
+            /** Opening Hours Json */
+            opening_hours_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Phone */
+            phone?: string | null;
+            /** Province */
+            province?: string | null;
+            /** Region */
+            region?: string | null;
+            /** Service Capabilities Json */
+            service_capabilities_json?: string[] | null;
+            /** Service Radius */
+            service_radius?: string | null;
+            /** Temporary Closures Json */
+            temporary_closures_json?: {
+                [key: string]: unknown;
+            }[] | null;
         };
         /** StoreSummary */
         StoreSummary: {

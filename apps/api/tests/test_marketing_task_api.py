@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
+from store_operator.jobs.service import create_job
 from store_operator.models import (
     BusinessFactSnapshot,
     DependencyEdge,
@@ -20,7 +21,6 @@ from store_operator.models import (
     TaskStep,
     User,
 )
-from store_operator.jobs.service import create_job
 from store_operator.models.store_knowledge import IdempotencyRecord, StoreRecordRevision
 
 ORIGIN = {"Origin": "http://localhost:5173"}

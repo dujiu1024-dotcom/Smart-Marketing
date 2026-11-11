@@ -1,8 +1,9 @@
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 from uuid import UUID, uuid4
+import re
 
 from fastapi import APIRouter, Depends, Header, Request, Response, status
 from pydantic import BaseModel
@@ -20,17 +21,30 @@ from store_operator.auth.dependencies import (
 from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
+from store_operator.object_storage import (
+    ObjectStorageNotConfigured,
+    create_download_url,
+    create_upload_url,
+    head_object,
+)
 from store_operator.models.store_knowledge import (
     AudienceProfile,
     BrandGuideline,
     IdempotencyRecord,
     KnowledgeItem,
+    MediaAsset,
     Offer,
     Product,
     StoreProfile,
     StoreRecordRevision,
+    UploadIntent,
 )
 from store_operator.store_knowledge_schemas import (
+    AssetUploadCompleteRead,
+    AssetUploadIntentCreate,
+    AssetUploadIntentRead,
+    MediaAssetList,
+    MediaAssetRead,
     AudienceProfileCreate,
     AudienceProfileList,
     AudienceProfileRead,
@@ -1110,3 +1124,225 @@ def confirm_store_facts(
     db.commit()
     db.refresh(record)
     return read_schema.model_validate(record).model_dump(mode="json")
+
+
+def _safe_filename(value: str) -> str:
+    name = value.replace("\\", "/").split("/")[-1]
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._")
+    return (cleaned or "upload").slice(0, 255) if hasattr(cleaned, "slice") else (cleaned or "upload")[:255]
+
+
+@router.post(
+    "/assets/upload-intents",
+    response_model=AssetUploadIntentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_asset_upload_intent(
+    payload: AssetUploadIntentCreate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> AssetUploadIntentRead:
+    store_id = _store_id(context)
+    idempotency_record, replay = _begin_idempotency(
+        db, store_id, auth.user.id, idempotency_key, "store.asset.upload_intent", payload
+    )
+    if replay is not None:
+        intent_id = UUID(str(replay["id"]))
+        intent = db.scalar(
+            select(UploadIntent).where(
+                UploadIntent.id == intent_id, UploadIntent.store_id == store_id
+            )
+        )
+        if intent is None or intent.status != "created":
+            raise ApiError(409, "UPLOAD_INTENT_NOT_AVAILABLE", "Upload intent is no longer available")
+    else:
+        now = datetime.now(UTC)
+        object_key = f"stores/{store_id}/quarantine/{uuid4()}"
+        intent = UploadIntent(
+            id=uuid4(),
+            store_id=store_id,
+            created_by_user_id=auth.user.id,
+            object_key=object_key,
+            expected_mime_type=payload.expected_mime_type,
+            expected_byte_size=payload.expected_byte_size,
+            expected_sha256=payload.expected_sha256.lower(),
+            status="created",
+            expires_at=now + timedelta(minutes=15),
+        )
+        db.add(intent)
+        db.flush()
+    try:
+        upload_url = create_upload_url(
+            object_key=intent.object_key,
+            mime_type=intent.expected_mime_type,
+            sha256=intent.expected_sha256 or "",
+        )
+    except ObjectStorageNotConfigured as exc:
+        db.rollback()
+        raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Private object storage is not configured") from exc
+    except Exception as exc:
+        db.rollback()
+        raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Could not create a secure upload URL") from exc
+    if idempotency_record is not None:
+        _complete_idempotency(
+            idempotency_record,
+            {"id": str(intent.id)},
+            "upload_intent",
+            intent.id,
+        )
+    _audit(
+        db, request, action="store.asset.upload_intent_created",
+        record_type="upload_intent", record_id=intent.id,
+        actor_id=auth.user.id, store_id=store_id,
+        metadata={"mime_type": intent.expected_mime_type, "byte_size": intent.expected_byte_size},
+    )
+    db.commit()
+    return AssetUploadIntentRead(
+        id=intent.id,
+        upload_url=upload_url,
+        required_headers={
+            "Content-Type": intent.expected_mime_type,
+            "x-amz-meta-sha256": intent.expected_sha256 or "",
+        },
+        expires_at=intent.expires_at,
+    )
+
+
+@router.post(
+    "/assets/upload-intents/{intent_id}/complete",
+    response_model=AssetUploadCompleteRead,
+)
+def complete_asset_upload(
+    intent_id: UUID,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> AssetUploadCompleteRead:
+    store_id = _store_id(context)
+    intent = db.scalar(
+        select(UploadIntent)
+        .where(
+            UploadIntent.id == intent_id,
+            UploadIntent.store_id == store_id,
+            UploadIntent.created_by_user_id == auth.user.id,
+        )
+        .with_for_update()
+    )
+    if intent is None:
+        raise ApiError(404, "UPLOAD_INTENT_NOT_FOUND", "Upload intent not found")
+    existing_asset = db.scalar(
+        select(MediaAsset).where(
+            MediaAsset.store_id == store_id,
+            MediaAsset.object_key == intent.object_key,
+        )
+    )
+    if existing_asset is not None:
+        return AssetUploadCompleteRead(
+            asset=MediaAssetRead.model_validate(existing_asset),
+            status=intent.status,
+        )
+    if intent.status != "created":
+        raise ApiError(409, "UPLOAD_INTENT_NOT_AVAILABLE", "Upload intent cannot be completed")
+    now = datetime.now(UTC)
+    if intent.expires_at <= now:
+        intent.status = "expired"
+        db.commit()
+        raise ApiError(410, "UPLOAD_INTENT_EXPIRED", "Upload intent has expired")
+    try:
+        stored = head_object(object_key=intent.object_key)
+    except ObjectStorageNotConfigured as exc:
+        raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Private object storage is not configured") from exc
+    except Exception as exc:
+        raise ApiError(409, "UPLOAD_OBJECT_NOT_FOUND", "Uploaded object could not be verified") from exc
+    metadata = stored.get("Metadata") or {}
+    actual_size = int(stored.get("ContentLength") or 0)
+    actual_mime = str(stored.get("ContentType") or "")
+    actual_sha256 = str(metadata.get("sha256") or "").lower()
+    if (
+        actual_size != intent.expected_byte_size
+        or actual_mime != intent.expected_mime_type
+        or actual_sha256 != (intent.expected_sha256 or "").lower()
+    ):
+        intent.status = "rejected"
+        intent.rejection_reason = "Uploaded object metadata did not match the signed upload intent"
+        db.commit()
+        raise ApiError(422, "UPLOAD_OBJECT_MISMATCH", "Uploaded file failed server-side verification")
+    asset = MediaAsset(
+        id=uuid4(),
+        store_id=store_id,
+        object_key=intent.object_key,
+        sha256=actual_sha256,
+        mime_type=actual_mime,
+        byte_size=actual_size,
+        original_filename_sanitized=_safe_filename("upload"),
+        asset_type="image",
+        source_type="merchant_upload",
+        usage_rights_status="unknown",
+        status="quarantined",
+        version_no=1,
+        created_by_user_id=auth.user.id,
+    )
+    db.add(asset)
+    intent.status = "scanning"
+    intent.completed_at = now
+    _audit(
+        db, request, action="store.asset.upload_quarantined",
+        record_type="media_asset", record_id=asset.id,
+        actor_id=auth.user.id, store_id=store_id,
+        metadata={"sha256": actual_sha256, "byte_size": actual_size},
+    )
+    db.commit()
+    db.refresh(asset)
+    return AssetUploadCompleteRead(
+        asset=MediaAssetRead.model_validate(asset),
+        status="scanning",
+    )
+
+
+@router.get("/assets", response_model=MediaAssetList)
+def list_media_assets(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = 50,
+    offset: int = 0,
+) -> MediaAssetList:
+    store_id = _store_id(context)
+    query = select(MediaAsset).where(MediaAsset.store_id == store_id)
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    assets = db.scalars(
+        query.order_by(MediaAsset.created_at.desc(), MediaAsset.id.desc())
+        .limit(max(1, min(limit, 100)))
+        .offset(max(0, offset))
+    ).all()
+    return MediaAssetList(
+        items=[MediaAssetRead.model_validate(item) for item in assets],
+        total=total,
+    )
+
+
+@router.get("/assets/{asset_id}/download-url")
+def get_media_asset_download_url(
+    asset_id: UUID,
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, str]:
+    store_id = _store_id(context)
+    asset = db.scalar(
+        select(MediaAsset).where(
+            MediaAsset.id == asset_id,
+            MediaAsset.store_id == store_id,
+        )
+    )
+    if asset is None:
+        raise ApiError(404, "MEDIA_ASSET_NOT_FOUND", "Media asset not found")
+    if asset.status != "ready" or asset.usage_rights_status != "confirmed_allowed":
+        raise ApiError(409, "MEDIA_ASSET_NOT_READY", "Only scanned, rights-confirmed assets can be downloaded")
+    try:
+        url = create_download_url(object_key=asset.object_key)
+    except ObjectStorageNotConfigured as exc:
+        raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Private object storage is not configured") from exc
+    return {"url": url}

@@ -6,7 +6,7 @@ This change builds the server-side persistence and authorization foundation for 
 
 local immutable package -> explicit merchant confirmation -> official Douyin API -> readback verification.
 
-It does not claim that a real Douyin account has been connected or that publishing is production-ready.
+It does not claim that a real Douyin account has been connected or that a production test-account publish has been completed.
 
 ## Data model
 

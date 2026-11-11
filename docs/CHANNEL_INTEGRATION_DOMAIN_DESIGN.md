@@ -1,6 +1,6 @@
 # 渠道账号与官方发布集成领域设计（Issue #12）
 
-> 状态：设计提案；首个渠道平台尚未选择  
+> 状态：抖音首期实施中；OAuth/发布 API 与异步图文发布已合并，真实账号验收和 UI 接入待完成  
 > 日期：2026-11-11  
 > 产品基线：PRODUCT_DESIGN.md v1.8 / UX_AUDIT_AND_REDESIGN.md v1.8  
 > Demo 基线：门店资料 channels、营销任务 task 的 channel / publish 步骤
@@ -19,7 +19,7 @@
 - 不伪造平台成功、作品 ID、发布 URL、草稿或规则校验结果。
 - 不把 PublishOperation 的状态复制为 Job 状态；不重新实现 Outbox、租约和重试调度。
 - 不做广告投放、付费推广、营销预算、CRM/POS 数据接入。
-- 不在本 PR 默认选择具体平台；必须通过首个渠道选择门禁。
+- 首期已选择抖音；其他平台仍须逐个平台经过选择门禁，不得因为 Demo 显示平台选项就宣称已接通。
 
 ## 2. Demo 页面与产品流程映射
 
@@ -223,9 +223,9 @@ ChannelSpecVersion：**id, channel_spec_id, spec_version, text_constraints_json,
 - channel.publish_operation_created / channel.publish_operation_updated / channel.publish_operation_published / channel.publish_operation_needs_human
 - #12 发事件时只包含 store_id、account_id、operation_id、fingerprint、状态和外部证据引用；不包含 Token/授权码。
 
-## 9. 首个平台选择门禁
+## 9. 首个平台选择结果与后续门禁
 
-本 PR 不选平台。产品负责人确认前，只冻结通用 Adapter/领域边界，不创建平台专属 SDK、OAuth 配置或“假发布”。
+项目负责人已批准抖音作为首个官方渠道，并批准以“本地冻结包 + 商家最终确认 + 官方 API 发布 + 作品读回核验”替代抖音原生草稿箱。该批准不代表真实 OAuth 或平台联调已经验收。其他平台仍需独立评审。
 
 候选平台对比至少核验：
 
@@ -242,9 +242,9 @@ ChannelSpecVersion：**id, channel_spec_id, spec_version, text_constraints_json,
 | 运营限制 | 限流、每日配额、内容政策、风险控制 |
 | 成本与合规 | 接入费用、数据区域、隐私政策、内容数据保留 |
 
-首个渠道选择由项目负责人确认；如果草稿/发布权限未获批，明确阻塞，不以页面自动化替代官方 API。
+抖音应用需在开放平台完成应用审核、`video.create`/`video.list` 权限申请及回调域名登记。若权限未获批，明确阻塞，不以页面自动化替代官方 API。
 
-## 10. 测试矩阵（设计准备，全部待执行）
+## 10. 测试矩阵（部分自动化测试已实现；真实平台验收待执行）
 
 | ID | 场景 | 预期 |
 |---|---|---|

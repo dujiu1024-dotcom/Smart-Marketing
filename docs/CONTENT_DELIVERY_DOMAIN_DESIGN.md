@@ -84,7 +84,7 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 
 Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须支持多渠道聚合，而不是把一个 `channel_content_id` 塞进单个包后丢失其他渠道。
 
-- `PublishPackage` 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, fact_snapshot_ids, content_fingerprint, frozen_at, frozen_by`。
+- `PublishPackage` 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, fact_snapshot_ids, package_fingerprint, frozen_at, frozen_by`。
 - `PublishPackageItem` 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, copy_version_id, image_version_ids, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。
 - `PublishConfirmation`：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at, confirmation_note`。
 - 一个 PublishPackage 至少包含一个 PackageItem；同一 package 的 channel_key 唯一。PackageItem 精确绑定 ChannelContent、Copy/Image 版本、QualityReport 和可选 ChannelAccount。
@@ -113,7 +113,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - ArtifactVersion.input_fingerprint：task_id、RequirementSnapshot/StrategySnapshot ID、BusinessFactSnapshot IDs、源 MediaAsset IDs + content_hash、前序依赖版本、prompt_version_id、provider/model 版本、生成指令。
 - ChannelContent.input_fingerprint：channel_key、copy_version_id、image_version_ids、Store/Task 事实快照 IDs、channel spec_version、适配规则版本。
 - QualityReport.input_fingerprint：channel_content_id + content fingerprint、rule_version、相关事实快照和必要素材哈希。
-- PublishPackage.content_fingerprint：task snapshot IDs、全部 PackageItem 按 channel_key 排序后的 item_fingerprint、所有 QualityReport IDs/fingerprints、fact_snapshot_ids、planned_publish_at 和 delivery_mode。
+- PublishPackage.package_fingerprint：task snapshot IDs、全部 PackageItem 按 channel_key 排序后的 item_fingerprint、所有 QualityReport IDs/fingerprints、fact_snapshot_ids、planned_publish_at 和 delivery_mode。
 - Fingerprint 不包含 secret/token；ChannelAccount 只记录 ID 与能力快照版本，不记录凭据。
 
 ## 6. API 契约细化

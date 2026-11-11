@@ -243,6 +243,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/channels/douyin/oauth/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Begin Douyin Authorization */
+        post: operations["begin_douyin_authorization_api_v1_channels_douyin_oauth_authorize_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/douyin/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Complete Douyin Authorization */
+        get: operations["complete_douyin_authorization_api_v1_channels_douyin_oauth_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -717,40 +751,6 @@ export interface paths {
         put?: never;
         /** Complete Asset Upload */
         post: operations["complete_asset_upload_api_v1_store_assets_upload_intents__intent_id__complete_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/store/assets/{asset_id}/archive": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Archive Media Asset */
-        post: operations["archive_media_asset_api_v1_store_assets__asset_id__archive_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/store/assets/{asset_id}/confirm-usage-rights": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Confirm Media Asset Usage Rights */
-        post: operations["confirm_media_asset_usage_rights_api_v1_store_assets__asset_id__confirm_usage_rights_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1924,20 +1924,6 @@ export interface components {
             /** Version No */
             version_no: number;
         };
-        /** MediaAssetUsageRightsConfirm */
-        MediaAssetUsageRightsConfirm: {
-            /** Expected Sha256 */
-            expected_sha256: string;
-            /** Expected Version */
-            expected_version: number;
-            /** License Note */
-            license_note: string;
-            /**
-             * Usage Rights Status
-             * @enum {string}
-             */
-            usage_rights_status: "confirmed_allowed" | "restricted";
-        };
         /** MemberPatchRequest */
         MemberPatchRequest: {
             /** Role */
@@ -3057,6 +3043,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    begin_douyin_authorization_api_v1_channels_douyin_oauth_authorize_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_douyin_authorization_api_v1_channels_douyin_oauth_callback_get: {
+        parameters: {
+            query: {
+                code: string;
+                state: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4204,79 +4257,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssetUploadCompleteRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    archive_media_asset_api_v1_store_assets__asset_id__archive_post: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-                "If-Match"?: string | null;
-                "X-Store-ID"?: string | null;
-            };
-            path: {
-                asset_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MediaAssetRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    confirm_media_asset_usage_rights_api_v1_store_assets__asset_id__confirm_usage_rights_post: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-                "X-Store-ID"?: string | null;
-            };
-            path: {
-                asset_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MediaAssetUsageRightsConfirm"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MediaAssetRead"];
                 };
             };
             /** @description Validation Error */

@@ -83,6 +83,11 @@ def test_platform_admin_can_create_publish_and_rollback_prompt_versions(
     )
     assert created.status_code == 201, created.text
     template_id = created.json()["id"]
+    listed = identity_client.get(
+        "/api/v1/admin/prompt-templates?industry_key=retail&capability=text"
+    )
+    assert listed.status_code == 200, listed.text
+    assert [item["id"] for item in listed.json()] == [template_id]
 
     def create_version(changelog: str):
         return identity_client.post(

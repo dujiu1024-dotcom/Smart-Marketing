@@ -3,7 +3,7 @@
 > 文档类型：Issue #7 设计准备 / 领域规则基线  
 > 对应产品基线：`PRODUCT_DESIGN.md v1.8`  
 > 对应架构基线：`TECHNICAL_ARCHITECTURE.md`（模块化单体 + 独立 Worker）  
-> 状态：设计提案，待领域评审冻结；不是生产实现声明  
+> 状态：领域规则已冻结（2026-11-11）；本文件是实现契约，不是数据库迁移脚本  
 > 日期：2026-11-11
 
 ## 1. 目标与边界
@@ -308,20 +308,22 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | DOM-19 | 任务归档后写操作 | 拒绝修改，历史查询可用 |
 | DOM-20 | 任务 completed 后经营效果尚无数据 | 任务完成保持；效果模块显示待采集/空状态 |
 
-## 12. 设计冻结门槛与未决项
+## 12. 设计冻结结论
 
-本设计可以作为 Issue #7 的设计评审输入；以下项目需在进入实现前完成：
+本轮依据 PRODUCT_DESIGN.md v1.8、TECHNICAL_ARCHITECTURE.md、已合并的 #4 工程底座、#5 身份门店安全、#6 门店资料、#8 内容交付设计、#9 Job Runtime 和 #12 渠道契约完成交叉评审。以下规则作为 #7 实现基线冻结：
 
-1. 评审本文件的生命周期状态和任务类型适用节点矩阵。
-2. 与轨道 B 的 Store/Member/Session 授权契约对齐；任务接口只接受服务端解析出的门店上下文。
-3. 与工程底座确认 ORM、迁移、Outbox、Celery/Redis、对象存储实现细节，不在本领域设计中擅自新增基础设施。
-4. 明确每类任务（完整营销、纯文案、纯图片、原图优化、自有内容）的节点适用性配置。
-5. 将本文件状态从“设计提案”改为“已冻结”前，需产品/技术评审确认；本文件不代表已完成数据库迁移、API 或生产代码。
-6. 实现阶段补齐状态迁移、依赖失效、审核隔离、幂等、并发、权限、Worker 恢复与发布不确定性测试，并更新 Demo 验收矩阵。
+1. MarketingTask 是流程协调聚合根；#8 拥有 Artifact/Review/Quality/PublishPackage，#9 拥有 Job/Attempt/Outbox，#12 拥有 ChannelAccount/PublishOperation。
+2. 任务类型、节点键、生命周期状态、TaskStep 状态及适用性矩阵以本文件第 2、3 节为准；前端不得自行推导迁移。
+3. #5 的 request-scoped AuthorizedStoreContext 是唯一门店授权来源；#6 的 StoreRecordRevision/MediaAsset 是经营事实与素材来源；#9 的 Job 状态不得映射为业务步骤状态。
+4. 所有快照、产物版本、审核记录、依赖边、事件、发布包和最终确认采用追加写/不可变语义；依赖失效按版本 ID + 内容指纹计算闭包。
+5. 用户写 API 使用共享幂等记录。数据库唯一范围保持 store_id + idempotency_key；记录 actor_user_id、operation 和 request_hash。同一操作者、同一操作、同一请求才允许重放；跨操作者或不同请求体复用 key 返回 409。#6 PR #49 实现该操作者绑定后，#7 直接复用，不另造幂等表。
+6. MarketingTask 当前快照指针与 Artifact 当前版本指针允许在创建事务中先为空，再在对应快照/版本插入后更新；复合外键保证 store/task/artifact 归属，不依赖全局 UUID 单列引用。
+7. 不选择具体渠道平台，不在 #7 实现平台 OAuth/SDK；不引入 n8n、ComfyUI 或微服务拆分。首期仍为模块化单体，平台专属能力由 #12 单独立项。
+8. 设计冻结不代表 ORM、Migration、API、Worker Handler、前端或生产验收已完成；这些仍由后续编码 PR 和验收矩阵交付。
 
 ## 13. 与 Identity & Store（轨道 B）的集成契约
 
-> 本节依据产品基线、技术架构和 Issue #5 的身份/门店安全设计定义营销任务域必须遵守的消费契约。Issue #5 的 request-scoped X-Store-ID / AuthorizedStoreContext 契约仍待联合评审冻结；实现时以最终合并版本为准。
+> 本节依据已合并的 Issue #5 身份/门店安全实现定义营销任务域必须遵守的消费契约。营销模块只消费 AuthContext/AuthorizedStoreContext，不复制认证、Session 或成员授权逻辑。
 
 ### 14.1 请求身份与门店上下文
 
@@ -375,9 +377,9 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 - 当前 Demo 的本地状态仅为交互基准，不是服务端领域实现或生产级隔离证明。
 
 
-## 15. 字段级逻辑数据模型（待轨道 B/D 对齐，不是迁移脚本）
+## 15. 字段级逻辑数据模型（已完成 B/D 对齐，不是迁移脚本）
 
-> 本节用于冻结营销域的数据语义与引用关系。字段类型采用 PostgreSQL 逻辑类型表达；具体 ORM 命名、UUID 生成策略、JSONB 拆分、Identity 外键目标及 Job/Outbox 物理表归属，须在轨道 B/D 契约评审后确定。不得据此直接生成生产迁移。
+> 本节冻结营销域的数据语义与引用关系。字段类型采用 PostgreSQL 逻辑类型表达；ORM、Migration 必须复用 #5 身份、#6 资料、#9 Job/Outbox 和 #12 渠道的权威实现，不得重复建立同类基础设施。不得直接把逻辑 ERD 当作生产迁移脚本。
 
 ### 15.1 通用约定
 
@@ -461,30 +463,31 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 9. store_id 一致性由复合外键兜底，授权仍由应用服务执行；RLS 仅作纵深防御。
 10. Outbox 与业务写入同事务；消费者按 event_id 幂等处理。
 
-### 15.6 必须由轨道 B/D 给出答案的字段映射
+### 15.6 已确认的跨域字段映射
 
-| 待确认项 | 权威来源 | 营销域暂定处理 |
+| 字段/能力 | 权威实现 | 营销域映射 |
 |---|---|---|
-| actor/user 主体表与主键类型 | #5 Identity & Store | 只引用 UUID 概念 ID，不绑定具体表名 |
-| Store、Membership 的表名/主键/复合唯一键 | #5 Identity & Store | 只保存 store_id 与授权上下文引用 |
-| 权限能力名称与撤销时效 | #5 Identity & Store | 仅消费能力判定，不自建角色模型 |
-| session_id、membership_id、authorization_version 是否持久化 | #5 Identity & Store | 审计保留可追溯授权引用，字段最终对齐 B |
-| Job、JobAttempt、租约字段、重试策略 | #9 Async Jobs | 营销域只定义业务关联与输入指纹 |
-| Outbox 物理实现与消息发布语义 | #9 Async Jobs / #4 工程底座 | 业务事件语义固定，表结构服从公共实现 |
-| asset_id、对象存储元数据和签名 URL | 媒体资产模块/工程底座 | ArtifactVersion 保存受控资产引用，不保存可公开访问 URL |
-| 渠道账号与发布回执引用 | 渠道集成模块 | 保存 opaque reference，不在营销域复制渠道凭据 |
+| actor_id / user_id | #5 `users.id`（UUID） | 记录可信操作者 ID；由 AuthContext 注入 |
+| store_id / membership_id / session_id | #5 `stores.id`、`store_memberships.id`、`sessions.id` | 任务及子资源保存 store_id；审计引用 membership/session |
+| 授权能力与撤销 | #5 `require_store_context` / capability checks | 只调用授权依赖，不自建角色或成员表 |
+| 资料事实版本 | #6 `store_record_revisions` | BusinessFactSnapshot 保存 revision 引用、快照值和 fingerprint |
+| 素材资产 | #6 `media_assets` | ArtifactVersion 只保存 asset_id/object key 受控引用及 hash，不保存公开 URL |
+| Job / Attempt / Event | #9 `jobs`、`job_attempts`、`job_events` | 保存 marketing_task_id、业务步骤关联和输入指纹；不复制 Job 状态机 |
+| Outbox | #9 `outbox_events` + Relay | 业务事务写入公共 Outbox；消费者按 event_id 幂等 |
+| Provider 调用 | #9 AIInvocation / #10 PromptVersion | 固定 prompt_version_id、provider/model key 和输入指纹，不保存 Secret |
+| 渠道账号/发布回执 | #12 ChannelAccount / PublishOperation | 只保存 channel_key 和精确 package/item 引用，不复制凭据或发布 attempt |
 
 ### 15.7 设计评审检查项
 
-- [ ] 每张门店业务表均有 store_id，所有子资源外键均能证明同门店归属。
-- [ ] 当前版本指针与历史版本的关系无循环 FK 或事务竞态漏洞。
-- [ ] 文案/图片审核通过数据库约束与服务端规则共同保证独立。
-- [ ] 快照、版本、审核、事件、发布包和最终确认没有原地覆盖路径。
-- [ ] 依赖边支持精确失效和反向查询，不依赖全表扫描。
-- [ ] 幂等唯一键的作用域与 actor/session 授权语义经轨道 B 确认。
-- [ ] Job/Outbox 表结构与轨道 D/#4 共用实现，不重复造基础设施。
-- [ ] 所有外部发布动作可追溯到唯一发布包、最终确认和发布 attempt。
-- [ ] PostgreSQL Migration 只有在 B、D 契约和工程底座评审通过后才开始。
+- [x] 每张门店业务表均有 store_id，子资源通过复合键证明同门店归属。
+- [x] 当前版本指针采用先建父对象、再建版本、最后更新指针的事务顺序；复合外键验证归属。
+- [x] 文案/图片审核独立，审核绑定确切 ArtifactVersion。
+- [x] 快照、版本、审核、事件、发布包和最终确认采用追加写/不可变语义。
+- [x] 依赖边按版本 ID + 内容指纹计算受影响闭包。
+- [x] 幂等键绑定 actor/operation/hash；跨操作者复用失败关闭，具体由 #6 共享幂等记录实现。
+- [x] Job/Outbox 复用 #9 公共实现，不在营销域重复造基础设施。
+- [x] 外部发布动作追溯到唯一发布包、最终确认和 #12 PublishOperation。
+- [x] #5/#9/#4 的契约与迁移链已建立；营销域迁移按实际 revision 顺序追加。
 
 
 ## 16. 核心关系图（逻辑 ERD）
@@ -531,12 +534,38 @@ erDiagram
 - 当前版本指针（artifacts.current_version_id）需通过延迟约束触发器或事务内强校验，证明版本属于该 artifact；不得仅以 version_id 全局外键代替归属校验。
 - 依赖图允许同任务内跨产物依赖，但不允许跨 store/task 建边；若未来需要跨任务复用素材，必须通过独立、显式的共享资产授权关系，不得放宽任务外键。
 
-### 16.2 当前 Schema 草案的评审风险
+### 16.2 已确认约束与上线前风险
 
-1. 表清单中的 JSONB payload 必须有 schema_version，并在应用层执行结构校验；不能将业务必填字段全部藏入 JSONB。
-2. artifacts 与 artifact_versions 的当前指针形成逻辑循环，迁移顺序和一致性校验必须单独设计。
-3. PublishOperation（#12）的唯一键必须区分一次逻辑发布与平台重试；平台查询/对账不能误创建新的逻辑发布动作。#8 不保存平台凭据或外部请求尝试表。
-4. idempotency_records 的 actor 作用域要兼容轨道 B 最终确认的主体类型；系统触发任务不能伪装成用户 actor。
-5. task_events 与 audit_events 的保留期限、敏感字段脱敏和删除合规要求需在安全/数据治理基线中明确。
-6. business_fact_snapshots 的 source_id/source_version 是来源引用，不保证源资料仍可读取；快照 value_json 与 fingerprint 才是历史还原依据。
-7. 所有唯一索引必须明确 NULL 语义；可空的外部平台 ID 不应意外阻止多个未发布记录并存。
+1. JSONB payload 必须携带 schema_version，并由应用层结构校验；核心可检索/唯一字段不得全部隐藏在 JSONB。
+2. 当前快照/版本指针采用事务内两阶段写入：先插入父对象，再插入版本，最后更新指针；外键通过 (store_id, parent_id, version_id) 证明归属。
+3. PublishOperation 的唯一键区分一次逻辑发布与平台重试；平台对账不得创建新的逻辑发布动作。
+4. 共享幂等记录保存 actor_user_id、operation、request_hash；系统触发任务必须使用明确的 system actor_type，不得伪装成商家用户。
+5. task_events/audit_events 的保留期限、敏感字段脱敏和删除合规属于 #14 生产门禁，不阻止本领域规则冻结。
+6. BusinessFactSnapshot 必须保存可还原的 value_json 与 fingerprint；source_id/source_version 仅用于追溯。
+7. 所有唯一索引明确 NULL 语义；可空外部平台 ID 不阻止多个未发布记录并存。
+
+
+## 17. 领域规则冻结记录（2026-11-11）
+
+本次冻结范围：MarketingTask、RequirementSnapshot、StrategySnapshot、BusinessFactSnapshot、TaskStep、StepDecision、DependencyEdge、TaskEvent 及其与 #5/#6/#8/#9/#10/#12 的边界。冻结后，除发现安全漏洞、数据一致性缺陷或产品负责人明确变更外，不因实现便利随意改变领域语义。
+
+### 冻结决策
+
+1. 任务类型固定为 full_marketing、copy_only、image_only、image_optimization、merchant_content；任务类型在需求确认前可修正，确认后修改必须创建新需求快照并重新计算节点适用性。
+2. TaskStep 固定使用 requirement_understanding、context_snapshot、opportunity_decision、strategy_confirmation、copy_production_review、image_production_review、channel_adaptation、quality_check、final_confirmation、delivery；适用性由服务端任务矩阵和交付范围决定。
+3. MarketingTask 生命周期与 TaskStep 状态分离；Job succeeded 不自动推进 TaskStep succeeded；任务 completed 必须由服务端验证所有 required 节点成功、optional 节点完成或有原因跳过、not_applicable 节点有系统跳过记录。
+4. 文案与图片审核完全独立，审核记录绑定 ArtifactVersion ID；任何新版本不得继承旧版本审核结论。
+5. Requirement/Strategy/BusinessFact 快照、ArtifactVersion、ReviewRecord、DependencyEdge、TaskEvent、PublishPackage 和 PublishConfirmation 均采用不可变/追加写；修正通过新版本表达。
+6. 依赖失效按真实引用关系和输入 fingerprint 传播；禁止“任一上游变化就重置全部后续节点”。
+7. 所有任务写请求都必须使用 #5 授权上下文、#6 事实版本、#9 公共 Job/Outbox 与 #10 不可变 PromptVersion；模块之间通过应用服务/领域事件交互，不跨模块直接写表。
+8. 具体渠道平台、OAuth 和发布 Adapter 不在 #7 范围内；只有 #12 负责渠道账号、能力、外部发布结果和对账。
+
+### 冻结后的实施顺序
+
+- 第一步：实现本文件第 3、4 节纯领域状态机与单元测试（当前 PR）。
+- 第二步：实现 ORM、Alembic migration、复合外键、索引和并发约束。
+- 第三步：实现任务创建/查询/需求确认/策略确认/节点动作 API 与审计/Outbox 事务。
+- 第四步：接入 #8 Artifact/Review/Quality/PublishPackage 服务及 #9 Job Runtime，不直接写入其表。
+- 第五步：完成门店越权、重复提交、版本失效、Worker 迟到、取消/恢复和完整浏览器验收。
+
+以上仅冻结领域规则，不代表 #7 编码完成或可以关闭 Issue。

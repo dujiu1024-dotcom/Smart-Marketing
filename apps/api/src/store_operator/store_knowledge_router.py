@@ -20,6 +20,7 @@ from store_operator.auth.errors import ApiError
 from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.db import get_db
 from store_operator.models.store_knowledge import (
+    IdempotencyRecord,
     AudienceProfile,
     BrandGuideline,
     KnowledgeItem,
@@ -149,7 +150,7 @@ def _begin_idempotency(
     key: str,
     operation: str,
     payload: BaseModel,
-):
+) -> tuple[IdempotencyRecord | None, dict[str, object] | None]:
     return begin_idempotency(
         db,
         store_id=store_id,
@@ -161,7 +162,7 @@ def _begin_idempotency(
 
 
 def _complete_idempotency(
-    record,
+    record: IdempotencyRecord | None,
     response: dict[str, object],
     resource_type: str,
     resource_id: UUID,

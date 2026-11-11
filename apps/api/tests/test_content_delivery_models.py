@@ -34,8 +34,8 @@ def test_artifact_versions_are_store_scoped_and_immutable_by_schema() -> None:
         for item in table.constraints
         if isinstance(item, CheckConstraint)
     }
-    assert "source_type" in checks
-    assert "content_required" in checks
+    assert "ck_artifact_versions_source_type" in checks
+    assert "ck_artifact_versions_content_required" in checks
 
 
 def test_reviews_reference_the_exact_artifact_version_in_same_store() -> None:
@@ -53,7 +53,7 @@ def test_reviews_reference_the_exact_artifact_version_in_same_store() -> None:
     assert _named_constraint(
         table,
         CheckConstraint,
-        "revision_comment_required",
+        "ck_review_records_revision_comment_required",
     )
 
 

@@ -265,6 +265,95 @@
         "title": "ActiveStoreResponse",
         "type": "object"
       },
+      "AssetUploadCompleteRead": {
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/MediaAssetRead"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset",
+          "status"
+        ],
+        "title": "AssetUploadCompleteRead",
+        "type": "object"
+      },
+      "AssetUploadIntentCreate": {
+        "properties": {
+          "expected_byte_size": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 26214400.0,
+            "title": "Expected Byte Size",
+            "type": "integer"
+          },
+          "expected_mime_type": {
+            "pattern": "^image/(jpeg|png|webp)$",
+            "title": "Expected Mime Type",
+            "type": "string"
+          },
+          "expected_sha256": {
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "title": "Expected Sha256",
+            "type": "string"
+          },
+          "original_filename": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Original Filename",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_mime_type",
+          "expected_byte_size",
+          "expected_sha256",
+          "original_filename"
+        ],
+        "title": "AssetUploadIntentCreate",
+        "type": "object"
+      },
+      "AssetUploadIntentRead": {
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "method": {
+            "default": "PUT",
+            "title": "Method",
+            "type": "string"
+          },
+          "required_headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Required Headers",
+            "type": "object"
+          },
+          "upload_url": {
+            "title": "Upload Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "upload_url",
+          "required_headers",
+          "expires_at"
+        ],
+        "title": "AssetUploadIntentRead",
+        "type": "object"
+      },
       "AudienceProfileCreate": {
         "properties": {
           "audience_description": {
@@ -2482,6 +2571,113 @@
           "session"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "MediaAssetList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MediaAssetRead"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "MediaAssetList",
+        "type": "object"
+      },
+      "MediaAssetRead": {
+        "properties": {
+          "asset_type": {
+            "title": "Asset Type",
+            "type": "string"
+          },
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "original_filename_sanitized": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename Sanitized"
+          },
+          "parent_asset_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Asset Id"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          },
+          "usage_rights_status": {
+            "title": "Usage Rights Status",
+            "type": "string"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "store_id",
+          "asset_type",
+          "mime_type",
+          "byte_size",
+          "sha256",
+          "original_filename_sanitized",
+          "usage_rights_status",
+          "status",
+          "parent_asset_id",
+          "version_no",
+          "created_at"
+        ],
+        "title": "MediaAssetRead",
         "type": "object"
       },
       "MemberPatchRequest": {
@@ -5397,6 +5593,265 @@
         "summary": "Set Active Store",
         "tags": [
           "store-context"
+        ]
+      }
+    },
+    "/api/v1/store/assets": {
+      "get": {
+        "operationId": "list_media_assets_api_v1_store_assets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaAssetList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Media Assets",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/assets/upload-intents": {
+      "post": {
+        "operationId": "create_asset_upload_intent_api_v1_store_assets_upload_intents_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetUploadIntentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetUploadIntentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Asset Upload Intent",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/assets/upload-intents/{intent_id}/complete": {
+      "post": {
+        "operationId": "complete_asset_upload_api_v1_store_assets_upload_intents__intent_id__complete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "intent_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Intent Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetUploadCompleteRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Complete Asset Upload",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/assets/{asset_id}/download-url": {
+      "get": {
+        "operationId": "get_media_asset_download_url_api_v1_store_assets__asset_id__download_url_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Get Media Asset Download Url Api V1 Store Assets  Asset Id  Download Url Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Media Asset Download Url",
+        "tags": [
+          "store-knowledge"
         ]
       }
     },

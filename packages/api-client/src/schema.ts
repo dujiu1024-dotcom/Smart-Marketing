@@ -295,6 +295,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/store/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Media Assets */
+        get: operations["list_media_assets_api_v1_store_assets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/assets/upload-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Asset Upload Intent */
+        post: operations["create_asset_upload_intent_api_v1_store_assets_upload_intents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/assets/upload-intents/{intent_id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Asset Upload */
+        post: operations["complete_asset_upload_api_v1_store_assets_upload_intents__intent_id__complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/store/assets/{asset_id}/download-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Media Asset Download Url */
+        get: operations["get_media_asset_download_url_api_v1_store_assets__asset_id__download_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/store/audiences": {
         parameters: {
             query?: never;
@@ -626,6 +694,47 @@ export interface components {
             membership: {
                 [key: string]: string;
             };
+        };
+        /** AssetUploadCompleteRead */
+        AssetUploadCompleteRead: {
+            asset: components["schemas"]["MediaAssetRead"];
+            /** Status */
+            status: string;
+        };
+        /** AssetUploadIntentCreate */
+        AssetUploadIntentCreate: {
+            /** Expected Byte Size */
+            expected_byte_size: number;
+            /** Expected Mime Type */
+            expected_mime_type: string;
+            /** Expected Sha256 */
+            expected_sha256: string;
+            /** Original Filename */
+            original_filename: string;
+        };
+        /** AssetUploadIntentRead */
+        AssetUploadIntentRead: {
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Method
+             * @default PUT
+             */
+            method: string;
+            /** Required Headers */
+            required_headers: {
+                [key: string]: string;
+            };
+            /** Upload Url */
+            upload_url: string;
         };
         /** AudienceProfileCreate */
         AudienceProfileCreate: {
@@ -1206,6 +1315,49 @@ export interface components {
             active_store: components["schemas"]["StoreSummary"] | null;
             session: components["schemas"]["SessionSummary"];
             user: components["schemas"]["UserSummary"];
+        };
+        /** MediaAssetList */
+        MediaAssetList: {
+            /** Items */
+            items: components["schemas"]["MediaAssetRead"][];
+            /** Total */
+            total: number;
+        };
+        /** MediaAssetRead */
+        MediaAssetRead: {
+            /** Asset Type */
+            asset_type: string;
+            /** Byte Size */
+            byte_size: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mime Type */
+            mime_type: string;
+            /** Original Filename Sanitized */
+            original_filename_sanitized: string | null;
+            /** Parent Asset Id */
+            parent_asset_id: string | null;
+            /** Sha256 */
+            sha256: string;
+            /** Status */
+            status: string;
+            /**
+             * Store Id
+             * Format: uuid
+             */
+            store_id: string;
+            /** Usage Rights Status */
+            usage_rights_status: string;
+            /** Version No */
+            version_no: number;
         };
         /** MemberPatchRequest */
         MemberPatchRequest: {
@@ -2296,6 +2448,144 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_media_assets_api_v1_store_assets_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaAssetList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_asset_upload_intent_api_v1_store_assets_upload_intents_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetUploadIntentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetUploadIntentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_asset_upload_api_v1_store_assets_upload_intents__intent_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                intent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetUploadCompleteRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_media_asset_download_url_api_v1_store_assets__asset_id__download_url_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                asset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

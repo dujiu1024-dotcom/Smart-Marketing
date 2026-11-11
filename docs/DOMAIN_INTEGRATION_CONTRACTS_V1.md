@@ -303,6 +303,7 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 | content.publish_confirmed | #8 | #9 | 商家确认整个 package fingerprint，可请求发布 Job |
 | content.publish_command_requested | #8 | #12/#9 | 每个 official_api PackageItem 单独提交受控发布命令 |
 | channel.account_authorized/reauth_required/revoked | #12 | #5/#8 | 门店渠道授权生命周期变化 |
+| channel.spec_version_published | #12 | #8 | 新规格发布；旧 ChannelContent 对新任务标记 stale，冻结包保留原版本并在发布前重新验证 |
 | channel.capabilities_refreshed | #12 | #8 | 账号能力快照更新，触发渠道内容/发布门禁重新评估 |
 | channel.publish_operation_created/updated/published/needs_human | #12 | #7/#8/#9 | 外部发布状态必须由平台证据确认 |
 | job.succeeded/failed/needs_human | #9 | 发起该 Job 的业务域 | 回传执行结果；业务域校验后更新自己的状态 |

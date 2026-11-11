@@ -230,6 +230,14 @@ def test_task_step_transitions_and_skip_gates() -> None:
             applicability=StepApplicability.OPTIONAL,
             skip_reason="Not selected",
         )
+    with pytest.raises(InvalidTaskStepTransition, match="Required task steps"):
+        ensure_step_transition(
+            TaskStepStatus.PENDING,
+            TaskStepStatus.SKIPPED,
+            applicability=StepApplicability.REQUIRED,
+            skip_reason="Attempt to skip required work",
+            allow_explicit_skip=True,
+        )
     with pytest.raises(InvalidTaskStepTransition, match="cannot be skipped"):
         ensure_step_transition(
             TaskStepStatus.PENDING,

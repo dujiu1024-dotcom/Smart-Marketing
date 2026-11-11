@@ -183,7 +183,7 @@ def me(
     auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
     db: Annotated[Session, Depends(get_db)],
 ) -> MeResponse:
-    active_store = None
+    active_store: StoreSummary | None = None
     if auth.session.active_store_id is not None:
         row = db.execute(
             select(Store, StoreMembership)

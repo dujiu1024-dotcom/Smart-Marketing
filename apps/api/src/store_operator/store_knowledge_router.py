@@ -18,8 +18,8 @@ from store_operator.auth.dependencies import (
     require_store_context,
 )
 from store_operator.auth.errors import ApiError
-from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.db import get_db
+from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.models.store_knowledge import (
     AudienceProfile,
     BrandGuideline,

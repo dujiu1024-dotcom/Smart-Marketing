@@ -488,8 +488,14 @@ def create_store_profile(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> StoreProfileRead:
     store_id = _store_id(context)
+    idempotency_record, replay = _begin_idempotency(
+        db, store_id, idempotency_key, "store.profile.create", payload
+    )
+    if replay is not None:
+        return StoreProfileRead.model_validate(replay)
     if db.scalar(select(StoreProfile.id).where(StoreProfile.store_id == store_id)):
         raise ApiError(409, "RESOURCE_ALREADY_EXISTS", "Store profile already exists")
     profile = StoreProfile(
@@ -521,6 +527,12 @@ def create_store_profile(
         record_id=profile.id,
         actor_id=auth.user.id,
         store_id=store_id,
+    )
+    _complete_idempotency(
+        idempotency_record,
+        StoreProfileRead.model_validate(profile).model_dump(mode="json"),
+        "store_profile",
+        profile.id,
     )
     db.commit()
     db.refresh(profile)
@@ -615,8 +627,14 @@ def create_product(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
 ) -> ProductRead:
     store_id = _store_id(context)
+    idempotency_record, replay = _begin_idempotency(
+        db, store_id, idempotency_key, "store.product.create", payload
+    )
+    if replay is not None:
+        return ProductRead.model_validate(replay)
     product = Product(
         id=uuid4(),
         store_id=store_id,
@@ -653,6 +671,9 @@ def create_product(
         record_id=product.id,
         actor_id=auth.user.id,
         store_id=store_id,
+    )
+    _complete_idempotency(
+        idempotency_record, result.model_dump(mode="json"), "product", product.id
     )
     db.commit()
     db.refresh(product)

@@ -8,9 +8,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import create_engine, or_, select
 from sqlalchemy.orm import sessionmaker
 
+from store_operator_worker.celery_app import celery_app
 from store_operator.jobs.service import claim_job, fail_job
 from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent
-from store_operator_worker.celery_app import celery_app
+from celery.exceptions import CeleryError  # type: ignore[import-untyped]
+from kombu.exceptions import OperationalError  # type: ignore[import-untyped]
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
@@ -71,14 +73,14 @@ def relay_outbox(batch_size: int = 50) -> int:
                 raise ValueError("Unsupported Outbox event type")
             job_id = payload.get("job_id")
             if not isinstance(job_id, str):
-                raise ValueError("Outbox job_id is invalid")
+                raise TypeError("Outbox job_id is invalid")
             celery_app.send_task(
                 "jobs.execute",
                 args=[job_id],
                 task_id=str(event_id),
                 queue="default",
             )
-        except Exception:
+        except (CeleryError, OperationalError, OSError, TypeError, ValueError):
             with SessionLocal.begin() as db:
                 event = db.scalar(
                     select(OutboxEvent)

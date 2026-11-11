@@ -265,3 +265,26 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - 仅允许对当前门店的 `needs_human` 报告追加一次决议；报告 fingerprint 不匹配时返回 409；hard fail/pass 返回 422。
 - QualityReport 本身保持不可变；accepted/rejected 作为独立 QualityResolution 记录，并写审计事件。
 - 当前实现沿用门店授权和 CSRF 写请求约束。更细粒度角色能力仍需与 #5 授权矩阵联动验收。
+
+
+## 2026-11-11 发布包冻结与商家确认第一阶段
+
+新增后端 API（PR #64）：
+
+- `POST /api/v1/marketing-tasks/{task_id}/publish-packages/freeze`
+- `POST /api/v1/marketing-tasks/publish-packages/{package_id}/confirm`
+- `GET /api/v1/marketing-tasks/{task_id}/publish-packages`
+
+冻结门禁：
+- 任务必须处于 active / waiting_for_user，expected_task_version 必须匹配。
+- 当前需求和策略快照必须已确认，策略快照必须依赖当前需求快照。
+- 至少一个 BusinessFactSnapshot；每条事实必须已确认、绑定同门店 StoreRecordRevision、fingerprint/value 一致、来源版本仍是最新且在有效期内。
+- 每个渠道内容必须属于当前任务/门店、状态 ready；文案和图片版本必须仍是当前版本且各自审核通过。
+- 每个渠道必须有精确绑定当前 ChannelContent 的 QualityReport；重新计算质检 fingerprint；hard fail 阻断，needs_human 只有 accepted QualityResolution 才可继续。
+- 一个包每个 channel_key 仅允许一个 item；冻结 fingerprint 覆盖任务版本、需求/策略快照、全部 item fingerprint 和事实快照 ID。
+- Freeze 在单事务创建 PublishPackage、PackageItem 和 FactRef；数据库 deferred constraint 保证包至少有一条 item 和一条已确认事实引用。
+- 商家确认绑定 package_id + package_fingerprint；旧包或旧 fingerprint 不能授权新包。确认记录不可变。
+
+首阶段仅开放 `manual_handoff`。#12 尚未实现 ChannelAccount/真实 OAuth/平台 Adapter，因此 API 不接受 `official_api`，也不会创建 PublishOperation 或显示“已发布”。人工交付确认只代表商家确认冻结内容，不代表渠道发布成功。
+
+验收边界：后端门禁/API/DB 测试正在 PR #64 中验证；Demo 页面、完整浏览器业务流程和真实渠道发布仍未完成。

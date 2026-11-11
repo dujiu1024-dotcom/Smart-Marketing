@@ -94,8 +94,6 @@ def update_store_member(
         membership.joined_at = membership.joined_at or datetime.now(UTC)
         membership.revoked_at = None
     elif new_status in {"suspended", "removed"}:
-        from datetime import UTC, datetime
-
         membership.revoked_at = datetime.now(UTC)
     record_audit(
         db,

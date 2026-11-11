@@ -57,7 +57,7 @@ def _safe_response_ref(
     if not values:
         return None
     allowed = {"schema_version", "object_key", "sha256", "mime_type", "width", "height"}
-    safe = {
+    safe: dict[str, object] = {
         key: value
         for key, value in values.items()
         if key in allowed

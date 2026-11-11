@@ -21,7 +21,8 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from store_operator.models.base import Base
@@ -46,7 +47,8 @@ class StoreProfile(StoreScoped, Base):
         UniqueConstraint("store_id", name="uq_store_profiles_store"),
         UniqueConstraint("store_id", "id", name="uq_store_profiles_store_id"),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', 'needs_review', 'expired')",
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "'needs_review', 'expired')",
             name="fact_status",
         ),
     )
@@ -67,7 +69,9 @@ class StoreProfile(StoreScoped, Base):
     temporary_closures_json: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
     service_radius: Mapped[str | None] = mapped_column(String(120))
     service_capabilities_json: Mapped[list[str] | None] = mapped_column(JSONB)
-    fact_status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="unverified")
+    fact_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="unverified"
+    )
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
@@ -92,7 +96,8 @@ class Product(StoreScoped, Base):
             name="availability_status",
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', 'needs_review', 'expired')",
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "'needs_review', 'expired')",
             name="fact_status",
         ),
         Index(
@@ -122,7 +127,9 @@ class Product(StoreScoped, Base):
     allergens_and_restrictions_json: Mapped[list[str] | None] = mapped_column(JSONB)
     service_process: Mapped[str | None] = mapped_column(Text)
     delivery_method: Mapped[str | None] = mapped_column(String(120))
-    fact_status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="unverified")
+    fact_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="unverified"
+    )
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
@@ -136,10 +143,16 @@ class Offer(StoreScoped, Base):
     __tablename__ = "offers"
     __table_args__ = (
         UniqueConstraint("store_id", "id", name="uq_offers_store_id"),
-        CheckConstraint("ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at", name="valid_window"),
-        CheckConstraint("status IN ('draft', 'active', 'paused', 'expired', 'archived')", name="status"),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', 'needs_review', 'expired')",
+            "ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at",
+            name="valid_window",
+        ),
+        CheckConstraint(
+            "status IN ('draft', 'active', 'paused', 'expired', 'archived')", name="status"
+        ),
+        CheckConstraint(
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "'needs_review', 'expired')",
             name="fact_status",
         ),
         Index("ix_offers_store_status_window", "store_id", "status", "starts_at", "ends_at"),
@@ -156,7 +169,9 @@ class Offer(StoreScoped, Base):
     stacking_policy: Mapped[str | None] = mapped_column(String(40))
     usage_limit: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="draft")
-    fact_status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="unverified")
+    fact_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="unverified"
+    )
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
@@ -190,7 +205,9 @@ class BrandGuideline(StoreScoped, Base):
     color_palette_json: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
     font_preferences_json: Mapped[list[str] | None] = mapped_column(JSONB)
     visual_style: Mapped[str | None] = mapped_column(Text)
-    fact_status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="unverified")
+    fact_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="unverified"
+    )
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
 
@@ -202,7 +219,8 @@ class AudienceProfile(StoreScoped, Base):
             "segment_type IN ('core', 'secondary', 'seasonal', 'scenario')", name="segment_type"
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', 'needs_review', 'expired')",
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "'needs_review', 'expired')",
             name="fact_status",
         ),
         Index("ix_audience_profiles_store_segment", "store_id", "segment_type"),
@@ -220,7 +238,9 @@ class AudienceProfile(StoreScoped, Base):
     sample_size: Mapped[int | None] = mapped_column(Integer)
     sampled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     confidence_level: Mapped[str | None] = mapped_column(String(24))
-    fact_status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="unverified")
+    fact_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="unverified"
+    )
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
@@ -235,7 +255,8 @@ class KnowledgeItem(StoreScoped, Base):
     __table_args__ = (
         UniqueConstraint("store_id", "id", name="uq_knowledge_items_store_id"),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', 'needs_review', 'expired')",
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "'needs_review', 'expired')",
             name="fact_status",
         ),
         Index("ix_knowledge_items_store_fact_expiry", "store_id", "fact_status", "expires_at"),
@@ -250,7 +271,9 @@ class KnowledgeItem(StoreScoped, Base):
     source_ref: Mapped[str | None] = mapped_column(String(500))
     effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    fact_status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="unverified")
+    fact_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="unverified"
+    )
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
@@ -265,7 +288,10 @@ class MediaAsset(StoreScoped, Base):
     __table_args__ = (
         UniqueConstraint("store_id", "id", name="uq_media_assets_store_id"),
         UniqueConstraint("object_key", name="uq_media_assets_object_key"),
-        UniqueConstraint("store_id", "parent_asset_id", "version_no", name="uq_media_assets_parent_version"),
+        UniqueConstraint(
+            "store_id", "parent_asset_id", "version_no",
+            name="uq_media_assets_parent_version",
+        ),
         ForeignKeyConstraint(
             ["store_id", "parent_asset_id"],
             ["media_assets.store_id", "media_assets.id"],
@@ -280,7 +306,10 @@ class MediaAsset(StoreScoped, Base):
             "usage_rights_status IN ('unknown', 'confirmed_allowed', 'restricted')",
             name="usage_rights_status",
         ),
-        Index("ix_media_assets_store_status_type_created", "store_id", "status", "asset_type", "created_at"),
+        Index(
+            "ix_media_assets_store_status_type_created",
+            "store_id", "status", "asset_type", "created_at",
+        ),
     )
 
     object_key: Mapped[str] = mapped_column(String(700), nullable=False)
@@ -340,10 +369,14 @@ class StoreRecordRevision(StoreScoped, Base):
             name="uq_store_record_revisions_version",
         ),
         CheckConstraint(
-            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', 'needs_review', 'expired')",
+            "fact_status IN ('unverified', 'pending_confirmation', 'confirmed', " 
+            "'needs_review', 'expired')",
             name="fact_status",
         ),
-        Index("ix_store_record_revisions_lookup", "store_id", "record_type", "record_id", "created_at"),
+        Index(
+            "ix_store_record_revisions_lookup",
+            "store_id", "record_type", "record_id", "created_at",
+        ),
     )
 
     record_type: Mapped[str] = mapped_column(String(60), nullable=False)

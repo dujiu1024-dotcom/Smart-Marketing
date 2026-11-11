@@ -119,7 +119,7 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 - Copy 与 Image review 分开保存和查询。
 
 ### ChannelContent
-`id, store_id, task_id, channel_key, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。每个渠道/输入指纹对应不可变快照；变更创建新记录。
+`id, store_id, task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。图片版本通过 ChannelContentArtifactRef 子表按 position 引用。每个渠道/输入指纹对应不可变快照；变更创建新记录。
 - 渠道规则与账号能力分开：spec_version 表示 #12 发布的适配规格版本；ChannelContent 不绑定具体账号，目标账号只在 PublishPackageItem 中引用，账号授权和支持能力由 Channel Integration 持有。
 - 变体依赖指纹变化时标 stale。
 
@@ -129,7 +129,7 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 
 ### PublishPackage / PublishPackageItem / PublishConfirmation
 PublishPackage 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, fact_snapshot_ids, package_fingerprint, frozen_at, frozen_by`。
-PublishPackageItem 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, copy_version_id, image_version_ids, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。
+PublishPackageItem 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。文案/图片版本由不可变 ChannelContent 间接绑定。
 PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at, confirmation_note`。
 - 一个 PublishPackage 至少包含一个 PackageItem；同一 package 的 channel_key 唯一。每个 item 精确绑定 ChannelContent、文案/图片版本和 QualityReport。
 - channel_account_id 仅引用 #12 的 ChannelAccount；official_api 必须绑定已授权账号，manual_handoff 时允许为空且不得显示已发布。

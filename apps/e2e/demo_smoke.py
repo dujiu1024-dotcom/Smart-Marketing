@@ -40,12 +40,7 @@ async def main() -> None:
         await route_to("hotspots", "发现适合本店的热点机会")
         await route_to("hotspot-detail:hot-001", "秋冬热饮与暖饮消费场景")
         await route_to("tasks", "营销任务")
-        await route_to("task", "当季草莓鲜奶新品推广")
-        await route_to("effects", "经营效果")
-        await route_to("account-ops", "账号运营监测")
-        await route_to("account-register", "登记已发布作品")
-
-        # Return to the task workspace before exercising its internal tabs.
+        await page.locator('[data-action="open-task"]').first.click()
         await route_to("task", "当季草莓鲜奶新品推广")
 
         # The seven marketing task stages are distinct interactive tabs.

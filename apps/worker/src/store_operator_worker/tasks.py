@@ -1273,7 +1273,11 @@ def execute_douyin_image_text_publish(
                             attempt_id,
                             normalized_status="failed",
                             retryable=True,
-                            error_code=(\n                                exc.code\n                                if isinstance(exc, DouyinApiError)\n                                else "HTTP_TRANSPORT_ERROR"\n                            ),
+                            error_code=(
+                                exc.code
+                                if isinstance(exc, DouyinApiError)
+                                else "HTTP_TRANSPORT_ERROR"
+                            ),
                         )
                         raise
                     _finish_douyin_publish_attempt(
@@ -1326,7 +1330,11 @@ def execute_douyin_image_text_publish(
                         attempt_id,
                         normalized_status="unknown",
                         retryable=False,
-                        error_code=(\n                            exc.code\n                            if isinstance(exc, DouyinApiError)\n                            else "HTTP_TRANSPORT_ERROR"\n                        ),
+                        error_code=(
+                            exc.code
+                            if isinstance(exc, DouyinApiError)
+                            else "HTTP_TRANSPORT_ERROR"
+                        ),
                     )
                     raise
                 _finish_douyin_publish_attempt(

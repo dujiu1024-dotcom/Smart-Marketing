@@ -142,7 +142,13 @@ class MarketingTaskRequirementConfirm(BaseModel):
 
 class MarketingTaskStrategyConfirm(BaseModel):
     expected_version: int = Field(ge=1)
-    strategy: dict[str, object] = Field(min_length=1)
+    strategy: dict[str, object]
+
+    @model_validator(mode="after")
+    def require_non_empty_strategy(self) -> "MarketingTaskStrategyConfirm":
+        if not self.strategy:
+            raise ValueError("strategy must contain at least one field")
+        return self
 
 
 class MarketingTaskStepSkip(BaseModel):

@@ -159,8 +159,7 @@ class PublishOperation(Base):
         nullable=False,
     )
     publish_confirmation_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True),
-        nullable=False,
+        PGUUID(as_uuid=True), ForeignKey("publish_confirmations.id", ondelete="RESTRICT"), nullable=False
     )
     channel_account_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), nullable=False

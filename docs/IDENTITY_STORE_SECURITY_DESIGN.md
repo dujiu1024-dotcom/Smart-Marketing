@@ -203,3 +203,8 @@ Issue #4 合并并验收工程骨架、CI、PostgreSQL 测试服务、迁移入�
 - 不启用 PostgreSQL RLS；先完成应用层 request-scoped 授权与 PostgreSQL 集成测试，再单独评估 RLS 和连接池隔离。
 
 未完成项：生产 Session 时限安全审批、邀请/注册/密码重置产品流程、平台管理员紧急恢复流程评审、#6–#12 资源 API 的完整 IDOR 覆盖、密码变更后的 Session 轮换以及全量安全矩阵。Issue #5 不得因首轮认证路由可用而关闭。
+
+
+## 12. Store 时区权威字段
+
+`Store.timezone` 是门店时区的唯一权威字段，使用 IANA Time Zone Database 标识（例如 `Asia/Tokyo`）。门店初始化命令必须显式提供 `--timezone` 并通过 ZoneInfo 校验；不得静默默认 UTC 或依赖服务器所在时区。#6 的 StoreProfile、营业时间和 Offer 日期边界均引用该字段，不得重复保存时区。

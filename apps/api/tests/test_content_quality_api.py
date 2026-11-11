@@ -4,7 +4,6 @@ from uuid import uuid4
 from store_operator.auth.security import hash_password
 from store_operator.models import Store, StoreMembership, User
 
-
 ORIGIN = {"Origin": "http://localhost:5173"}
 
 

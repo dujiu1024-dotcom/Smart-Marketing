@@ -389,7 +389,7 @@ PublishOperation.published 必须有 external_post_id 或等价平台证据；Jo
 20. PromptActivation 追加写并按 idempotency_record_id 去重；只能引用同一 PromptTemplate 的 published PromptVersion。
 21. AIInvocation.prompt_version_id 必须引用精确 PromptVersion；历史调用不得动态读取 PromptTemplate.current_published_version_id。
 22. PromptTemplate.current_published_version_id 通过复合 FK 校验 PromptVersion 属于同一模板；PromptActivation 的 activated_version_id/previous_version_id 也必须属于该模板且为 published 版本。
-23. ChannelAccount UNIQUE(store_id, channel_key, external_account_id)；所有 ChannelAccount/Capability/Operation 复合 FK 必须同 store。
+23. ChannelAccount UNIQUE(channel_key, external_account_id)；首期同一外部账号不得跨 store 绑定；所有 ChannelAccount/Capability/Operation 复合 FK 必须同 store。
 24. OAuthAuthorizationAttempt.state_hash UNIQUE、expires_at 必须有效、consumed_at 只允许从 NULL 单向设置；不得存 state/code 原文。
 25. ChannelSpecVersion UNIQUE(channel_spec_id, spec_version)，发布后不可 UPDATE/DELETE；ChannelCapabilitySnapshot 引用精确 channel_spec_version_id。
 26. PublishOperation UNIQUE(store_id, package_item_id, channel_account_id, action, package_fingerprint)；idempotency_key 唯一，且复合 FK 到同店 PublishPackage/PackageItem/ChannelAccount。

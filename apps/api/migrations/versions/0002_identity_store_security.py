@@ -208,12 +208,12 @@ def upgrade() -> None:
         sa.Column(
             "actor_user_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            sa.ForeignKey("users.id", ondelete="RESTRICT"),
         ),
         sa.Column(
             "store_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("stores.id", ondelete="SET NULL"),
+            sa.ForeignKey("stores.id", ondelete="RESTRICT"),
         ),
         sa.Column("action", sa.String(100), nullable=False),
         sa.Column("target_type", sa.String(80), nullable=False),

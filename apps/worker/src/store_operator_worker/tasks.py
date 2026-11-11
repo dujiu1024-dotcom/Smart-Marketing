@@ -1261,6 +1261,14 @@ def execute_douyin_image_text_publish(
         )
         platform_item_id = receipt.item_id
 
+    if platform_item_id is None:
+        raise JobExecutionError(
+            "DOUYIN_PLATFORM_ITEM_ID_MISSING",
+            "The platform item identifier is not available for readback.",
+            retryable=False,
+            side_effect_state=SideEffectState.UNKNOWN,
+        )
+
     async def read_back_post() -> dict[str, Any] | None:
         client = DouyinOAuthClient(credentials)
         try:

@@ -260,7 +260,14 @@ class AIInvocation(Base):
     provider_key: Mapped[str] = mapped_column(String(100), nullable=False)
     model_key: Mapped[str] = mapped_column(String(150), nullable=False)
     capability: Mapped[str] = mapped_column(String(24), nullable=False)
-    prompt_version_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    prompt_version_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey(
+            "prompt_versions.id",
+            ondelete="RESTRICT",
+            name="fk_ai_invocations_prompt_version",
+        ),
+    )
     parameter_snapshot_json: Mapped[dict[str, object]] = mapped_column(
         "parameter_snapshot", JSONB, nullable=False, server_default="{}"
     )

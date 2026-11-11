@@ -181,7 +181,7 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
             id=uuid4(),
             store_id=store_a.id,
             user_id=second_user.id,
-            role="manager",
+            role="owner",
             status="active",
             joined_at=datetime.now(UTC),
         )
@@ -213,7 +213,10 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
         },
     )
     assert cross_actor_replay.status_code == 409
-    assert cross_actor_replay.json()["error"]["code"] == "IDEMPOTENCY_KEY_SCOPE_MISMATCH"
+    assert (
+        cross_actor_replay.json()["error"]["code"]
+        == "IDEMPOTENCY_KEY_SCOPE_MISMATCH"
+    )
     assert product["id"] not in cross_actor_replay.text
 
 

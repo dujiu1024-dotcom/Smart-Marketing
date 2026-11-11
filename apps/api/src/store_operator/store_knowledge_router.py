@@ -21,13 +21,6 @@ from store_operator.auth.dependencies import (
 from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
-from store_operator.object_storage import (
-    ObjectStorageNotConfigured,
-    calculate_object_sha256,
-    create_download_url,
-    create_upload_url,
-    head_object,
-)
 from store_operator.models.store_knowledge import (
     AudienceProfile,
     BrandGuideline,
@@ -40,12 +33,17 @@ from store_operator.models.store_knowledge import (
     StoreRecordRevision,
     UploadIntent,
 )
+from store_operator.object_storage import (
+    ObjectStorageNotConfigured,
+    calculate_object_sha256,
+    create_download_url,
+    create_upload_url,
+    head_object,
+)
 from store_operator.store_knowledge_schemas import (
     AssetUploadCompleteRead,
     AssetUploadIntentCreate,
     AssetUploadIntentRead,
-    MediaAssetList,
-    MediaAssetRead,
     AudienceProfileCreate,
     AudienceProfileList,
     AudienceProfileRead,
@@ -58,6 +56,8 @@ from store_operator.store_knowledge_schemas import (
     KnowledgeItemList,
     KnowledgeItemRead,
     KnowledgeItemUpdate,
+    MediaAssetList,
+    MediaAssetRead,
     OfferCreate,
     OfferList,
     OfferRead,
@@ -1158,10 +1158,15 @@ def create_asset_upload_intent(
             )
         )
         if intent is None or intent.status != "created":
-            raise ApiError(409, "UPLOAD_INTENT_NOT_AVAILABLE", "Upload intent is no longer available")
+            raise ApiError(
+                409,
+                "UPLOAD_INTENT_NOT_AVAILABLE",
+                "Upload intent is no longer available",
+            )
     else:
         now = datetime.now(UTC)
-        object_key = f"stores/{store_id}/quarantine/{uuid4()}/{_safe_filename(payload.original_filename)}"
+        safe_filename = _safe_filename(payload.original_filename)
+        object_key = f"stores/{store_id}/quarantine/{uuid4()}/{safe_filename}"
         intent = UploadIntent(
             id=uuid4(),
             store_id=store_id,
@@ -1184,10 +1189,18 @@ def create_asset_upload_intent(
         )
     except ObjectStorageNotConfigured as exc:
         db.rollback()
-        raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Private object storage is not configured") from exc
+        raise ApiError(
+            503,
+            "OBJECT_STORAGE_UNAVAILABLE",
+            "Private object storage is not configured",
+        ) from exc
     except Exception as exc:
         db.rollback()
-        raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Could not create a secure upload URL") from exc
+        raise ApiError(
+            503,
+            "OBJECT_STORAGE_UNAVAILABLE",
+            "Could not create a secure upload URL",
+        ) from exc
     if idempotency_record is not None:
         _complete_idempotency(
             idempotency_record,
@@ -1257,24 +1270,42 @@ def complete_asset_upload(
     try:
         stored = head_object(object_key=intent.object_key)
     except ObjectStorageNotConfigured as exc:
-        raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Private object storage is not configured") from exc
+        raise ApiError(
+            503,
+            "OBJECT_STORAGE_UNAVAILABLE",
+            "Private object storage is not configured",
+        ) from exc
     except Exception as exc:
-        raise ApiError(409, "UPLOAD_OBJECT_NOT_FOUND", "Uploaded object could not be verified") from exc
+        raise ApiError(
+            409,
+            "UPLOAD_OBJECT_NOT_FOUND",
+            "Uploaded object could not be verified",
+        ) from exc
     actual_size = int(stored.get("ContentLength") or 0)
     actual_mime = str(stored.get("ContentType") or "")
     try:
         actual_sha256 = calculate_object_sha256(object_key=intent.object_key).lower()
     except Exception as exc:
-        raise ApiError(503, "UPLOAD_HASH_VERIFICATION_FAILED", "Uploaded file hash could not be verified") from exc
+        raise ApiError(
+            503,
+            "UPLOAD_HASH_VERIFICATION_FAILED",
+            "Uploaded file hash could not be verified",
+        ) from exc
     if (
         actual_size != intent.expected_byte_size
         or actual_mime != intent.expected_mime_type
         or actual_sha256 != (intent.expected_sha256 or "").lower()
     ):
         intent.status = "rejected"
-        intent.rejection_reason = "Uploaded object metadata did not match the signed upload intent"
+        intent.rejection_reason = (
+            "Uploaded object metadata did not match the signed upload intent"
+        )
         db.commit()
-        raise ApiError(422, "UPLOAD_OBJECT_MISMATCH", "Uploaded file failed server-side verification")
+        raise ApiError(
+            422,
+            "UPLOAD_OBJECT_MISMATCH",
+            "Uploaded file failed server-side verification",
+        )
     asset = MediaAsset(
         id=uuid4(),
         store_id=store_id,
@@ -1344,9 +1375,17 @@ def get_media_asset_download_url(
     if asset is None:
         raise ApiError(404, "MEDIA_ASSET_NOT_FOUND", "Media asset not found")
     if asset.status != "ready" or asset.usage_rights_status != "confirmed_allowed":
-        raise ApiError(409, "MEDIA_ASSET_NOT_READY", "Only scanned, rights-confirmed assets can be downloaded")
+        raise ApiError(
+            409,
+            "MEDIA_ASSET_NOT_READY",
+            "Only scanned, rights-confirmed assets can be downloaded",
+        )
     try:
         url = create_download_url(object_key=asset.object_key)
     except ObjectStorageNotConfigured as exc:
-        raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Private object storage is not configured") from exc
+        raise ApiError(
+            503,
+            "OBJECT_STORAGE_UNAVAILABLE",
+            "Private object storage is not configured",
+        ) from exc
     return {"url": url}

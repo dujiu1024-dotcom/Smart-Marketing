@@ -498,7 +498,7 @@ erDiagram
     ARTIFACT_VERSION ||--o{ REVIEW_RECORD : reviewed_by
     ARTIFACT_VERSION ||--o{ REVISION_REQUEST : revised_from
     REVIEW_RECORD ||--o{ REVISION_REQUEST : initiates
-    ARTIFACT_VERSION ||--o{ CHANNEL_CONTENT : adapts
+    CHANNEL_CONTENT }o--o{ ARTIFACT_VERSION : derives_from
     CHANNEL_CONTENT ||--o{ QUALITY_REPORT : checks
     MARKETING_TASK ||--o{ DEPENDENCY_EDGE : depends
     MARKETING_TASK ||--o{ PUBLISH_PACKAGE : freezes

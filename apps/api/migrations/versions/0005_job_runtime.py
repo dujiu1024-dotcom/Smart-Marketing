@@ -64,6 +64,7 @@ def upgrade() -> None:
         ),
         sa.Column("started_at", sa.DateTime(timezone=True)),
         sa.Column("finished_at", sa.DateTime(timezone=True)),
+        sa.Column("cancel_requested_at", sa.DateTime(timezone=True)),
         sa.Column("cancelled_at", sa.DateTime(timezone=True)),
         sa.UniqueConstraint(
             "idempotency_scope_type",

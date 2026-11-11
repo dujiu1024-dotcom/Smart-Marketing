@@ -1,6 +1,7 @@
 import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -47,7 +48,7 @@ def validate_browser_origin(request: Request) -> None:
 
 def get_current_session(
     request: Request,
-    db: Session = Depends(get_db),
+    db: Annotated[Session, Depends(get_db)],
 ) -> AuthenticatedSession:
     raw_token = request.cookies.get(SESSION_COOKIE_NAME)
     if not raw_token:
@@ -96,7 +97,7 @@ def get_current_session(
 
 def require_csrf(
     request: Request,
-    auth: AuthenticatedSession = Depends(get_current_session),
+    auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
 ) -> AuthenticatedSession:
     validate_browser_origin(request)
     supplied = request.headers.get("x-csrf-token")
@@ -110,9 +111,9 @@ def require_csrf(
 
 def require_store_context(
     request: Request,
-    store_id_header: str | None = Header(default=None, alias="X-Store-ID"),
-    auth: AuthenticatedSession = Depends(get_current_session),
-    db: Session = Depends(get_db),
+    store_id_header: Annotated[str | None, Header(alias="X-Store-ID")] = None,
+    auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> AuthContext:
     if not store_id_header:
         raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")

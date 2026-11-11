@@ -119,8 +119,8 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 - Copy 与 Image review 分开保存和查询。
 
 ### ChannelContent
-`id, store_id, task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。图片版本通过 ChannelContentArtifactRef 子表按 position 引用。每个渠道/输入指纹对应不可变快照；变更创建新记录。
-- 渠道规则与账号能力分开：spec_version 表示 #12 发布的适配规格版本；ChannelContent 不绑定具体账号，目标账号只在 PublishPackageItem 中引用，账号授权和支持能力由 Channel Integration 持有。
+`id, store_id, task_id, channel_key, copy_version_id, payload_json, channel_spec_version_id, input_fingerprint, status, created_at, updated_at`。图片版本通过 ChannelContentArtifactRef 子表按 position 引用。每个渠道/输入指纹对应不可变快照；变更创建新记录。
+- 渠道规则与账号能力分开：channel_spec_version_id 复合 FK 指向 #12 发布的精确 ChannelSpecVersion；ChannelContent 不绑定具体账号，目标账号只在 PublishPackageItem 中引用，账号授权和支持能力由 Channel Integration 持有。
 - 变体依赖指纹变化时标 stale。
 
 ### QualityReport
@@ -202,8 +202,8 @@ ProviderContext 扩展提案：store_id/actor_scope、task_id、job_id、invocat
 
 - ChannelAccount（门店级）：id、store_id、channel_key、external_account_id、display_name、authorization_status、granted_scopes_json、access_token_secret_ref、refresh_token_secret_ref、token_expires_at、authorized_by_user_id、authorized_at、last_verified_at、version。Token 只保存在 Secret Manager/Vault，DB 只保存 secret_ref。
 - OAuthAuthorizationAttempt：store_id、channel_key、requested_by_user_id、state_hash、nonce、pkce_verifier_secret_ref、redirect_uri_key、expires_at、consumed_at。state 一次性、短 TTL；callback 必须重新验证 #5 membership 和 store 状态。
-- ChannelSpecVersion（全局无 store_id）：channel_key、spec_version、text/media/hashtag/link/schedule constraints、draft/publish capability、official source evidence。规则变化创建新版本，历史 ChannelContent/Package 不被静默改写。
-- ChannelCapabilitySnapshot（门店账号级）：store_id、channel_account_id、spec_version、capability_key、support_status、evidence_ref、checked_at、expires_at。unsupported/pending_verification 不得伪装为已接通。
+- ChannelSpec/ChannelSpecVersion（全局无 store_id）：ChannelSpec 持有 channel_key/current_version_id；ChannelSpecVersion 保存 spec_version 与 text/media/hashtag/link/schedule constraints、draft/publish capability、official source evidence。版本不可变。
+- ChannelCapabilitySnapshot（门店账号级）：store_id、channel_account_id、channel_spec_version_id、capability_key、support_status、evidence_ref、checked_at、expires_at。unsupported/pending_verification 不得伪装为已接通。
 - PublishOperation：store_id、publish_package_id、package_item_id、package_fingerprint、channel_account_id、action(save_draft|publish)、status、idempotency_key、request_fingerprint、external_request_id、external_post_id、external_url、response_evidence_ref、error_code、requested_by_user_id、timestamps。
 - PublishOperationAttempt 保存每次外部平台调用证据；它与 #9 JobAttempt 分离：JobAttempt 是 Worker 执行尝试，PublishOperationAttempt 是外部 API 调用事实。
 

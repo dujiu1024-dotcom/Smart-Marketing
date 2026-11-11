@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from store_operator.auth.audit import record_audit
 from store_operator.auth.context import AuthContext
 from store_operator.auth.errors import ApiError
 from store_operator.auth.security import csrf_token_verifier, session_token_verifier
@@ -134,6 +135,17 @@ def require_store_context(
         ) from exc
 
     if store is None or membership is None:
+        record_audit(
+            db,
+            request,
+            action="store.context.access",
+            target_type="store",
+            target_id=store_id,
+            actor_user_id=auth.user.id,
+            result="denied",
+            metadata={"reason": "not_member_or_inactive"},
+        )
+        db.commit()
         raise ApiError(404, "STORE_NOT_FOUND", "Store not found")
     context = AuthContext(
         user_id=auth.user.id,
@@ -150,6 +162,7 @@ def require_store_context(
 
 
 def require_platform_admin(
+    request: Request,
     auth: AuthenticatedSession = Depends(get_current_session),
     db: Session = Depends(get_db),
 ) -> AuthenticatedSession:
@@ -166,5 +179,15 @@ def require_platform_admin(
             503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
         ) from exc
     if grant is None:
+        record_audit(
+            db,
+            request,
+            action="platform_admin.access",
+            target_type="capability",
+            target_id="platform.store_members.manage",
+            actor_user_id=auth.user.id,
+            result="denied",
+        )
+        db.commit()
         raise ApiError(403, "FORBIDDEN", "Forbidden")
     return auth

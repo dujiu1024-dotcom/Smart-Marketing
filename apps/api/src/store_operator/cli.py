@@ -4,6 +4,7 @@ import argparse
 from datetime import UTC, datetime
 from getpass import getpass
 from uuid import uuid4
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
 
@@ -56,12 +57,16 @@ def create_user(email: str) -> None:
         print(f"Created user {user.id}.")
 
 
-def bootstrap_store_owner(email: str, store_name: str) -> None:
+def bootstrap_store_owner(email: str, store_name: str, timezone: str) -> None:
     normalized_email = normalize_email(email)
     if not normalized_email or "@" not in normalized_email:
         raise SystemExit("A valid email address is required")
     if not store_name.strip():
         raise SystemExit("Store name is required")
+    try:
+        ZoneInfo(timezone)
+    except ZoneInfoNotFoundError as exc:
+        raise SystemExit("A valid IANA time zone is required") from exc
 
     with SessionLocal() as db:
         user = db.scalar(select(User).where(User.email_normalized == normalized_email))
@@ -81,7 +86,7 @@ def bootstrap_store_owner(email: str, store_name: str) -> None:
         elif user.status != "active":
             raise SystemExit("Existing user is not active")
 
-        store = Store(id=uuid4(), name=store_name.strip(), status="active")
+        store = Store(id=uuid4(), name=store_name.strip(), timezone=timezone, status="active")
         db.add(store)
         db.flush()
         membership = StoreMembership(
@@ -201,6 +206,7 @@ def main() -> None:
     owner = commands.add_parser("bootstrap-store-owner")
     owner.add_argument("--email", required=True)
     owner.add_argument("--store-name", required=True)
+    owner.add_argument("--timezone", required=True, help="IANA time zone, e.g. Asia/Tokyo")
 
     grant = commands.add_parser("grant-platform-admin")
     grant.add_argument("--email", required=True)
@@ -214,7 +220,7 @@ def main() -> None:
     if args.command == "create-user":
         create_user(args.email)
     elif args.command == "bootstrap-store-owner":
-        bootstrap_store_owner(args.email, args.store_name)
+        bootstrap_store_owner(args.email, args.store_name, args.timezone)
     elif args.command == "grant-platform-admin":
         grant_platform_admin(args.email, args.reason)
     elif args.command == "revoke-platform-admin":

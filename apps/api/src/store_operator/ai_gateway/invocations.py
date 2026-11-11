@@ -58,21 +58,21 @@ def start_ai_invocation(
     store_id: UUID | None,
     job_id: UUID | None,
     attempt_id: UUID | None,
-    provider: str,
-    model: str,
+    provider_key: str,
+    model_key: str,
     capability: str,
     request_fingerprint: str,
-    prompt_template_id: UUID | None = None,
-    prompt_version: str | None = None,
+    task_id: UUID | None = None,
+    prompt_version_id: UUID | None = None,
     parameter_snapshot: dict[str, object] | None = None,
     now: datetime | None = None,
 ) -> AIInvocation:
     if not _FINGERPRINT_PATTERN.fullmatch(request_fingerprint):
         raise ValueError("request_fingerprint must be a lowercase SHA-256 hex digest")
-    if not provider.strip() or len(provider) > 100:
-        raise ValueError("provider must contain 1-100 characters")
-    if not model.strip() or len(model) > 150:
-        raise ValueError("model must contain 1-150 characters")
+    if not provider_key.strip() or len(provider_key) > 100:
+        raise ValueError("provider_key must contain 1-100 characters")
+    if not model_key.strip() or len(model_key) > 150:
+        raise ValueError("model_key must contain 1-150 characters")
     if not capability.strip() or len(capability) > 24:
         raise ValueError("capability must contain 1-24 characters")
     if attempt_id is not None and job_id is None:
@@ -81,6 +81,10 @@ def start_ai_invocation(
         job = db.get(Job, job_id)
         if job is None or job.store_id != store_id:
             raise LookupError("Job not found in the requested store")
+        if task_id is None:
+            task_id = job.marketing_task_id
+        elif task_id != job.marketing_task_id:
+            raise ValueError("task_id does not match the referenced Job")
     if attempt_id is not None:
         attempt = db.get(JobAttempt, attempt_id)
         if attempt is None or attempt.job_id != job_id:
@@ -91,11 +95,10 @@ def start_ai_invocation(
         store_id=store_id,
         job_id=job_id,
         attempt_id=attempt_id,
-        provider=provider.strip(),
-        model=model.strip(),
+        provider_key=provider_key.strip(),
+        model_key=model_key.strip(),
         capability=capability.strip(),
-        prompt_template_id=prompt_template_id,
-        prompt_version=prompt_version,
+        prompt_version_id=prompt_version_id,
         request_fingerprint=request_fingerprint,
         parameter_snapshot_json=_safe_parameter_snapshot(parameter_snapshot),
         status="running",
@@ -117,7 +120,7 @@ def complete_ai_invocation(
     currency: str | None = None,
     metering_source: str = "provider_reported",
     provider_request_id: str | None = None,
-    latency_ms: int | None = None,
+    duration_ms: int | None = None,
     now: datetime | None = None,
 ) -> AIInvocation:
     current_time = now or datetime.now(UTC)
@@ -147,7 +150,7 @@ def complete_ai_invocation(
     )
     if invocation is None:
         raise LookupError("AI invocation not found")
-    elapsed_ms = latency_ms
+    elapsed_ms = duration_ms
     if elapsed_ms is None:
         elapsed_ms = max(
             0, int((current_time - invocation.created_at).total_seconds() * 1000)
@@ -185,7 +188,7 @@ def complete_ai_invocation(
 
     invocation.status = "succeeded"
     invocation.provider_request_id = provider_request_id
-    invocation.latency_ms = elapsed_ms
+    invocation.duration_ms = elapsed_ms
     invocation.finished_at = current_time
     if usage is None:
         db.add(AIUsageRecord(invocation_id=invocation.id, **values))
@@ -198,7 +201,7 @@ def fail_ai_invocation(
     *,
     invocation_id: UUID,
     error_code: str,
-    latency_ms: int | None = None,
+    duration_ms: int | None = None,
     now: datetime | None = None,
 ) -> AIInvocation:
     current_time = now or datetime.now(UTC)

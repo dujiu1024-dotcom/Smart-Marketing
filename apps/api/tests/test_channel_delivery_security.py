@@ -6,6 +6,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from store_operator.channels.oauth_state import new_oauth_state
+from store_operator.content_publishing_router import PublishPackageItemInput
 from store_operator.channels.secret_store import (
     AwsSecretsManagerStore,
     SecretStoreError,
@@ -91,3 +92,35 @@ def test_aws_secret_store_rejects_invalid_secret_payload() -> None:
 
     with pytest.raises(SecretStoreError):
         store.get_json("douyin/store/account")
+
+
+
+def test_official_api_freeze_item_requires_channel_account() -> None:
+    with pytest.raises(ValueError, match="requires a channel_account_id"):
+        PublishPackageItemInput(
+            channel_content_id="00000000-0000-0000-0000-000000000001",
+            quality_report_id="00000000-0000-0000-0000-000000000002",
+            delivery_mode="official_api",
+        )
+
+
+def test_manual_handoff_freeze_item_rejects_channel_account() -> None:
+    with pytest.raises(ValueError, match="cannot bind a channel account"):
+        PublishPackageItemInput(
+            channel_content_id="00000000-0000-0000-0000-000000000001",
+            quality_report_id="00000000-0000-0000-0000-000000000002",
+            delivery_mode="manual_handoff",
+            channel_account_id="00000000-0000-0000-0000-000000000003",
+        )
+
+
+def test_official_api_freeze_item_binds_selected_account() -> None:
+    account_id = "00000000-0000-0000-0000-000000000003"
+    item = PublishPackageItemInput(
+        channel_content_id="00000000-0000-0000-0000-000000000001",
+        quality_report_id="00000000-0000-0000-0000-000000000002",
+        delivery_mode="official_api",
+        channel_account_id=account_id,
+    )
+
+    assert str(item.channel_account_id) == account_id

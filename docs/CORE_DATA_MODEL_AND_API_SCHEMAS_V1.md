@@ -322,9 +322,9 @@ erDiagram
 9. PublishPackage 与 PublishPackageItem 冻结后禁止 UPDATE；PublishConfirmation 绑定整个 package fingerprint。
 10. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 的 ChannelContent/QualityReport/ArtifactVersion 复合 FK 必须包含 store_id。
 11. 一个 PublishPackage 至少有一个 PackageItem；manual_handoff 时 channel_account_id 允许 NULL，official_api 时必须非 NULL。
-10. PublishOperation 对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
-11. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
-12. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
+12. PublishOperation（#12）对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
+13. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
+14. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -55,7 +55,7 @@ def _secret_store() -> AwsSecretsManagerStore:
 
 
 @router.post("/oauth/authorize")
-def begin_douyin_authorization(
+async def begin_douyin_authorization(
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)],
@@ -88,15 +88,12 @@ def begin_douyin_authorization(
             scopes=DOUYIN_REQUIRED_SCOPES,
         )
     finally:
-        import asyncio
-
-        asyncio.run(client.aclose())
+        await client.aclose()
     return {"authorization_url": authorization_url, "expires_in": "600"}
 
 
 @router.get("/oauth/callback")
 async def complete_douyin_authorization(
-    request: Request,
     auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
     db: Annotated[Session, Depends(get_db)],
     code: Annotated[str, Query(min_length=1, max_length=2048)],

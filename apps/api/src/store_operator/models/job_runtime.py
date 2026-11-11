@@ -239,7 +239,7 @@ class AIInvocation(Base):
             "status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')",
             name="status",
         ),
-        CheckConstraint("latency_ms IS NULL OR latency_ms >= 0", name="latency_nonnegative"),
+        CheckConstraint("duration_ms IS NULL OR duration_ms >= 0", name="duration_nonnegative"),
         CheckConstraint("input_schema_version >= 1", name="input_schema_version_positive"),
         CheckConstraint("output_schema_version >= 1", name="output_schema_version_positive"),
         Index("ix_ai_invocations_store_created", "store_id", "created_at"),

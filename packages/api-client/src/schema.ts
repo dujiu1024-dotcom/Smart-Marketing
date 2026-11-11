@@ -345,6 +345,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketing-tasks/{task_id}/strategy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Strategy */
+        patch: operations["patch_strategy_api_v1_marketing_tasks__task_id__strategy_patch"];
+        trace?: never;
+    };
     "/api/v1/marketing-tasks/{task_id}/strategy/confirm": {
         parameters: {
             query?: never;
@@ -1321,6 +1338,15 @@ export interface components {
         MarketingTaskStrategyConfirm: {
             /** Expected Version */
             expected_version: number;
+        };
+        /** MarketingTaskStrategyUpdate */
+        MarketingTaskStrategyUpdate: {
+            /** Expected Version */
+            expected_version: number;
+            /** Strategy */
+            strategy: {
+                [key: string]: unknown;
+            };
         };
         /** MarketingTaskSummary */
         MarketingTaskSummary: {
@@ -2561,6 +2587,44 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MarketingTaskStepSkip"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketingTaskDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_strategy_api_v1_marketing_tasks__task_id__strategy_patch: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketingTaskStrategyUpdate"];
             };
         };
         responses: {

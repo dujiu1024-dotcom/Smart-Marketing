@@ -2541,6 +2541,26 @@
         "title": "MarketingTaskStrategyConfirm",
         "type": "object"
       },
+      "MarketingTaskStrategyUpdate": {
+        "properties": {
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "strategy": {
+            "additionalProperties": true,
+            "title": "Strategy",
+            "type": "object"
+          }
+        },
+        "required": [
+          "expected_version",
+          "strategy"
+        ],
+        "title": "MarketingTaskStrategyUpdate",
+        "type": "object"
+      },
       "MarketingTaskSummary": {
         "properties": {
           "blocked_steps_count": {
@@ -5933,6 +5953,84 @@
           }
         },
         "summary": "Skip Step",
+        "tags": [
+          "marketing-tasks"
+        ]
+      }
+    },
+    "/api/v1/marketing-tasks/{task_id}/strategy": {
+      "patch": {
+        "operationId": "patch_strategy_api_v1_marketing_tasks__task_id__strategy_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketingTaskStrategyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketingTaskDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Strategy",
         "tags": [
           "marketing-tasks"
         ]

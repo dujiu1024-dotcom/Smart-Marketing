@@ -10,6 +10,7 @@ from store_operator.models.identity import (
 from store_operator.models.store_knowledge import (
     AudienceProfile,
     BrandGuideline,
+    IdempotencyRecord,
     KnowledgeItem,
     MediaAsset,
     Offer,
@@ -25,6 +26,7 @@ __all__ = [
     "AuthSession",
     "Base",
     "BrandGuideline",
+    "IdempotencyRecord",
     "KnowledgeItem",
     "MediaAsset",
     "Offer",

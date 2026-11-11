@@ -15,7 +15,7 @@
 | User、Store 生命周期、StoreMembership、Session、AuthorizedStoreContext | #5 Identity & Store | #6–#10 |
 | StoreProfile、Product、Offer、BrandGuideline、KnowledgeItem、MediaAsset | #6 Store Knowledge | #7–#10 |
 | MarketingTask、RequirementSnapshot、StrategySnapshot、TaskStep、DependencyEdge、TaskEvent | #7 Marketing Orchestrator | #8–#10 |
-| Artifact/ArtifactVersion（copy/image）、ReviewRecord、ChannelContent、QualityReport、PublishPackage/Item/Confirmation | #8 Content/Media/Publishing | #7、#9、#10、#12 |
+| Artifact/ArtifactVersion（copy/image）、ReviewRecord、ChannelContent、QualityReport/QualityResolution、PublishPackage/Item/Confirmation | #8 Content/Media/Publishing | #7、#9、#10、#12 |
 | ChannelAccount、平台授权凭据、平台能力状态、PublishOperation | #12 Channel Integration | #8 只引用账号/能力，不持有平台凭据 |
 | Job、JobAttempt、JobEvent、OutboxEvent、JobType、lease/retry/recovery | #9 Job Runtime | #7、#8、#10、#11、#12 |
 | AIInvocation、ModelConfig、Provider capability registry、usage/cost | #9 AI Gateway | #7、#8、#10、#11 |

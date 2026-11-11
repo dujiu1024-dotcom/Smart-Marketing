@@ -2149,11 +2149,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/MemberSummary"
-                  },
-                  "title": "Response List Store Members Api V1 Admin Stores  Store Id  Members Get",
-                  "type": "array"
+                  "$ref": "#/components/schemas/ProductRead"
                 }
               }
             },
@@ -2253,56 +2249,39 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Update Store Member",
+        "summary": "Update Product",
         "tags": [
-          "platform-admin"
+          "store-knowledge"
         ]
       }
     },
-    "/api/v1/auth/csrf": {
-      "post": {
-        "operationId": "refresh_csrf_api_v1_auth_csrf_post",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Refresh Csrf Api V1 Auth Csrf Post",
-                  "type": "object"
+    "/api/v1/store/profile": {
+      "get": {
+        "operationId": "get_store_profile_api_v1_store_profile_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
                 }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Refresh Csrf",
-        "tags": [
-          "identity"
-        ]
-      }
-    },
-    "/api/v1/auth/login": {
-      "post": {
-        "operationId": "login_api_v1_auth_login_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
+              ],
+              "title": "X-Store-Id"
             }
-          },
-          "required": true
-        },
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
+                  "$ref": "#/components/schemas/StoreProfileRead"
                 }
               }
             },

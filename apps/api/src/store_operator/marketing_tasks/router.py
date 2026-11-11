@@ -11,16 +11,33 @@ from store_operator.auth.dependencies import (
     require_store_context,
 )
 from store_operator.db import get_db
-from store_operator.domain.marketing_task import MarketingTaskStatus, MarketingTaskType
+from store_operator.domain.marketing_task import (
+    MarketingTaskStatus,
+    MarketingTaskType,
+    TaskStepKey,
+)
 from store_operator.marketing_tasks.schemas import (
+    MarketingTaskAction,
     MarketingTaskCreate,
     MarketingTaskDetail,
     MarketingTaskList,
+    MarketingTaskRecover,
+    MarketingTaskRequirementConfirm,
+    MarketingTaskRequirementUpdate,
+    MarketingTaskStrategyConfirm,
+    MarketingTaskStepSkip,
 )
 from store_operator.marketing_tasks.service import (
+    archive_marketing_task,
+    cancel_marketing_task,
+    confirm_requirement,
+    confirm_strategy,
     create_marketing_task,
     get_marketing_task,
     list_marketing_tasks,
+    recover_marketing_task,
+    skip_task_step,
+    update_requirement_draft,
 )
 
 router = APIRouter(prefix="/marketing-tasks", tags=["marketing-tasks"])
@@ -75,3 +92,120 @@ def get_task(
     db: Annotated[Session, Depends(get_db)],
 ) -> MarketingTaskDetail:
     return get_marketing_task(db, context, task_id)
+
+
+
+@router.patch("/{task_id}/requirement", response_model=MarketingTaskDetail)
+def patch_requirement(
+    task_id: UUID,
+    payload: MarketingTaskRequirementUpdate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MarketingTaskDetail:
+    return update_requirement_draft(
+        db, request, auth, context, task_id, payload, idempotency_key
+    )
+
+
+@router.post("/{task_id}/requirement/confirm", response_model=MarketingTaskDetail)
+def confirm_task_requirement(
+    task_id: UUID,
+    payload: MarketingTaskRequirementConfirm,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MarketingTaskDetail:
+    return confirm_requirement(
+        db, request, auth, context, task_id, payload, idempotency_key
+    )
+
+
+@router.post("/{task_id}/strategy/confirm", response_model=MarketingTaskDetail)
+def confirm_task_strategy(
+    task_id: UUID,
+    payload: MarketingTaskStrategyConfirm,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MarketingTaskDetail:
+    return confirm_strategy(
+        db, request, auth, context, task_id, payload, idempotency_key
+    )
+
+
+@router.post(
+    "/{task_id}/steps/{step_key}/skip",
+    response_model=MarketingTaskDetail,
+)
+def skip_step(
+    task_id: UUID,
+    step_key: TaskStepKey,
+    payload: MarketingTaskStepSkip,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MarketingTaskDetail:
+    return skip_task_step(
+        db,
+        request,
+        auth,
+        context,
+        task_id,
+        step_key,
+        payload,
+        idempotency_key,
+    )
+
+
+@router.post("/{task_id}/recover", response_model=MarketingTaskDetail)
+def recover_task(
+    task_id: UUID,
+    payload: MarketingTaskRecover,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MarketingTaskDetail:
+    return recover_marketing_task(
+        db, request, auth, context, task_id, payload, idempotency_key
+    )
+
+
+@router.post("/{task_id}/cancel", response_model=MarketingTaskDetail)
+def cancel_task(
+    task_id: UUID,
+    payload: MarketingTaskAction,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MarketingTaskDetail:
+    return cancel_marketing_task(
+        db, request, auth, context, task_id, payload, idempotency_key
+    )
+
+
+@router.post("/{task_id}/archive", response_model=MarketingTaskDetail)
+def archive_task(
+    task_id: UUID,
+    payload: MarketingTaskAction,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+) -> MarketingTaskDetail:
+    return archive_marketing_task(
+        db, request, auth, context, task_id, payload, idempotency_key
+    )

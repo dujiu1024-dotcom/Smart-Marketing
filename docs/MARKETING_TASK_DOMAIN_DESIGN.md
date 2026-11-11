@@ -407,7 +407,8 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | channel_contents | task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status | 每个渠道/输入快照独立；文案版本直接引用，图片版本由关系表引用 |
 | channel_content_artifact_refs | channel_content_id, artifact_version_id, role, position | 只保存图片版本引用；复合 FK 校验同店和精确版本 |
 | quality_reports | task_id, channel_content_id, rule_version, result, issues_json, input_fingerprint, created_at | 结果绑定精确 ChannelContent 与规则版本；输入变化后旧报告 stale |
-| publish_packages | task_id, package_version, fact_snapshot_ids, package_fingerprint, frozen_at, frozen_by_actor_id | (store_id,task_id,package_version) 唯一；聚合一次多渠道交付并冻结 |
+| publish_packages | task_id, package_version, package_fingerprint, frozen_at, frozen_by_actor_id | (store_id,task_id,package_version) 唯一；聚合一次多渠道交付并冻结 |
+| publish_package_fact_refs | publish_package_id, business_fact_snapshot_id, position | (store_id,publish_package_id,business_fact_snapshot_id) 唯一；引用已确认事实快照 |
 | publish_package_items | task_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode, planned_publish_at, item_fingerprint | (store_id,publish_package_id,channel_key) 唯一；每个渠道一条 |
 | publish_confirmations | task_id, publish_package_id, package_fingerprint, confirmed_by_actor_id, confirmed_at, revoked_at, confirmation_text | 确认绑定整个冻结包的精确指纹；新包不得复用旧确认 |
 | task_events | task_id, aggregate_version, event_type, actor_id, actor_type, correlation_id, causation_id, payload_json, schema_version, occurred_at | 追加写；event_id 唯一 |
@@ -422,7 +423,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 - artifact_versions 通过 (store_id, task_id, artifact_id) 引用产物；artifacts.current_version_id 必须引用同一 artifact 的版本。
 - review_records 与 revision_requests 必须引用同门店、同任务、同产物的精确版本；禁止只保存全局 artifact_version_id 而不验证归属链。
 - dependency_edges 两端都必须归属同门店同任务；若依赖门店资料快照，使用显式 upstream_type/source_ref 与来源版本快照，不建立跨域可写外键。
-- channel_contents.copy_version_id 通过 (store_id,task_id,artifact_version_id) 复合 FK 引用同任务已审核的文案版本；channel_content_artifact_refs 通过 store_id 复合 FK 引用已审核图片版本；quality_reports 引用确切 ChannelContent；publish_package_items 的 channel_key 必须匹配 ChannelContent，且 QualityReport 必须属于同一 ChannelContent；publish_packages 通过 publish_package_items 聚合渠道快照；publish_confirmations 引用冻结发布包。PublishOperation 由 #12 持有，不在 #7/#8 建立 publish_attempts 表。
+- publish_package_fact_refs 复合 FK 到同店已确认 BusinessFactSnapshot；channel_contents.copy_version_id 通过 (store_id,task_id,artifact_version_id) 复合 FK 引用同任务已审核的文案版本；channel_content_artifact_refs 通过 store_id 复合 FK 引用已审核图片版本；quality_reports 引用确切 ChannelContent；publish_package_items 的 channel_key 必须匹配 ChannelContent，且 QualityReport 必须属于同一 ChannelContent；publish_packages 通过 publish_package_items 聚合渠道快照；publish_confirmations 引用冻结发布包。PublishOperation 由 #12 持有，不在 #7/#8 建立 publish_attempts 表。
 - jobs 属于轨道 D 的异步基础设施模型，但必须携带 store_id、task_id、触发 actor、目标资源引用和输入指纹，并在领取/写回时校验归属。具体 Job 表不在本节重复定义。
 
 ### 15.4 必需索引（逻辑要求）
@@ -439,6 +440,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | channel_content_artifact_refs | (store_id,channel_content_id,position) |
 | quality_reports | (store_id,channel_content_id,rule_version,input_fingerprint)；(store_id,channel_content_id,id) |
 | publish_packages | (store_id,task_id,package_version DESC) |
+| publish_package_fact_refs | (store_id,publish_package_id,business_fact_snapshot_id) |
 | publish_package_items | (store_id,publish_package_id,channel_key) |
 | task_events | (store_id,task_id,occurred_at) |
 | audit_events | (store_id,occurred_at DESC)；(actor_id,occurred_at DESC) |

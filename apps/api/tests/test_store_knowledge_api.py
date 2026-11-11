@@ -152,7 +152,9 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     assert stale_product.json()["error"]["code"] == "VERSION_CONFLICT"
 
 
-def test_store_knowledge_api_rejects_missing_store_context(identity_client, db_session, monkeypatch):
+def test_store_knowledge_api_rejects_missing_store_context(
+    identity_client, db_session, monkeypatch
+):
     import store_operator.auth.router as auth_router
 
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())

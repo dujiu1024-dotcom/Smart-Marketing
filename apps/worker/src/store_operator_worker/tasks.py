@@ -1025,6 +1025,8 @@ def _mark_douyin_operation(
             operation.published_at = datetime.now(UTC)
             operation.last_readback_at = datetime.now(UTC)
             operation.next_attempt_at = None
+        if status in {"published", "needs_human", "failed", "cancelled"}:
+            operation.next_attempt_at = None
         if error_code is not None:
             operation.last_error_code = error_code
         if error_summary is not None:
@@ -1203,6 +1205,13 @@ def execute_douyin_publish(
         raise JobExecutionError(
             "DOUYIN_UPLOAD_FAILED",
             "Douyin image upload failed before public submission.",
+            retryable=True,
+            retry_delay_seconds=60,
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 - upload has no public-post side effect
+        raise JobExecutionError(
+            "DOUYIN_UPLOAD_UNAVAILABLE",
+            "The private image could not be uploaded to Douyin; retry is safe.",
             retryable=True,
             retry_delay_seconds=60,
         ) from exc

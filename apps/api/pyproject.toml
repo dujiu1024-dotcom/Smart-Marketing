@@ -5,6 +5,7 @@ description = "AI Store Operator modular monolith API"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "fastapi>=0.156,<0.157",
+  "httpx>=0.28,<1",
   "uvicorn[standard]>=0.35",
   "pydantic>=2.14,<3",
   "pydantic-settings>=2.9",
@@ -14,7 +15,6 @@ dependencies = [
   "alembic>=1.15",
   "redis>=6.2",
   "celery[redis]>=5.7,<5.8",
-  "httpx>=0.28,<1",
   "boto3>=1.38",
   "structlog>=25.3",
   "opentelemetry-api>=1.45,<2",

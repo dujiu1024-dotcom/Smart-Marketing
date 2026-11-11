@@ -81,6 +81,8 @@ erDiagram
   ARTIFACT ||--o{ ARTIFACT_VERSION : versions
   ARTIFACT_VERSION ||--o{ REVIEW_RECORD : reviewed
   MARKETING_TASK ||--o{ CHANNEL_CONTENT : adapts
+  CHANNEL_CONTENT ||--o{ CHANNEL_CONTENT_ARTIFACT_REF : contains
+  ARTIFACT_VERSION ||--o{ CHANNEL_CONTENT_ARTIFACT_REF : image_ref
   CHANNEL_CONTENT ||--o{ QUALITY_REPORT : validates
   MARKETING_TASK ||--o{ PUBLISH_PACKAGE : freezes
   PUBLISH_PACKAGE ||--|{ PUBLISH_PACKAGE_ITEM : contains
@@ -229,8 +231,6 @@ erDiagram
     {
       "channel_key": "wechat_official_account",
       "channel_content_id": "7e8c9a10-0000-4000-8000-000000000006",
-      "copy_version_id": "7e8c9a10-0000-4000-8000-000000000003",
-      "image_version_ids": ["7e8c9a10-0000-4000-8000-000000000004"],
       "quality_report_id": "7e8c9a10-0000-4000-8000-000000000005",
       "channel_account_id": "7e8c9a10-0000-4000-8000-000000000007",
       "delivery_mode": "official_api",
@@ -239,8 +239,6 @@ erDiagram
     {
       "channel_key": "douyin",
       "channel_content_id": "7e8c9a10-0000-4000-8000-000000000008",
-      "copy_version_id": "7e8c9a10-0000-4000-8000-000000000009",
-      "image_version_ids": ["7e8c9a10-0000-4000-8000-000000000004"],
       "quality_report_id": "7e8c9a10-0000-4000-8000-000000000011",
       "channel_account_id": null,
       "delivery_mode": "manual_handoff",
@@ -320,11 +318,12 @@ erDiagram
 7. Job 尝试唯一：`UNIQUE(job_id, attempt_no)`；租约领取用原子 UPDATE/SELECT FOR UPDATE SKIP LOCKED。
 8. Outbox 消费端持久化 event_id 去重；Relay 通过租约/锁避免并发重复 claim。
 9. PublishPackage 与 PublishPackageItem 冻结后禁止 UPDATE；PublishConfirmation 绑定整个 package fingerprint。
-10. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 的 ChannelContent/QualityReport/ArtifactVersion 复合 FK 必须包含 store_id。
-11. 一个 PublishPackage 至少有一个 PackageItem；manual_handoff 时 channel_account_id 允许 NULL，official_api 时必须非 NULL。
-12. PublishOperation（#12）对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
-13. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
-14. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
+10. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 的 ChannelContent/QualityReport 复合 FK 必须包含 store_id。
+11. ChannelContentArtifactRef 以 (store_id, channel_content_id, position) 唯一，并对 ChannelContent/ArtifactVersion 使用包含 store_id 的复合 FK；图片数组仅是 API projection。
+12. 一个 PublishPackage 至少有一个 PackageItem；manual_handoff 时 channel_account_id 允许 NULL，official_api 时必须非 NULL。
+13. PublishOperation（#12）对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
+14. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
+15. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

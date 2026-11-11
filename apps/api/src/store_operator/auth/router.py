@@ -23,6 +23,8 @@ from store_operator.auth.schemas import (
     LoginResponse,
     LogoutAllRequest,
     MeResponse,
+    PasswordChangeRequest,
+    PasswordChangeResponse,
     SessionSummary,
     StoreSummary,
     UserSummary,
@@ -31,6 +33,7 @@ from store_operator.auth.security import (
     csrf_token_verifier,
     dummy_password_hash,
     fingerprint,
+    hash_password,
     normalize_email,
     random_token,
     session_token_verifier,
@@ -290,3 +293,101 @@ def logout_all(
     _clear_session_cookie(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+@router.post("/auth/password/change", response_model=PasswordChangeResponse)
+def change_password(
+    payload: PasswordChangeRequest,
+    request: Request,
+    response: Response,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    db: Annotated[Session, Depends(get_db)],
+) -> PasswordChangeResponse:
+    current_password = payload.current_password.get_secret_value()
+    new_password = payload.new_password.get_secret_value()
+    if current_password == new_password:
+        raise ApiError(422, "PASSWORD_UNCHANGED", "Choose a different password")
+
+    try:
+        user = db.scalar(select(User).where(User.id == auth.user.id).with_for_update())
+        if user is None or user.status != "active":
+            raise ApiError(401, "UNAUTHENTICATED", "Unauthenticated")
+        if not verify_password(user.password_hash, current_password):
+            raise ApiError(401, "REAUTHENTICATION_REQUIRED", "Reauthentication required")
+
+        now = datetime.now(UTC)
+        active_store_id = auth.session.active_store_id
+        if active_store_id is not None:
+            membership = db.execute(
+                select(StoreMembership, Store)
+                .join(Store, Store.id == StoreMembership.store_id)
+                .where(
+                    StoreMembership.store_id == active_store_id,
+                    StoreMembership.user_id == user.id,
+                    StoreMembership.status == "active",
+                    Store.status == "active",
+                )
+            ).first()
+            if membership is None:
+                active_store_id = None
+
+        sessions = db.scalars(
+            select(AuthSession)
+            .where(
+                AuthSession.user_id == user.id,
+                AuthSession.revoked_at.is_(None),
+            )
+            .with_for_update()
+        ).all()
+        for old_session in sessions:
+            old_session.revoked_at = now
+            old_session.revoke_reason = "password_changed"
+
+        user.password_hash = hash_password(new_password)
+        user.password_changed_at = now
+        user.auth_version += 1
+
+        raw_token = random_token()
+        csrf_token = random_token()
+        expires_at = now + timedelta(seconds=settings.session_absolute_timeout_seconds)
+        new_session = AuthSession(
+            id=uuid4(),
+            user_id=user.id,
+            token_hash=session_token_verifier(raw_token, settings.session_token_pepper),
+            csrf_token_hash=csrf_token_verifier(csrf_token),
+            auth_version=user.auth_version,
+            active_store_id=active_store_id,
+            created_at=now,
+            last_seen_at=now,
+            idle_expires_at=now + timedelta(seconds=settings.session_idle_timeout_seconds),
+            expires_at=expires_at,
+            rotated_from_session_id=auth.session.id,
+            ip_fingerprint=auth.session.ip_fingerprint,
+            user_agent=request.headers.get("user-agent", "")[:512] or None,
+        )
+        db.add(new_session)
+        record_audit(
+            db,
+            request,
+            action="auth.password.changed",
+            target_type="user",
+            target_id=user.id,
+            actor_user_id=user.id,
+            store_id=active_store_id,
+            metadata={"revoked_session_count": len(sessions)},
+        )
+        db.commit()
+    except ApiError:
+        db.rollback()
+        raise
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise ApiError(
+            503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
+        ) from exc
+
+    _set_session_cookie(response, raw_token)
+    return PasswordChangeResponse(
+        session=SessionSummary(expires_at=expires_at),
+        csrf_token=csrf_token,
+    )

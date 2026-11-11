@@ -113,6 +113,20 @@ def test_platform_admin_can_create_publish_and_rollback_prompt_versions(
     )
     assert published.status_code == 200, published.text
     assert published.json()["action"] == "publish"
+    replayed = identity_client.post(
+        f"/api/v1/admin/prompt-templates/{template_id}/versions/{first_id}/publish",
+        headers={**headers, "Idempotency-Key": "prompt-publish-v1"},
+        json={"reason": "Initial reviewed release"},
+    )
+    assert replayed.status_code == 200, replayed.text
+    assert replayed.json()["id"] == published.json()["id"]
+    key_conflict = identity_client.post(
+        f"/api/v1/admin/prompt-templates/{template_id}/versions/{first_id}/publish",
+        headers={**headers, "Idempotency-Key": "prompt-publish-v1"},
+        json={"reason": "Different reason"},
+    )
+    assert key_conflict.status_code == 409
+    assert key_conflict.json()["error"]["code"] == "IDEMPOTENCY_KEY_REUSED"
 
     second = create_version("Improve store tone")
     assert second.status_code == 201, second.text

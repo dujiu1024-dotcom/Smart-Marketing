@@ -19,6 +19,12 @@ class JobExecutionError(Exception):
         side_effect_state: SideEffectState = SideEffectState.NONE,
         retry_delay_seconds: int = 30,
     ) -> None:
+        if not code or len(code) > 100:
+            raise ValueError("error code must contain 1-100 characters")
+        if not safe_summary.strip():
+            raise ValueError("A safe error summary is required")
+        if retry_delay_seconds < 0:
+            raise ValueError("retry_delay_seconds cannot be negative")
         super().__init__(safe_summary)
         self.code = code
         self.safe_summary = safe_summary

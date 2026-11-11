@@ -75,7 +75,7 @@
 | Content Studio | 文案生成、编辑、版本、文案独立审核 | CopyArtifact、ArtifactVersion、ReviewRecord | 否 |
 | Media Studio | 原图管理、图片生成/编辑、图片版本与审核 | MediaAsset、ImageArtifact、ReviewRecord | 否 |
 | Quality Assurance | 事实、优惠、平台规则、OCR、画质与品牌检查 | QualityReport、QualityIssue | 否 |
-| Channel Integration | 渠道能力发现、账号授权、内容适配、草稿、发布和指标读取 | ChannelAccount、ChannelOperation | 否；Worker 执行 |
+| Channel Integration | 渠道能力发现、门店账号授权、内容适配、草稿、发布和指标读取 | ChannelAccount、OAuthAuthorizationAttempt、ChannelSpec/Version、ChannelCapabilitySnapshot、PublishOperation/Attempt | 否；Worker 执行 |
 | Publishing | 冻结发布包、商家确认、发布幂等与结果核验 | PublishPackage、PublishConfirmation | 否 |
 | Performance & Attribution | 内容/意向/经营指标、采集来源、观察窗口、归因可信度 | MetricObservation、AttributionEvidence | 否 |
 | AI Gateway | 模型路由、供应商配置、结构化输出、超时、重试、成本审计 | ModelConfig、AIInvocation、Provider capability registry | 可后续独立 |
@@ -276,6 +276,7 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 - Adapter 接口稳定，操作结果可通过事件回传。
 
 渠道服务不拥有营销任务主状态，也不能绕过发布确认规则。
+渠道账号属于门店前端；平台管理员后台不提供渠道连接中心。#12 只接受 #8 已冻结并由商家确认的 PublishPackage，不持有 AI Prompt/ModelConfig，也不直接修改 MarketingTask。
 
 ### 阶段 D：按需抽取分析服务
 

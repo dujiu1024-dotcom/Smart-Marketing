@@ -91,6 +91,14 @@ erDiagram
   PUBLISH_PACKAGE ||--|{ PUBLISH_PACKAGE_ITEM : contains
   PUBLISH_PACKAGE_ITEM }o--|| CHANNEL_CONTENT : references
   PUBLISH_PACKAGE_ITEM }o--|| QUALITY_REPORT : binds
+  PUBLISH_PACKAGE_ITEM ||--o{ PUBLISH_OPERATION : publishes
+  CHANNEL_ACCOUNT ||--o{ PUBLISH_OPERATION : uses
+  PUBLISH_OPERATION ||--o{ PUBLISH_OPERATION_ATTEMPT : attempts
+  CHANNEL_ACCOUNT ||--o{ OAUTH_AUTHORIZATION_ATTEMPT : authorizes
+  CHANNEL_SPEC ||--o{ CHANNEL_SPEC_VERSION : versions
+  CHANNEL_ACCOUNT ||--o{ CHANNEL_CAPABILITY_SNAPSHOT : discovers
+  CHANNEL_SPEC_VERSION ||--o{ CHANNEL_CONTENT : adapts_with
+  CHANNEL_SPEC_VERSION ||--o{ CHANNEL_CAPABILITY_SNAPSHOT : constrains
   PUBLISH_PACKAGE ||--o{ PUBLISH_CONFIRMATION : confirms
   MARKETING_TASK ||--o{ DEPENDENCY_EDGE : links
   MARKETING_TASK ||--o{ TASK_EVENT : emits
@@ -139,6 +147,17 @@ PromptTemplate/PromptVersion/PromptActivation 是全局平台配置，不含 sto
 - AIInvocation.prompt_version_id 固定引用实际 PromptVersion；历史调用不得读取当前模板指针。
 
 AIInvocation 扩展建议（待 #9 联合评审）：nullable `provider_request_id` 与 `usage_json`，用于供应商任务对账和分项 usage/成本复算；未批准前不视为冻结字段。
+
+### 3.6 Channel Integration（#12）
+
+- ChannelAccount（门店级）：id、store_id、channel_key、external_account_id、display_name、authorization_status、granted_scopes_json、access_token_secret_ref、refresh_token_secret_ref、token_expires_at、authorized_by_user_id、authorized_at、last_verified_at、version。Token 不存明文。
+- OAuthAuthorizationAttempt：store_id、channel_key、requested_by_user_id、state_hash、nonce、pkce_verifier_secret_ref、redirect_uri_key、expires_at、consumed_at；state 单次使用且短 TTL。
+- ChannelSpec/ChannelSpecVersion（全局无 store_id）：ChannelSpec 持有 channel_key/current_version_id；ChannelSpecVersion 保存 spec_version、文本/媒体/标签/链接/排期约束、draft/publish capability、官方来源证据；版本不可变。
+- ChannelCapabilitySnapshot（门店账号级）：store_id、channel_account_id、channel_spec_version_id、capability_key、support_status、evidence_ref、checked_at、expires_at；必须绑定确切规格版本，unsupported/pending_verification 不得伪装已接通。
+- PublishOperation：store_id、publish_package_id、package_item_id、package_fingerprint、channel_account_id、action(save_draft|publish)、status(requested|queued|submitting|processing|draft_saved|published|failed|needs_human|cancelled)、idempotency_key、request_fingerprint、external_request_id、external_post_id、external_url、response_evidence_ref、error_code、timestamps。
+- PublishOperationAttempt：publish_operation_id、attempt_no、adapter_version、request_fingerprint、external_request_id、response_evidence_ref、normalized_status、error_code、retryable、timestamps。与 #9 JobAttempt 分离。
+
+PublishOperation.published 必须有 external_post_id 或等价平台证据；Job succeeded 只代表 Worker 执行完成。manual_handoff 不创建 PublishOperation。ChannelAccount/PublishOperation 均为 store-scoped；ChannelSpecVersion 是平台级全局配置。
 
 ## 4. API 通用约定
 
@@ -370,6 +389,15 @@ AIInvocation 扩展建议（待 #9 联合评审）：nullable `provider_request_
 20. PromptActivation 追加写并按 idempotency_record_id 去重；只能引用同一 PromptTemplate 的 published PromptVersion。
 21. AIInvocation.prompt_version_id 必须引用精确 PromptVersion；历史调用不得动态读取 PromptTemplate.current_published_version_id。
 22. PromptTemplate.current_published_version_id 通过复合 FK 校验 PromptVersion 属于同一模板；PromptActivation 的 activated_version_id/previous_version_id 也必须属于该模板且为 published 版本。
+23. ChannelAccount UNIQUE(channel_key, external_account_id)；首期同一外部账号不得跨 store 绑定；所有 ChannelAccount/Capability/Operation 复合 FK 必须同 store。
+24. OAuthAuthorizationAttempt.state_hash UNIQUE、expires_at 必须有效、consumed_at 只允许从 NULL 单向设置；不得存 state/code 原文。
+25. ChannelSpecVersion UNIQUE(channel_spec_id, spec_version)，发布后不可 UPDATE/DELETE；ChannelCapabilitySnapshot 引用精确 channel_spec_version_id。
+26. PublishOperation UNIQUE(store_id, package_item_id, channel_account_id, action, package_fingerprint)；idempotency_key 唯一，且复合 FK 到同店 PublishPackage/PackageItem/ChannelAccount。
+27. PublishOperationAttempt UNIQUE(publish_operation_id, attempt_no)，外部请求证据按受控引用保存。
+28. PublishOperation.status=published 时必须有 external_post_id 或平台等价成功证据；draft_saved 必须有平台草稿证据。
+29. ChannelSpec UNIQUE(channel_key)；ChannelSpecVersion UNIQUE(channel_spec_id,spec_version)，current_version_id 通过复合 FK 指向同一 ChannelSpec 的不可变版本。
+30. ChannelCapabilitySnapshot 复合 FK 到同店 ChannelAccount 和 ChannelSpecVersion；历史能力快照禁止覆盖。
+31. ChannelContent.channel_spec_version_id 必须 FK 到精确 ChannelSpecVersion；PublishPackage/PackageItem 冻结时将其纳入 item/package fingerprint。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

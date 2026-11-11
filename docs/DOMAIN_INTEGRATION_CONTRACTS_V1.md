@@ -119,8 +119,8 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 - Copy 与 Image review 分开保存和查询。
 
 ### ChannelContent
-`id, store_id, task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。图片版本通过 ChannelContentArtifactRef 子表按 position 引用。每个渠道/输入指纹对应不可变快照；变更创建新记录。
-- 渠道规则与账号能力分开：spec_version 表示 #12 发布的适配规格版本；ChannelContent 不绑定具体账号，目标账号只在 PublishPackageItem 中引用，账号授权和支持能力由 Channel Integration 持有。
+`id, store_id, task_id, channel_key, copy_version_id, payload_json, channel_spec_version_id, input_fingerprint, status, created_at, updated_at`。图片版本通过 ChannelContentArtifactRef 子表按 position 引用。每个渠道/输入指纹对应不可变快照；变更创建新记录。
+- 渠道规则与账号能力分开：channel_spec_version_id 复合 FK 指向 #12 发布的精确 ChannelSpecVersion；ChannelContent 不绑定具体账号，目标账号只在 PublishPackageItem 中引用，账号授权和支持能力由 Channel Integration 持有。
 - 变体依赖指纹变化时标 stale。
 
 ### QualityReport
@@ -196,6 +196,27 @@ ProviderContext 扩展提案：store_id/actor_scope、task_id、job_id、invocat
 - PROVIDER_AUTH_FAILED：不自动无限重试，通知管理员检查 Secret reference。
 - PROVIDER_POLICY_BLOCKED：记录合规阻断，不尝试通过提示词绕过安全策略。
 
+## 8.5 Channel Integration（#12）
+
+#12 是门店渠道账号、平台授权、平台规格/能力快照和外部发布结果的唯一权威所有者；渠道账号属于门店前端，不在平台管理员后台建立独立渠道连接中心。
+
+- ChannelAccount（门店级）：id、store_id、channel_key、external_account_id、display_name、authorization_status、granted_scopes_json、access_token_secret_ref、refresh_token_secret_ref、token_expires_at、authorized_by_user_id、authorized_at、last_verified_at、version。Token 只保存在 Secret Manager/Vault，DB 只保存 secret_ref。
+- OAuthAuthorizationAttempt：store_id、channel_key、requested_by_user_id、state_hash、nonce、pkce_verifier_secret_ref、redirect_uri_key、expires_at、consumed_at。state 一次性、短 TTL；callback 必须重新验证 #5 membership 和 store 状态。
+- ChannelSpec（全局无 store_id）：id、channel_key、current_version_id、status；ChannelSpecVersion（全局无 store_id）：id、channel_spec_id、spec_version、text/media/hashtag/link/schedule constraints、draft/publish capability、official source evidence、published_at。ChannelSpecVersion 不可变，current_version_id 复合 FK 指向同一 ChannelSpec。
+- ChannelCapabilitySnapshot（门店账号级）：store_id、channel_account_id、channel_spec_version_id、capability_key、support_status、evidence_ref、checked_at、expires_at。unsupported/pending_verification 不得伪装为已接通。
+- PublishOperation：store_id、publish_package_id、package_item_id、package_fingerprint、channel_account_id、action(save_draft|publish)、status、idempotency_key、request_fingerprint、external_request_id、external_post_id、external_url、response_evidence_ref、error_code、requested_by_user_id、timestamps。
+- PublishOperationAttempt：publish_operation_id、attempt_no、adapter_version、request_fingerprint、external_request_id、response_evidence_ref、normalized_status、error_code、retryable、started_at、finished_at。它与 #9 JobAttempt 分离：JobAttempt 是 Worker 执行尝试，PublishOperationAttempt 是外部 API 调用事实。
+
+PublishOperation 状态：requested/queued/submitting/processing/draft_saved/published/failed/needs_human/cancelled。它不是 Job 状态。Job succeeded 只代表执行器完成；只有平台真实响应/作品 ID 等证据才能把 PublishOperation 置为 published。
+
+#12 ChannelAdapter 接口包含 OAuth URL/code exchange/token refresh/revoke、account profile、capability discovery、content validation、draft create/read-back、publish、operation status/reconcile、published item read-back、raw metrics fetch。平台不支持某能力时明确返回 unsupported；不创建假草稿/假发布。
+
+发布前必须重验 #5 AuthorizedStoreContext、Store/StoreMembership、#8 PublishConfirmation 与 package fingerprint、PackageItem/ChannelContent/QualityReport 新鲜度、ChannelAccount 状态和当前 ChannelCapabilitySnapshot。manual_handoff 不创建 PublishOperation；仅 official_api PackageItem 可创建。
+
+幂等范围建议为 store_id + package_item_id + channel_account_id + action + package_fingerprint。外部 timeout 结果未知时先按 external_request_id/作品查询/Webhook 对账；无法核验则 needs_human，禁止盲目重发。OAuth Token/授权码不得进入 DB 明文、前端、日志或 Outbox payload。
+
+首个平台尚未选择。项目负责人确认前只评审通用 Adapter 契约，不实现平台专属 OAuth/SDK/发布流程。
+
 ## 9. API 与事件的共同约束
 
 - API 版本前缀 `/api/v1`；JSON Schema 由 Pydantic 生成 OpenAPI，TypeScript Client 从 OpenAPI 生成。
@@ -233,6 +254,20 @@ ProviderContext 扩展提案：store_id/actor_scope、task_id、job_id、invocat
 - POST /api/v1/publish-packages/{package_id}/publish（为 official_api PackageItem 创建发布命令）
 发布 API 必须在服务端重新校验每个 item 的审核、质检指纹、最终确认、门店状态、账号授权和发布幂等键；外部成功状态由 #12 PublishOperation 证据回传。
 
+### #12 Channel Integration
+- GET /api/v1/stores/{store_id}/channel-accounts
+- POST /api/v1/stores/{store_id}/channel-accounts/{channel_key}/oauth/start
+- GET /api/v1/channel-oauth/{channel_key}/callback
+- POST /api/v1/stores/{store_id}/channel-accounts/{id}/disconnect
+- POST /api/v1/stores/{store_id}/channel-accounts/{id}/capabilities/refresh
+- POST /api/v1/stores/{store_id}/channel-accounts/{id}/refresh
+- GET /api/v1/stores/{store_id}/channel-accounts/{id}/capabilities
+- POST /api/v1/publish-operations（仅 #8/#9 内部命令，需确认 package fingerprint）
+- GET /api/v1/publish-operations/{id}
+- POST /api/v1/publish-operations/{id}/reconcile
+- POST /api/v1/channel-webhooks/{channel_key}（签名验证与事件去重）
+首个渠道必须经产品负责人确认；所有门店读写由 #5 AuthorizedStoreContext 授权。
+
 ### #10 Prompt 管理
 - GET/POST /api/v1/admin/prompt-templates
 - GET /api/v1/admin/prompt-templates/{template_id}
@@ -269,7 +304,11 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 | content.publish_package_frozen | #8 | #7 | 多渠道交付包已冻结 |
 | content.publish_confirmed | #8 | #9 | 商家确认整个 package fingerprint，可请求发布 Job |
 | content.publish_command_requested | #8 | #12/#9 | 每个 official_api PackageItem 单独提交受控发布命令 |
-| channel.publish_operation_started/succeeded/failed/needs_human | #12 | #7/#8/#9 | 外部发布状态必须由平台证据确认 |
+| channel.account_authorized/reauth_required/revoked | #12 | #5/#8 | 门店渠道授权生命周期变化 |
+| channel.spec_version_published | #12 | #8 | 新规格发布；旧 ChannelContent 对新任务标记 stale，冻结包保留原版本并在发布前重新验证 |
+| channel.spec_version_published | #12 | #8 | 新规格发布；旧 ChannelContent 对新任务 stale，冻结包保留原版本并在发布前重新验证 |
+| channel.capabilities_refreshed | #12 | #8 | 账号能力快照更新，触发渠道内容/发布门禁重新评估 |
+| channel.publish_operation_created/updated/published/needs_human | #12 | #7/#8/#9 | 外部发布状态必须由平台证据确认 |
 | job.succeeded/failed/needs_human | #9 | 发起该 Job 的业务域 | 回传执行结果；业务域校验后更新自己的状态 |
 | prompt.version_published | #10 | #9 | 新 PromptVersion 发布，后续调用可引用 |
 | prompt.version_activated | #10 | #9 | 当前 Prompt 指针激活/回滚，历史 invocation 不变 |
@@ -293,6 +332,10 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 12. AI 返回未经确认的价格/优惠/门店事实：事实校验失败，不进入正式产物。
 13. 旧 PublishPackage 确认后上游版本变化：旧包不可修改，新包必须重新确认。
 15. 多渠道 PublishPackage 的任一 PackageItem 缺少审核/质检或跨店引用：整个 Freeze 原子失败，不得产生半包。
+16. OAuth callback state 过期/重放/发起成员已撤销：拒绝创建或更新 ChannelAccount。
+17. 同一 PublishOperation 重复提交或 Webhook 重放：按 operation idempotency_key / platform event ID 去重。
+18. Worker Job succeeded 但无 external_post_id/平台成功证据：PublishOperation 不得标 published。
+19. 外部发布 timeout 且平台不支持状态查询：进入 needs_human，不盲目重发。
 14. 平台管理员访问门店内容：默认拒绝，必要支持访问必须有独立受审计授权。
 
 ## 13. 冻结清单与阻塞项
@@ -311,6 +354,8 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 - [ ] 所有门店资源复合外键、统一错误语义、幂等和乐观锁约定。
 - [ ] API 路径、请求/响应 Schema 和事件 schema_version 进入 OpenAPI/契约测试。
 - [ ] #8 多渠道 PackageItem、manual_handoff 与 official_api 发布命令边界完成 #12 联合评审。
+- [ ] #12 首个平台官方 API/OAuth、账号授权、草稿/发布/状态查询能力和主体资质由项目负责人确认；未确认不得实现特定平台。
+- [ ] #12 PublishOperation 与 #9 Job 状态、Attempt、幂等和 needs_human 对账边界完成联合评审。
 
 
 ## 14. Identity request context and platform-admin boundary alignment

@@ -276,6 +276,18 @@ class TaskStep(StoreTaskScoped, Base):
             "applicability IN ('required', 'optional', 'not_applicable')",
             name="applicability",
         ),
+        CheckConstraint(
+            "status != 'skipped' OR (skip_reason IS NOT NULL AND length(btrim(skip_reason)) > 0)",
+            name="skipped_reason",
+        ),
+        CheckConstraint(
+            "applicability != 'required' OR status != 'skipped'",
+            name="required_not_skipped",
+        ),
+        CheckConstraint(
+            "applicability != 'not_applicable' OR status IN ('skipped', 'stale')",
+            name="not_applicable_status",
+        ),
         CheckConstraint("version >= 1", name="version_positive"),
         ForeignKeyConstraint(
             ["store_id", "task_id"],

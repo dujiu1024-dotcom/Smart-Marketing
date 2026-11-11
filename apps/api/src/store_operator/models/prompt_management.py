@@ -32,7 +32,11 @@ class PromptTemplate(Base):
             "template_key",
             name="uq_prompt_templates_scope_key",
         ),
-        UniqueConstraint("id", "current_published_version_id", name="uq_prompt_templates_current_version"),
+        UniqueConstraint(
+            "id",
+            "current_published_version_id",
+            name="uq_prompt_templates_current_version",
+        ),
         ForeignKeyConstraint(
             ["id", "current_published_version_id"],
             ["prompt_versions.prompt_template_id", "prompt_versions.id"],

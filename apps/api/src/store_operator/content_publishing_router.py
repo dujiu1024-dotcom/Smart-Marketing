@@ -183,6 +183,8 @@ def _validate_confirmed_fact(
     if (
         revision is None
         or revision.confirmed_at is None
+        or revision.content_fingerprint != fact.content_fingerprint
+        or revision.snapshot_json != fact.value_json
         or (revision.valid_from is not None and revision.valid_from > now)
         or (revision.valid_until is not None and revision.valid_until <= now)
     ):
@@ -288,8 +290,8 @@ def freeze_publish_package(
         raise ApiError(404, "TASK_NOT_FOUND", "Marketing task not found")
     if task.version != payload.expected_task_version:
         raise ApiError(409, "TASK_VERSION_CONFLICT", "Marketing task version has changed")
-    if task.lifecycle_status in {"cancelled", "archived", "failed"}:
-        raise ApiError(409, "TASK_NOT_FREEZABLE", "Marketing task cannot be frozen")
+    if task.lifecycle_status not in {"active", "waiting_for_user"}:
+        raise ApiError(409, "TASK_NOT_FREEZABLE", "Marketing task must be active before freezing")
 
     requirement = db.scalar(
         select(RequirementSnapshot).where(
@@ -308,8 +310,11 @@ def freeze_publish_package(
     if (
         requirement is None
         or requirement.confirmed_at is None
+        or requirement.confirmed_by_user_id is None
         or strategy is None
+        or strategy.requirement_snapshot_id != requirement.id
         or strategy.confirmed_at is None
+        or strategy.confirmed_by_user_id is None
     ):
         raise ApiError(
             422,

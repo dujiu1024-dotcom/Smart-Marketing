@@ -71,10 +71,16 @@ async def main() -> None:
             assert await tab.get_attribute("aria-selected") == "true"
             assert tab_name in await tab.inner_text()
 
-        # Product and offer editors are independent second-level pages.
-        await route_to("store-editor:product:p1", "编辑商品")
-        await page.get_by_role("button", name="返回列表", exact=True).wait_for(state="visible")
+        # Product and offer editors are independent second-level pages reached through their lists.
+        await route_to("store:products", "门店资料")
+        await page.locator('[data-action="edit-product"]').first.click()
+        await route_to("store-editor:product:p1", "编辑商品 / 服务")
+        await page.get_by_label("商品 / 服务名称").wait_for(state="visible")
+        await page.get_by_role("button", name="返回列表", exact=True).click()
+        await route_to("store:offers", "门店资料")
+        await page.locator('[data-action="edit-offer"]').first.click()
         await route_to("store-editor:offer:o1", "编辑活动与优惠")
+        await page.get_by_label("活动名称").wait_for(state="visible")
         await page.get_by_role("button", name="返回列表", exact=True).wait_for(state="visible")
 
         # Platform administration top-level pages.

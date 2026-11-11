@@ -19,6 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from store_operator.application.system_info import get_system_info
 from store_operator.config import settings
 from store_operator.observability import configure_logging
 from store_operator.tracing import configure_tracing
@@ -194,9 +195,10 @@ def ready() -> JSONResponse:
 
 @app.get("/api/v1/system/info", tags=["system"])
 def system_info() -> dict[str, str]:
+    info = get_system_info(app_name=settings.app_name, environment=settings.environment)
     return {
-        "name": settings.app_name,
-        "environment": settings.environment,
-        "api_version": "v1",
+        "name": info.name,
+        "environment": info.environment,
+        "api_version": info.api_version,
     }
 

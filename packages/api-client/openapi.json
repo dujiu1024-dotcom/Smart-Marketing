@@ -3148,6 +3148,42 @@
         "title": "MediaAssetRead",
         "type": "object"
       },
+      "MediaAssetUsageRightsConfirm": {
+        "properties": {
+          "expected_sha256": {
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "title": "Expected Sha256",
+            "type": "string"
+          },
+          "expected_version": {
+            "minimum": 1.0,
+            "title": "Expected Version",
+            "type": "integer"
+          },
+          "license_note": {
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "License Note",
+            "type": "string"
+          },
+          "usage_rights_status": {
+            "enum": [
+              "confirmed_allowed",
+              "restricted"
+            ],
+            "title": "Usage Rights Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "expected_sha256",
+          "usage_rights_status",
+          "license_note"
+        ],
+        "title": "MediaAssetUsageRightsConfirm",
+        "type": "object"
+      },
       "MemberPatchRequest": {
         "properties": {
           "role": {
@@ -8509,6 +8545,168 @@
           }
         },
         "summary": "Complete Asset Upload",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/assets/{asset_id}/archive": {
+      "post": {
+        "operationId": "archive_media_asset_api_v1_store_assets__asset_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaAssetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Media Asset",
+        "tags": [
+          "store-knowledge"
+        ]
+      }
+    },
+    "/api/v1/store/assets/{asset_id}/confirm-usage-rights": {
+      "post": {
+        "operationId": "confirm_media_asset_usage_rights_api_v1_store_assets__asset_id__confirm_usage_rights_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaAssetUsageRightsConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaAssetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Media Asset Usage Rights",
         "tags": [
           "store-knowledge"
         ]

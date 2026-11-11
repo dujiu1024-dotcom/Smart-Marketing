@@ -156,7 +156,9 @@ def execute_job(job_id: str) -> dict[str, str]:
     return {"status": "failed", "reason": "handler_not_registered"}
 
 
-@celery_app.task(name="jobs.recover_expired_leases", ignore_result=True)  # type: ignore[untyped-decorator]
+@celery_app.task(
+    name="jobs.recover_expired_leases", ignore_result=True
+)  # type: ignore[untyped-decorator]
 def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     now = datetime.now(UTC)

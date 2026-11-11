@@ -385,7 +385,7 @@ def test_publish_package_rejects_hard_fail(
     user = create_user(db_session)
     store = create_store(db_session, user)
     csrf = login(identity_client, monkeypatch)
-    task, fact, content = create_package_inputs(db_session, identity_client, user, store)
+    task, fact, content = create_package_inputs(db_session, identity_client, user, store, csrf)
     report = QualityReport(
         id=uuid4(),
         store_id=store.id,

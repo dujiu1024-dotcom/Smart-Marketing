@@ -575,6 +575,44 @@ def test_optional_step_can_be_skipped_but_required_review_cannot(
     )
     assert created.status_code == 201, created.text
     task_id = created.json()["id"]
+    source_id = uuid4()
+    db_session.add(
+        StoreRecordRevision(
+            id=uuid4(),
+            store_id=store.id,
+            record_type="store_profile",
+            record_id=source_id,
+            version_no=1,
+            snapshot_json={"store_name": "Task Step Skip Store"},
+            schema_version=1,
+            content_fingerprint="d" * 64,
+            fact_status="confirmed",
+            created_by_user_id=user.id,
+            confirmed_by_user_id=user.id,
+            confirmed_at=datetime.now(UTC),
+        )
+    )
+    db_session.flush()
+    confirmed = identity_client.post(
+        f"/api/v1/marketing-tasks/{task_id}/requirement/confirm",
+        headers={
+            **ORIGIN,
+            "X-CSRF-Token": csrf,
+            "X-Store-ID": str(store.id),
+            "Idempotency-Key": "task-step-skip-confirm",
+        },
+        json={
+            "expected_version": 1,
+            "business_facts": [
+                {
+                    "fact_key": "store_profile",
+                    "record_type": "store_profile",
+                    "record_id": str(source_id),
+                }
+            ],
+        },
+    )
+    assert confirmed.status_code == 200, confirmed.text
 
     skipped = identity_client.post(
         f"/api/v1/marketing-tasks/{task_id}/steps/opportunity_decision/skip",
@@ -585,12 +623,12 @@ def test_optional_step_can_be_skipped_but_required_review_cannot(
             "Idempotency-Key": "task-opportunity-skip",
         },
         json={
-            "expected_version": 1,
+            "expected_version": 2,
             "reason": "No timely opportunity fits this task",
         },
     )
     assert skipped.status_code == 200, skipped.text
-    assert skipped.json()["version"] == 2
+    assert skipped.json()["version"] == 3
     opportunity_step = next(
         step
         for step in skipped.json()["steps"]
@@ -611,7 +649,7 @@ def test_optional_step_can_be_skipped_but_required_review_cannot(
             "Idempotency-Key": "task-required-step-skip",
         },
         json={
-            "expected_version": 2,
+            "expected_version": 3,
             "reason": "Trying to bypass copy review",
         },
     )

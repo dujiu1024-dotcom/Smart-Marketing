@@ -32,8 +32,18 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=16), server_default="active", nullable=False),
         sa.Column("current_published_version_id", UUID, nullable=True),
         sa.Column("created_by_user_id", UUID, nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id", name="pk_prompt_templates"),
         sa.UniqueConstraint(
             "industry_key", "task_type", "capability", "template_key",
@@ -77,7 +87,12 @@ def upgrade() -> None:
         sa.Column("changelog", sa.Text(), nullable=False),
         sa.Column("status", sa.String(length=16), server_default="draft", nullable=False),
         sa.Column("created_by_user_id", UUID, nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("published_by_user_id", UUID, nullable=True),
         sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id", name="pk_prompt_versions"),
@@ -105,7 +120,10 @@ def upgrade() -> None:
             ondelete="RESTRICT",
         ),
         sa.CheckConstraint("version_no >= 1", name="ck_prompt_versions_version_no_positive"),
-        sa.CheckConstraint("schema_version >= 1", name="ck_prompt_versions_schema_version_positive"),
+        sa.CheckConstraint(
+            "schema_version >= 1",
+            name="ck_prompt_versions_schema_version_positive",
+        ),
         sa.CheckConstraint(
             "status IN ('draft', 'published')",
             name="ck_prompt_versions_status",
@@ -146,7 +164,12 @@ def upgrade() -> None:
         sa.Column("actor_user_id", UUID, nullable=True),
         sa.Column("idempotency_key_hash", sa.String(length=64), nullable=False),
         sa.Column("request_hash", sa.String(length=64), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id", name="pk_prompt_activations"),
         sa.UniqueConstraint(
             "idempotency_key_hash",
@@ -294,7 +317,10 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP TRIGGER IF EXISTS trg_prompt_templates_published_pointer ON prompt_templates")
     op.execute("DROP FUNCTION IF EXISTS enforce_prompt_template_published_pointer()")
-    op.execute("DROP TRIGGER IF EXISTS trg_prompt_activations_require_published ON prompt_activations")
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_prompt_activations_require_published "
+        "ON prompt_activations"
+    )
     op.execute("DROP FUNCTION IF EXISTS enforce_prompt_activation_published_versions()")
     op.execute("DROP TRIGGER IF EXISTS trg_prompt_activations_append_only ON prompt_activations")
     op.execute("DROP FUNCTION IF EXISTS prevent_prompt_activation_mutation()")

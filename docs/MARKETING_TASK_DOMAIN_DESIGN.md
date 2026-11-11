@@ -231,19 +231,26 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 
 ## 8. 事件与审计
 
-建议领域事件：
+建议领域事件按所有权拆分：
 
+**#7 MarketingTask**
 - `marketing_task.created / activated / waiting_for_user / blocked / completed / cancelled / archived`
 - `requirement.snapshot_created / requirement.confirmed`
 - `strategy.snapshot_created / strategy.confirmed`
 - `task_step.started / succeeded / failed / skipped / stale`
-- `copy.version_created / copy.review_requested / copy.revision_requested / copy.approved`
-- `image.version_created / image.review_requested / image.revision_requested / image.approved`
-- `artifact.marked_stale`
-- `publish_package.frozen / publish.confirmed / publish.requested / publish.completed / publish.failed / publish.needs_human`
-- `job.queued / job.claimed / job.retry_scheduled / job.failed / job.recovered`
 
-事件至少包含 event_id、task_id、store_id、aggregate_version、event_type、actor_type/id、correlation_id、causation_id、occurred_at、payload schema version。事件与审计日志追加写入，不以覆盖更新替代历史。
+**#8 Content / Publishing**
+- `content.artifact_version_created / content.review_recorded / content.channel_content_created`
+- `content.quality_report_completed / content.publish_package_frozen / content.publish_confirmed`
+- `content.publish_command_requested`（只表示向 #12 提交官方发布命令，不表示已发布）
+
+**#9 Job Runtime**
+- `job.queued / job.claimed / job.retry_scheduled / job.succeeded / job.failed / job.needs_human / job.recovered`
+
+**#12 Channel Integration**
+- `channel.publish_operation_started / channel.publish_operation_succeeded / channel.publish_operation_failed / channel.publish_operation_needs_human`（以平台证据为准）
+
+事件至少包含 event_id、store_id、aggregate_type/id、aggregate_version、event_type、actor_type/id、correlation_id、causation_id、occurred_at、schema_version。事件与审计日志追加写入，不以覆盖更新替代历史。#7 只消费 #8/#9/#12 事件并校验版本/指纹后更新 TaskStep；不得自行创建审核或发布记录。
 
 ## 9. API 契约草案
 
@@ -258,16 +265,12 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | POST | /api/v1/marketing-tasks/{task_id}/requirement/confirm | 生成并确认需求快照 |
 | POST | /api/v1/marketing-tasks/{task_id}/strategy/confirm | 确认策略快照 |
 | POST | /api/v1/marketing-tasks/{task_id}/steps/{step_key}/skip | 提交允许的跳过决策与原因 |
-| POST | /api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/reviews | 针对明确版本提交审核结论/意见 |
-| POST | /api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/revisions | 创建整改请求与异步 Job |
-| POST | /api/v1/marketing-tasks/{task_id}/publish-packages | 校验并冻结发布包 |
-| POST | /api/v1/marketing-tasks/{task_id}/publish-packages/{package_id}/confirm | 商家最终确认 |
-| POST | /api/v1/marketing-tasks/{task_id}/publish-packages/{package_id}/deliver | 创建发布/草稿 Job |
+
 | POST | /api/v1/marketing-tasks/{task_id}/recover | 对失败节点进行显式恢复 |
 | POST | /api/v1/marketing-tasks/{task_id}/cancel | 取消任务 |
 | POST | /api/v1/marketing-tasks/{task_id}/archive | 归档任务 |
 
-写接口统一支持 Idempotency-Key；并发更新支持 expected_version/If-Match。API 返回 task lifecycle、task version、各 step 状态、文案审核状态、图片审核状态、当前版本 ID、stale 原因、blocked_by 和 pending_actions。审核接口必须明确传入 artifact_version_id。
+写接口统一支持 Idempotency-Key；并发更新支持 expected_version/If-Match。API 返回 task lifecycle、task version、各 step 状态、文案/图片审核摘要、当前版本 ID、stale 原因、blocked_by 和 pending_actions。Artifact/Review/ChannelContent/QualityReport/PublishPackage 的写 API 由 #8 持有，详见 DOMAIN_INTEGRATION_CONTRACTS_V1.md §6/§10 与 CONTENT_DELIVERY_DOMAIN_DESIGN.md；#7 只通过版本化事件消费其结果并推进 TaskStep。
 
 ## 10. 数据库约束建议
 

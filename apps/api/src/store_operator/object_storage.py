@@ -92,3 +92,31 @@ def calculate_object_sha256(*, object_key: str) -> str:
     finally:
         body.close()
     return digest.hexdigest()
+
+
+
+def download_object_bytes(*, object_key: str, max_bytes: int) -> bytes:
+    if not object_key.strip() or max_bytes <= 0:
+        raise ValueError("A valid object key and positive size limit are required")
+    client = _client()
+    metadata = client.head_object(
+        Bucket=settings.object_storage_bucket,
+        Key=object_key,
+    )
+    content_length = metadata.get("ContentLength")
+    if not isinstance(content_length, int) or content_length <= 0:
+        raise ValueError("Stored media metadata is invalid")
+    if content_length > max_bytes:
+        raise ValueError("Stored media exceeds the channel upload size limit")
+    response = client.get_object(
+        Bucket=settings.object_storage_bucket,
+        Key=object_key,
+    )
+    body = response["Body"]
+    try:
+        content = body.read(max_bytes + 1)
+    finally:
+        body.close()
+    if not isinstance(content, bytes) or not content or len(content) > max_bytes:
+        raise ValueError("Stored media could not be read within the configured size limit")
+    return content

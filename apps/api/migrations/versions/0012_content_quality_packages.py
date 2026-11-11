@@ -582,7 +582,33 @@ def upgrade() -> None:
     )
     op.execute(
         """
-        CREATE FUNCTION enforce_quality_resolution_needs_human() RETURNS trigger AS $$
+        CREATE FUNCTION enforce_quality_report_ready_content() RETURNS trigger AS $
+        DECLARE
+            content_status text;
+        BEGIN
+            SELECT status INTO content_status
+            FROM channel_contents
+            WHERE store_id = NEW.store_id
+              AND task_id = NEW.task_id
+              AND id = NEW.channel_content_id;
+            IF content_status IS DISTINCT FROM 'ready' THEN
+                RAISE EXCEPTION 'quality reports require ready channel content';
+            END IF;
+            RETURN NEW;
+        END;
+        $ LANGUAGE plpgsql;
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER trg_quality_reports_ready_content_only
+        BEFORE INSERT ON quality_reports
+        FOR EACH ROW EXECUTE FUNCTION enforce_quality_report_ready_content();
+        """
+    )
+    op.execute(
+        """
+        CREATE FUNCTION enforce_quality_resolution_needs_human() RETURNS trigger AS $
         DECLARE
             report_result text;
         BEGIN
@@ -736,6 +762,11 @@ def downgrade() -> None:
         "ON publish_package_items"
     )
     op.execute("DROP FUNCTION IF EXISTS enforce_publish_package_item_quality_gate()")
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_quality_reports_ready_content_only "
+        "ON quality_reports"
+    )
+    op.execute("DROP FUNCTION IF EXISTS enforce_quality_report_ready_content()")
     op.execute(
         "DROP TRIGGER IF EXISTS trg_quality_resolutions_needs_human_only "
         "ON quality_resolutions"

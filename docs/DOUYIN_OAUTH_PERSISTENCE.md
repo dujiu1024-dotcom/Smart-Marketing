@@ -53,6 +53,22 @@ All three Douyin OAuth settings must be supplied together. The Secret Manager re
 - `GET /api/v1/channels/douyin/accounts` lists account metadata without exposing Secret Manager references or tokens.
 - `POST /api/v1/channels/douyin/accounts/{account_id}/refresh` refreshes credentials server-side and updates the secret only if the account has not changed concurrently.
 
+## Merchant-confirmed publish operation
+
+- `POST /api/v1/marketing-tasks/publish-packages/{package_id}/items/{package_item_id}/publish` requires the exact package fingerprint, item fingerprint, and the persisted `PublishConfirmation` ID.
+- The API verifies that the frozen item is `official_api`, is bound to an active same-store Douyin account, and has the required scopes.
+- `PublishOperation`, Job and `job.dispatch_requested` Outbox event are created in the same database transaction. The Job payload contains only the operation ID and schema version; it never contains tokens or media bytes.
+- `GET /api/v1/marketing-tasks/publish-operations/{operation_id}` returns store-scoped operation state.
+
+## Worker safety and readback
+
+- The first worker implementation supports frozen image-text packages whose image assets are private object-storage objects, rights-approved, JPEG/PNG/WebP, at most 20 MiB each, and 1-30 images total.
+- Upload is retryable before content creation. Immediately before `/image_text/create/`, the operation moves to `submitting`.
+- Once the create request may have reached Douyin, an unknown response moves the operation to `needs_human`; the worker will not blindly submit a second post.
+- On a confirmed response, the `item_id` is persisted before readback. Subsequent retries only call `/video/list/` readback; they never upload or create again.
+- A readback match records `processing` with `readback_verified=true`. This does not claim public visibility: Douyin says the post may remain self-visible while platform review is pending.
+- Repeated readback absence after bounded retries moves the operation to `needs_human` for reconciliation.
+
 ## Remaining integration work
 
 - Add an account revoke/disconnect endpoint and a scheduled token-refresh Worker; the account-list and server-side refresh endpoints are implemented.

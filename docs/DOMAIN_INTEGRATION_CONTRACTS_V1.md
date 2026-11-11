@@ -202,10 +202,10 @@ ProviderContext 扩展提案：store_id/actor_scope、task_id、job_id、invocat
 
 - ChannelAccount（门店级）：id、store_id、channel_key、external_account_id、display_name、authorization_status、granted_scopes_json、access_token_secret_ref、refresh_token_secret_ref、token_expires_at、authorized_by_user_id、authorized_at、last_verified_at、version。Token 只保存在 Secret Manager/Vault，DB 只保存 secret_ref。
 - OAuthAuthorizationAttempt：store_id、channel_key、requested_by_user_id、state_hash、nonce、pkce_verifier_secret_ref、redirect_uri_key、expires_at、consumed_at。state 一次性、短 TTL；callback 必须重新验证 #5 membership 和 store 状态。
-- ChannelSpec/ChannelSpecVersion（全局无 store_id）：ChannelSpec 持有 channel_key/current_version_id；ChannelSpecVersion 保存 spec_version 与 text/media/hashtag/link/schedule constraints、draft/publish capability、official source evidence。版本不可变。
+- ChannelSpec（全局无 store_id）：id、channel_key、current_version_id、status；ChannelSpecVersion（全局无 store_id）：id、channel_spec_id、spec_version、text/media/hashtag/link/schedule constraints、draft/publish capability、official source evidence、published_at。ChannelSpecVersion 不可变，current_version_id 复合 FK 指向同一 ChannelSpec。
 - ChannelCapabilitySnapshot（门店账号级）：store_id、channel_account_id、channel_spec_version_id、capability_key、support_status、evidence_ref、checked_at、expires_at。unsupported/pending_verification 不得伪装为已接通。
 - PublishOperation：store_id、publish_package_id、package_item_id、package_fingerprint、channel_account_id、action(save_draft|publish)、status、idempotency_key、request_fingerprint、external_request_id、external_post_id、external_url、response_evidence_ref、error_code、requested_by_user_id、timestamps。
-- PublishOperationAttempt 保存每次外部平台调用证据；它与 #9 JobAttempt 分离：JobAttempt 是 Worker 执行尝试，PublishOperationAttempt 是外部 API 调用事实。
+- PublishOperationAttempt：publish_operation_id、attempt_no、adapter_version、request_fingerprint、external_request_id、response_evidence_ref、normalized_status、error_code、retryable、started_at、finished_at。它与 #9 JobAttempt 分离：JobAttempt 是 Worker 执行尝试，PublishOperationAttempt 是外部 API 调用事实。
 
 PublishOperation 状态：requested/queued/submitting/processing/draft_saved/published/failed/needs_human/cancelled。它不是 Job 状态。Job succeeded 只代表执行器完成；只有平台真实响应/作品 ID 等证据才能把 PublishOperation 置为 published。
 
@@ -304,6 +304,7 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 | content.publish_command_requested | #8 | #12/#9 | 每个 official_api PackageItem 单独提交受控发布命令 |
 | channel.account_authorized/reauth_required/revoked | #12 | #5/#8 | 门店渠道授权生命周期变化 |
 | channel.spec_version_published | #12 | #8 | 新规格发布；旧 ChannelContent 对新任务标记 stale，冻结包保留原版本并在发布前重新验证 |
+| channel.spec_version_published | #12 | #8 | 新规格发布；旧 ChannelContent 对新任务 stale，冻结包保留原版本并在发布前重新验证 |
 | channel.capabilities_refreshed | #12 | #8 | 账号能力快照更新，触发渠道内容/发布门禁重新评估 |
 | channel.publish_operation_created/updated/published/needs_human | #12 | #7/#8/#9 | 外部发布状态必须由平台证据确认 |
 | job.succeeded/failed/needs_human | #9 | 发起该 Job 的业务域 | 回传执行结果；业务域校验后更新自己的状态 |

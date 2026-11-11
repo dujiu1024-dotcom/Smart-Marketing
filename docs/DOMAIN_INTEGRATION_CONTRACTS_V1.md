@@ -19,7 +19,7 @@
 | ChannelAccount、平台授权凭据、平台能力状态、PublishOperation | #12 Channel Integration | #8 只引用账号/能力，不持有平台凭据 |
 | Job、JobAttempt、JobEvent、OutboxEvent、JobType、lease/retry/recovery | #9 Job Runtime | #7、#8、#10、#11、#12 |
 | AIInvocation、ModelConfig、Provider capability registry、usage/cost | #9 AI Gateway | #7、#8、#10、#11 |
-| PromptTemplate、PromptVersion 生命周期与管理 | #10（实现）/ Platform Admin 产品能力 | #7–#9 消费固定版本引用 |
+| PromptTemplate、PromptVersion、PromptActivation 生命周期与管理 | #10 / Platform Admin 产品能力 | #7–#9 消费固定版本引用 |
 | Text/Image/Vision/OCR provider concrete adapters and real integrations | #10 | #9 Gateway |
 | API OpenAPI schema generation | API module owner per endpoint | Web client |
 
@@ -168,6 +168,12 @@ PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, co
 - 记录调用元数据和成本；原始敏感 prompt/response 存受控引用或按最小化原则脱敏，不直接写普通日志。
 - AIInvocation 状态：queued/running/succeeded/failed/cancelled；它不是 Job，也不拥有营销业务状态。
 - prompt_version_id 指向 #10 管理的不可变 PromptVersion；AIInvocation 固定记录实际版本、变量 schema 版本、model/provider 选择与参数指纹，历史任务不得动态读取最新 Prompt。
+- 跨域扩展建议（待 #9 批准）：增加 nullable `provider_request_id` 与 `usage_json`，记录供应商任务对账 ID 和分项 usage；在联合评审通过前不作为冻结字段。
+
+### PromptTemplate / PromptVersion（#10 权威）
+PromptTemplate 是平台级共享模板，不含 store_id：`id, template_key, display_name, industry_key, task_type, capability, status, current_published_version_id, created_at, updated_at`。
+PromptVersion：`id, prompt_template_id, version_no, system_prompt, user_prompt_template, variables_schema_json, output_schema_json, schema_version, input_policy_json, changelog, status(draft|published|retired), created_by_user_id, created_at, published_by_user_id, published_at`。Draft 可编辑；published 后不可变，修改必须新建版本。
+PromptActivation：`id, prompt_template_id, activated_version_id, previous_version_id, action(publish|rollback), reason, actor_user_id, created_at, idempotency_record_id`；发布/回滚均追加记录，不覆盖历史版本。PromptTemplate/Version/Activation 为全局平台配置，平台管理员访问受 #5 能力授权；不得借此读取门店任务或经营数据。
 
 ### Provider 接口（#9 定义，#10 实现）
 - TextProvider.generate(request, context) -> StructuredTextResult
@@ -224,6 +230,16 @@ Provider 统一返回：provider_key、model_key、provider_request_id、status�
 - POST /api/v1/publish-packages/{package_id}/publish（为 official_api PackageItem 创建发布命令）
 发布 API 必须在服务端重新校验每个 item 的审核、质检指纹、最终确认、门店状态、账号授权和发布幂等键；外部成功状态由 #12 PublishOperation 证据回传。
 
+### #10 Prompt 管理
+- GET/POST /api/v1/admin/prompt-templates
+- GET /api/v1/admin/prompt-templates/{template_id}
+- POST /api/v1/admin/prompt-templates/{template_id}/versions
+- PATCH /api/v1/admin/prompt-versions/{version_id}（仅 draft）
+- POST /api/v1/admin/prompt-versions/{version_id}/validate
+- POST /api/v1/admin/prompt-versions/{version_id}/publish
+- POST /api/v1/admin/prompt-templates/{template_id}/activate（发布/回滚已发布版本）
+Prompt 预览首期只使用合成 Fixture；ModelConfig、Provider capability registry、Secret reference 与模型路由仍由 #9 持有。
+
 ### #9 Job / AI Gateway
 - GET /api/v1/jobs/{job_id}
 - POST /api/v1/jobs/{job_id}/retry（需授权与幂等）
@@ -252,6 +268,8 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 | content.publish_command_requested | #8 | #12/#9 | 每个 official_api PackageItem 单独提交受控发布命令 |
 | channel.publish_operation_started/succeeded/failed/needs_human | #12 | #7/#8/#9 | 外部发布状态必须由平台证据确认 |
 | job.succeeded/failed/needs_human | #9 | 发起该 Job 的业务域 | 回传执行结果；业务域校验后更新自己的状态 |
+| prompt.version_published | #10 | #9 | 新 PromptVersion 发布，后续调用可引用 |
+| prompt.version_activated | #10 | #9 | 当前 Prompt 指针激活/回滚，历史 invocation 不变 |
 | ai.invocation.completed/failed | #9 | #7/#8/#10 | 调用审计/成本与任务关联 |
 
 事件消费者必须幂等；不能仅因收到 job.succeeded 就直接修改 MarketingTask。

@@ -237,7 +237,7 @@ Provider 统一返回：provider_key、model_key、provider_request_id、status�
 - PATCH /api/v1/admin/prompt-versions/{version_id}（仅 draft）
 - POST /api/v1/admin/prompt-versions/{version_id}/validate
 - POST /api/v1/admin/prompt-versions/{version_id}/publish
-- POST /api/v1/admin/prompt-templates/{template_id}/activate（发布/回滚已发布版本）
+- POST /api/v1/admin/prompt-templates/{template_id}/rollback（回滚到已发布版本）
 Prompt 预览首期只使用合成 Fixture；ModelConfig、Provider capability registry、Secret reference 与模型路由仍由 #9 持有。
 
 ### #9 Job / AI Gateway

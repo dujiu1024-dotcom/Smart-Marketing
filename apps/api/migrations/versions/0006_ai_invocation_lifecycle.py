@@ -24,6 +24,7 @@ def upgrade() -> None:
         "ai_invocations",
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
     )
+    op.drop_constraint("ck_ai_invocations_status", "ai_invocations", type_="check")
     op.execute(
         "UPDATE ai_invocations SET status = 'running' WHERE status = 'started'"
     )
@@ -32,7 +33,6 @@ def upgrade() -> None:
         "error_code = COALESCE(error_code, 'AI_INVOCATION_REQUIRES_REVIEW') "
         "WHERE status = 'needs_human'"
     )
-    op.drop_constraint("ck_ai_invocations_status", "ai_invocations", type_="check")
     op.create_check_constraint(
         "ck_ai_invocations_status",
         "ai_invocations",
@@ -41,11 +41,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_constraint("ck_ai_invocations_status", "ai_invocations", type_="check")
     op.execute(
         "UPDATE ai_invocations SET status = 'started' "
         "WHERE status IN ('queued', 'running', 'cancelled')"
     )
-    op.drop_constraint("ck_ai_invocations_status", "ai_invocations", type_="check")
     op.create_check_constraint(
         "ck_ai_invocations_status",
         "ai_invocations",

@@ -27,10 +27,13 @@ class FakeRedis:
         return len(keys)
 
 
-def create_user(db: Session) -> User:
+def create_user(
+    db: Session,
+    email: str = "knowledge@example.com",
+) -> User:
     user = User(
         id=uuid4(),
-        email_normalized="knowledge@example.com",
+        email_normalized=email,
         password_hash=hash_password("test-password-123"),
         status="active",
     )
@@ -171,6 +174,47 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     )
     assert stale_product.status_code == 409
     assert stale_product.json()["error"]["code"] == "VERSION_CONFLICT"
+
+    second_user = create_user(db_session, "second-knowledge@example.com")
+    db_session.add(
+        StoreMembership(
+            id=uuid4(),
+            store_id=store_a.id,
+            user_id=second_user.id,
+            role="manager",
+            status="active",
+            joined_at=datetime.now(UTC),
+        )
+    )
+    db_session.flush()
+    second_login = identity_client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "second-knowledge@example.com",
+            "password": "test-password-123",
+        },
+        headers=ORIGIN,
+    )
+    assert second_login.status_code == 200, second_login.text
+    second_headers = {
+        **ORIGIN,
+        "X-CSRF-Token": second_login.json()["csrf_token"],
+        "X-Store-ID": str(store_a.id),
+        "Idempotency-Key": "product-create-1",
+    }
+    cross_actor_replay = identity_client.post(
+        "/api/v1/store/products",
+        headers=second_headers,
+        json={
+            "name": "Seasonal tea",
+            "price_amount": "680.00",
+            "currency": "JPY",
+            "availability_status": "available",
+        },
+    )
+    assert cross_actor_replay.status_code == 409
+    assert cross_actor_replay.json()["error"]["code"] == "IDEMPOTENCY_KEY_SCOPE_MISMATCH"
+    assert product["id"] not in cross_actor_replay.text
 
 
 def test_store_knowledge_api_rejects_missing_store_context(

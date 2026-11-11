@@ -52,6 +52,26 @@ def _safe_parameter_snapshot(
     return safe
 
 
+
+def _safe_response_ref(
+    values: dict[str, object] | None,
+) -> dict[str, object] | None:
+    if not values:
+        return None
+    allowed = {"schema_version", "object_key", "sha256", "mime_type", "width", "height"}
+    safe = {
+        key: value
+        for key, value in values.items()
+        if key in allowed
+        and (isinstance(value, (str, int, bool)) or value is None)
+    }
+    if not isinstance(safe.get("schema_version"), int):
+        raise ValueError("response_ref requires an integer schema_version")
+    if not isinstance(safe.get("object_key"), str):
+        raise ValueError("response_ref requires an object_key reference")
+    return safe
+
+
 def start_ai_invocation(
     db: Session,
     *,
@@ -93,6 +113,7 @@ def start_ai_invocation(
     invocation = AIInvocation(
         id=uuid4(),
         store_id=store_id,
+        task_id=task_id,
         job_id=job_id,
         attempt_id=attempt_id,
         provider_key=provider_key.strip(),
@@ -120,6 +141,7 @@ def complete_ai_invocation(
     currency: str | None = None,
     metering_source: str = "provider_reported",
     provider_request_id: str | None = None,
+    response_ref: dict[str, object] | None = None,
     duration_ms: int | None = None,
     now: datetime | None = None,
 ) -> AIInvocation:
@@ -142,6 +164,7 @@ def complete_ai_invocation(
         raise ValueError("metering_source must contain 1-40 characters")
     if provider_request_id is not None and len(provider_request_id) > 200:
         raise ValueError("provider_request_id cannot exceed 200 characters")
+    safe_response_ref = _safe_response_ref(response_ref) if response_ref else None
 
     invocation = db.scalar(
         select(AIInvocation)
@@ -156,7 +179,7 @@ def complete_ai_invocation(
             0, int((current_time - invocation.created_at).total_seconds() * 1000)
         )
     if elapsed_ms < 0:
-        raise ValueError("latency_ms cannot be negative")
+        raise ValueError("duration_ms cannot be negative")
 
     values = {
         "input_tokens": input_tokens,
@@ -172,6 +195,7 @@ def complete_ai_invocation(
             usage is None
             or any(getattr(usage, key) != value for key, value in values.items())
             or invocation.provider_request_id != provider_request_id
+            or invocation.response_ref_json != safe_response_ref
         ):
             raise AIInvocationTransitionError(
                 "A completed AI invocation cannot be completed with different usage"
@@ -188,6 +212,7 @@ def complete_ai_invocation(
 
     invocation.status = "succeeded"
     invocation.provider_request_id = provider_request_id
+    invocation.response_ref_json = safe_response_ref
     invocation.duration_ms = elapsed_ms
     invocation.finished_at = current_time
     if usage is None:
@@ -218,7 +243,7 @@ def fail_ai_invocation(
         return invocation
     if invocation.status != "running":
         raise AIInvocationTransitionError("Only running AI invocations can fail")
-    elapsed_ms = latency_ms
+    elapsed_ms = duration_ms
     if elapsed_ms is None:
         elapsed_ms = max(
             0, int((current_time - invocation.created_at).total_seconds() * 1000)
@@ -227,7 +252,7 @@ def fail_ai_invocation(
         raise ValueError("latency_ms cannot be negative")
     invocation.status = "failed"
     invocation.error_code = error_code.strip()
-    invocation.latency_ms = elapsed_ms
+    invocation.duration_ms = elapsed_ms
     invocation.finished_at = current_time
     db.flush()
     return invocation

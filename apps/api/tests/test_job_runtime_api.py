@@ -258,11 +258,11 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
     invocation = AIInvocation(
         id=uuid4(),
         store_id=store_a.id,
-        provider="test-provider",
-        model="test-model",
+        provider_key="test-provider",
+        model_key="test-model",
         capability="text_generate",
         status="succeeded",
-        prompt_version="v1",
+        prompt_version_id=uuid4(),
     )
     db_session.add(invocation)
     db_session.flush()
@@ -283,7 +283,7 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
         headers={"X-Store-ID": str(store_a.id)},
     )
     assert usage.status_code == 200, usage.text
-    assert usage.json()["provider"] == "test-provider"
+    assert usage.json()["provider_key"] == "test-provider"
     assert usage.json()["usage"]["input_tokens"] == 12
     assert "secret_prompt" not in usage.text
 

@@ -80,18 +80,21 @@ erDiagram
   MARKETING_TASK ||--o{ ARTIFACT : produces
   ARTIFACT ||--o{ ARTIFACT_VERSION : versions
   ARTIFACT_VERSION ||--o{ REVIEW_RECORD : reviewed
-  ARTIFACT_VERSION ||--o{ REVISION_REQUEST : revised
-  MARKETING_TASK ||--o{ DEPENDENCY_EDGE : links
-  MARKETING_TASK ||--o{ QUALITY_CHECK : validates
+  MARKETING_TASK ||--o{ CHANNEL_CONTENT : adapts
+  CHANNEL_CONTENT ||--o{ QUALITY_REPORT : validates
   MARKETING_TASK ||--o{ PUBLISH_PACKAGE : freezes
+  PUBLISH_PACKAGE ||--|{ PUBLISH_PACKAGE_ITEM : contains
+  PUBLISH_PACKAGE_ITEM }o--|| CHANNEL_CONTENT : references
+  PUBLISH_PACKAGE_ITEM }o--|| QUALITY_REPORT : binds
   PUBLISH_PACKAGE ||--o{ PUBLISH_CONFIRMATION : confirms
-  PUBLISH_PACKAGE ||--o{ PUBLISH_ATTEMPT : publishes
+  MARKETING_TASK ||--o{ DEPENDENCY_EDGE : links
   MARKETING_TASK ||--o{ TASK_EVENT : emits
 ```
 
-- MarketingTask 是业务聚合根；Artifact/Review/Package 由 #8 持有，Job/Outbox 由 #9 持有。
-- RequirementSnapshot、StrategySnapshot、BusinessFactSnapshot、ArtifactVersion、ReviewRecord、PublishPackage、PublishConfirmation 均按不可变记录处理。
+- MarketingTask 是业务聚合根；Artifact/Review/ChannelContent/QualityReport/Package 由 #8 持有，Job/Outbox 由 #9 持有。
+- RequirementSnapshot、StrategySnapshot、BusinessFactSnapshot、ArtifactVersion、ReviewRecord、ChannelContent、QualityReport、PublishPackage、PublishPackageItem、PublishConfirmation 均按不可变记录处理。
 - 文案与图片审核分别按 artifact_type/version 绑定；审核旧版本不能批准新版本。
+- 一个 PublishPackage 聚合一次任务交付，PublishPackageItem 每个渠道一条；冻结/确认以整个 package fingerprint 为单位。
 - 依赖边记录上游版本 ID + fingerprint；失效只沿真实依赖闭包传播。
 - 发布确认必须绑定冻结包的确切 fingerprint。
 

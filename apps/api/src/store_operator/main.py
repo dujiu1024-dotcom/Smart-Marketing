@@ -24,6 +24,7 @@ from store_operator.auth.dependencies import SESSION_COOKIE_NAME
 from store_operator.auth.errors import ApiError
 from store_operator.auth.router import router as auth_router
 from store_operator.config import settings
+from store_operator.channel_douyin_router import router as channel_douyin_router
 from store_operator.content_delivery_router import router as content_delivery_router
 from store_operator.content_publishing_router import router as content_publishing_router
 from store_operator.content_quality_router import router as content_quality_router
@@ -195,6 +196,7 @@ app.include_router(store_router, prefix="/api/v1")
 app.include_router(store_knowledge_router, prefix="/api/v1")
 app.include_router(marketing_tasks_router, prefix="/api/v1")
 app.include_router(content_delivery_router, prefix="/api/v1")
+app.include_router(channel_douyin_router, prefix="/api/v1")
 app.include_router(content_quality_router, prefix="/api/v1")
 app.include_router(content_publishing_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")

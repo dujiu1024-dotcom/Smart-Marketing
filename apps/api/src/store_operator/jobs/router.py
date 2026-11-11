@@ -191,9 +191,11 @@ def get_ai_invocation(
         capability=invocation.capability,
         prompt_version=invocation.prompt_version,
         provider_request_id=invocation.provider_request_id,
+        request_fingerprint=invocation.request_fingerprint,
         status=invocation.status,
         latency_ms=invocation.latency_ms,
         error_code=invocation.error_code,
         created_at=invocation.created_at,
+        finished_at=invocation.finished_at,
         usage=AIUsageRead.model_validate(usage) if usage is not None else None,
     )

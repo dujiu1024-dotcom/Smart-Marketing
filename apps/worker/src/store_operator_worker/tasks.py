@@ -18,11 +18,11 @@ from store_operator.ai_gateway.errors import (
     SideEffectState,
 )  # type: ignore[import-untyped]
 from store_operator.jobs.service import (
+    InvalidJobTransition,
+    LeaseLostError,
     acknowledge_job_cancellation,
     claim_job,
     complete_job,
-    InvalidJobTransition,
-    LeaseLostError,
     fail_job,
     heartbeat_job,
 )  # type: ignore[import-untyped]

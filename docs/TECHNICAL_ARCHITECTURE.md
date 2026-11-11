@@ -78,9 +78,9 @@
 | Channel Integration | 渠道能力发现、账号授权、内容适配、草稿、发布和指标读取 | ChannelAccount、ChannelOperation | 否；Worker 执行 |
 | Publishing | 冻结发布包、商家确认、发布幂等与结果核验 | PublishPackage、PublishConfirmation | 否 |
 | Performance & Attribution | 内容/意向/经营指标、采集来源、观察窗口、归因可信度 | MetricObservation、AttributionEvidence | 否 |
-| AI Gateway | 模型路由、供应商配置、结构化输出、超时、重试、成本审计 | ModelConfig、AIInvocation | 可后续独立 |
+| AI Gateway | 模型路由、供应商配置、结构化输出、超时、重试、成本审计 | ModelConfig、AIInvocation、Provider capability registry | 可后续独立 |
 | Job Runtime | 持久化队列、Worker、租约、重试、死信、人工恢复 | Job、JobAttempt、JobEvent | Worker 独立进程 |
-| Platform Admin | 门店管理、门店级模型配置、提示词、用量成本、审计 | PromptVersion、UsageRecord、AuditEvent | 否 |
+| Platform Admin | 门店管理、门店级模型配置、平台级 Prompt 版本、用量成本、审计 | PromptTemplate、PromptVersion、PromptActivation、UsageRecord、AuditEvent | 否 |
 
 ### 模块依赖规则
 
@@ -194,6 +194,8 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 - `ImageProvider.edit()`
 - `VisionProvider.inspect()`
 - `OCRProvider.extract()`
+
+接口/所有权边界：#9 AI Gateway 定义 Provider 接口、ModelConfig、密钥引用、路由、AIInvocation 和成本审计；#10 实现 Text/Image/Vision/OCR 真实 Adapter，并持有 PromptTemplate/PromptVersion/PromptActivation 生命周期。已发布 PromptVersion 不可变，AIInvocation 必须固定实际版本引用；业务域不得直接调用厂商 SDK。
 
 每次调用记录 provider、model、prompt_version、input/output token 或图像计量、耗时、费用、请求 ID、结果状态和脱敏错误。模型输出必须经过结构校验和业务事实校验，不能直接视为可信事实。
 

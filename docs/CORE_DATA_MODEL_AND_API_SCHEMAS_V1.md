@@ -348,6 +348,7 @@ erDiagram
 15. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。
 16. 时间窗口、Offer 有效期统一 UTC 存储，展示按 Store.timezone 解释。
 17. QualityResolution 复合 FK 到同店 QualityReport，保存 quality_report_fingerprint；UNIQUE(store_id, quality_report_id, quality_report_fingerprint)，写入时校验报告 result=needs_human，并通过 idempotency_record_id 防重复。
+18. PublishConfirmation 以 (store_id,publish_package_id,package_fingerprint) 唯一；首期不提供撤销，确认记录不可 UPDATE/DELETE。
 
 ## 8. 必须补齐的实现前 Schema 工件
 

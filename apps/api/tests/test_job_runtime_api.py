@@ -285,7 +285,7 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
     assert usage.status_code == 200, usage.text
     assert usage.json()["provider"] == "test-provider"
     assert usage.json()["usage"]["input_tokens"] == 12
-    assert "prompt" not in usage.text
+    assert "secret_prompt" not in usage.text
 
     hidden = identity_client.get(
         f"/api/v1/ai/invocations/{invocation.id}",

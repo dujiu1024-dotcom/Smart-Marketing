@@ -92,3 +92,27 @@ def calculate_object_sha256(*, object_key: str) -> str:
     finally:
         body.close()
     return digest.hexdigest()
+
+
+def read_object_bytes(*, object_key: str, max_bytes: int) -> tuple[bytes, str]:
+    """Read a bounded private object for a server-side channel upload."""
+    if not object_key.strip() or max_bytes < 1:
+        raise ValueError("Object key and positive byte limit are required")
+    response = _client().get_object(
+        Bucket=settings.object_storage_bucket,
+        Key=object_key,
+    )
+    body = response["Body"]
+    try:
+        content_length = response.get("ContentLength")
+        if isinstance(content_length, int) and content_length > max_bytes:
+            raise ValueError("Object exceeds the channel upload size limit")
+        content = body.read(max_bytes + 1)
+        if len(content) > max_bytes:
+            raise ValueError("Object exceeds the channel upload size limit")
+    finally:
+        body.close()
+    content_type = response.get("ContentType")
+    if not isinstance(content_type, str) or not content_type:
+        raise ValueError("Object content type is missing")
+    return content, content_type

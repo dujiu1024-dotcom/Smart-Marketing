@@ -27,7 +27,7 @@ OUTBOX_LOCK_SECONDS = 30
 OUTBOX_MAX_ATTEMPTS = 12
 
 
-@celery_app.task(name="jobs.relay_outbox", ignore_result=True)
+@celery_app.task(name="jobs.relay_outbox", ignore_result=True)  # type: ignore[untyped-decorator]
 def relay_outbox(batch_size: int = 50) -> int:
     """Publish committed Outbox rows; a crash after publish can cause safe redelivery."""
     now = datetime.now(UTC)
@@ -118,7 +118,7 @@ def relay_outbox(batch_size: int = 50) -> int:
     return published
 
 
-@celery_app.task(name="jobs.execute", acks_late=True)
+@celery_app.task(name="jobs.execute", acks_late=True)  # type: ignore[untyped-decorator]
 def execute_job(job_id: str) -> dict[str, str]:
     """Claim a durable Job; domain handlers are registered in a later capability slice."""
     parsed_job_id = UUID(job_id)
@@ -145,7 +145,7 @@ def execute_job(job_id: str) -> dict[str, str]:
     return {"status": "failed", "reason": "handler_not_registered"}
 
 
-@celery_app.task(name="jobs.recover_expired_leases", ignore_result=True)
+@celery_app.task(name="jobs.recover_expired_leases", ignore_result=True)  # type: ignore[untyped-decorator]
 def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     now = datetime.now(UTC)

@@ -124,15 +124,17 @@ payload_json 必须存可追溯的门店资料引用/版本、关键事实确认
 - 变体依赖指纹变化时标 stale。
 
 ### QualityReport
-`id, store_id, task_id, channel_content_id, rule_version, input_fingerprint, result(pass|fail|needs_human), issues_json, reviewer_id, resolution_reason, created_at`。
-- 硬性问题未解决不能冻结发布包；人工复核结果必须有操作者和理由。
+`id, store_id, task_id, channel_content_id, rule_version, input_fingerprint, result(pass|fail|needs_human), issues_json, created_at`。
+
+QualityResolution：`id, store_id, quality_report_id, decision(accepted|rejected), reviewer_user_id, reason, created_at, idempotency_record_id`。仅对 needs_human 报告追加；hard fail 不可覆盖。
+- 硬性问题未解决不能冻结发布包；needs_human 必须追加 QualityResolution，accepted 才允许冻结，rejected 继续阻断；hard fail 不允许人工覆盖。原 QualityReport 保持不可变。
 
 ### PublishPackage / PublishPackageItem / PublishConfirmation
 PublishPackage 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, package_fingerprint, frozen_at, frozen_by`。事实快照通过 PublishPackageFactRef 子表引用。
-PublishPackageFactRef：`id, store_id, publish_package_id, business_fact_snapshot_id, position`；以复合 FK 引用 #6 已确认的 BusinessFactSnapshot。
+PublishPackageFactRef：`id, store_id, publish_package_id, business_fact_snapshot_id, position`；以复合 FK 引用 #7 任务级 BusinessFactSnapshot；该快照的来源必须追溯至 #6 已确认的 StoreRecordRevision。
 PublishPackageItem 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。文案/图片版本由不可变 ChannelContent 间接绑定。
-PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at, confirmation_note`。
-- 一个 PublishPackage 至少包含一个 PackageItem 和一条 PublishPackageFactRef；同一 package 的 channel_key 唯一。每个 item 精确绑定 ChannelContent、文案/图片版本和 QualityReport。
+PublishConfirmation：`id, store_id, publish_package_id, package_fingerprint, confirmed_by_user_id, confirmed_at, confirmation_note`。确认记录不可变，首期不提供撤销接口。
+- 一个 PublishPackage 至少包含一个 PackageItem 和一条已确认 BusinessFactSnapshot 引用；同一 package 的 channel_key 唯一。每个 item 精确绑定 ChannelContent、文案/图片版本和 QualityReport。
 - channel_account_id 仅引用 #12 的 ChannelAccount；official_api 必须绑定已授权账号，manual_handoff 时允许为空且不得显示已发布。
 - Package 与 PackageItem 冻结后不可变；任何上游变化生成新 package_version 和新 fingerprint。
 - 最终确认绑定整个 package ID + fingerprint；任一 item 变化都必须重新冻结并重新确认。
@@ -216,6 +218,7 @@ Provider 统一返回：provider_key、model_key、provider_request_id、status�
 - POST /api/v1/artifact-versions/{version_id}/reviews
 - POST /api/v1/channel-content
 - POST /api/v1/quality-reports/run
+- POST /api/v1/quality-reports/{quality_report_id}/resolutions
 - POST /api/v1/publish-packages/freeze（items[] 多渠道原子冻结）
 - POST /api/v1/publish-packages/{package_id}/confirm（确认整个 package fingerprint）
 - POST /api/v1/publish-packages/{package_id}/publish（为 official_api PackageItem 创建发布命令）
@@ -243,6 +246,7 @@ Job API 只暴露授权门店范围内的状态/错误摘要，不返回 Secret 
 | content.review_recorded | #8 | #7 | 指定版本审核决定回写任务步骤视图 |
 | content.channel_content_created | #8 | #7/#9 | 渠道快照生成，输入指纹校验后可继续质检 |
 | content.quality_report_completed | #8 | #7/#9 | 质检完成，领域服务校验输入指纹后推进步骤 |
+| content.quality_resolution_recorded | #8 | #7 | 人工复核结论追加记录；#7 重新评估发布门禁 |
 | content.publish_package_frozen | #8 | #7 | 多渠道交付包已冻结 |
 | content.publish_confirmed | #8 | #9 | 商家确认整个 package fingerprint，可请求发布 Job |
 | content.publish_command_requested | #8 | #12/#9 | 每个 official_api PackageItem 单独提交受控发布命令 |

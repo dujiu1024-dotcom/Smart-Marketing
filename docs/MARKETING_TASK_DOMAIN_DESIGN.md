@@ -517,7 +517,7 @@ erDiagram
 - task 内子资源：父表提供 (store_id, task_id, id)，子表使用 (store_id, task_id, parent_id) 引用。
 - artifact_versions：提供 (store_id, task_id, artifact_id, id)，供 review_records、revision_requests、channel_contents、publish_package_items 等引用精确版本。
 - review_records：提供 (store_id, task_id, artifact_id, artifact_version_id, id)，供 revision_requests 证明审核与源版本属于同一产物。
-- publish_packages：提供 (store_id, task_id, id, content_fingerprint)，供 publish_package_items 和 publish_confirmations 绑定包及指纹；PackageItem 另需 (store_id, publish_package_id, channel_key) 唯一键。
+- publish_packages：提供 (store_id, task_id, id, package_fingerprint)，供 publish_package_items 和 publish_confirmations 绑定包及指纹；PackageItem 另需 (store_id, publish_package_id, channel_key) 唯一键。
 - 当前版本指针（artifacts.current_version_id）需通过延迟约束触发器或事务内强校验，证明版本属于该 artifact；不得仅以 version_id 全局外键代替归属校验。
 - 依赖图允许同任务内跨产物依赖，但不允许跨 store/task 建边；若未来需要跨任务复用素材，必须通过独立、显式的共享资产授权关系，不得放宽任务外键。
 

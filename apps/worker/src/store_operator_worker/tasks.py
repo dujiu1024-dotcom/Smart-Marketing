@@ -12,7 +12,10 @@ from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine, or_, select
 from sqlalchemy.orm import sessionmaker
-from store_operator.ai_gateway.errors import ProviderError, SideEffectState  # type: ignore[import-untyped]
+from store_operator.ai_gateway.errors import (
+    ProviderError,
+    SideEffectState,
+)  # type: ignore[import-untyped]
 from store_operator.jobs.service import (
     acknowledge_job_cancellation,
     claim_job,
@@ -20,7 +23,12 @@ from store_operator.jobs.service import (
     fail_job,
     heartbeat_job,
 )  # type: ignore[import-untyped]
-from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent  # type: ignore[import-untyped]
+from store_operator.models import (
+    Job,
+    JobAttempt,
+    JobEvent,
+    OutboxEvent,
+)  # type: ignore[import-untyped]
 
 from store_operator_worker.celery_app import celery_app
 from store_operator_worker.handlers import (

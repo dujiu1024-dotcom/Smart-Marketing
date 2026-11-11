@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     session_last_seen_update_seconds: int = 60
     auth_login_max_attempts: int = 10
     auth_login_window_seconds: int = 900
+    object_storage_endpoint_url: str | None = None
+    object_storage_region: str = "us-east-1"
+    object_storage_bucket: str | None = None
+    object_storage_access_key_id: str | None = None
+    object_storage_secret_access_key: str | None = None
+    object_storage_upload_ttl_seconds: int = 600
+    object_storage_download_ttl_seconds: int = 300
 
     @model_validator(mode="after")
     def validate_auth_settings(self) -> "Settings":
@@ -35,7 +42,23 @@ class Settings(BaseSettings):
             raise ValueError("SESSION_LAST_SEEN_UPDATE_SECONDS must be positive")
         if self.auth_login_max_attempts <= 0 or self.auth_login_window_seconds <= 0:
             raise ValueError("Login rate-limit settings must be positive")
+        if (
+            self.object_storage_upload_ttl_seconds <= 0
+            or self.object_storage_download_ttl_seconds <= 0
+        ):
+            raise ValueError("Object storage URL TTL values must be positive")
         if self.environment == "production":
+            if not self.object_storage_bucket:
+                raise ValueError(
+                    "OBJECT_STORAGE_BUCKET must be explicitly configured in production"
+                )
+            if (
+                not self.object_storage_access_key_id
+                or not self.object_storage_secret_access_key
+            ):
+                raise ValueError(
+                    "Object storage credentials must be explicitly configured in production"
+                )
             if "session_token_pepper" not in self.model_fields_set:
                 raise ValueError("SESSION_TOKEN_PEPPER must be explicitly configured in production")
             if len(self.session_token_pepper) < 32:

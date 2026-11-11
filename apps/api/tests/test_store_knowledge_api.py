@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
+from store_operator.models.store_knowledge import MediaAsset, UploadIntent
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -318,3 +319,145 @@ def test_offer_knowledge_brand_and_audience_apis_support_fact_confirmation(
     )
     assert brand_response.status_code == 201, brand_response.text
     assert brand_response.json()["current_version"] == 1
+
+
+def test_media_asset_upload_is_verified_and_quarantined_before_use(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+    import store_operator.store_knowledge_router as knowledge_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = create_user(db_session, "asset-upload@example.com")
+    store = create_store(db_session, user, "Asset Upload Store")
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "asset-upload@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    csrf = login.json()["csrf_token"]
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": csrf,
+        "X-Store-ID": str(store.id),
+        "Idempotency-Key": "asset-upload-intent-1",
+    }
+    sha256 = "a" * 64
+    monkeypatch.setattr(
+        knowledge_router,
+        "create_upload_url",
+        lambda **kwargs: "https://private-storage.invalid/upload",
+    )
+    created = identity_client.post(
+        "/api/v1/store/assets/upload-intents",
+        headers=headers,
+        json={
+            "expected_mime_type": "image/png",
+            "expected_byte_size": 1024,
+            "expected_sha256": sha256,
+            "original_filename": "../../menu.png",
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["method"] == "PUT"
+    assert created.json()["required_headers"]["Content-Type"] == "image/png"
+    assert created.json()["required_headers"]["If-None-Match"] == "*"
+    assert "x-amz-meta-sha256" in created.json()["required_headers"]
+
+    intent = db_session.get(UploadIntent, UUID(created.json()["id"]))
+    assert intent is not None
+    assert intent.store_id == store.id
+    assert intent.object_key.startswith(f"stores/{store.id}/quarantine/")
+    assert ".." not in intent.object_key
+
+    monkeypatch.setattr(
+        knowledge_router,
+        "head_object",
+        lambda **kwargs: {
+            "ContentLength": 1024,
+            "ContentType": "image/png",
+            "Metadata": {"sha256": "0" * 64},
+        },
+    )
+    monkeypatch.setattr(
+        knowledge_router, "calculate_object_sha256", lambda **kwargs: sha256
+    )
+    completed = identity_client.post(
+        f"/api/v1/store/assets/upload-intents/{intent.id}/complete",
+        headers={**headers, "Idempotency-Key": "asset-upload-complete-1"},
+    )
+    assert completed.status_code == 200, completed.text
+    assert completed.json()["status"] == "scanning"
+    assert completed.json()["asset"]["status"] == "quarantined"
+    assert completed.json()["asset"]["original_filename_sanitized"] == "menu.png"
+    asset = db_session.get(MediaAsset, UUID(completed.json()["asset"]["id"]))
+    assert asset is not None
+    assert asset.usage_rights_status == "unknown"
+
+    download = identity_client.get(
+        f"/api/v1/store/assets/{asset.id}/download-url",
+        headers={"X-Store-ID": str(store.id)},
+    )
+    assert download.status_code == 409
+    assert download.json()["error"]["code"] == "MEDIA_ASSET_NOT_READY"
+
+
+def test_media_asset_upload_rejects_server_metadata_mismatch(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+    import store_operator.store_knowledge_router as knowledge_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = create_user(db_session, "asset-mismatch@example.com")
+    store = create_store(db_session, user, "Asset Mismatch Store")
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "asset-mismatch@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": login.json()["csrf_token"],
+        "X-Store-ID": str(store.id),
+        "Idempotency-Key": "asset-mismatch-intent-1",
+    }
+    monkeypatch.setattr(
+        knowledge_router,
+        "create_upload_url",
+        lambda **kwargs: "https://private-storage.invalid/upload",
+    )
+    created = identity_client.post(
+        "/api/v1/store/assets/upload-intents",
+        headers=headers,
+        json={
+            "expected_mime_type": "image/jpeg",
+            "expected_byte_size": 512,
+            "expected_sha256": "b" * 64,
+            "original_filename": "photo.jpg",
+        },
+    )
+    assert created.status_code == 201, created.text
+    intent_id = UUID(created.json()["id"])
+    monkeypatch.setattr(
+        knowledge_router,
+        "head_object",
+        lambda **kwargs: {
+            "ContentLength": 512,
+            "ContentType": "image/jpeg",
+            "Metadata": {"sha256": "b" * 64},
+        },
+    )
+    monkeypatch.setattr(
+        knowledge_router, "calculate_object_sha256", lambda **kwargs: "c" * 64
+    )
+    rejected = identity_client.post(
+        f"/api/v1/store/assets/upload-intents/{intent_id}/complete",
+        headers={**headers, "Idempotency-Key": "asset-mismatch-complete-1"},
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["error"]["code"] == "UPLOAD_OBJECT_MISMATCH"
+    db_session.refresh(db_session.get(UploadIntent, intent_id))
+    assert db_session.get(UploadIntent, intent_id).status == "rejected"

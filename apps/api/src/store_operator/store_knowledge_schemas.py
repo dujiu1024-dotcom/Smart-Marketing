@@ -349,3 +349,45 @@ class FactConfirmationRequest(BaseModel):
     source_type: str = Field(min_length=1, max_length=40)
     source_ref: str | None = Field(default=None, max_length=500)
     confirmation_note: str | None = Field(default=None, max_length=2000)
+
+
+class AssetUploadIntentCreate(BaseModel):
+    expected_mime_type: str = Field(pattern=r"^image/(jpeg|png|webp)$")
+    expected_byte_size: int = Field(gt=0, le=25 * 1024 * 1024)
+    expected_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    original_filename: str = Field(min_length=1, max_length=255)
+
+
+class AssetUploadIntentRead(BaseModel):
+    id: UUID
+    upload_url: str
+    method: str = "PUT"
+    required_headers: dict[str, str]
+    expires_at: datetime
+
+
+class MediaAssetRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    store_id: UUID
+    asset_type: str
+    mime_type: str
+    byte_size: int
+    sha256: str
+    original_filename_sanitized: str | None
+    usage_rights_status: str
+    status: str
+    parent_asset_id: UUID | None
+    version_no: int
+    created_at: datetime
+
+
+class MediaAssetList(BaseModel):
+    items: list[MediaAssetRead]
+    total: int
+
+
+class AssetUploadCompleteRead(BaseModel):
+    asset: MediaAssetRead
+    status: str

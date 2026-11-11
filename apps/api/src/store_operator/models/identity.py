@@ -173,10 +173,10 @@ class AuditEvent(Base):
     actor_type: Mapped[str] = mapped_column(String(24), nullable=False)
     actor_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     actor_user_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
     )
     store_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="SET NULL")
+        PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT")
     )
     action: Mapped[str] = mapped_column(String(100), nullable=False)
     target_type: Mapped[str] = mapped_column(String(80), nullable=False)

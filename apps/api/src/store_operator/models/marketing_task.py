@@ -325,6 +325,11 @@ class StepDecision(StoreTaskScoped, Base):
         CheckConstraint(
             "actor_type IN ('user', 'platform_admin', 'system')", name="actor_type"
         ),
+        CheckConstraint(
+            "(actor_type = 'system' AND actor_user_id IS NULL) OR "
+            "(actor_type IN ('user', 'platform_admin') AND actor_user_id IS NOT NULL)",
+            name="actor_reference",
+        ),
         ForeignKeyConstraint(
             ["store_id", "task_id"],
             ["marketing_tasks.store_id", "marketing_tasks.id"],

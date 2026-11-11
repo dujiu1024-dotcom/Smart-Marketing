@@ -26,10 +26,12 @@ class FakeSecretsManager:
                 "CreateSecret",
             )
         self.values[Name] = SecretString
+        self.values[self.next_arn] = SecretString
         return {"ARN": self.next_arn}
 
     def put_secret_value(self, *, SecretId: str, SecretString: str) -> dict[str, str]:
         self.values[SecretId] = SecretString
+        self.values[self.next_arn] = SecretString
         return {"ARN": self.next_arn}
 
     def get_secret_value(self, *, SecretId: str) -> dict[str, str]:

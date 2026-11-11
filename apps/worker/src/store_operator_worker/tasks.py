@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -21,6 +22,8 @@ from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
 )
 from store_operator.jobs.service import (  # type: ignore[import-untyped]
     InvalidJobTransition,
+    JobIdempotencyConflict,
+    create_job,
     LeaseLostError,
     acknowledge_job_cancellation,
     claim_job,
@@ -30,6 +33,7 @@ from store_operator.jobs.service import (  # type: ignore[import-untyped]
 )
 from store_operator.models import (  # type: ignore[import-untyped]
     Artifact,
+    ChannelAccount,
     ArtifactVersion,
     ChannelContent,
     ChannelContentArtifactRef,
@@ -37,10 +41,23 @@ from store_operator.models import (  # type: ignore[import-untyped]
     JobAttempt,
     JobEvent,
     OutboxEvent,
+    PublishOperation,
+    PublishPackage,
+    PublishPackageItem,
+    PublishConfirmation,
     QualityReport,
     ReviewRecord,
 )
 
+from store_operator.channels.douyin import (
+    DouyinApiError,
+    DouyinAppCredentials,
+    DouyinOAuthClient,
+)
+from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
+from store_operator.config import settings
+from store_operator.object_storage import read_object_bytes
+from store_operator.models.content_delivery import ChannelContentArtifactRef
 from store_operator_worker.celery_app import celery_app
 from store_operator_worker.handlers import (
     JobCancelled,

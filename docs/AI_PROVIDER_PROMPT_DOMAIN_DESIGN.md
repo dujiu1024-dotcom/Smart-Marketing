@@ -73,7 +73,7 @@ Prompt 是平台级共享配置，不是门店经营资料。首期 PromptTempla
 
 建议字段：
 
-`id, prompt_template_id, version_no, system_prompt, user_prompt_template, variables_schema_json, output_schema_json, schema_version, input_policy_json, changelog, status(draft|published|retired), created_by_user_id, created_at, published_by_user_id, published_at`
+`id, prompt_template_id, version_no, system_prompt, user_prompt_template, variables_schema_json, output_schema_json, schema_version, input_policy_json, changelog, status(draft|published), created_by_user_id, created_at, published_by_user_id, published_at`
 
 - `UNIQUE(prompt_template_id, version_no)`；version_no 单调递增。
 - Draft 可编辑；发布后正文、变量 Schema、输出 Schema、输入策略和 changelog 均不可变。
@@ -184,7 +184,7 @@ AIInvocation 由 #9 持有。每次调用必须关联：
 | POST | /api/v1/admin/prompt-templates | 创建模板 | template_key 唯一 |
 | GET | /api/v1/admin/prompt-templates/{id} | 模板详情/版本历史 | 不返回 Secret |
 | POST | /api/v1/admin/prompt-templates/{id}/versions | 创建 Draft | version_no 服务端分配 |
-| PATCH | /api/v1/admin/prompt-versions/{id} | 编辑 Draft | published/retired 返回 409 |
+| PATCH | /api/v1/admin/prompt-versions/{id} | 编辑 Draft | published 返回 409 |
 | POST | /api/v1/admin/prompt-versions/{id}/validate | 校验 Schema/占位符 | 不调用真实 Provider |
 | POST | /api/v1/admin/prompt-versions/{id}/publish | 发布版本 | 同事务追加 PromptActivation |
 | POST | /api/v1/admin/prompt-templates/{id}/activate | 激活/回滚已发布版本 | body: version_id、reason、expected_version；追加 activation |

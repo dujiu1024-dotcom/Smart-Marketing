@@ -755,7 +755,7 @@ def confirm_requirement(
         )
 
     steps = {step.step_key: step for step in _task_steps_for_update(db, store_id, task.id)}
-    for step_key, output_refs in (
+    step_outputs: tuple[tuple[TaskStepKey, list[dict[str, object]]], ...] = (
         (
             TaskStepKey.REQUIREMENT_UNDERSTANDING,
             [{"type": "requirement_snapshot", "id": str(requirement_snapshot.id)}],
@@ -771,7 +771,8 @@ def confirm_requirement(
                 for snapshot in fact_snapshots
             ],
         ),
-    ):
+    )
+    for step_key, output_refs in step_outputs:
         step = steps[step_key.value]
         if TaskStepStatus(step.status) is not TaskStepStatus.PENDING:
             raise ApiError(

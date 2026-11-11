@@ -62,12 +62,14 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 
 ### 3.3 ChannelContent
 
-`ChannelContent` 是某个渠道的不可变内容快照：`id, store_id, task_id, channel_key, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。
+`ChannelContent` 是某个渠道的不可变内容快照：`id, store_id, task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。图片版本通过 `ChannelContentArtifactRef` 子表按顺序引用，API 可投影为 `image_version_ids[]`。
 
 - 每个目标渠道独立生成一条 ChannelContent；修改上游版本或重新适配时创建新记录，不覆盖旧 payload。
-- `copy_version_id`、`image_version_ids` 必须引用已通过对应审核的精确版本。
+- `copy_version_id` 必须引用已通过审核的精确版本；图片引用必须通过 `ChannelContentArtifactRef` 指向已审核的精确 ArtifactVersion。
 - `spec_version` 引用 #12 发布的渠道能力/规格快照；#8 不维护 OAuth 或账号权限。
 - ChannelContent 不绑定具体账号；目标账号只在 PublishPackageItem 中作为 #12 的外键引用，不代表 #8 获得读取凭据或调用厂商 API 的权限。
+
+`ChannelContentArtifactRef`：`id, store_id, channel_content_id, artifact_version_id, role(image), position`。它是图片版本的关系表，包含 store_id 复合外键；不存储图片二进制。
 - status 仅表达内容快照状态（如 ready/stale/blocked）；异步生成中状态读取 #9 Job，不复制 Job 的 queued/running/retry_wait 等状态。
 
 ### 3.4 QualityReport
@@ -85,7 +87,7 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须支持多渠道聚合，而不是把一个 `channel_content_id` 塞进单个包后丢失其他渠道。
 
 - `PublishPackage` 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, fact_snapshot_ids, package_fingerprint, frozen_at, frozen_by`。
-- `PublishPackageItem` 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, copy_version_id, image_version_ids, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。
+- `PublishPackageItem` 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。文案/图片版本通过不可变 ChannelContent 间接绑定，避免在 PackageItem 重复存储版本数组。
 - `PublishConfirmation`：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at, confirmation_note`。
 - 一个 PublishPackage 至少包含一个 PackageItem；同一 package 的 channel_key 唯一。PackageItem 精确绑定 ChannelContent、Copy/Image 版本、QualityReport 和可选 ChannelAccount。
 - `delivery_mode=official_api` 时必须引用 #12 已授权且支持该渠道动作的 ChannelAccount；`manual_handoff` 不得伪造账号或显示已发布。
@@ -168,7 +170,8 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - QualityReport FK 到确切 ChannelContent；同一 channel_content_id + rule_version + input_fingerprint 幂等唯一。
 - UNIQUE(store_id, task_id, package_version)。
 - UNIQUE(store_id, publish_package_id, channel_key)。
-- PublishPackageItem 复合 FK 到 ChannelContent、ArtifactVersion、QualityReport 和 #12 ChannelAccount 引用；manual_handoff 时 channel_account_id 可空。
+- ChannelContentArtifactRef 复合 FK 到 ChannelContent 和 ArtifactVersion；UNIQUE(store_id, channel_content_id, position)。
+- PublishPackageItem 复合 FK 到 ChannelContent、QualityReport 和 #12 ChannelAccount 引用；manual_handoff 时 channel_account_id 可空。
 - PublishConfirmation FK 到 package_id + package_fingerprint；部分唯一索引保证一个 package 只有一个未撤销确认。
 - 冻结后禁止修改 Package/PackageItem 核心字段；通过数据库权限或触发器保护不可变性。
 
@@ -192,7 +195,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 | CNT-14 | needs_human 无操作者/理由确认 | 拒绝并审计 |
 | CNT-15 | 多渠道包缺少一个目标渠道质量报告 | Freeze 原子失败，不产生半包 |
 | CNT-16 | 同一 package 重复包含 channel_key | 409/422，唯一约束阻断 |
-| CNT-17 | PackageItem 跨店引用 ChannelContent/QualityReport | DB 复合 FK 拒绝 |
+| CNT-17 | PackageItem 跨店引用 ChannelContent/QualityReport，或图片引用跨店 ArtifactVersion | DB 复合 FK 拒绝 |
 | CNT-18 | 冻结后更新 PackageItem 内容 | DB 拒绝 |
 | CNT-19 | package fingerprint 变化后复用旧确认 | 409 PACKAGE_STALE / PACKAGE_NOT_CONFIRMED |
 | CNT-20 | 账号撤权后发起 publish | #12 再校验并拒绝；不得触发外部副作用 |

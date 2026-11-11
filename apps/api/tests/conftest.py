@@ -1,7 +1,6 @@
 import os
 
 import pytest
-from sqlalchemy import event
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
@@ -19,13 +18,11 @@ def db_session():
 
     connection = engine.connect()
     outer_transaction = connection.begin()
-    session = Session(bind=connection, expire_on_commit=False)
-    session.begin_nested()
-
-    @event.listens_for(session, "after_transaction_end")
-    def restart_savepoint(current_session, transaction):
-        if transaction.nested and transaction._parent is not None and not transaction._parent.nested:
-            current_session.begin_nested()
+    session = Session(
+        bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
+    )
 
     try:
         yield session

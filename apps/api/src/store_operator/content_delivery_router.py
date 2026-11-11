@@ -21,6 +21,7 @@ from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.models.content_delivery import Artifact, ArtifactVersion, ReviewRecord
+from store_operator.models.job_runtime import OutboxEvent
 from store_operator.models.marketing_task import MarketingTask
 from store_operator.models.store_knowledge import MediaAsset
 
@@ -110,6 +111,45 @@ def _artifact_payload(
         "updated_at": artifact.updated_at.isoformat(),
         "versions": [_version_payload(item) for item in versions or []],
     }
+
+
+
+
+def _enqueue_content_event(
+    db: Session,
+    *,
+    event_type: str,
+    aggregate_type: str,
+    aggregate_id: UUID,
+    store_id: UUID,
+    task_id: UUID,
+    artifact_id: UUID,
+    artifact_version_id: UUID | None = None,
+    review_id: UUID | None = None,
+    decision: str | None = None,
+) -> None:
+    payload: dict[str, object] = {
+        "schema_version": 1,
+        "store_id": str(store_id),
+        "task_id": str(task_id),
+        "artifact_id": str(artifact_id),
+    }
+    if artifact_version_id is not None:
+        payload["artifact_version_id"] = str(artifact_version_id)
+    if review_id is not None:
+        payload["review_id"] = str(review_id)
+    if decision is not None:
+        payload["decision"] = decision
+    db.add(
+        OutboxEvent(
+            aggregate_type=aggregate_type,
+            aggregate_id=aggregate_id,
+            event_type=event_type,
+            schema_version=1,
+            payload_json=payload,
+            dedupe_key=f"{event_type}:{aggregate_id}",
+        )
+    )
 
 
 def _new_version(
@@ -255,6 +295,16 @@ def create_artifact(
         resource_type="artifact",
         resource_id=artifact.id,
     )
+    _enqueue_content_event(
+        db,
+        event_type="content.artifact_version_created",
+        aggregate_type="artifact",
+        aggregate_id=version.id,
+        store_id=store_id,
+        task_id=task_id,
+        artifact_id=artifact.id,
+        artifact_version_id=version.id,
+    )
     record_audit(
         db,
         request,
@@ -383,6 +433,16 @@ def create_artifact_version(
         resource_type="artifact_version",
         resource_id=version.id,
     )
+    _enqueue_content_event(
+        db,
+        event_type="content.artifact_version_created",
+        aggregate_type="artifact",
+        aggregate_id=version.id,
+        store_id=store_id,
+        task_id=task_id,
+        artifact_id=artifact.id,
+        artifact_version_id=version.id,
+    )
     record_audit(
         db,
         request,
@@ -503,6 +563,18 @@ def create_review_record(
         response=response,
         resource_type="review_record",
         resource_id=review.id,
+    )
+    _enqueue_content_event(
+        db,
+        event_type="content.review_recorded",
+        aggregate_type="artifact",
+        aggregate_id=review.id,
+        store_id=store_id,
+        task_id=task_id,
+        artifact_id=artifact_id,
+        artifact_version_id=version_id,
+        review_id=review.id,
+        decision=review.decision,
     )
     record_audit(
         db,

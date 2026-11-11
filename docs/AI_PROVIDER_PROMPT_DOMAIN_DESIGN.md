@@ -108,6 +108,15 @@ Prompt 是平台级共享配置，不是门店经营资料。首期 PromptTempla
 
 发布后禁止 PATCH/DELETE；若校验失败返回明确错误，不改变当前生效版本。
 
+### 4.5 数据库约束
+
+- `UNIQUE(industry_key, task_type, capability, template_key)`。
+- `UNIQUE(prompt_template_id, version_no)`；版本号由服务端分配并单调递增。
+- PromptTemplate.current_published_version_id 必须通过复合 FK 证明 PromptVersion 属于同一模板。
+- PromptActivation 的 activated_version_id / previous_version_id 必须引用同一 PromptTemplate 的 published PromptVersion；activation 记录追加写。
+- Published PromptVersion 与 PromptActivation 禁止普通 UPDATE/DELETE；模板归档不删除版本和激活历史。
+- 所有写操作使用 Idempotency-Key；并发发布使用 expected_version，避免两个管理员覆盖当前生效指针。
+
 ## 5. Provider Adapter 契约
 
 #9 的统一接口是唯一调用入口。#10 实现 Adapter，不自创重试循环、不保存 Provider Secret、不自行选择门店模型。

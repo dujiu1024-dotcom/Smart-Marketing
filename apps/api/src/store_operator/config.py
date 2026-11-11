@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     object_storage_secret_access_key: str | None = None
     object_storage_upload_ttl_seconds: int = 600
     object_storage_download_ttl_seconds: int = 300
+    douyin_client_key: str | None = None
+    douyin_client_secret: str | None = None
+    douyin_redirect_uri: str | None = None
+    channel_secret_store_region: str | None = None
+    channel_secret_store_prefix: str = "ai-store-operator/channel-accounts"
 
     @model_validator(mode="after")
     def validate_auth_settings(self) -> "Settings":
@@ -47,6 +52,18 @@ class Settings(BaseSettings):
             or self.object_storage_download_ttl_seconds <= 0
         ):
             raise ValueError("Object storage URL TTL values must be positive")
+        douyin_configured = any(
+            (self.douyin_client_key, self.douyin_client_secret, self.douyin_redirect_uri)
+        )
+        if douyin_configured and not all(
+            (self.douyin_client_key, self.douyin_client_secret, self.douyin_redirect_uri)
+        ):
+            raise ValueError(
+                "DOUYIN_CLIENT_KEY, DOUYIN_CLIENT_SECRET and DOUYIN_REDIRECT_URI "
+                "must be configured together"
+            )
+        if self.douyin_redirect_uri and not self.douyin_redirect_uri.startswith("https://"):
+            raise ValueError("DOUYIN_REDIRECT_URI must use HTTPS")
         if self.environment == "production":
             if not self.object_storage_bucket:
                 raise ValueError(

@@ -903,3 +903,315 @@ def confirm_strategy(
         audit_action="marketing_task.strategy.confirmed",
         audit_metadata={"strategy_snapshot_id": str(strategy_snapshot.id)},
     )
+
+
+_APPROVAL_STEP_KEYS = {
+    TaskStepKey.STRATEGY_CONFIRMATION,
+    TaskStepKey.COPY_PRODUCTION_REVIEW,
+    TaskStepKey.IMAGE_PRODUCTION_REVIEW,
+    TaskStepKey.FINAL_CONFIRMATION,
+}
+
+
+def skip_task_step(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task_id: UUID,
+    step_key: TaskStepKey,
+    payload: MarketingTaskStepSkip,
+    idempotency_key: str,
+) -> MarketingTaskDetail:
+    store_id = _require_store_id(context)
+    idempotency_record, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="marketing_task.step.skip",
+        payload=payload,
+    )
+    if replay is not None:
+        return MarketingTaskDetail.model_validate(replay)
+
+    task = _task_for_update(db, store_id, task_id)
+    _check_expected_version(task, payload.expected_version)
+    if task.lifecycle_status not in {
+        MarketingTaskStatus.ACTIVE.value,
+        MarketingTaskStatus.WAITING_FOR_USER.value,
+    }:
+        raise ApiError(
+            409,
+            "TASK_NOT_ACTIONABLE",
+            "Only active or waiting tasks accept step decisions",
+        )
+
+    steps = _task_steps_for_update(db, store_id, task.id)
+    step = next((item for item in steps if item.step_key == step_key.value), None)
+    if step is None:
+        raise ApiError(404, "TASK_STEP_NOT_FOUND", "Task step not found")
+    applicability = StepApplicability(step.applicability)
+    _ensure_step_transition(
+        TaskStepStatus(step.status),
+        TaskStepStatus.SKIPPED,
+        applicability=applicability,
+        skip_reason=payload.reason,
+        allow_explicit_skip=True,
+        approval_required=step_key in _APPROVAL_STEP_KEYS,
+    )
+
+    now = datetime.now(UTC)
+    step.status = TaskStepStatus.SKIPPED.value
+    step.skip_reason = payload.reason
+    step.skipped_by_user_id = auth.user.id
+    step.skipped_at = now
+    step.finished_at = now
+    step.version += 1
+    decision = StepDecision(
+        id=uuid4(),
+        store_id=store_id,
+        task_id=task.id,
+        task_step_id=step.id,
+        decision="skip",
+        reason=payload.reason,
+        actor_type="user",
+        actor_user_id=auth.user.id,
+        evidence_json={
+            "step_key": step_key.value,
+            "applicability": applicability.value,
+        },
+        idempotency_record_id=idempotency_record.id if idempotency_record else None,
+    )
+    db.add(decision)
+    task.version += 1
+    return _finish_task_write(
+        db,
+        request,
+        auth,
+        context,
+        task,
+        idempotency_record,
+        event_type="task_step.skipped",
+        event_payload={
+            "step_key": step_key.value,
+            "decision_id": str(decision.id),
+            "reason": payload.reason,
+        },
+        audit_action="marketing_task.step.skipped",
+        audit_metadata={
+            "step_key": step_key.value,
+            "decision_id": str(decision.id),
+        },
+    )
+
+
+def recover_marketing_task(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task_id: UUID,
+    payload: MarketingTaskRecover,
+    idempotency_key: str,
+) -> MarketingTaskDetail:
+    store_id = _require_store_id(context)
+    idempotency_record, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="marketing_task.recover",
+        payload=payload,
+    )
+    if replay is not None:
+        return MarketingTaskDetail.model_validate(replay)
+
+    task = _task_for_update(db, store_id, task_id)
+    _check_expected_version(task, payload.expected_version)
+    current_task_status = MarketingTaskStatus(task.lifecycle_status)
+    if current_task_status not in {
+        MarketingTaskStatus.ACTIVE,
+        MarketingTaskStatus.WAITING_FOR_USER,
+        MarketingTaskStatus.BLOCKED,
+        MarketingTaskStatus.FAILED,
+    }:
+        raise ApiError(
+            409,
+            "TASK_NOT_RECOVERABLE",
+            "Task must be active, waiting, blocked or failed to recover a step",
+        )
+
+    steps = _task_steps_for_update(db, store_id, task.id)
+    step = next(
+        (item for item in steps if item.step_key == payload.step_key.value),
+        None,
+    )
+    if step is None:
+        raise ApiError(404, "TASK_STEP_NOT_FOUND", "Task step not found")
+    applicability = StepApplicability(step.applicability)
+    if applicability is StepApplicability.NOT_APPLICABLE:
+        raise ApiError(
+            409,
+            "TASK_STEP_NOT_APPLICABLE",
+            "A not-applicable task step cannot be recovered",
+        )
+
+    current_step_status = TaskStepStatus(step.status)
+    if current_step_status in {
+        TaskStepStatus.FAILED,
+        TaskStepStatus.WAITING_FOR_USER,
+    }:
+        target_step_status = TaskStepStatus.RUNNING
+    elif current_step_status is TaskStepStatus.STALE:
+        target_step_status = TaskStepStatus.PENDING
+    else:
+        raise ApiError(
+            409,
+            "TASK_STEP_NOT_RECOVERABLE",
+            "Only failed, stale or waiting task steps can be recovered",
+        )
+    _ensure_step_transition(
+        current_step_status,
+        target_step_status,
+        applicability=applicability,
+    )
+    if current_task_status is not MarketingTaskStatus.ACTIVE:
+        _ensure_task_transition(current_task_status, MarketingTaskStatus.ACTIVE)
+
+    now = datetime.now(UTC)
+    step.status = target_step_status.value
+    step.version += 1
+    step.started_at = now if target_step_status is TaskStepStatus.RUNNING else None
+    step.finished_at = None
+    step.skip_reason = None
+    step.skipped_at = None
+    step.skipped_by_user_id = None
+    step.input_fingerprint = None
+    step.output_refs_json = []
+    step.blocked_by_json = []
+
+    decision = StepDecision(
+        id=uuid4(),
+        store_id=store_id,
+        task_id=task.id,
+        task_step_id=step.id,
+        decision="retry",
+        reason=payload.reason,
+        actor_type="user",
+        actor_user_id=auth.user.id,
+        evidence_json={
+            "step_key": payload.step_key.value,
+            "from_status": current_step_status.value,
+            "to_status": target_step_status.value,
+        },
+        idempotency_record_id=idempotency_record.id if idempotency_record else None,
+    )
+    db.add(decision)
+    if current_task_status is not MarketingTaskStatus.ACTIVE:
+        task.lifecycle_status = MarketingTaskStatus.ACTIVE.value
+    task.version += 1
+    return _finish_task_write(
+        db,
+        request,
+        auth,
+        context,
+        task,
+        idempotency_record,
+        event_type="task.recovered",
+        event_payload={
+            "step_key": payload.step_key.value,
+            "decision_id": str(decision.id),
+            "from_status": current_step_status.value,
+            "to_status": target_step_status.value,
+        },
+        audit_action="marketing_task.recovered",
+        audit_metadata={
+            "step_key": payload.step_key.value,
+            "decision_id": str(decision.id),
+        },
+    )
+
+
+def cancel_marketing_task(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task_id: UUID,
+    payload: MarketingTaskAction,
+    idempotency_key: str,
+) -> MarketingTaskDetail:
+    store_id = _require_store_id(context)
+    idempotency_record, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="marketing_task.cancel",
+        payload=payload,
+    )
+    if replay is not None:
+        return MarketingTaskDetail.model_validate(replay)
+
+    task = _task_for_update(db, store_id, task_id)
+    _check_expected_version(task, payload.expected_version)
+    current_status = MarketingTaskStatus(task.lifecycle_status)
+    _ensure_task_transition(current_status, MarketingTaskStatus.CANCELLED)
+    task.lifecycle_status = MarketingTaskStatus.CANCELLED.value
+    task.cancelled_at = datetime.now(UTC)
+    task.version += 1
+    return _finish_task_write(
+        db,
+        request,
+        auth,
+        context,
+        task,
+        idempotency_record,
+        event_type="task.cancelled",
+        event_payload={"reason": payload.reason},
+        audit_action="marketing_task.cancelled",
+        audit_metadata={"reason": payload.reason},
+    )
+
+
+def archive_marketing_task(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task_id: UUID,
+    payload: MarketingTaskAction,
+    idempotency_key: str,
+) -> MarketingTaskDetail:
+    store_id = _require_store_id(context)
+    idempotency_record, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="marketing_task.archive",
+        payload=payload,
+    )
+    if replay is not None:
+        return MarketingTaskDetail.model_validate(replay)
+
+    task = _task_for_update(db, store_id, task_id)
+    _check_expected_version(task, payload.expected_version)
+    current_status = MarketingTaskStatus(task.lifecycle_status)
+    _ensure_task_transition(current_status, MarketingTaskStatus.ARCHIVED)
+    task.lifecycle_status = MarketingTaskStatus.ARCHIVED.value
+    task.archived_at = datetime.now(UTC)
+    task.version += 1
+    return _finish_task_write(
+        db,
+        request,
+        auth,
+        context,
+        task,
+        idempotency_record,
+        event_type="task.archived",
+        event_payload={"reason": payload.reason},
+        audit_action="marketing_task.archived",
+        audit_metadata={"reason": payload.reason},
+    )

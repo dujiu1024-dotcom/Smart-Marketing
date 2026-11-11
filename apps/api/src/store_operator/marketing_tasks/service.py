@@ -49,7 +49,7 @@ from store_operator.models.marketing_task import (
     TaskEvent,
     TaskStep,
 )
-from store_operator.models.store_knowledge import StoreRecordRevision
+from store_operator.models.store_knowledge import IdempotencyRecord, StoreRecordRevision
 
 _PENDING_STEP_STATUSES = {
     TaskStepStatus.PENDING.value,
@@ -301,3 +301,606 @@ def get_marketing_task(
         )
     ).all()
     return _detail(task, list(steps))
+
+
+def _task_for_update(db: Session, store_id: UUID, task_id: UUID) -> MarketingTask:
+    task = db.scalar(
+        select(MarketingTask)
+        .where(MarketingTask.id == task_id, MarketingTask.store_id == store_id)
+        .with_for_update()
+    )
+    if task is None:
+        raise ApiError(404, "MARKETING_TASK_NOT_FOUND", "Marketing task not found")
+    return task
+
+
+def _task_steps_for_update(
+    db: Session, store_id: UUID, task_id: UUID
+) -> list[TaskStep]:
+    return list(
+        db.scalars(
+            select(TaskStep)
+            .where(TaskStep.store_id == store_id, TaskStep.task_id == task_id)
+            .with_for_update()
+        ).all()
+    )
+
+
+def _check_expected_version(task: MarketingTask, expected_version: int) -> None:
+    if task.version != expected_version:
+        raise ApiError(
+            409,
+            "MARKETING_TASK_VERSION_CONFLICT",
+            "Marketing task has changed; reload and retry with the current version",
+        )
+
+
+def _fingerprint(value: dict[str, object]) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _ensure_task_transition(
+    current: MarketingTaskStatus,
+    target: MarketingTaskStatus,
+) -> None:
+    try:
+        ensure_task_transition(current, target)
+    except InvalidMarketingTaskTransition as exc:
+        raise ApiError(409, "INVALID_TASK_TRANSITION", str(exc)) from exc
+
+
+def _ensure_step_transition(
+    current: TaskStepStatus,
+    target: TaskStepStatus,
+    *,
+    applicability: StepApplicability,
+    skip_reason: str | None = None,
+    allow_explicit_skip: bool = False,
+    approval_required: bool = False,
+) -> None:
+    try:
+        ensure_step_transition(
+            current,
+            target,
+            applicability=applicability,
+            skip_reason=skip_reason,
+            allow_explicit_skip=allow_explicit_skip,
+            approval_required=approval_required,
+        )
+    except InvalidTaskStepTransition as exc:
+        raise ApiError(409, "INVALID_TASK_STEP_TRANSITION", str(exc)) from exc
+
+
+def _finish_task_write(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task: MarketingTask,
+    idempotency_record: IdempotencyRecord | None,
+    *,
+    event_type: str,
+    event_payload: dict[str, object],
+    audit_action: str,
+    audit_metadata: dict[str, object],
+) -> MarketingTaskDetail:
+    db.add(
+        TaskEvent(
+            id=uuid4(),
+            store_id=task.store_id,
+            task_id=task.id,
+            event_type=event_type,
+            aggregate_version=task.version,
+            actor_type="user",
+            actor_user_id=auth.user.id,
+            correlation_id=context.request_id,
+            payload_json=event_payload,
+        )
+    )
+    record_audit(
+        db,
+        request,
+        action=audit_action,
+        target_type="marketing_task",
+        target_id=task.id,
+        actor_user_id=auth.user.id,
+        store_id=task.store_id,
+        metadata=audit_metadata,
+    )
+    db.flush()
+    db.refresh(task)
+    steps = _task_steps_for_update(db, task.store_id, task.id)
+    result = _detail(task, steps)
+    complete_idempotency(
+        idempotency_record,
+        response=result.model_dump(mode="json"),
+        resource_type="marketing_task",
+        resource_id=task.id,
+        response_status=200,
+    )
+    db.commit()
+    return result
+
+
+def update_requirement_draft(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task_id: UUID,
+    payload: MarketingTaskRequirementUpdate,
+    idempotency_key: str,
+) -> MarketingTaskDetail:
+    store_id = _require_store_id(context)
+    idempotency_record, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="marketing_task.requirement.update",
+        payload=payload,
+    )
+    if replay is not None:
+        return MarketingTaskDetail.model_validate(replay)
+
+    task = _task_for_update(db, store_id, task_id)
+    _check_expected_version(task, payload.expected_version)
+    if (
+        task.lifecycle_status != MarketingTaskStatus.DRAFT.value
+        or task.current_requirement_snapshot_id is not None
+    ):
+        raise ApiError(
+            409,
+            "REQUIREMENT_ALREADY_CONFIRMED",
+            "Requirement draft cannot be changed after confirmation",
+        )
+
+    options = payload.task_options or MarketingTaskOptions.model_validate(
+        task.task_options_json
+    )
+    validated = MarketingTaskCreate(
+        task_type=MarketingTaskType(task.task_type),
+        title=task.title,
+        requirement_draft=payload.requirement_draft,
+        task_options=options,
+    )
+    options_json = options.model_dump(mode="json")
+    now = datetime.now(UTC)
+    steps = _task_steps_for_update(db, store_id, task.id)
+    for step in steps:
+        old_applicability = StepApplicability(step.applicability)
+        new_applicability = resolve_step_applicability(
+            validated.task_type,
+            TaskStepKey(step.step_key),
+            includes_copy=options.includes_copy,
+            includes_image=options.includes_image,
+            opportunity_applicable=options.opportunity_applicable,
+            selected_channels=bool(options.selected_channel_keys),
+            requires_external_delivery=options.requires_external_delivery,
+        )
+        if new_applicability is old_applicability:
+            continue
+        current_status = TaskStepStatus(step.status)
+        if current_status not in {
+            TaskStepStatus.PENDING,
+            TaskStepStatus.SKIPPED,
+        }:
+            raise ApiError(
+                409,
+                "TASK_STEP_ALREADY_STARTED",
+                "Task step applicability cannot change after execution starts",
+            )
+
+        if new_applicability is StepApplicability.NOT_APPLICABLE:
+            reason = f"Not applicable to {validated.task_type.value} task scope"
+            if current_status is TaskStepStatus.PENDING:
+                _ensure_step_transition(
+                    current_status,
+                    TaskStepStatus.SKIPPED,
+                    applicability=new_applicability,
+                    skip_reason=reason,
+                )
+            step.status = TaskStepStatus.SKIPPED.value
+            step.skip_reason = reason
+            step.skipped_at = now
+            step.skipped_by_user_id = None
+        elif current_status is TaskStepStatus.SKIPPED:
+            _ensure_step_transition(
+                current_status,
+                TaskStepStatus.STALE,
+                applicability=old_applicability,
+            )
+            _ensure_step_transition(
+                TaskStepStatus.STALE,
+                TaskStepStatus.PENDING,
+                applicability=new_applicability,
+            )
+            step.status = TaskStepStatus.PENDING.value
+            step.skip_reason = None
+            step.skipped_at = None
+            step.skipped_by_user_id = None
+        step.applicability = new_applicability.value
+        step.version += 1
+        step.input_fingerprint = None
+        step.output_refs_json = []
+        step.blocked_by_json = []
+
+    task.requirement_draft_json = validated.requirement_draft
+    task.task_options_json = options_json
+    task.version += 1
+    return _finish_task_write(
+        db,
+        request,
+        auth,
+        context,
+        task,
+        idempotency_record,
+        event_type="requirement.draft_updated",
+        event_payload={
+            "expected_version": payload.expected_version,
+            "new_version": task.version,
+        },
+        audit_action="marketing_task.requirement.draft_updated",
+        audit_metadata={"task_type": task.task_type},
+    )
+
+
+def confirm_requirement(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task_id: UUID,
+    payload: MarketingTaskRequirementConfirm,
+    idempotency_key: str,
+) -> MarketingTaskDetail:
+    store_id = _require_store_id(context)
+    idempotency_record, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="marketing_task.requirement.confirm",
+        payload=payload,
+    )
+    if replay is not None:
+        return MarketingTaskDetail.model_validate(replay)
+
+    task = _task_for_update(db, store_id, task_id)
+    _check_expected_version(task, payload.expected_version)
+    if task.lifecycle_status != MarketingTaskStatus.DRAFT.value:
+        raise ApiError(409, "TASK_NOT_DRAFT", "Only draft tasks can confirm requirements")
+    if task.current_requirement_snapshot_id is not None:
+        raise ApiError(
+            409,
+            "REQUIREMENT_ALREADY_CONFIRMED",
+            "Requirement snapshot already exists",
+        )
+    if not task.requirement_draft_json:
+        raise ApiError(
+            422, "REQUIREMENT_DRAFT_EMPTY", "Requirement draft must not be empty"
+        )
+
+    now = datetime.now(UTC)
+    fact_snapshots: list[BusinessFactSnapshot] = []
+    fact_refs: list[dict[str, object]] = []
+    for fact_ref in payload.business_facts:
+        revision = db.scalar(
+            select(StoreRecordRevision)
+            .where(
+                StoreRecordRevision.store_id == store_id,
+                StoreRecordRevision.record_type == fact_ref.record_type,
+                StoreRecordRevision.record_id == fact_ref.record_id,
+            )
+            .order_by(StoreRecordRevision.version_no.desc())
+            .limit(1)
+            .with_for_update()
+        )
+        if revision is None:
+            raise ApiError(
+                404,
+                "BUSINESS_FACT_NOT_FOUND",
+                f"Business fact {fact_ref.fact_key} was not found in this store",
+            )
+        if (
+            fact_ref.expected_version_no is not None
+            and fact_ref.expected_version_no != revision.version_no
+        ):
+            raise ApiError(
+                409,
+                "BUSINESS_FACT_VERSION_CONFLICT",
+                f"Business fact {fact_ref.fact_key} has a newer version",
+            )
+        if revision.fact_status != "confirmed":
+            raise ApiError(
+                409,
+                "BUSINESS_FACT_NOT_CONFIRMED",
+                f"Business fact {fact_ref.fact_key} must be confirmed before task use",
+            )
+        if revision.valid_from is not None and revision.valid_from > now:
+            raise ApiError(
+                409,
+                "BUSINESS_FACT_NOT_YET_VALID",
+                f"Business fact {fact_ref.fact_key} is not yet valid",
+            )
+        if revision.valid_until is not None and revision.valid_until <= now:
+            raise ApiError(
+                409,
+                "BUSINESS_FACT_EXPIRED",
+                f"Business fact {fact_ref.fact_key} has expired",
+            )
+
+        fact_version = (
+            db.scalar(
+                select(func.max(BusinessFactSnapshot.version_no)).where(
+                    BusinessFactSnapshot.store_id == store_id,
+                    BusinessFactSnapshot.task_id == task.id,
+                    BusinessFactSnapshot.fact_key == fact_ref.fact_key,
+                )
+            )
+            or 0
+        ) + 1
+        snapshot = BusinessFactSnapshot(
+            id=uuid4(),
+            store_id=store_id,
+            task_id=task.id,
+            fact_key=fact_ref.fact_key,
+            source_type=fact_ref.record_type,
+            source_id=fact_ref.record_id,
+            source_version=revision.version_no,
+            version_no=fact_version,
+            value_json=revision.snapshot_json,
+            schema_version=revision.schema_version,
+            content_fingerprint=revision.content_fingerprint,
+            confirmation_status="confirmed",
+            created_by_user_id=auth.user.id,
+            confirmed_by_user_id=auth.user.id,
+            confirmed_at=now,
+        )
+        db.add(snapshot)
+        fact_snapshots.append(snapshot)
+        fact_refs.append(
+            {
+                "fact_key": fact_ref.fact_key,
+                "record_type": fact_ref.record_type,
+                "record_id": str(fact_ref.record_id),
+                "source_version": revision.version_no,
+                "content_fingerprint": revision.content_fingerprint,
+                "business_fact_snapshot_id": str(snapshot.id),
+            }
+        )
+
+    requirement_payload: dict[str, object] = {
+        "schema_version": 1,
+        "requirement": task.requirement_draft_json,
+        "business_facts": fact_refs,
+    }
+    requirement_fingerprint = _fingerprint(requirement_payload)
+    snapshot_no = (
+        db.scalar(
+            select(func.max(RequirementSnapshot.snapshot_no)).where(
+                RequirementSnapshot.store_id == store_id,
+                RequirementSnapshot.task_id == task.id,
+            )
+        )
+        or 0
+    ) + 1
+    requirement_snapshot = RequirementSnapshot(
+        id=uuid4(),
+        store_id=store_id,
+        task_id=task.id,
+        snapshot_no=snapshot_no,
+        payload_json=requirement_payload,
+        schema_version=1,
+        content_fingerprint=requirement_fingerprint,
+        created_by_user_id=auth.user.id,
+        confirmed_by_user_id=auth.user.id,
+        confirmed_at=now,
+    )
+    db.add(requirement_snapshot)
+
+    steps = {step.step_key: step for step in _task_steps_for_update(db, store_id, task.id)}
+    for step_key, output_refs in (
+        (
+            TaskStepKey.REQUIREMENT_UNDERSTANDING,
+            [{"type": "requirement_snapshot", "id": str(requirement_snapshot.id)}],
+        ),
+        (
+            TaskStepKey.CONTEXT_SNAPSHOT,
+            [
+                {
+                    "type": "business_fact_snapshot",
+                    "id": str(snapshot.id),
+                    "fact_key": snapshot.fact_key,
+                }
+                for snapshot in fact_snapshots
+            ],
+        ),
+    ):
+        step = steps[step_key.value]
+        if TaskStepStatus(step.status) is not TaskStepStatus.PENDING:
+            raise ApiError(
+                409,
+                "REQUIREMENT_STEP_NOT_PENDING",
+                f"Step {step_key.value} is not pending",
+            )
+        applicability = StepApplicability(step.applicability)
+        _ensure_step_transition(
+            TaskStepStatus.PENDING,
+            TaskStepStatus.RUNNING,
+            applicability=applicability,
+        )
+        _ensure_step_transition(
+            TaskStepStatus.RUNNING,
+            TaskStepStatus.SUCCEEDED,
+            applicability=applicability,
+        )
+        step.status = TaskStepStatus.SUCCEEDED.value
+        step.version += 1
+        step.started_at = now
+        step.finished_at = now
+        step.input_fingerprint = requirement_fingerprint
+        step.output_refs_json = output_refs
+        step.blocked_by_json = []
+        step.skip_reason = None
+
+    _ensure_task_transition(
+        MarketingTaskStatus.DRAFT, MarketingTaskStatus.ACTIVE
+    )
+    task.current_requirement_snapshot_id = requirement_snapshot.id
+    task.lifecycle_status = MarketingTaskStatus.ACTIVE.value
+    task.activated_at = now
+    task.version += 1
+    return _finish_task_write(
+        db,
+        request,
+        auth,
+        context,
+        task,
+        idempotency_record,
+        event_type="requirement.confirmed",
+        event_payload={
+            "requirement_snapshot_id": str(requirement_snapshot.id),
+            "business_fact_snapshot_ids": [str(item.id) for item in fact_snapshots],
+            "snapshot_no": snapshot_no,
+        },
+        audit_action="marketing_task.requirement.confirmed",
+        audit_metadata={
+            "requirement_snapshot_id": str(requirement_snapshot.id),
+            "business_fact_count": len(fact_snapshots),
+        },
+    )
+
+
+def confirm_strategy(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task_id: UUID,
+    payload: MarketingTaskStrategyConfirm,
+    idempotency_key: str,
+) -> MarketingTaskDetail:
+    store_id = _require_store_id(context)
+    idempotency_record, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="marketing_task.strategy.confirm",
+        payload=payload,
+    )
+    if replay is not None:
+        return MarketingTaskDetail.model_validate(replay)
+
+    task = _task_for_update(db, store_id, task_id)
+    _check_expected_version(task, payload.expected_version)
+    if task.lifecycle_status != MarketingTaskStatus.ACTIVE.value:
+        raise ApiError(
+            409,
+            "TASK_NOT_ACTIVE",
+            "Strategy can only be confirmed for an active task",
+        )
+    if task.current_requirement_snapshot_id is None:
+        raise ApiError(
+            409,
+            "REQUIREMENT_NOT_CONFIRMED",
+            "Requirement must be confirmed before strategy",
+        )
+    if task.current_strategy_snapshot_id is not None:
+        raise ApiError(
+            409,
+            "STRATEGY_ALREADY_CONFIRMED",
+            "Strategy snapshot already exists",
+        )
+
+    now = datetime.now(UTC)
+    snapshot_no = (
+        db.scalar(
+            select(func.max(StrategySnapshot.snapshot_no)).where(
+                StrategySnapshot.store_id == store_id,
+                StrategySnapshot.task_id == task.id,
+            )
+        )
+        or 0
+    ) + 1
+    strategy_payload: dict[str, object] = {
+        "schema_version": 1,
+        "strategy": payload.strategy,
+        "requirement_snapshot_id": str(task.current_requirement_snapshot_id),
+    }
+    fingerprint = _fingerprint(strategy_payload)
+    strategy_snapshot = StrategySnapshot(
+        id=uuid4(),
+        store_id=store_id,
+        task_id=task.id,
+        requirement_snapshot_id=task.current_requirement_snapshot_id,
+        snapshot_no=snapshot_no,
+        payload_json=strategy_payload,
+        schema_version=1,
+        content_fingerprint=fingerprint,
+        created_by_user_id=auth.user.id,
+        confirmed_by_user_id=auth.user.id,
+        confirmed_at=now,
+    )
+    db.add(strategy_snapshot)
+
+    steps = _task_steps_for_update(db, store_id, task.id)
+    step = next(
+        (item for item in steps if item.step_key == TaskStepKey.STRATEGY_CONFIRMATION.value),
+        None,
+    )
+    if step is None or TaskStepStatus(step.status) is not TaskStepStatus.PENDING:
+        raise ApiError(
+            409,
+            "STRATEGY_STEP_NOT_PENDING",
+            "Strategy confirmation step is not pending",
+        )
+    applicability = StepApplicability(step.applicability)
+    _ensure_step_transition(
+        TaskStepStatus.PENDING,
+        TaskStepStatus.RUNNING,
+        applicability=applicability,
+    )
+    _ensure_step_transition(
+        TaskStepStatus.RUNNING,
+        TaskStepStatus.SUCCEEDED,
+        applicability=applicability,
+    )
+    step.status = TaskStepStatus.SUCCEEDED.value
+    step.version += 1
+    step.started_at = now
+    step.finished_at = now
+    step.input_fingerprint = fingerprint
+    step.output_refs_json = [
+        {"type": "strategy_snapshot", "id": str(strategy_snapshot.id)}
+    ]
+    step.blocked_by_json = []
+    step.skip_reason = None
+
+    task.strategy_draft_json = payload.strategy
+    task.current_strategy_snapshot_id = strategy_snapshot.id
+    task.version += 1
+    return _finish_task_write(
+        db,
+        request,
+        auth,
+        context,
+        task,
+        idempotency_record,
+        event_type="strategy.confirmed",
+        event_payload={
+            "strategy_snapshot_id": str(strategy_snapshot.id),
+            "requirement_snapshot_id": str(task.current_requirement_snapshot_id),
+            "snapshot_no": snapshot_no,
+        },
+        audit_action="marketing_task.strategy.confirmed",
+        audit_metadata={"strategy_snapshot_id": str(strategy_snapshot.id)},
+    )

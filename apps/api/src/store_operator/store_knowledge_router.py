@@ -30,15 +30,18 @@ from store_operator.models.store_knowledge import (
 )
 from store_operator.store_knowledge_schemas import (
     AudienceProfileCreate,
+    AudienceProfileList,
     AudienceProfileRead,
     AudienceProfileUpdate,
     BrandGuidelineCreate,
     BrandGuidelineRead,
     BrandGuidelineUpdate,
     KnowledgeItemCreate,
+    KnowledgeItemList,
     KnowledgeItemRead,
     KnowledgeItemUpdate,
     OfferCreate,
+    OfferList,
     OfferRead,
     OfferUpdate,
     ProductCreate,
@@ -643,3 +646,291 @@ def delete_product(
     db.delete(product)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/offers", response_model=OfferList)
+def list_offers(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = 100,
+    offset: int = 0,
+) -> OfferList:
+    result = _list_scoped_records(
+        db, _store_id(context), Offer, OfferRead, limit, offset
+    )
+    return OfferList.model_validate(result)
+
+
+@router.post("/offers", response_model=OfferRead, status_code=status.HTTP_201_CREATED)
+def create_offer(
+    payload: OfferCreate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> OfferRead:
+    result = _create_scoped_record(
+        db, request, auth, _store_id(context), Offer, OfferRead, payload, "offer"
+    )
+    return OfferRead.model_validate(result)
+
+
+@router.get("/offers/{record_id}", response_model=OfferRead)
+def get_offer(
+    record_id: UUID,
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> OfferRead:
+    result = _get_scoped_record(
+        db, _store_id(context), record_id, Offer, OfferRead
+    )
+    return OfferRead.model_validate(result)
+
+
+@router.patch("/offers/{record_id}", response_model=OfferRead)
+def update_offer(
+    record_id: UUID,
+    payload: OfferUpdate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> OfferRead:
+    result = _update_scoped_record(
+        db, request, auth, _store_id(context), record_id, if_match,
+        Offer, OfferRead, payload, "offer",
+    )
+    return OfferRead.model_validate(result)
+
+
+@router.delete("/offers/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_offer(
+    record_id: UUID,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> Response:
+    _delete_scoped_record(
+        db, request, auth, _store_id(context), record_id, if_match,
+        Offer, OfferRead, "offer",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/audiences", response_model=AudienceProfileList)
+def list_audience_profiles(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = 100,
+    offset: int = 0,
+) -> AudienceProfileList:
+    result = _list_scoped_records(
+        db, _store_id(context), AudienceProfile, AudienceProfileRead, limit, offset
+    )
+    return AudienceProfileList.model_validate(result)
+
+
+@router.post(
+    "/audiences",
+    response_model=AudienceProfileRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_audience_profile(
+    payload: AudienceProfileCreate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> AudienceProfileRead:
+    result = _create_scoped_record(
+        db, request, auth, _store_id(context),
+        AudienceProfile, AudienceProfileRead, payload, "audience_profile",
+    )
+    return AudienceProfileRead.model_validate(result)
+
+
+@router.get("/audiences/{record_id}", response_model=AudienceProfileRead)
+def get_audience_profile(
+    record_id: UUID,
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> AudienceProfileRead:
+    result = _get_scoped_record(
+        db, _store_id(context), record_id, AudienceProfile, AudienceProfileRead
+    )
+    return AudienceProfileRead.model_validate(result)
+
+
+@router.patch("/audiences/{record_id}", response_model=AudienceProfileRead)
+def update_audience_profile(
+    record_id: UUID,
+    payload: AudienceProfileUpdate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> AudienceProfileRead:
+    result = _update_scoped_record(
+        db, request, auth, _store_id(context), record_id, if_match,
+        AudienceProfile, AudienceProfileRead, payload, "audience_profile",
+    )
+    return AudienceProfileRead.model_validate(result)
+
+
+@router.delete("/audiences/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_audience_profile(
+    record_id: UUID,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> Response:
+    _delete_scoped_record(
+        db, request, auth, _store_id(context), record_id, if_match,
+        AudienceProfile, AudienceProfileRead, "audience_profile",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/knowledge", response_model=KnowledgeItemList)
+def list_knowledge_items(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = 100,
+    offset: int = 0,
+) -> KnowledgeItemList:
+    result = _list_scoped_records(
+        db, _store_id(context), KnowledgeItem, KnowledgeItemRead, limit, offset
+    )
+    return KnowledgeItemList.model_validate(result)
+
+
+@router.post(
+    "/knowledge",
+    response_model=KnowledgeItemRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_knowledge_item(
+    payload: KnowledgeItemCreate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> KnowledgeItemRead:
+    result = _create_scoped_record(
+        db, request, auth, _store_id(context),
+        KnowledgeItem, KnowledgeItemRead, payload, "knowledge_item",
+    )
+    return KnowledgeItemRead.model_validate(result)
+
+
+@router.get("/knowledge/{record_id}", response_model=KnowledgeItemRead)
+def get_knowledge_item(
+    record_id: UUID,
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> KnowledgeItemRead:
+    result = _get_scoped_record(
+        db, _store_id(context), record_id, KnowledgeItem, KnowledgeItemRead
+    )
+    return KnowledgeItemRead.model_validate(result)
+
+
+@router.patch("/knowledge/{record_id}", response_model=KnowledgeItemRead)
+def update_knowledge_item(
+    record_id: UUID,
+    payload: KnowledgeItemUpdate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> KnowledgeItemRead:
+    result = _update_scoped_record(
+        db, request, auth, _store_id(context), record_id, if_match,
+        KnowledgeItem, KnowledgeItemRead, payload, "knowledge_item",
+    )
+    return KnowledgeItemRead.model_validate(result)
+
+
+@router.delete("/knowledge/{record_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_knowledge_item(
+    record_id: UUID,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> Response:
+    _delete_scoped_record(
+        db, request, auth, _store_id(context), record_id, if_match,
+        KnowledgeItem, KnowledgeItemRead, "knowledge_item",
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/brand-guideline", response_model=BrandGuidelineRead)
+def get_brand_guideline(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> BrandGuidelineRead:
+    store_id = _store_id(context)
+    record = db.scalar(
+        select(BrandGuideline).where(BrandGuideline.store_id == store_id)
+    )
+    if record is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
+    return BrandGuidelineRead.model_validate(record)
+
+
+@router.post(
+    "/brand-guideline",
+    response_model=BrandGuidelineRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_brand_guideline(
+    payload: BrandGuidelineCreate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> BrandGuidelineRead:
+    store_id = _store_id(context)
+    if db.scalar(
+        select(BrandGuideline.id).where(BrandGuideline.store_id == store_id)
+    ):
+        raise ApiError(409, "RESOURCE_ALREADY_EXISTS", "Brand guideline already exists")
+    result = _create_scoped_record(
+        db, request, auth, store_id,
+        BrandGuideline, BrandGuidelineRead, payload, "brand_guideline",
+    )
+    return BrandGuidelineRead.model_validate(result)
+
+
+@router.patch("/brand-guideline", response_model=BrandGuidelineRead)
+def update_brand_guideline(
+    payload: BrandGuidelineUpdate,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
+) -> BrandGuidelineRead:
+    store_id = _store_id(context)
+    record = db.scalar(
+        select(BrandGuideline)
+        .where(BrandGuideline.store_id == store_id)
+        .with_for_update()
+    )
+    if record is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
+    result = _update_scoped_record(
+        db, request, auth, store_id, record.id, if_match,
+        BrandGuideline, BrandGuidelineRead, payload, "brand_guideline",
+    )
+    return BrandGuidelineRead.model_validate(result)

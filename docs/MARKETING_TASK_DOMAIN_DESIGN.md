@@ -394,7 +394,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | 表 | 关键字段（除通用 id/store_id/created_at 外） | 关键约束 |
 |---|---|---|
 | marketing_tasks | task_type, lifecycle_status, title, current_requirement_snapshot_id, current_strategy_snapshot_id, version, created_by_actor_id, activated_at, completed_at, archived_at | (store_id,id) 唯一；version > 0；当前快照必须属于同一任务/门店 |
-| requirement_snapshots | task_id, snapshot_no, payload_json, confirmed_at, confirmed_by_actor_id, content_fingerprint, schema_version | (store_id,task_id,snapshot_no) 唯一；确认后不可更新 |
+| requirement_snapshots | task_id, snapshot_no, payload_json, confirmed_at, confirmed_by_actor_id, package_fingerprint, schema_version | (store_id,task_id,snapshot_no) 唯一；确认后不可更新 |
 | strategy_snapshots | task_id, snapshot_no, requirement_snapshot_id, payload_json, confirmed_at, confirmed_by_actor_id, content_fingerprint, schema_version | 同任务快照序号唯一；引用需求快照必须同门店同任务 |
 | business_fact_snapshots | task_id, fact_key, source_type, source_id, source_version, value_json, confirmation_status, confirmed_at, confirmed_by_actor_id, fingerprint | 来源及值快照不可覆盖；可追溯原始资料版本 |
 | task_steps | task_id, step_key, status, applicability, skip_reason, input_fingerprint, block_code, block_detail_json, started_at, finished_at, version | (store_id,task_id,step_key) 唯一；不适用节点必须有显式 skipped 决策 |
@@ -406,7 +406,7 @@ Job 状态由 Issue #9 Job Runtime 唯一拥有，采用 `queued`、`running`、
 | dependency_edges | task_id, upstream_type, upstream_id, upstream_version_id, upstream_fingerprint, downstream_type, downstream_id, downstream_version_id, impact_policy | 同一上下游版本边唯一；两端属于同任务/门店 |
 | channel_contents | task_id, channel_key, channel_account_id, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status | 每个渠道/输入快照独立；引用的文案/图片版本必须已审核 |
 | quality_reports | task_id, channel_content_id, rule_version, result, issues_json, input_fingerprint, created_at | 结果绑定精确 ChannelContent 与规则版本；输入变化后旧报告 stale |
-| publish_packages | task_id, package_version, fact_snapshot_ids, content_fingerprint, frozen_at, frozen_by_actor_id | (store_id,task_id,package_version) 唯一；聚合一次多渠道交付并冻结 |
+| publish_packages | task_id, package_version, fact_snapshot_ids, package_fingerprint, frozen_at, frozen_by_actor_id | (store_id,task_id,package_version) 唯一；聚合一次多渠道交付并冻结 |
 | publish_package_items | task_id, publish_package_id, channel_key, channel_content_id, copy_version_id, image_version_ids, quality_report_id, channel_account_id, delivery_mode, planned_publish_at, item_fingerprint | (store_id,publish_package_id,channel_key) 唯一；每个渠道一条 |
 | publish_confirmations | task_id, publish_package_id, package_fingerprint, confirmed_by_actor_id, confirmed_at, revoked_at, confirmation_text | 确认绑定整个冻结包的精确指纹；新包不得复用旧确认 |
 | task_events | task_id, aggregate_version, event_type, actor_id, actor_type, correlation_id, causation_id, payload_json, schema_version, occurred_at | 追加写；event_id 唯一 |

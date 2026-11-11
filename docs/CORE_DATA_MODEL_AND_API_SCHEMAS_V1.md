@@ -318,8 +318,8 @@ erDiagram
 7. Job 尝试唯一：`UNIQUE(job_id, attempt_no)`；租约领取用原子 UPDATE/SELECT FOR UPDATE SKIP LOCKED。
 8. Outbox 消费端持久化 event_id 去重；Relay 通过租约/锁避免并发重复 claim。
 9. PublishPackage 与 PublishPackageItem 冻结后禁止 UPDATE；PublishConfirmation 绑定整个 package fingerprint。
-10. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 的 ChannelContent/QualityReport 复合 FK 必须包含 store_id。
-11. ChannelContentArtifactRef 以 (store_id, channel_content_id, position) 唯一，并对 ChannelContent/ArtifactVersion 使用包含 store_id 的复合 FK；图片数组仅是 API projection。
+10. UNIQUE(store_id, publish_package_id, channel_key)；PackageItem 复合 FK 校验 channel_key 与 ChannelContent 一致，并保证 QualityReport 属于同一 ChannelContent，所有复合 FK 包含 store_id。
+11. ChannelContent.copy_version_id 使用 store_id 复合 FK；ChannelContentArtifactRef 以 (store_id, channel_content_id, position) 唯一，并对 ChannelContent/ArtifactVersion 使用包含 store_id 的复合 FK；图片数组仅是 API projection。
 12. 一个 PublishPackage 至少有一个 PackageItem；manual_handoff 时 channel_account_id 允许 NULL，official_api 时必须非 NULL。
 13. PublishOperation（#12）对外副作用前先持久化幂等键和 attempt；未知结果进入 needs_human。
 14. 所有复合外键包含 store_id；禁止只凭全局 UUID 跨门店引用。

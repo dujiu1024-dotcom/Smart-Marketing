@@ -68,7 +68,7 @@
 
 | 模块 | 核心职责 | 关键对象 | 是否首期独立部署 |
 |---|---|---|---|
-| Identity & Store | 登录身份、门店归属、StoreUser、服务端数据授权 | Store、StoreUser、Session | 否 |
+| Identity & Store | 登录身份、门店归属、StoreMembership、服务端数据授权 | Store、StoreMembership、Session | 否 |
 | Store Knowledge | 门店档案、商品服务、活动优惠、品牌规范、客群、知识库 | StoreProfile、Product、Offer、KnowledgeItem | 否 |
 | Marketing Orchestrator | 需求理解、流程推进、状态机、阶段依赖与恢复 | MarketingTask、TaskStage、StrategySnapshot | 否 |
 | Strategy & Opportunity | 热点匹配、经营目标分析、营销策略与事实确认 | Opportunity、StrategySnapshot、FactConfirmation | 否 |
@@ -146,7 +146,7 @@
 
 ```text
 Store
- ├── StoreUser
+ ├── StoreMembership
  ├── StoreProfile / Product / Offer / KnowledgeItem
  ├── ChannelAccount
  └── MarketingTask
@@ -227,7 +227,7 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 
 ## 8. 安全、多门店与管理后台
 
-- 首期按 Store / StoreUser 建立门店归属，不额外引入独立租户层级和租户管理 UI。
+- 首期按 Store / StoreMembership 建立门店归属，不额外引入独立租户层级和租户管理 UI。
 - 所有 API 从认证主体解析门店权限，数据库查询强制带门店范围；关键表可进一步启用 PostgreSQL RLS 作为纵深防御。
 - 平台管理员权限与门店用户权限分离，管理员仅访问产品定义允许的管理数据。
 - 密钥存密钥管理服务或环境密钥引用；数据库仅保存 secret reference，不保存明文 API Key。
@@ -308,7 +308,7 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 
 ### P0：生产底座
 
-1. 后端 API、认证和 Store/StoreUser 服务端授权。
+1. 后端 API、认证和 Store/StoreMembership 服务端授权。
 2. PostgreSQL 数据模型、迁移和门店数据隔离。
 3. MarketingTask 状态机、策略快照、文案/图片版本及独立审核。
 4. 持久化 Job、Worker、幂等、租约、重试、失败恢复和 Outbox。
@@ -358,7 +358,7 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 - 数据：PostgreSQL 为业务事实主库；SQLAlchemy + Alembic 管理访问与迁移。
 - 异步：Celery + Redis Broker；Job、JobAttempt、JobEvent、Outbox 持久化于 PostgreSQL。Redis 不作为业务状态主存储，Worker 必须幂等并支持重投递恢复。
 - 对象存储：应用只依赖 S3 API。此前“开发可用 MinIO”的建议已废止；MinIO Community 上游仓库已归档。开发环境改用 SeaweedFS S3 mini；生产对象存储供应商待部署区域与预算确认。
-- 身份：应用 Identity / StoreUser / Session 由服务端管理；Argon2id 密码哈希、HttpOnly 安全 Cookie、CSRF 防护和会话撤销；每次请求服务端校验门店归属。
+- 身份：应用 Identity / StoreMembership / Session 由服务端管理；Argon2id 密码哈希、HttpOnly 安全 Cookie、CSRF 防护和会话撤销；每次请求服务端校验门店归属。
 - 契约：FastAPI OpenAPI 作为 API 契约来源，生成 TypeScript API client/types。
 - 工程门禁：GitHub Actions、Docker Compose、pytest、Vitest、Playwright、Ruff、TypeScript 检查与构建。
 
@@ -372,3 +372,8 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 - 营销任务生命周期、TaskStep、审核依赖和版本失效规则以 [MARKETING_TASK_DOMAIN_DESIGN.md](MARKETING_TASK_DOMAIN_DESIGN.md) 为准。
 - 文档中的状态枚举必须保持唯一：异步 Job 的人工处理状态统一为 `needs_human`，不得另用 `needs_attention`。
 - 以上是设计契约，不代表功能已实现；只有联合评审记录、OpenAPI Schema、迁移和自动化测试齐备后，才允许标记冻结或实现完成。
+
+
+## 17. 异步运行时契约入口（2026-11-11）
+
+Issue #9 的详细实现契约以 [ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md](ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md) 为准；身份、营销领域与 Job Runtime 的跨域边界以 [ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md](ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md) 为准。本文保留目标架构摘要，不重复定义 Job 状态机、Outbox Relay 和 Worker fencing 细节。Job Runtime 是模块化单体中的领域模块，Worker 作为独立进程运行，不构成首期微服务拆分。

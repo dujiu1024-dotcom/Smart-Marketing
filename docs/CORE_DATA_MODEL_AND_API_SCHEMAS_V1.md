@@ -32,19 +32,20 @@
 ```mermaid
 erDiagram
   USER ||--o{ SESSION : authenticates
-  USER ||--o{ STORE_USER : membership
-  STORE ||--o{ STORE_USER : contains
+  USER ||--o{ STORE_MEMBERSHIP : membership
+  STORE ||--o{ STORE_MEMBERSHIP : contains
+  USER ||--o| PLATFORM_ADMIN_GRANT : platform_admin
   USER ||--o{ AUDIT_EVENT : acts
   STORE ||--o{ AUDIT_EVENT : scopes
-  STORE_USER ||--o{ AUDIT_EVENT : authorizes
+  STORE_MEMBERSHIP ||--o{ AUDIT_EVENT : authorizes
 ```
 
 核心约束：
 - `users.email_normalized` UNIQUE；密码只存 Argon2id hash。
-- `store_users(store_id,user_id)` UNIQUE；成员状态为 invited/active/suspended/removed。
+- `store_memberships(store_id,user_id)` UNIQUE；成员状态为 invited/active/suspended/removed。
 - Session 只存 Token hash/verifier；不保存可绕过成员校验的 current_store_id。
-- `X-Store-Id` 是请求的门店选择，不是授权凭证；每个请求实时验证 active Store + active StoreUser。
-- 平台管理员身份不得混入 StoreUser.role，也不得默认读取门店业务内容。
+- `X-Store-ID` 是请求的门店选择，不是授权凭证；每个请求实时验证 active Store + active StoreMembership。
+- 平台管理员身份不得混入 StoreMembership.role，也不得默认读取门店业务内容。
 
 ### 3.2 Store Knowledge
 
@@ -56,6 +57,8 @@ erDiagram
   STORE ||--o| BRAND_GUIDELINE : governs
   STORE ||--o{ KNOWLEDGE_ITEM : knows
   STORE ||--o{ MEDIA_ASSET : owns
+  STORE ||--o{ AUDIENCE_PROFILE : segments
+  STORE ||--o{ STORE_RECORD_REVISION : revises
   MEDIA_ASSET ||--o{ MEDIA_ASSET : derived_from
 ```
 
@@ -105,7 +108,7 @@ erDiagram
 ```
 
 - PostgreSQL 是 Job/Attempt/Outbox 状态事实源；Celery + Redis 仅提供至少一次投递。
-- Job 状态唯一枚举：queued/running/retry_wait/succeeded/failed/dead/needs_human/cancelled。
+- Job 状态按 PR #20 的待评审契约统一为 queued/running/retry_wait/succeeded/failed/needs_human/cancelled；Job 不单独使用 dead。OutboxEvent 可使用 dead 表示投递耗尽，不能映射为 Job 状态。
 - AIInvocation 与 Job 状态独立；PromptVersion 必须固定不可变版本引用。
 - 发布超时等外部副作用结果不确定时进入 needs_human，对账前禁止盲目重发。
 
@@ -116,7 +119,7 @@ erDiagram
 | Header | 要求 | 语义 |
 |---|---|---|
 | Cookie | 门店 API 必须 | HttpOnly Session；不允许 localStorage Token |
-| X-Store-Id | 门店作用域 API 必须 | 选择当前门店；服务端校验成员关系 |
+| X-Store-ID | 门店作用域 API 必须 | 选择当前门店；服务端校验成员关系 |
 | Idempotency-Key | 所有有副作用 POST 必须 | 同一作用域同一 key + 同一 request hash 返回原结果；不同 hash 返回 409 |
 | If-Match / expected_version | 更新聚合根必须 | 乐观并发控制；过期版本返回 409 |
 | X-CSRF-Token | Cookie Session 写请求必须 | Session 绑定 synchronizer token |
@@ -138,7 +141,7 @@ erDiagram
 
 | HTTP | code 示例 | 规则 |
 |---|---|---|
-| 400 | STORE_CONTEXT_REQUIRED | 缺少 X-Store-Id |
+| 400 | STORE_CONTEXT_REQUIRED | 缺少 X-Store-ID |
 | 401 | AUTH_REQUIRED / SESSION_EXPIRED | 未认证或 Session 无效 |
 | 403 | ACTION_FORBIDDEN | 已认证但无动作能力 |
 | 404 | RESOURCE_NOT_FOUND | 不存在或不属于当前门店，统一语义 |
@@ -323,3 +326,12 @@ erDiagram
 - [ ] 关联 Demo 路由和页面验收矩阵，确保接口与真实产品流程对应。
 
 **状态声明：** 本文完成的是文档层工程化准备。没有修改业务代码，没有生成或执行数据库迁移，没有生成正式 OpenAPI，没有执行测试；因此不代表任何生产能力已实现或测试通过。
+
+
+## 9. Identity / Store Knowledge / Job Runtime 最新映射（待 PR #20、#26 联合评审）
+
+- Identity 的成员实体统一称 StoreMembership；PlatformAdminGrant 是独立平台管理员授权，不是 StoreMembership。
+- 每个门店 API 使用 X-Store-ID 不可信 selector；AuthContext.request_store_id 由服务端逐请求校验后产生。Session.active_store_id 仅作 UI 默认选择。
+- Store Knowledge 增加 AudienceProfile 与 StoreRecordRevision 的领域设计，具体字段和事实确认规则以 STORE_KNOWLEDGE_DOMAIN_DESIGN.md 为准。
+- 用户触发 Job 的 store_id / created_by_user_id 从 AuthorizedStoreContext 注入；系统 Job 使用显式 system scope 与 actor_type=system。
+- Job 状态按 PR #20 提案不包含 dead；OutboxEvent 可以独立使用 dead。PR #20 与 PR #26 均未合并，状态仍待联合评审。

@@ -62,12 +62,12 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 
 ### 3.3 ChannelContent
 
-`ChannelContent` 是某个渠道的不可变内容快照：`id, store_id, task_id, channel_key, channel_account_id, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。
+`ChannelContent` 是某个渠道的不可变内容快照：`id, store_id, task_id, channel_key, copy_version_id, image_version_ids, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。
 
 - 每个目标渠道独立生成一条 ChannelContent；修改上游版本或重新适配时创建新记录，不覆盖旧 payload。
 - `copy_version_id`、`image_version_ids` 必须引用已通过对应审核的精确版本。
 - `spec_version` 引用 #12 发布的渠道能力/规格快照；#8 不维护 OAuth 或账号权限。
-- `channel_account_id` 是 #12 的外键引用，不代表 #8 获得读取凭据或调用厂商 API 的权限。
+- ChannelContent 不绑定具体账号；目标账号只在 PublishPackageItem 中作为 #12 的外键引用，不代表 #8 获得读取凭据或调用厂商 API 的权限。
 - status 仅表达内容快照状态（如 ready/stale/blocked）；异步生成中状态读取 #9 Job，不复制 Job 的 queued/running/retry_wait 等状态。
 
 ### 3.4 QualityReport

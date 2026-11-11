@@ -224,3 +224,17 @@
 | 质检报告新鲜度 | Worker 执行前校验 ChannelContent 指纹、当前文案/图片版本和独立审核 | 上游修改后 UI stale 状态未验收 |
 
 说明：PR #62 的确定性规则不是 LLM 语义质检、图片 OCR/视觉检查或渠道官方规范校验；也不构成经营事实验证。PR CI 通过只证明本轮 API/Worker/构建/基础设施检查，不代表 Demo 的完整质量检查流程通过。发布包冻结、商家最终确认、真实浏览器业务流程仍未完成。
+
+
+## 18. #8 发布包冻结与最终确认服务进度（2026-11-11）
+
+| 能力 | 生产 API/DB 状态 | Demo/浏览器状态 |
+|---|---|---|
+| 多渠道发布包冻结 | PR #63 开发中；事务创建 Package/Items/FactRefs，覆盖任务/内容/质检/事实指纹 | 发布包页面完整接入未完成 |
+| 事实门禁 | 要求已确认 BusinessFactSnapshot，追溯到最新有效 StoreRecordRevision | 事实引用与过期提示未接入 |
+| 质检门禁 | hard fail 阻断；needs_human 必须有 accepted QualityResolution | 报告及复核交互未接入 |
+| 商家最终确认 | fingerprint-bound PublishConfirmation，不可变、幂等 | 确认摘要/二次确认 UI 未接入 |
+| 人工交付 | 仅 manual_handoff；确认不等于发布成功 | 下载/交付界面尚未实现 |
+| 官方 API | 暂不支持；等待 #12 ChannelAccount/OAuth/Adapter 实际能力 | 不显示已连接或已发布状态 |
+
+本阶段后端接口不会模拟官方发布，也不会因 Job 成功或商家确认显示“已发布”。PR CI 和 API 测试通过后，只能证明服务端冻结/确认门禁，不代表 Demo 完整流程或真实渠道发布验收通过。

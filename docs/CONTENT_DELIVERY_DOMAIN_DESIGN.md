@@ -62,11 +62,11 @@ Demo 中“AI 生成/整改”“图片生成/改造”“渠道校验”“发�
 
 ### 3.3 ChannelContent
 
-`ChannelContent` 是某个渠道的不可变内容快照：`id, store_id, task_id, channel_key, copy_version_id, payload_json, spec_version, input_fingerprint, status, created_at, updated_at`。图片版本通过 `ChannelContentArtifactRef` 子表按顺序引用，API 可投影为 `image_version_ids[]`。
+`ChannelContent` 是某个渠道的不可变内容快照：`id, store_id, task_id, channel_key, copy_version_id, payload_json, channel_spec_version_id, input_fingerprint, status, created_at, updated_at`。图片版本通过 `ChannelContentArtifactRef` 子表按顺序引用，API 可投影为 `image_version_ids[]`。
 
 - 每个目标渠道独立生成一条 ChannelContent；修改上游版本或重新适配时创建新记录，不覆盖旧 payload。
 - `copy_version_id` 必须引用已通过审核的精确版本；图片引用必须通过 `ChannelContentArtifactRef` 指向已审核的精确 ArtifactVersion。
-- `spec_version` 引用 #12 发布的渠道能力/规格快照；#8 不维护 OAuth 或账号权限。
+- `channel_spec_version_id` 复合 FK 引用 #12 发布的精确 ChannelSpecVersion；#8 不维护 OAuth 或账号权限。
 - ChannelContent 不绑定具体账号；目标账号只在 PublishPackageItem 中作为 #12 的外键引用，不代表 #8 获得读取凭据或调用厂商 API 的权限。
 
 `ChannelContentArtifactRef`：`id, store_id, channel_content_id, artifact_version_id, role(image), position`。它是图片版本的关系表，包含 store_id 复合外键；不存储图片二进制。
@@ -121,7 +121,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 所有 fingerprint 使用稳定 canonical JSON（字段排序、统一 UTC 时间、明确 null/数组顺序）并计算 SHA-256；禁止直接 hash 非稳定 JSON 字符串。
 
 - ArtifactVersion.input_fingerprint：task_id、RequirementSnapshot/StrategySnapshot ID、BusinessFactSnapshot IDs、源 MediaAsset IDs + content_hash、前序依赖版本、prompt_version_id、provider/model 版本、生成指令。
-- ChannelContent.input_fingerprint：channel_key、copy_version_id、image_version_ids、Store/Task 事实快照 IDs、channel spec_version、适配规则版本。
+- ChannelContent.input_fingerprint：channel_key、copy_version_id、image_version_ids、Store/Task 事实快照 IDs、channel_spec_version_id、适配规则版本。
 - QualityReport.input_fingerprint：channel_content_id + content fingerprint、rule_version、相关事实快照和必要素材哈希。
 - PublishPackage.package_fingerprint：task snapshot IDs、全部 PackageItem 按 channel_key 排序后的 item_fingerprint、所有 QualityReport IDs/fingerprints、fact_snapshot_ids、planned_publish_at 和 delivery_mode。
 - Fingerprint 不包含 secret/token；ChannelAccount 只记录 ID 与能力快照版本，不记录凭据。
@@ -135,7 +135,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 | POST /marketing-tasks/{task_id}/artifacts | artifact_type、source_type、初始内容/源引用 | Artifact + ArtifactVersion | task 不属于当前门店、来源资产不属于门店 |
 | POST /artifacts/{artifact_id}/versions | expected_version、source_type、instruction、content/source_refs | 新 ArtifactVersion | 版本冲突、事实未确认、素材无权使用 |
 | POST /artifact-versions/{version_id}/reviews | review_type、decision、comment、target、expected_version | ReviewRecord | review_type 不匹配、旧版本/重复提交 |
-| POST /channel-content | channel_key、copy_version_id、image_version_ids、spec_version | ChannelContent + Job 引用 | 版本未审核、渠道不支持、指纹过期 |
+| POST /channel-content | channel_key、copy_version_id、image_version_ids、expected_channel_spec_version_id | ChannelContent + Job 引用 | 版本未审核、渠道不支持、指纹过期 |
 | POST /quality-reports/run | channel_content_id、rule_version、expected_fingerprint | QualityReport + Job 引用 | ChannelContent 不属于当前门店或已 stale |
 | POST /quality-reports/{id}/resolutions | decision、reason、expected_fingerprint | QualityResolution | 非 needs_human、无权复核、fingerprint 已变化 |
 | POST /publish-packages/freeze | task_version、items[]、fact_snapshot_ids、expected_fingerprint | 不可变 PublishPackage + PackageItems | 任一 item 审核/质检不通过、指纹不匹配、版本跨店 |

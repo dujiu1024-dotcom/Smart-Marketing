@@ -37,7 +37,6 @@ def bootstrap_store_owner(email: str, store_name: str) -> None:
                 email_normalized=normalized_email,
                 password_hash=hash_password(password),
                 status="active",
-                email_verified_at=datetime.now(UTC),
             )
             db.add(user)
             db.flush()

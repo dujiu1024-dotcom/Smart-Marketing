@@ -69,6 +69,8 @@ class TaskStepRead(BaseModel):
     input_fingerprint: str | None
     output_refs: list[dict[str, object]]
     blocked_by: list[dict[str, object]]
+    block_code: str | None
+    block_detail: dict[str, object] | None
     started_at: datetime | None
     finished_at: datetime | None
 

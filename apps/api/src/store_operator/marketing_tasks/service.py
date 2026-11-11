@@ -34,8 +34,8 @@ from store_operator.marketing_tasks.schemas import (
     MarketingTaskRecover,
     MarketingTaskRequirementConfirm,
     MarketingTaskRequirementUpdate,
-    MarketingTaskStrategyConfirm,
     MarketingTaskStepSkip,
+    MarketingTaskStrategyConfirm,
     MarketingTaskSummary,
     TaskStepRead,
 )

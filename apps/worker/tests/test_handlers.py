@@ -20,7 +20,7 @@ def test_handler_registry_registers_explicit_job_types() -> None:
     clear_job_handlers_for_testing()
 
     @register_job_handler("test.generate")
-    def handler(context, payload):
+    def handler(_context, _payload):
         return {"schema_version": 1, "artifact_ref": "test"}
 
     assert resolve_job_handler("test.generate") is handler
@@ -32,12 +32,12 @@ def test_handler_registry_rejects_duplicate_job_type() -> None:
     clear_job_handlers_for_testing()
 
     @register_job_handler("test.duplicate")
-    def first(context, payload):
+    def first(_context, _payload):
         return {"schema_version": 1}
 
     with pytest.raises(ValueError):
         @register_job_handler("test.duplicate")
-        def second(context, payload):
+        def second(_context, _payload):
             return {"schema_version": 1}
 
     clear_job_handlers_for_testing()
@@ -64,7 +64,7 @@ def make_context(
         deadline_at=deadline_at or datetime.now(UTC) + timedelta(minutes=1),
         cancellation_requested=cancellation_event,
         lease_lost=lease_lost_event,
-        update_progress_callback=lambda current, total: None,
+        update_progress_callback=lambda _current, _total: None,
     )
 
 

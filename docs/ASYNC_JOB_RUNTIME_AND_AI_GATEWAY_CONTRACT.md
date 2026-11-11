@@ -478,3 +478,16 @@ Job Runtime API 是平台内部/受权限保护的运维能力，不向普通商
 - #7/#8/#11/#12 的业务 Handler 与真实 Provider Adapter 完成后，补齐端到端联调；真实厂商 SDK/适配器由 #10 负责，渠道发布由 #12 负责。
 
 当前状态是“核心持久化执行链路已交付”，不是“Job Runtime 全部生产验收完成”。Issue #9 在上述限流、故障注入、运维可观测和业务联调完成前保持 Open。
+
+
+## 2026-11-11 首期门店级 Job 并发配额实现（PR #69）
+
+已增加 Worker claim 阶段的门店级并发门禁：
+
+- 默认每门店最多 3 个 running Job，可通过 `WORKER_MAX_RUNNING_JOBS_PER_STORE` 配置。
+- 当达到上限时不创建 JobAttempt、不增加 attempt_count、不消耗重试预算；Job 保持 queued，更新 available_at，并在同一事务创建延迟 Outbox dispatch 事件。
+- 门店记录行锁串行化同一门店的 claim + running-count 检查，避免多个 Worker 同时超发配额。
+- 通过 `WORKER_CONCURRENCY_DEFER_SECONDS` 配置容量不足时的重投延迟；默认 10 秒。
+- 系统级 Job 暂不受门店配额限制；Celery worker pool 仍负责进程级总并发。
+
+测试覆盖：容量满时 deferred、Outbox 重新投递、attempt 不增长、容量释放后可正常 claim。该实现解决首期门店级限流，不等同于 Provider/模型级 max_concurrency、队列级公平调度或成本预算；这些仍待实现与故障注入。

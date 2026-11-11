@@ -5,7 +5,7 @@ from sqlalchemy import delete, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from store_operator.models import MarketingTask, RequirementSnapshot, Store, TaskEvent
+from store_operator.models import MarketingTask, RequirementSnapshot, Store, TaskEvent, TaskStep
 
 
 def create_task_with_store(db: Session) -> MarketingTask:
@@ -67,4 +67,35 @@ def test_task_events_reject_deletes(db_session: Session) -> None:
 
     with pytest.raises(DBAPIError):
         db_session.execute(delete(TaskEvent).where(TaskEvent.id == event.id))
+    db_session.rollback()
+
+
+
+@pytest.mark.parametrize(
+    ("applicability", "status", "skip_reason"),
+    [
+        ("required", "skipped", "Required work cannot be skipped"),
+        ("optional", "skipped", None),
+        ("not_applicable", "pending", None),
+    ],
+)
+def test_invalid_task_step_skip_states_are_rejected(
+    db_session: Session,
+    applicability: str,
+    status: str,
+    skip_reason: str | None,
+) -> None:
+    task = create_task_with_store(db_session)
+    step = TaskStep(
+        id=uuid4(),
+        store_id=task.store_id,
+        task_id=task.id,
+        step_key="image_production_review",
+        status=status,
+        applicability=applicability,
+        skip_reason=skip_reason,
+    )
+    db_session.add(step)
+    with pytest.raises(DBAPIError):
+        db_session.flush()
     db_session.rollback()

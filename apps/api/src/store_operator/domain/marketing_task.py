@@ -291,8 +291,12 @@ def ensure_task_transition(
 
 def ensure_task_can_complete(steps: Iterable[TaskStepSnapshot]) -> None:
     snapshots = tuple(steps)
-    if not snapshots:
-        raise TaskCompletionBlocked("A task with no step snapshots cannot be completed")
+    expected_keys = {step.value for step in TaskStepKey}
+    actual_keys = [step.key for step in snapshots]
+    if len(actual_keys) != len(expected_keys) or set(actual_keys) != expected_keys:
+        raise TaskCompletionBlocked(
+            "Task completion requires exactly one snapshot for every task step"
+        )
 
     for step in snapshots:
         try:

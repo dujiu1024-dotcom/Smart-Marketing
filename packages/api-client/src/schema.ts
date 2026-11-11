@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/admin/outbox-events/{event_id}/requeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Requeue Dead Outbox Event */
+        post: operations["requeue_dead_outbox_event_api_v1_admin_outbox_events__event_id__requeue_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/stores/{store_id}/members": {
         parameters: {
             query?: never;
@@ -1157,6 +1174,11 @@ export interface components {
             /** Usage Limit */
             usage_limit?: number | null;
         };
+        /** OutboxRequeueRequest */
+        OutboxRequeueRequest: {
+            /** Reason */
+            reason: string;
+        };
         /** ProductCreate */
         ProductCreate: {
             /** Allergens And Restrictions Json */
@@ -1486,6 +1508,43 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    requeue_dead_outbox_event_api_v1_admin_outbox_events__event_id__requeue_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutboxRequeueRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_store_members_api_v1_admin_stores__store_id__members_get: {
         parameters: {
             query?: never;

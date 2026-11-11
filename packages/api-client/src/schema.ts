@@ -397,6 +397,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketing-tasks/publish-operations/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Publish Operation */
+        get: operations["get_publish_operation_api_v1_marketing_tasks_publish_operations__operation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/marketing-tasks/publish-packages/{package_id}/confirm": {
         parameters: {
             query?: never;
@@ -408,6 +425,23 @@ export interface paths {
         put?: never;
         /** Confirm Publish Package */
         post: operations["confirm_publish_package_api_v1_marketing_tasks_publish_packages__package_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketing-tasks/publish-packages/{package_id}/items/{package_item_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Douyin Publish Operation */
+        post: operations["create_douyin_publish_operation_api_v1_marketing_tasks_publish_packages__package_id__items__package_item_id__publish_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2320,6 +2354,18 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** PublishOperationCreateRequest */
+        PublishOperationCreateRequest: {
+            /** Package Fingerprint */
+            package_fingerprint: string;
+            /** Package Item Fingerprint */
+            package_item_fingerprint: string;
+            /**
+             * Publish Confirmation Id
+             * Format: uuid
+             */
+            publish_confirmation_id: string;
+        };
         /** PublishPackageConfirmRequest */
         PublishPackageConfirmRequest: {
             /** Confirmation Note */
@@ -3481,6 +3527,41 @@ export interface operations {
             };
         };
     };
+    get_publish_operation_api_v1_marketing_tasks_publish_operations__operation_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     confirm_publish_package_api_v1_marketing_tasks_publish_packages__package_id__confirm_post: {
         parameters: {
             query?: never;
@@ -3496,6 +3577,47 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PublishPackageConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_douyin_publish_operation_api_v1_marketing_tasks_publish_packages__package_id__items__package_item_id__publish_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                package_id: string;
+                package_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishOperationCreateRequest"];
             };
         };
         responses: {

@@ -4340,6 +4340,32 @@
         "title": "PromptVersionCreate",
         "type": "object"
       },
+      "PublishOperationCreateRequest": {
+        "properties": {
+          "package_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Fingerprint",
+            "type": "string"
+          },
+          "package_item_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Item Fingerprint",
+            "type": "string"
+          },
+          "publish_confirmation_id": {
+            "format": "uuid",
+            "title": "Publish Confirmation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "package_fingerprint",
+          "package_item_fingerprint",
+          "publish_confirmation_id"
+        ],
+        "title": "PublishOperationCreateRequest",
+        "type": "object"
+      },
       "PublishPackageConfirmRequest": {
         "properties": {
           "confirmation_note": {
@@ -6963,6 +6989,67 @@
         ]
       }
     },
+    "/api/v1/marketing-tasks/publish-operations/{operation_id}": {
+      "get": {
+        "operationId": "get_publish_operation_api_v1_marketing_tasks_publish_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Publish Operation Api V1 Marketing Tasks Publish Operations  Operation Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Publish Operation",
+        "tags": [
+          "content-publishing"
+        ]
+      }
+    },
     "/api/v1/marketing-tasks/publish-packages/{package_id}/confirm": {
       "post": {
         "operationId": "confirm_publish_package_api_v1_marketing_tasks_publish_packages__package_id__confirm_post",
@@ -7038,6 +7125,96 @@
           }
         },
         "summary": "Confirm Publish Package",
+        "tags": [
+          "content-publishing"
+        ]
+      }
+    },
+    "/api/v1/marketing-tasks/publish-packages/{package_id}/items/{package_item_id}/publish": {
+      "post": {
+        "operationId": "create_douyin_publish_operation_api_v1_marketing_tasks_publish_packages__package_id__items__package_item_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "package_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Package Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "package_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Package Item Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishOperationCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Douyin Publish Operation Api V1 Marketing Tasks Publish Packages  Package Id  Items  Package Item Id  Publish Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Douyin Publish Operation",
         "tags": [
           "content-publishing"
         ]

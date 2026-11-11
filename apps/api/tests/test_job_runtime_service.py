@@ -177,8 +177,11 @@ def test_retry_budget_and_uncertain_side_effect_require_human(db_session) -> Non
         .order_by(OutboxEvent.created_at, OutboxEvent.id)
     ).all()
     assert len(retry_outbox) == 2
-    assert retry_outbox[1].status == "pending"
-    assert retry_outbox[1].available_at == waiting.available_at
+    retry_dispatch = next(
+        event for event in retry_outbox if event.dedupe_key.endswith(":attempt:2")
+    )
+    assert retry_dispatch.status == "pending"
+    assert retry_dispatch.available_at == waiting.available_at
 
     second = claim_job(
         db_session,

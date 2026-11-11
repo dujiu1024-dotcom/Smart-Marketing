@@ -46,7 +46,7 @@ class AwsSecretsManagerStore:
             if code != "ResourceExistsException":
                 raise SecretStoreError("Secret could not be stored") from exc
             try:
-                response = self._client.put_secret_value(  # type: ignore[attr-defined]
+                response = self._client.put_secret_value(
                     SecretId=secret_name, SecretString=serialized
                 )
             except (BotoCoreError, ClientError) as update_exc:

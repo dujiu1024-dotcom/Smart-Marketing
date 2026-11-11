@@ -409,7 +409,7 @@ def freeze_publish_package(
                     "CHANNEL_ACCOUNT_UNAVAILABLE",
                     "The selected Douyin account is not active for this store",
                 )
-            required_scopes = {"user_info", "video.create.bind", "video.list"}
+            required_scopes = {"user_info", "video.create", "video.list"}
             if not required_scopes.issubset(set(channel_account.granted_scopes)):
                 raise ApiError(
                     409,

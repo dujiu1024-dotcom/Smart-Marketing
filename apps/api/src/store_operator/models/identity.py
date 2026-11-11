@@ -11,7 +11,6 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
-    Text,
     UniqueConstraint,
     func,
 )

@@ -226,6 +226,38 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
     assert replay.status_code == 201, replay.text
     assert replay.json()["id"] == created.json()["id"]
 
+    quality_url = (
+        f"/api/v1/marketing-tasks/{task_id}/channel-contents/"
+        f"{created.json()['id']}/quality-reports/run"
+    )
+    quality_payload = {
+        "rule_version": "content-structure-v1",
+        "expected_fingerprint": created.json()["input_fingerprint"],
+    }
+    quality_headers = {**headers, "Idempotency-Key": "quality-run-1"}
+    quality_job = identity_client.post(
+        quality_url,
+        headers=quality_headers,
+        json=quality_payload,
+    )
+    assert quality_job.status_code == 202, quality_job.text
+    assert quality_job.json()["job_status"] == "queued"
+    quality_replay = identity_client.post(
+        quality_url,
+        headers=quality_headers,
+        json=quality_payload,
+    )
+    assert quality_replay.status_code == 202, quality_replay.text
+    assert quality_replay.json()["job_id"] == quality_job.json()["job_id"]
+
+    stale_quality = identity_client.post(
+        quality_url,
+        headers={**headers, "Idempotency-Key": "quality-run-stale"},
+        json={**quality_payload, "expected_fingerprint": "0" * 64},
+    )
+    assert stale_quality.status_code == 409, stale_quality.text
+    assert stale_quality.json()["error"]["code"] == "CHANNEL_CONTENT_STALE"
+
     listed = identity_client.get(content_url, headers=headers)
     assert listed.status_code == 200, listed.text
     assert {item["id"] for item in listed.json()} == {

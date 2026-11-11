@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -39,8 +39,11 @@ def list_store_members(
             membership_id=membership.id,
             user_id=user.id,
             email=user.email_normalized,
-            role=membership.role,
-            status=membership.status,
+            role=cast(Literal["owner", "member"], membership.role),
+            status=cast(
+                Literal["invited", "active", "suspended", "removed"],
+                membership.status,
+            ),
         )
         for membership, user in rows
     ]
@@ -140,6 +143,9 @@ def update_store_member(
         membership_id=membership.id,
         user_id=user.id,
         email=user.email_normalized,
-        role=membership.role,
-        status=membership.status,
+        role=cast(Literal["owner", "member"], membership.role),
+        status=cast(
+            Literal["invited", "active", "suspended", "removed"],
+            membership.status,
+        ),
     )

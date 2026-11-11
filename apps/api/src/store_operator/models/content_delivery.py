@@ -439,6 +439,7 @@ class PublishPackageItem(Base):
             "store_id", "publish_package_id", "channel_key",
             name="uq_publish_package_items_channel",
         ),
+        UniqueConstraint("store_id", "id", name="uq_publish_package_items_store_id"),
         ForeignKeyConstraint(
             ["store_id", "publish_package_id"],
             ["publish_packages.store_id", "publish_packages.id"],

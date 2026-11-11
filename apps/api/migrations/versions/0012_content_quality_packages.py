@@ -583,7 +583,7 @@ def upgrade() -> None:
     )
     op.execute(
         """
-        CREATE FUNCTION enforce_quality_report_ready_content() RETURNS trigger AS $$
+        CREATE FUNCTION enforce_quality_report_ready_content() RETURNS trigger AS $
         DECLARE
             content_status text;
         BEGIN

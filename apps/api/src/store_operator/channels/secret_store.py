@@ -69,7 +69,7 @@ class AwsSecretsManagerStore:
             value = json.loads(raw)
         except (BotoCoreError, ClientError) as exc:
             raise SecretStoreError("Secret could not be retrieved") from exc
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        except (TypeError, ValueError) as exc:
             raise SecretStoreError("Secret payload is invalid") from exc
         if not isinstance(value, dict) or not all(
             isinstance(key, str) and isinstance(item, str) for key, item in value.items()

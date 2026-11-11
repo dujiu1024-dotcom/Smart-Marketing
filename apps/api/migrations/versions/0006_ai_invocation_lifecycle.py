@@ -20,6 +20,10 @@ def upgrade() -> None:
         "ai_invocations",
         sa.Column("request_fingerprint", sa.String(64), nullable=True),
     )
+    op.add_column(
+        "ai_invocations",
+        sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
+    )
     op.execute(
         "UPDATE ai_invocations SET status = 'running' WHERE status = 'started'"
     )
@@ -47,4 +51,5 @@ def downgrade() -> None:
         "ai_invocations",
         "status IN ('started', 'succeeded', 'failed', 'needs_human')",
     )
+    op.drop_column("ai_invocations", "finished_at")
     op.drop_column("ai_invocations", "request_fingerprint")

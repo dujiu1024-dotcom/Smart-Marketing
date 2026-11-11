@@ -4325,6 +4325,33 @@
         "title": "QualityReportRun",
         "type": "object"
       },
+      "QualityResolutionCreate": {
+        "properties": {
+          "decision": {
+            "pattern": "^(accepted|rejected)$",
+            "title": "Decision",
+            "type": "string"
+          },
+          "expected_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Fingerprint",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decision",
+          "reason",
+          "expected_fingerprint"
+        ],
+        "title": "QualityResolutionCreate",
+        "type": "object"
+      },
       "ReviewCreate": {
         "properties": {
           "comment": {
@@ -6556,6 +6583,86 @@
         "summary": "Create Task",
         "tags": [
           "marketing-tasks"
+        ]
+      }
+    },
+    "/api/v1/marketing-tasks/quality-reports/{report_id}/resolutions": {
+      "post": {
+        "operationId": "create_quality_resolution_api_v1_marketing_tasks_quality_reports__report_id__resolutions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QualityResolutionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Quality Resolution Api V1 Marketing Tasks Quality Reports  Report Id  Resolutions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Quality Resolution",
+        "tags": [
+          "content-quality"
         ]
       }
     },

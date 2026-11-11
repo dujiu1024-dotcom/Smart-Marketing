@@ -260,6 +260,8 @@ PublishOperation 状态：requested/queued/submitting/processing/draft_saved/pub
 - GET /api/v1/channel-oauth/{channel_key}/callback
 - POST /api/v1/stores/{store_id}/channel-accounts/{id}/disconnect
 - POST /api/v1/stores/{store_id}/channel-accounts/{id}/capabilities/refresh
+- POST /api/v1/stores/{store_id}/channel-accounts/{id}/refresh
+- GET /api/v1/stores/{store_id}/channel-accounts/{id}/capabilities
 - POST /api/v1/publish-operations（仅 #8/#9 内部命令，需确认 package fingerprint）
 - GET /api/v1/publish-operations/{id}
 - POST /api/v1/publish-operations/{id}/reconcile

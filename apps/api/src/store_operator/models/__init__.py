@@ -1,4 +1,5 @@
 from store_operator.models.base import Base
+from store_operator.models.channel_delivery import ChannelAccount, OAuthAuthorizationAttempt, PublishOperation
 from store_operator.models.content_delivery import (
     Artifact,
     ArtifactVersion,
@@ -54,6 +55,9 @@ from store_operator.models.store_knowledge import (
 
 __all__ = [
     "Artifact",
+    "ChannelAccount",
+    "OAuthAuthorizationAttempt",
+    "PublishOperation",
     "ArtifactVersion",
     "ReviewRecord",
     "ChannelContent",

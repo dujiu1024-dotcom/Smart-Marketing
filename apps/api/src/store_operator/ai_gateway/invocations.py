@@ -8,7 +8,12 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from store_operator.models.job_runtime import AIInvocation, AIUsageRecord
+from store_operator.models.job_runtime import (
+    AIInvocation,
+    AIUsageRecord,
+    Job,
+    JobAttempt,
+)
 
 _FINGERPRINT_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_PARAMETER_KEYS = frozenset(
@@ -70,6 +75,16 @@ def start_ai_invocation(
         raise ValueError("model must contain 1-150 characters")
     if not capability.strip() or len(capability) > 24:
         raise ValueError("capability must contain 1-24 characters")
+    if attempt_id is not None and job_id is None:
+        raise ValueError("attempt_id requires job_id")
+    if job_id is not None:
+        job = db.get(Job, job_id)
+        if job is None or job.store_id != store_id:
+            raise LookupError("Job not found in the requested store")
+    if attempt_id is not None:
+        attempt = db.get(JobAttempt, attempt_id)
+        if attempt is None or attempt.job_id != job_id:
+            raise ValueError("attempt_id does not belong to job_id")
     current_time = now or datetime.now(UTC)
     invocation = AIInvocation(
         id=uuid4(),
@@ -187,8 +202,8 @@ def fail_ai_invocation(
     now: datetime | None = None,
 ) -> AIInvocation:
     current_time = now or datetime.now(UTC)
-    if not error_code.strip() or len(error_code) > 100:
-        raise ValueError("error_code must contain 1-100 characters")
+    if not re.fullmatch(r"[A-Z0-9_.-]{1,100}", error_code.strip()):
+        raise ValueError("error_code must be a normalized error identifier")
     invocation = db.scalar(
         select(AIInvocation)
         .where(AIInvocation.id == invocation_id)

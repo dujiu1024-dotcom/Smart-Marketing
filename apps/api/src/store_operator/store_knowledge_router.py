@@ -150,15 +150,18 @@ def _create_scoped_record(
     payload: BaseModel,
     record_type: str,
 ) -> dict[str, object]:
-    record = model(
-        id=uuid4(),
-        store_id=store_id,
+    values = {
+        "id": uuid4(),
+        "store_id": store_id,
         **payload.model_dump(),
-        fact_status="pending_confirmation",
-        current_version=1,
-        created_by_user_id=auth.user.id,
-        updated_by_user_id=auth.user.id,
-    )
+        "fact_status": "pending_confirmation",
+        "current_version": 1,
+    }
+    if "created_by_user_id" in model.__table__.columns:
+        values["created_by_user_id"] = auth.user.id
+    if "updated_by_user_id" in model.__table__.columns:
+        values["updated_by_user_id"] = auth.user.id
+    record = model(**values)
     db.add(record)
     try:
         db.flush()
@@ -255,11 +258,23 @@ def _update_scoped_record(
         raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
     if record.current_version != expected:
         raise ApiError(409, "VERSION_CONFLICT", "Record has changed")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
         column = record.__table__.columns.get(field)
         if value is None and column is not None and not column.nullable:
             raise ApiError(422, "NULL_NOT_ALLOWED", f"{field} cannot be null")
         setattr(record, field, value)
+    if record_type == "knowledge_item":
+        if not record.content_text and not record.content_ref:
+            raise ApiError(
+                422, "KNOWLEDGE_CONTENT_REQUIRED",
+                "content_text or content_ref is required",
+            )
+        if record.effective_at and record.expires_at and record.expires_at <= record.effective_at:
+            raise ApiError(422, "INVALID_VALIDITY_WINDOW", "expires_at must be later")
+    if record_type == "offer":
+        if record.starts_at and record.ends_at and record.ends_at <= record.starts_at:
+            raise ApiError(422, "INVALID_OFFER_WINDOW", "ends_at must be later")
     record.current_version += 1
     record.fact_status = "pending_confirmation"
     if hasattr(record, "updated_by_user_id"):

@@ -146,6 +146,7 @@ def _audit(
 def _begin_idempotency(
     db: Session,
     store_id: UUID,
+    actor_user_id: UUID,
     key: str,
     operation: str,
     payload: BaseModel,
@@ -175,6 +176,12 @@ def _begin_idempotency(
         db.flush()
         existing = None
     if existing is not None:
+        if existing.actor_user_id != actor_user_id:
+            raise ApiError(
+                409,
+                "IDEMPOTENCY_KEY_SCOPE_MISMATCH",
+                "Idempotency-Key belongs to a different actor",
+            )
         if existing.operation != operation or existing.request_hash != request_hash:
             raise ApiError(
                 409,
@@ -191,6 +198,7 @@ def _begin_idempotency(
         id=uuid4(),
         store_id=store_id,
         idempotency_key=normalized_key,
+        actor_user_id=actor_user_id,
         operation=operation,
         request_hash=request_hash,
         status="in_progress",
@@ -207,6 +215,12 @@ def _begin_idempotency(
                 IdempotencyRecord.idempotency_key == normalized_key,
             )
         )
+        if winner is not None and winner.actor_user_id != actor_user_id:
+            raise ApiError(
+                409,
+                "IDEMPOTENCY_KEY_SCOPE_MISMATCH",
+                "Idempotency-Key belongs to a different actor",
+            ) from exc
         if (
             winner is not None
             and winner.operation == operation
@@ -249,7 +263,7 @@ def _create_scoped_record(
     operation: str,
 ) -> dict[str, object]:
     idempotency_record, replay = _begin_idempotency(
-        db, store_id, idempotency_key, operation, payload
+        db, store_id, auth.user.id, idempotency_key, operation, payload
     )
     if replay is not None:
         return replay
@@ -492,7 +506,7 @@ def create_store_profile(
 ) -> StoreProfileRead:
     store_id = _store_id(context)
     idempotency_record, replay = _begin_idempotency(
-        db, store_id, idempotency_key, "store.profile.create", payload
+        db, store_id, auth.user.id, idempotency_key, "store.profile.create", payload
     )
     if replay is not None:
         return StoreProfileRead.model_validate(replay)
@@ -631,7 +645,7 @@ def create_product(
 ) -> ProductRead:
     store_id = _store_id(context)
     idempotency_record, replay = _begin_idempotency(
-        db, store_id, idempotency_key, "store.product.create", payload
+        db, store_id, auth.user.id, idempotency_key, "store.product.create", payload
     )
     if replay is not None:
         return ProductRead.model_validate(replay)

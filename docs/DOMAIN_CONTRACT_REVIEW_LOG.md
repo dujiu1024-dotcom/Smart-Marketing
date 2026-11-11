@@ -138,3 +138,28 @@
 - 该方案仍需 #7/#9/#12 联合评审；PackageItem 聚合、manual_handoff 和人工质检复核规则不得未经评审直接进入生产实现。
 
 **验证状态：** 仅完成静态文档交叉审查；CNT-01 至 CNT-26、OpenAPI Schema、Alembic 约束、API/Worker 集成和浏览器回归均待执行。
+
+
+## 11. Issue #8 联合契约静态复核补充（2026-11-11）
+
+本轮在 PR #30 初稿上发现并修正四项一致性问题：
+
+1. **Artifact 类型重复：** ChannelContent 已是独立渠道快照实体，不应同时作为 Artifact.artifact_type。Artifact 类型收敛为 copy/image；ChannelContent 单独持有渠道规格、适配 payload 和输入指纹。
+2. **BusinessFactSnapshot 权属错误：** BusinessFactSnapshot 属于 #7 MarketingTask 的任务级不可变快照，不属于 #6。其 source revision 追溯到 #6 已确认 StoreRecordRevision；#8 的 PublishPackageFactRef 只引用 #7 快照。
+3. **QualityReport 人工复核可变性冲突：** QualityReport 作为不可变质检结果，不再写 reviewer_id/resolution_reason。新增追加式 QualityResolution，绑定 report fingerprint；仅 needs_human 可接受/拒绝，hard fail 不可覆盖。Freeze 只接受 pass 或带 accepted QualityResolution 的 needs_human。
+4. **PublishConfirmation 撤销字段冲突：** 核心模型将确认记录定义为不可变，故移除 revoked_at；首期不提供撤销接口。未来若开放撤销，必须另建追加式撤销记录并定义已提交发布命令的处理边界。
+
+同时统一了 PublishPackage 最低条件：至少一个 PackageItem 和一个已确认 BusinessFactSnapshot 引用。该门槛是安全提案，仍需 #7/#8 联合确认。
+
+### 同步文档
+- CONTENT_DELIVERY_DOMAIN_DESIGN.md
+- DOMAIN_INTEGRATION_CONTRACTS_V1.md
+- CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md
+- README.md 索引保持不变
+
+### 仍需联合决议
+- #7/#8 确认 BusinessFactSnapshot 的必需性和引用粒度。
+- #8/#12 决议 ChannelSpec/ChannelCapability 的版本快照与失效事件。
+- #8/#12 确认 manual_handoff 首期交付形式与 PublishOperation 幂等边界。
+- #8/#9 确认 QualityResolution 的授权能力和事件消费者。
+- #8 产品负责人确认首期不提供 PublishConfirmation 撤销。

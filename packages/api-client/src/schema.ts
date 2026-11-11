@@ -363,6 +363,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/marketing-tasks/{task_id}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Task Artifacts */
+        get: operations["list_task_artifacts_api_v1_marketing_tasks__task_id__artifacts_get"];
+        put?: never;
+        /** Create Artifact */
+        post: operations["create_artifact_api_v1_marketing_tasks__task_id__artifacts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Artifact Version */
+        post: operations["create_artifact_version_api_v1_marketing_tasks__task_id__artifacts__artifact_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/versions/{version_id}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Review Record */
+        post: operations["create_review_record_api_v1_marketing_tasks__task_id__artifacts__artifact_id__versions__version_id__reviews_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/marketing-tasks/{task_id}/cancel": {
         parameters: {
             query?: never;
@@ -916,6 +968,69 @@ export interface components {
             membership: {
                 [key: string]: string;
             };
+        };
+        /** ArtifactCreate */
+        ArtifactCreate: {
+            /**
+             * Artifact Type
+             * @enum {string}
+             */
+            artifact_type: "copy" | "image";
+            version: components["schemas"]["ArtifactVersionInput"];
+        };
+        /** ArtifactVersionCreate */
+        ArtifactVersionCreate: {
+            /** Content Json */
+            content_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Expected Version */
+            expected_version: number;
+            /** Instruction */
+            instruction?: string | null;
+            /** Media Asset Id */
+            media_asset_id?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            /** Prompt Version Id */
+            prompt_version_id?: string | null;
+            /** Provider Id */
+            provider_id?: string | null;
+            /** Source Refs */
+            source_refs?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "ai_generated" | "merchant_upload" | "manual_edit";
+        };
+        /** ArtifactVersionInput */
+        ArtifactVersionInput: {
+            /** Content Json */
+            content_json?: {
+                [key: string]: unknown;
+            } | null;
+            /** Instruction */
+            instruction?: string | null;
+            /** Media Asset Id */
+            media_asset_id?: string | null;
+            /** Model Id */
+            model_id?: string | null;
+            /** Prompt Version Id */
+            prompt_version_id?: string | null;
+            /** Provider Id */
+            provider_id?: string | null;
+            /** Source Refs */
+            source_refs?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Source Type
+             * @enum {string}
+             */
+            source_type: "ai_generated" | "merchant_upload" | "manual_edit";
         };
         /** AssetUploadCompleteRead */
         AssetUploadCompleteRead: {
@@ -1965,6 +2080,27 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ReviewCreate */
+        ReviewCreate: {
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "revision_requested" | "rejected";
+            /** Expected Version */
+            expected_version: number;
+            /**
+             * Review Type
+             * @enum {string}
+             */
+            review_type: "copy" | "image";
+            /** Target */
+            target?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** SessionSummary */
         SessionSummary: {
             /**
@@ -2973,6 +3109,164 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketingTaskDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_task_artifacts_api_v1_marketing_tasks__task_id__artifacts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_artifact_api_v1_marketing_tasks__task_id__artifacts_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtifactCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_artifact_version_api_v1_marketing_tasks__task_id__artifacts__artifact_id__versions_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ArtifactVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_review_record_api_v1_marketing_tasks__task_id__artifacts__artifact_id__versions__version_id__reviews_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                task_id: string;
+                artifact_id: string;
+                version_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

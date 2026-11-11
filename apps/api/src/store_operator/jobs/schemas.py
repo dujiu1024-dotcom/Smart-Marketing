@@ -70,8 +70,10 @@ class AIInvocationRead(BaseModel):
     capability: str
     prompt_version: str | None
     provider_request_id: str | None
+    request_fingerprint: str | None
     status: str
     latency_ms: int | None
     error_code: str | None
     created_at: datetime
+    finished_at: datetime | None
     usage: AIUsageRead | None

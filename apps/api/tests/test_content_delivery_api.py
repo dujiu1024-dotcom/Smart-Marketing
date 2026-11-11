@@ -141,7 +141,7 @@ def test_artifact_versions_and_reviews_are_version_bound(
         headers={**headers, "Idempotency-Key": "content-artifact-create"},
         json=first_payload,
     )
-    assert replay.status_code == 200, replay.text
+    assert replay.status_code == 201, replay.text
     assert replay.json()["id"] == artifact_id
 
     second = identity_client.post(

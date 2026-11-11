@@ -1,8 +1,16 @@
+from typing import Annotated
+
 import structlog
+from fastapi import Body
 from fastapi.testclient import TestClient
 
 from store_operator.main import app
 from store_operator.observability import configure_logging
+
+@app.post("/_test/validation")
+def validation_probe(quantity: Annotated[int, Body()]) -> dict[str, int]:
+    return {"quantity": quantity}
+
 
 client = TestClient(app)
 
@@ -42,3 +50,27 @@ def test_structured_logging_redacts_nested_secrets(capsys) -> None:
     assert "[REDACTED]" in output
     assert "req-123" in output
     assert "visible" in output
+
+
+
+def test_not_found_uses_unified_error_envelope() -> None:
+    response = client.get("/_missing")
+
+    assert response.status_code == 404
+    assert response.json()["error"] == {
+        "code": "RESOURCE_NOT_FOUND",
+        "message": "Resource not found",
+    }
+    assert response.json()["request_id"] == response.headers["X-Request-ID"]
+
+
+def test_validation_error_uses_unified_envelope_without_echoing_input() -> None:
+    response = client.post("/_test/validation", json="sensitive-invalid-input")
+
+    assert response.status_code == 422
+    assert response.json()["error"] == {
+        "code": "VALIDATION_ERROR",
+        "message": "Request validation failed",
+    }
+    assert response.json()["request_id"] == response.headers["X-Request-ID"]
+    assert "sensitive-invalid-input" not in response.text

@@ -672,6 +672,12 @@ def execute_content_quality_check(
     }
 
 
+def _verify_douyin_media_sha256(content: bytes, expected_sha256: str) -> None:
+    actual_sha256 = hashlib.sha256(content).hexdigest()
+    if actual_sha256 != expected_sha256:
+        raise ValueError("Downloaded image SHA-256 does not match the approved media asset")
+
+
 def _set_douyin_publish_state(
     operation_id: UUID,
     store_id: UUID,
@@ -851,7 +857,7 @@ def execute_douyin_image_text_publish(
         refresh_expires_at = account.refresh_token_expires_at
 
         platform_item_id = operation.platform_item_id
-        media_items: list[tuple[str, str, str]] = []
+        media_items: list[tuple[str, str, str, str]] = []
         post_text = ""
         if platform_item_id is None:
             channel_content = db.scalar(
@@ -971,6 +977,7 @@ def execute_douyin_image_text_publish(
                         media_asset.original_filename_sanitized
                         or f"image-{image_ref.position}.jpg",
                         media_asset.mime_type,
+                        media_asset.sha256,
                     )
                 )
             _set_douyin_publish_state(
@@ -1160,17 +1167,14 @@ def execute_douyin_image_text_publish(
 
     if platform_item_id is None:
         try:
-            image_bytes = [
-                (
-                    filename,
-                    mime_type,
-                    download_object_bytes(
-                        object_key=object_key,
-                        max_bytes=20 * 1024 * 1024,
-                    ),
+            image_bytes = []
+            for object_key, filename, mime_type, expected_sha256 in media_items:
+                content = download_object_bytes(
+                    object_key=object_key,
+                    max_bytes=20 * 1024 * 1024,
                 )
-                for object_key, filename, mime_type in media_items
-            ]
+                _verify_douyin_media_sha256(content, expected_sha256)
+                image_bytes.append((filename, mime_type, content))
         except (ObjectStorageNotConfigured, ValueError) as exc:
             _set_douyin_publish_state(
                 operation_id,

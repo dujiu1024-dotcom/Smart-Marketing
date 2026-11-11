@@ -13,10 +13,10 @@ from store_operator.domain.marketing_task import (
     TaskStepKey,
     TaskStepSnapshot,
     TaskStepStatus,
+    compute_stale_downstream,
     ensure_step_transition,
     ensure_task_can_complete,
     ensure_task_transition,
-    compute_stale_downstream,
     resolve_step_applicability,
     validate_dependency_graph,
 )

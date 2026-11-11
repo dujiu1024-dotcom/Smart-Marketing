@@ -153,51 +153,27 @@ class PromptActivation(Base):
             ondelete="RESTRICT",
         ),
         ForeignKeyConstraint(
-            ["actor_user_id"], ["users.id"],
+            ["actor_user_id"],
+            ["users.id"],
             name="fk_prompt_activations_actor_user",
             ondelete="SET NULL",
         ),
         CheckConstraint("action IN ('publish', 'rollback')", name="action"),
         CheckConstraint("length(trim(reason)) > 0", name="reason_required"),
-        UniqueConstraint("idempotency_key_hash", name="uq_prompt_activations_idempotency_hash"),
         CheckConstraint(
             "idempotency_key_hash ~ '^[0-9a-f]{64}$' AND "
             "request_hash ~ '^[0-9a-f]{64}$'",
             name="hashes",
         ),
-    )
-
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    prompt_template_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    activated_version_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    previous_version_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
-    action: Mapped[str] = mapped_column(String(16), nullable=False)
-    reason: Mapped[str] = mapped_column(Text, nullable=False)
-    actor_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
-    idempotency_key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
- AND request_hash ~ '^[0-9a-f]{64}
-    )
-
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
-    prompt_template_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    activated_version_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    previous_version_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
-    action: Mapped[str] = mapped_column(String(16), nullable=False)
-    reason: Mapped[str] = mapped_column(Text, nullable=False)
-    actor_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
-    idempotency_key_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-",
-            name="hashes",
+        UniqueConstraint(
+            "idempotency_key_hash",
+            name="uq_prompt_activations_idempotency_hash",
         ),
-        Index("ix_prompt_activations_template_created", "prompt_template_id", "created_at"),
+        Index(
+            "ix_prompt_activations_template_created",
+            "prompt_template_id",
+            "created_at",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)

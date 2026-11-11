@@ -712,7 +712,7 @@ def test_optional_step_can_be_skipped_but_required_review_cannot(
     assert confirmed.status_code == 200, confirmed.text
 
     skipped = identity_client.post(
-        f"/api/v1/marketing-tasks/{task_id}/steps/opportunity_decision/skip",
+        f"/api/v1/marketing-tasks/{task_id}/steps/quality_check/skip",
         headers={
             **ORIGIN,
             "X-CSRF-Token": csrf,

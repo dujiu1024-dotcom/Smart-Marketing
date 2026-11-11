@@ -26,6 +26,7 @@ from store_operator.models.marketing_task import (
     TaskEvent,
     TaskStep,
 )
+from store_operator.models.prompt_management import PromptActivation, PromptTemplate, PromptVersion
 from store_operator.models.store_knowledge import (
     AudienceProfile,
     BrandGuideline,
@@ -43,6 +44,9 @@ __all__ = [
     "Artifact",
     "ArtifactVersion",
     "ReviewRecord",
+    "PromptActivation",
+    "PromptTemplate",
+    "PromptVersion",
     "AIInvocation",
     "AIUsageRecord",
     "AuditEvent",

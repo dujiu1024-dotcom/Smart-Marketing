@@ -282,6 +282,27 @@ Job 命令需包含 source/channel account ID、时间窗口、cursor、schema v
 
 门店经营结果数据源不得默认接入 POS/CRM；首期只定义受控导入/来源引用契约。任何来源的授权、合同、隐私和保留条款须单独评审。
 
+### 8.1 抖音官方视频指标能力初步核验（2026-11-11）
+
+已对照抖音开放平台官方文档，确认存在官方只读视频指标接口，但**不代表当前应用已获得权限或真实账号已可调用**：
+
+| 接口 | 官方 Scope | 官方文档明确的能力/限制 | 对本项目的处理 |
+|---|---|---|---|
+| `POST /video/data/` | `video.data` | 查询授权用户指定公开视频的点赞、播放等数据；仅返回公开作品；需用户授权且申请权限 | 可作为作品级即时指标候选；须先确认应用控制台权限和授权用户 |
+| `GET /data/external/item/base/` | `data.external.item` | 获取作品基础数据；仅近 30 天创建的视频；首次授权后次日才产生完整数据，后续约次日刷新 | 可作为延迟型基础指标候选，需记录延迟和 30 天限制 |
+| `GET /data/external/item/play/` | `data.external.item` | 获取作品播放数据；仅近 30 天创建的视频；首次授权后次日才产生完整数据 | 可作为按日播放观测候选，不得当作实时数据 |
+
+官方权限说明将 `video.data` 与 `data.external.item` 分列，且均需要申请/用户授权；官方 FAQ 还提示 `video.data` 申请入口可能未出现在管理中心，需通过开放平台渠道确认申请方式。因此，不能把发布/作品列表读回权限视为上述指标权限已开通。
+
+官方参考：
+- [查询特定视频的视频数据（video.data）](https://open.douyin.com/platform/resource/docs/openapi/video-management/douyin/search-video/video-data/)
+- [获取视频基础数据（data.external.item）](https://open.douyin.com/platform/resource/docs/openapi/data-open-service/video-data/get-basic-data/)
+- [获取视频播放数据（data.external.item）](https://open.douyin.com/platform/resource/docs/openapi/data-open-service/video-data/get-play-data/)
+- [开放平台能力与权限列表](https://open.douyin.com/platform/resource/docs/accession-guide/type-and-permission/)
+- [开放平台 FAQ：video.data 权限申请入口](https://open.douyin.com/platform/resource/docs/common-question/faq/)
+
+当前核验结论：`support_status=pending_verification`。尚未检查本项目应用控制台实际 Scope、应用审核资质、真实 OAuth 授权用户、配额或 API 响应；不创建同步 Job，不展示真实指标。后续 #12 应把指标读取能力作为独立 Capability 申请与验收，#13 只消费 #12 输出的能力快照和已脱敏观测证据。
+
 ## 9. 安全、隐私与审计
 
 - 全部查询先由 #5 构造 AuthorizedStoreContext；任何 client-supplied store_id 都不是授权事实。

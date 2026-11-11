@@ -23,6 +23,7 @@ from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.object_storage import (
     ObjectStorageNotConfigured,
+    calculate_object_sha256,
     create_download_url,
     create_upload_url,
     head_object,
@@ -1259,10 +1260,12 @@ def complete_asset_upload(
         raise ApiError(503, "OBJECT_STORAGE_UNAVAILABLE", "Private object storage is not configured") from exc
     except Exception as exc:
         raise ApiError(409, "UPLOAD_OBJECT_NOT_FOUND", "Uploaded object could not be verified") from exc
-    metadata = stored.get("Metadata") or {}
     actual_size = int(stored.get("ContentLength") or 0)
     actual_mime = str(stored.get("ContentType") or "")
-    actual_sha256 = str(metadata.get("sha256") or "").lower()
+    try:
+        actual_sha256 = calculate_object_sha256(object_key=intent.object_key).lower()
+    except Exception as exc:
+        raise ApiError(503, "UPLOAD_HASH_VERIFICATION_FAILED", "Uploaded file hash could not be verified") from exc
     if (
         actual_size != intent.expected_byte_size
         or actual_mime != intent.expected_mime_type

@@ -175,7 +175,7 @@
 - #7 提供任务与 BusinessFactSnapshot；#6 提供 StoreRecordRevision/MediaAsset；#8 持有 Artifact/Review/QualityReport。
 - PromptTemplate/Version/Activation 为全局平台配置，不含 store_id；平台管理员权限经 #5 capability check，不能因此读取门店资料。
 
-提出待 #9 联合批准的 AIInvocation 扩展：provider_request_id 与 usage_json。当前 Provider 统一返回已包含 provider_request_id/normalized_usage，但 AIInvocation 字段表尚未显式持久化，需统一审计与供应商对账。
+提出待 #9 联合批准的 AIInvocation 扩展：provider_request_id 与 usage_json。当前 Provider 统一返回已包含 provider_request_id/normalized_usage，但 AIInvocation 字段表尚未显式持久化，需统一审计与供应商对账。ProviderContext 同时建议固定 idempotency_key、deadline_at、correlation_id、trace_context 与 model_config_ref；Secret 仅通过受控 handle 注入。
 
 首期不锁定 Provider 厂商；必须先核验部署区域、账号主体、数据处理条款、价格、速率限制和图像编辑/Vision/OCR能力，并由项目负责人确认。
 

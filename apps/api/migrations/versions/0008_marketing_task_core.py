@@ -137,13 +137,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["created_by_user_id"],
             ["users.id"],
-            name="fk_requirement_snapshots_created_by_user_id_users",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
             ["confirmed_by_user_id"],
             ["users.id"],
-            name="fk_requirement_snapshots_confirmed_by_user_id_users",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
@@ -205,13 +203,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["created_by_user_id"],
             ["users.id"],
-            name="fk_strategy_snapshots_created_by_user_id_users",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
             ["confirmed_by_user_id"],
             ["users.id"],
-            name="fk_strategy_snapshots_confirmed_by_user_id_users",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
@@ -299,13 +295,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["created_by_user_id"],
             ["users.id"],
-            name="fk_business_fact_snapshots_created_by_user_id_users",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
             ["confirmed_by_user_id"],
             ["users.id"],
-            name="fk_business_fact_snapshots_confirmed_by_user_id_users",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
@@ -442,13 +436,11 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["actor_user_id"],
             ["users.id"],
-            name="fk_step_decisions_actor_user_id_users",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
             ["idempotency_record_id"],
             ["idempotency_records.id"],
-            name="fk_step_decisions_idempotency_record_id_idempotency_records",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(
@@ -580,7 +572,6 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["actor_user_id"],
             ["users.id"],
-            name="fk_task_events_actor_user_id_users",
             ondelete="SET NULL",
         ),
         sa.ForeignKeyConstraint(

@@ -1,13 +1,12 @@
 import hashlib
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, Request, Response, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from store_operator.auth.audit import record_audit
@@ -18,11 +17,11 @@ from store_operator.auth.dependencies import (
     require_store_context,
 )
 from store_operator.auth.errors import ApiError
+from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.db import get_db
 from store_operator.models.store_knowledge import (
     AudienceProfile,
     BrandGuideline,
-    IdempotencyRecord,
     KnowledgeItem,
     Offer,
     Product,
@@ -150,104 +149,29 @@ def _begin_idempotency(
     key: str,
     operation: str,
     payload: BaseModel,
-) -> tuple[IdempotencyRecord | None, dict[str, object] | None]:
-    normalized_key = key.strip()
-    if not normalized_key or len(normalized_key) > 255:
-        raise ApiError(400, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key is invalid")
-    request_hash = hashlib.sha256(
-        json.dumps(
-            payload.model_dump(mode="json"),
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
-    now = datetime.now(UTC)
-    existing = db.scalar(
-        select(IdempotencyRecord)
-        .where(
-            IdempotencyRecord.store_id == store_id,
-            IdempotencyRecord.idempotency_key == normalized_key,
-        )
-        .with_for_update()
-    )
-    if existing is not None and existing.expires_at <= now:
-        db.delete(existing)
-        db.flush()
-        existing = None
-    if existing is not None:
-        if existing.actor_user_id != actor_user_id:
-            raise ApiError(
-                409,
-                "IDEMPOTENCY_KEY_SCOPE_MISMATCH",
-                "Idempotency-Key belongs to a different actor",
-            )
-        if existing.operation != operation or existing.request_hash != request_hash:
-            raise ApiError(
-                409,
-                "IDEMPOTENCY_KEY_REUSED",
-                "Idempotency-Key was already used for a different request",
-            )
-        if existing.status == "completed" and existing.response_json is not None:
-            return None, existing.response_json
-        raise ApiError(
-            409, "IDEMPOTENCY_IN_PROGRESS", "An identical request is still processing"
-        )
-
-    record = IdempotencyRecord(
-        id=uuid4(),
+):
+    return begin_idempotency(
+        db,
         store_id=store_id,
-        idempotency_key=normalized_key,
         actor_user_id=actor_user_id,
+        key=key,
         operation=operation,
-        request_hash=request_hash,
-        status="in_progress",
-        expires_at=now + timedelta(hours=24),
+        payload=payload,
     )
-    db.add(record)
-    try:
-        db.flush()
-    except IntegrityError as exc:
-        db.rollback()
-        winner = db.scalar(
-            select(IdempotencyRecord).where(
-                IdempotencyRecord.store_id == store_id,
-                IdempotencyRecord.idempotency_key == normalized_key,
-            )
-        )
-        if winner is not None and winner.actor_user_id != actor_user_id:
-            raise ApiError(
-                409,
-                "IDEMPOTENCY_KEY_SCOPE_MISMATCH",
-                "Idempotency-Key belongs to a different actor",
-            ) from exc
-        if (
-            winner is not None
-            and winner.operation == operation
-            and winner.request_hash == request_hash
-            and winner.status == "completed"
-            and winner.response_json is not None
-        ):
-            return None, winner.response_json
-        raise ApiError(
-            409, "IDEMPOTENCY_IN_PROGRESS", "An identical request is still processing"
-        ) from exc
-    return record, None
 
 
 def _complete_idempotency(
-    record: IdempotencyRecord | None,
+    record,
     response: dict[str, object],
     resource_type: str,
     resource_id: UUID,
 ) -> None:
-    if record is None:
-        return
-    record.status = "completed"
-    record.response_status = status.HTTP_201_CREATED
-    record.response_json = response
-    record.resource_type = resource_type
-    record.resource_id = resource_id
+    complete_idempotency(
+        record,
+        response=response,
+        resource_type=resource_type,
+        resource_id=resource_id,
+    )
 
 
 def _create_scoped_record(

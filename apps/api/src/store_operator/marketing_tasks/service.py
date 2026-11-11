@@ -28,7 +28,6 @@ from store_operator.marketing_tasks.schemas import (
     MarketingTaskCreate,
     MarketingTaskDetail,
     MarketingTaskList,
-    MarketingTaskOptions,
     MarketingTaskSummary,
     TaskStepRead,
 )

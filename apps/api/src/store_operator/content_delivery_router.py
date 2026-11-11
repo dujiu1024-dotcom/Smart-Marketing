@@ -39,7 +39,7 @@ class ArtifactVersionInput(BaseModel):
     prompt_version_id: UUID | None = None
 
     @model_validator(mode="after")
-    def require_content_reference(self) -> "ArtifactVersionInput":
+    def require_content_reference(self) -> ArtifactVersionInput:
         if self.content_json is None and self.media_asset_id is None:
             raise ValueError("content_json or media_asset_id is required")
         if self.content_json is not None and self.media_asset_id is not None:
@@ -68,7 +68,7 @@ class ReviewCreate(BaseModel):
     target: dict[str, object] | None = None
 
     @model_validator(mode="after")
-    def require_revision_comment(self) -> "ReviewCreate":
+    def require_revision_comment(self) -> ReviewCreate:
         if self.decision == "revision_requested" and not (
             self.comment and self.comment.strip()
         ):

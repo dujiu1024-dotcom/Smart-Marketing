@@ -874,6 +874,66 @@ def confirm_requirement(
     )
 
 
+def update_strategy_draft(
+    db: Session,
+    request: Request,
+    auth: AuthenticatedSession,
+    context: AuthContext,
+    task_id: UUID,
+    payload: MarketingTaskStrategyUpdate,
+    idempotency_key: str,
+) -> MarketingTaskDetail:
+    store_id = _require_store_id(context)
+    idempotency_record, replay = begin_idempotency(
+        db,
+        store_id=store_id,
+        actor_user_id=auth.user.id,
+        key=idempotency_key,
+        operation="marketing_task.strategy.update",
+        payload=payload,
+    )
+    if replay is not None:
+        return MarketingTaskDetail.model_validate(replay)
+
+    task = _task_for_update(db, store_id, task_id)
+    _check_expected_version(task, payload.expected_version)
+    if task.lifecycle_status != MarketingTaskStatus.WAITING_FOR_USER.value:
+        raise ApiError(
+            409,
+            "STRATEGY_NOT_AWAITING_REVIEW",
+            "Strategy can only be edited while awaiting user review",
+        )
+    steps = _task_steps_for_update(db, store_id, task.id)
+    strategy_step = next(
+        (item for item in steps if item.step_key == TaskStepKey.STRATEGY_CONFIRMATION.value),
+        None,
+    )
+    if (
+        strategy_step is None
+        or TaskStepStatus(strategy_step.status) is not TaskStepStatus.WAITING_FOR_USER
+    ):
+        raise ApiError(
+            409,
+            "STRATEGY_STEP_NOT_AWAITING_REVIEW",
+            "Strategy generation has not produced a reviewable draft",
+        )
+
+    task.strategy_draft_json = payload.strategy
+    task.version += 1
+    return _finish_task_write(
+        db,
+        request,
+        auth,
+        context,
+        task,
+        idempotency_record,
+        event_type="strategy.draft_updated",
+        event_payload={"strategy_fingerprint": _fingerprint(payload.strategy)},
+        audit_action="marketing_task.strategy.draft_updated",
+        audit_metadata={"strategy_fingerprint": _fingerprint(payload.strategy)},
+    )
+
+
 def confirm_strategy(
     db: Session,
     request: Request,
@@ -897,11 +957,11 @@ def confirm_strategy(
 
     task = _task_for_update(db, store_id, task_id)
     _check_expected_version(task, payload.expected_version)
-    if task.lifecycle_status != MarketingTaskStatus.ACTIVE.value:
+    if task.lifecycle_status != MarketingTaskStatus.WAITING_FOR_USER.value:
         raise ApiError(
             409,
-            "TASK_NOT_ACTIVE",
-            "Strategy can only be confirmed for an active task",
+            "STRATEGY_NOT_AWAITING_REVIEW",
+            "Strategy can only be confirmed while awaiting user review",
         )
     if task.current_requirement_snapshot_id is None:
         raise ApiError(
@@ -915,17 +975,14 @@ def confirm_strategy(
             "STRATEGY_ALREADY_CONFIRMED",
             "Strategy snapshot already exists",
         )
+    if not task.strategy_draft_json:
+        raise ApiError(
+            409,
+            "STRATEGY_DRAFT_NOT_READY",
+            "A generated strategy draft is required before confirmation",
+        )
 
     now = datetime.now(UTC)
-    snapshot_no = (
-        db.scalar(
-            select(func.max(StrategySnapshot.snapshot_no)).where(
-                StrategySnapshot.store_id == store_id,
-                StrategySnapshot.task_id == task.id,
-            )
-        )
-        or 0
-    ) + 1
     requirement_snapshot = db.scalar(
         select(RequirementSnapshot).where(
             RequirementSnapshot.id == task.current_requirement_snapshot_id,
@@ -941,15 +998,24 @@ def confirm_strategy(
         )
     strategy_payload: dict[str, object] = {
         "schema_version": 1,
-        "strategy": payload.strategy,
+        "strategy": task.strategy_draft_json,
         "requirement_snapshot_id": str(requirement_snapshot.id),
     }
     fingerprint = _fingerprint(strategy_payload)
+    snapshot_no = (
+        db.scalar(
+            select(func.max(StrategySnapshot.snapshot_no)).where(
+                StrategySnapshot.store_id == store_id,
+                StrategySnapshot.task_id == task.id,
+            )
+        )
+        or 0
+    ) + 1
     strategy_snapshot = StrategySnapshot(
         id=uuid4(),
         store_id=store_id,
         task_id=task.id,
-        requirement_snapshot_id=task.current_requirement_snapshot_id,
+        requirement_snapshot_id=requirement_snapshot.id,
         snapshot_no=snapshot_no,
         payload_json=strategy_payload,
         schema_version=1,
@@ -977,40 +1043,114 @@ def confirm_strategy(
     )
 
     steps = _task_steps_for_update(db, store_id, task.id)
-    step = next(
+    strategy_step = next(
         (item for item in steps if item.step_key == TaskStepKey.STRATEGY_CONFIRMATION.value),
         None,
     )
-    if step is None or TaskStepStatus(step.status) is not TaskStepStatus.PENDING:
+    if (
+        strategy_step is None
+        or TaskStepStatus(strategy_step.status) is not TaskStepStatus.WAITING_FOR_USER
+    ):
         raise ApiError(
             409,
-            "STRATEGY_STEP_NOT_PENDING",
-            "Strategy confirmation step is not pending",
+            "STRATEGY_STEP_NOT_AWAITING_REVIEW",
+            "Strategy confirmation step is not awaiting review",
         )
-    applicability = StepApplicability(step.applicability)
+    strategy_applicability = StepApplicability(strategy_step.applicability)
     _ensure_step_transition(
-        TaskStepStatus.PENDING,
+        TaskStepStatus.WAITING_FOR_USER,
         TaskStepStatus.RUNNING,
-        applicability=applicability,
+        applicability=strategy_applicability,
     )
     _ensure_step_transition(
         TaskStepStatus.RUNNING,
         TaskStepStatus.SUCCEEDED,
-        applicability=applicability,
+        applicability=strategy_applicability,
     )
-    step.status = TaskStepStatus.SUCCEEDED.value
-    step.version += 1
-    step.started_at = now
-    step.finished_at = now
-    step.input_fingerprint = fingerprint
-    step.output_refs_json = [
+    strategy_step.status = TaskStepStatus.SUCCEEDED.value
+    strategy_step.version += 1
+    strategy_step.started_at = strategy_step.started_at or now
+    strategy_step.finished_at = now
+    strategy_step.input_fingerprint = fingerprint
+    strategy_step.output_refs_json = [
         {"type": "strategy_snapshot", "id": str(strategy_snapshot.id)}
     ]
-    step.blocked_by_json = []
-    step.skip_reason = None
+    strategy_step.blocked_by_json = []
+    strategy_step.block_code = None
+    strategy_step.block_detail_json = None
+    strategy_step.skip_reason = None
 
-    task.strategy_draft_json = payload.strategy
+    content_job_ids: list[str] = []
+    for step_key, job_type in (
+        (TaskStepKey.COPY_PRODUCTION_REVIEW, "marketing_task.generate_copy"),
+        (TaskStepKey.IMAGE_PRODUCTION_REVIEW, "marketing_task.generate_image"),
+    ):
+        content_step = next(
+            (item for item in steps if item.step_key == step_key.value),
+            None,
+        )
+        if content_step is None:
+            continue
+        applicability = StepApplicability(content_step.applicability)
+        if applicability is StepApplicability.NOT_APPLICABLE:
+            continue
+        if TaskStepStatus(content_step.status) is not TaskStepStatus.PENDING:
+            raise ApiError(
+                409,
+                "CONTENT_STEP_NOT_PENDING",
+                f"Content step {step_key.value} is not pending",
+            )
+        _ensure_step_transition(
+            TaskStepStatus.PENDING,
+            TaskStepStatus.RUNNING,
+            applicability=applicability,
+        )
+        content_step.status = TaskStepStatus.RUNNING.value
+        content_step.version += 1
+        content_step.started_at = now
+        content_step.finished_at = None
+        content_step.input_fingerprint = fingerprint
+        content_step.output_refs_json = []
+        content_step.blocked_by_json = []
+        content_step.block_code = None
+        content_step.block_detail_json = None
+        content_step.skip_reason = None
+        try:
+            content_job = create_job(
+                db,
+                job_type=job_type,
+                payload_ref={
+                    "schema_version": 1,
+                    "marketing_task_id": str(task.id),
+                    "requirement_snapshot_id": str(requirement_snapshot.id),
+                    "strategy_snapshot_id": str(strategy_snapshot.id),
+                    "step_key": step_key.value,
+                    "strategy_fingerprint": fingerprint,
+                },
+                idempotency_key=(
+                    f"marketing-task:{task.id}:strategy:{strategy_snapshot.id}:"
+                    f"{step_key.value}"
+                ),
+                store_id=store_id,
+                actor_type="user",
+                actor_user_id=auth.user.id,
+                marketing_task_id=task.id,
+                max_attempts=3,
+                timeout_seconds=900,
+            )
+        except JobIdempotencyConflict as exc:
+            raise ApiError(
+                409,
+                "CONTENT_JOB_IDEMPOTENCY_CONFLICT",
+                f"A conflicting {step_key.value} job already exists",
+            ) from exc
+        content_job_ids.append(str(content_job.id))
+
+    _ensure_task_transition(
+        MarketingTaskStatus.WAITING_FOR_USER, MarketingTaskStatus.ACTIVE
+    )
     task.current_strategy_snapshot_id = strategy_snapshot.id
+    task.lifecycle_status = MarketingTaskStatus.ACTIVE.value
     task.version += 1
     return _finish_task_write(
         db,
@@ -1023,10 +1163,14 @@ def confirm_strategy(
         event_payload={
             "strategy_snapshot_id": str(strategy_snapshot.id),
             "requirement_snapshot_id": str(requirement_snapshot.id),
+            "content_job_ids": content_job_ids,
             "snapshot_no": snapshot_no,
         },
         audit_action="marketing_task.strategy.confirmed",
-        audit_metadata={"strategy_snapshot_id": str(strategy_snapshot.id)},
+        audit_metadata={
+            "strategy_snapshot_id": str(strategy_snapshot.id),
+            "content_job_ids": content_job_ids,
+        },
     )
 
 

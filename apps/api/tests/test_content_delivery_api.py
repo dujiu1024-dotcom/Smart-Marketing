@@ -1,12 +1,24 @@
 import hashlib
 import json
+
+import pytest
+from sqlalchemy import delete, update
+from sqlalchemy.exc import DBAPIError
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
-from store_operator.models import MediaAsset, OutboxEvent, Store, StoreMembership, User
+from store_operator.models import (
+    ArtifactVersion,
+    MediaAsset,
+    OutboxEvent,
+    ReviewRecord,
+    Store,
+    StoreMembership,
+    User,
+)
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -181,6 +193,19 @@ def test_artifact_versions_and_reviews_are_version_bound(
     )
     assert approved.status_code == 201, approved.text
     assert approved.json()["decision"] == "approved"
+
+    with pytest.raises(DBAPIError):
+        with db_session.begin_nested():
+            db_session.execute(
+                update(ArtifactVersion)
+                .where(ArtifactVersion.id == second_version_id)
+                .values(content_hash="f" * 64)
+            )
+    with pytest.raises(DBAPIError):
+        with db_session.begin_nested():
+            db_session.execute(
+                delete(ReviewRecord).where(ReviewRecord.id == approved.json()["id"])
+            )
 
     artifacts = identity_client.get(
         f"/api/v1/marketing-tasks/{task_id}/artifacts",

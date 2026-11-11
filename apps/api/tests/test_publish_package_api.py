@@ -95,13 +95,15 @@ def login(identity_client, monkeypatch) -> str:
     return response.json()["csrf_token"]
 
 
-def create_package_inputs(db: Session, identity_client, user: User, store: Store):
+def create_package_inputs(
+    db: Session, identity_client, user: User, store: Store, csrf: str
+):
     task_response = identity_client.post(
         "/api/v1/marketing-tasks",
         headers={
             **ORIGIN,
             "X-Store-ID": str(store.id),
-            "X-CSRF-Token": login(identity_client, monkeypatch=None),
+            "X-CSRF-Token": csrf,
             "Idempotency-Key": "package-task-create",
         },
         json={
@@ -271,7 +273,7 @@ def test_publish_package_requires_accepted_quality_and_confirmed_facts(
     user = create_user(db_session)
     store = create_store(db_session, user)
     csrf = login(identity_client, monkeypatch)
-    task, fact, content = create_package_inputs(db_session, identity_client, user, store)
+    task, fact, content = create_package_inputs(db_session, identity_client, user, store, csrf)
 
     report = QualityReport(
         id=uuid4(),
@@ -377,7 +379,7 @@ def test_publish_package_requires_accepted_quality_and_confirmed_facts(
     assert db_session.query(PublishConfirmation).count() == 1
 
 
-def test_publish_package_rejects_hard_fail_and_cross_store_content(
+def test_publish_package_rejects_hard_fail(
     identity_client, db_session: Session, monkeypatch
 ) -> None:
     user = create_user(db_session)

@@ -141,5 +141,7 @@ def update_store_member(
         user_id=user.id,
         email=user.email_normalized,
         role=cast(Literal["owner", "member"], membership.role),
-        status=cast(Literal["invited", "active", "suspended", "removed"], membership.status),
+        status=cast(
+            Literal["invited", "active", "suspended", "removed"], membership.status
+        ),
     )

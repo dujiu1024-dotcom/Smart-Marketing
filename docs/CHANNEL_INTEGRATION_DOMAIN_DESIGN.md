@@ -116,7 +116,7 @@ Demo 的连接、校验和发布目前均为本地演示，不是真实 OAuth �
 
 建议字段：
 
-**id, store_id, publish_operation_id, attempt_no, adapter_version, request_fingerprint, provider_request_id, response_evidence_ref, normalized_status, error_code, retryable, started_at, finished_at**
+**id, store_id, publish_operation_id, attempt_no, adapter_version, request_fingerprint, external_request_id, response_evidence_ref, normalized_status, error_code, retryable, started_at, finished_at**
 
 - 保存每次外部平台调用的证据和归一化结果；与 #9 JobAttempt 区分。
 - JobAttempt 是 Worker 执行尝试；PublishOperationAttempt 是外部平台 API 调用事实。

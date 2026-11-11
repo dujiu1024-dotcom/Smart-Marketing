@@ -258,6 +258,16 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
     assert stale_quality.status_code == 409, stale_quality.text
     assert stale_quality.json()["error"]["code"] == "CHANNEL_CONTENT_STALE"
 
+    unsupported_rule = identity_client.post(
+        quality_url,
+        headers={**headers, "Idempotency-Key": "quality-run-unsupported"},
+        json={**quality_payload, "rule_version": "uninstalled-rule-v99"},
+    )
+    assert unsupported_rule.status_code == 422, unsupported_rule.text
+    assert (
+        unsupported_rule.json()["error"]["code"] == "QUALITY_RULE_VERSION_UNSUPPORTED"
+    )
+
     needs_human_report = QualityReport(
         id=uuid4(),
         store_id=store.id,

@@ -89,7 +89,7 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - `PublishPackage` 是一次营销任务交付的不可变聚合快照：`id, store_id, task_id, package_version, fact_snapshot_ids, package_fingerprint, frozen_at, frozen_by`。
 - `PublishPackageItem` 每个渠道一条：`id, store_id, publish_package_id, channel_key, channel_content_id, quality_report_id, channel_account_id, delivery_mode(official_api|manual_handoff), planned_publish_at, item_fingerprint`。文案/图片版本通过不可变 ChannelContent 间接绑定，避免在 PackageItem 重复存储版本数组。
 - `PublishConfirmation`：`id, store_id, publish_package_id, package_fingerprint, confirmed_by, confirmed_at, revoked_at, confirmation_note`。
-- 一个 PublishPackage 至少包含一个 PackageItem；同一 package 的 channel_key 唯一。PackageItem 精确绑定 ChannelContent、Copy/Image 版本、QualityReport 和可选 ChannelAccount。
+- 一个 PublishPackage 至少包含一个 PackageItem；同一 package 的 channel_key 唯一。PackageItem 精确绑定 ChannelContent、QualityReport 和可选 ChannelAccount；Copy/Image 版本由 ChannelContent 的直接/子表引用间接冻结。
 - `delivery_mode=official_api` 时必须引用 #12 已授权且支持该渠道动作的 ChannelAccount；`manual_handoff` 不得伪造账号或显示已发布。
 - 冻结包和 PackageItem 冻结后不可 UPDATE；任何上游内容变化创建新 package_version 和新 fingerprint。
 - 最终确认绑定整个 package fingerprint；任一渠道 item 变化都必须重新冻结并重新确认。
@@ -166,12 +166,12 @@ Demo 的最终确认页面一次汇总多个目标渠道，因此发布包必须
 - 所有内容表均有 store_id；跨域复合外键包含 store_id。
 - UNIQUE(store_id, artifact_id, version_no)。
 - ReviewRecord 必须 FK 到 (store_id, artifact_id, artifact_version_id)；唯一幂等记录避免重复审核动作。
-- ChannelContent 对 (store_id, channel_key, input_fingerprint) 建议唯一，避免相同输入重复创建。
-- QualityReport FK 到确切 ChannelContent；同一 channel_content_id + rule_version + input_fingerprint 幂等唯一。
+- ChannelContent 对 (store_id, channel_key, input_fingerprint) 建议唯一，另提供 (store_id, id, channel_key) 复合唯一键；copy_version_id 使用 store_id 复合 FK。
+- QualityReport FK 到确切 ChannelContent；提供 (store_id, channel_content_id, id) 复合唯一键，同一 channel_content_id + rule_version + input_fingerprint 幂等唯一。
 - UNIQUE(store_id, task_id, package_version)。
 - UNIQUE(store_id, publish_package_id, channel_key)。
 - ChannelContentArtifactRef 复合 FK 到 ChannelContent 和 ArtifactVersion；UNIQUE(store_id, channel_content_id, position)。
-- PublishPackageItem 复合 FK 到 ChannelContent、QualityReport 和 #12 ChannelAccount 引用；manual_handoff 时 channel_account_id 可空。
+- PublishPackageItem 复合 FK 到 (store_id, channel_content_id, channel_key) 和 (store_id, channel_content_id, quality_report_id)，确保渠道和质检报告对应同一 ChannelContent；#12 ChannelAccount 引用也包含 store_id，manual_handoff 时 channel_account_id 可空。
 - PublishConfirmation FK 到 package_id + package_fingerprint；部分唯一索引保证一个 package 只有一个未撤销确认。
 - 冻结后禁止修改 Package/PackageItem 核心字段；通过数据库权限或触发器保护不可变性。
 

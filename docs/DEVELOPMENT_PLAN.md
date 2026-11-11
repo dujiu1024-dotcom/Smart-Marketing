@@ -19,7 +19,8 @@
 - `docs/TECH_STACK_SELECTION.md`
 - `docs/IDENTITY_STORE_SECURITY_DESIGN.md`
 - `docs/DOMAIN_INTEGRATION_CONTRACTS_V1.md`
-- `docs/DOMAIN_CONTRACT_REVIEW_LOG.md`\n- `docs/CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md`
+- `docs/DOMAIN_CONTRACT_REVIEW_LOG.md`
+- `docs/CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md`
 
 不做 ERP、CRM、POS、广告投放/预算管理、通用工作流编排。固定营销流程由领域状态机控制；首期采用模块化单体 + 独立 Worker + Provider/Adapter，不拆业务微服务，不将 n8n 或 ComfyUI 设为硬依赖。
 
@@ -63,7 +64,18 @@
 
 #5–#10 的跨域实体、字段、API、事件、状态枚举和错误语义统一以 `docs/DOMAIN_INTEGRATION_CONTRACTS_V1.md` 为评审入口；工程化逻辑 ERD/API/事件草案见 `docs/CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md`；身份域细节以 `docs/IDENTITY_STORE_SECURITY_DESIGN.md` 为准，营销任务状态机以 `docs/MARKETING_TASK_DOMAIN_DESIGN.md` 为准。上述文档目前均为设计提案，只有完成 B/C/D 联合评审并记录决议后才视为冻结契约。
 
-## 6. Stage 6 经营效果推进基线\n\nStage 6 领域设计入口：`docs/EFFECT_EVIDENCE_ATTRIBUTION_DOMAIN_DESIGN.md`。设计明确 PublishedWork / WorkOwnershipEvidence / MetricDefinition / MetricObservation / BusinessOutcomeEvidence / AttributionEvidence 的边界，Demo 对照 `#effects`、`#account-ops`、`#account-register`。\n\n阶段门禁：\n- 作品归属核验与指标真实性分开；人工登记先 pending_verification，未经核验不进入任务效果。\n- 内容表现、互动意向、经营结果分层；没有交易证据不输出销售增长、到店增长或 ROI。\n- #12 的作品列表读回不等于指标 API 已开放；抖音指标权限必须独立核验。\n- 经营数据源不默认接入 POS/CRM；仅消费经批准、可追溯的数据来源。\n- 先完成契约评审，再实施迁移/API/Worker；EFF-01..EFF-30 通过前不得关闭 #13。\n\n## 7. 统一交付定义（DoD）
+## 6. Stage 6 经营效果推进基线
+
+Stage 6 领域设计入口：`docs/EFFECT_EVIDENCE_ATTRIBUTION_DOMAIN_DESIGN.md`。设计明确 PublishedWork / WorkOwnershipEvidence / MetricDefinition / MetricObservation / BusinessOutcomeEvidence / AttributionEvidence 的边界，Demo 对照 `#effects`、`#account-ops`、`#account-register`。
+
+阶段门禁：
+- 作品归属核验与指标真实性分开；人工登记先 pending_verification，未经核验不进入任务效果。
+- 内容表现、互动意向、经营结果分层；没有交易证据不输出销售增长、到店增长或 ROI。
+- #12 的作品列表读回不等于指标 API 已开放；抖音指标权限必须独立核验。
+- 经营数据源不默认接入 POS/CRM；仅消费经批准、可追溯的数据来源。
+- 先完成契约评审，再实施迁移/API/Worker；EFF-01..EFF-30 通过前不得关闭 #13。
+
+## 7. 统一交付定义（DoD）
 
 每个 Issue 完成前必须逐项勾选：
 - [ ] 范围、非目标、Demo 页面/路由和相关状态已明确。

@@ -41,6 +41,7 @@ from store_operator.marketing_tasks.schemas import (
 )
 from store_operator.models.marketing_task import (
     BusinessFactSnapshot,
+    DependencyEdge,
     MarketingTask,
     RequirementSnapshot,
     StepDecision,
@@ -589,6 +590,7 @@ def confirm_requirement(
 
     now = datetime.now(UTC)
     fact_snapshots: list[BusinessFactSnapshot] = []
+    fact_revisions: list[StoreRecordRevision] = []
     fact_refs: list[dict[str, object]] = []
     for fact_ref in payload.business_facts:
         revision = db.scalar(
@@ -665,6 +667,7 @@ def confirm_requirement(
         )
         db.add(snapshot)
         fact_snapshots.append(snapshot)
+        fact_revisions.append(revision)
         fact_refs.append(
             {
                 "fact_key": fact_ref.fact_key,
@@ -704,6 +707,39 @@ def confirm_requirement(
         confirmed_at=now,
     )
     db.add(requirement_snapshot)
+    for revision, fact_snapshot in zip(fact_revisions, fact_snapshots, strict=True):
+        db.add(
+            DependencyEdge(
+                id=uuid4(),
+                store_id=store_id,
+                task_id=task.id,
+                upstream_type="store_record_revision",
+                upstream_id=revision.id,
+                upstream_version_id=revision.id,
+                upstream_fingerprint=revision.content_fingerprint,
+                downstream_type="business_fact_snapshot",
+                downstream_id=fact_snapshot.id,
+                downstream_version_id=fact_snapshot.id,
+                downstream_fingerprint=fact_snapshot.content_fingerprint,
+                impact_policy="invalidate",
+            )
+        )
+        db.add(
+            DependencyEdge(
+                id=uuid4(),
+                store_id=store_id,
+                task_id=task.id,
+                upstream_type="business_fact_snapshot",
+                upstream_id=fact_snapshot.id,
+                upstream_version_id=fact_snapshot.id,
+                upstream_fingerprint=fact_snapshot.content_fingerprint,
+                downstream_type="requirement_snapshot",
+                downstream_id=requirement_snapshot.id,
+                downstream_version_id=requirement_snapshot.id,
+                downstream_fingerprint=requirement_fingerprint,
+                impact_policy="invalidate",
+            )
+        )
 
     steps = {step.step_key: step for step in _task_steps_for_update(db, store_id, task.id)}
     for step_key, output_refs in (
@@ -830,10 +866,23 @@ def confirm_strategy(
         )
         or 0
     ) + 1
+    requirement_snapshot = db.scalar(
+        select(RequirementSnapshot).where(
+            RequirementSnapshot.id == task.current_requirement_snapshot_id,
+            RequirementSnapshot.store_id == store_id,
+            RequirementSnapshot.task_id == task.id,
+        )
+    )
+    if requirement_snapshot is None:
+        raise ApiError(
+            409,
+            "REQUIREMENT_SNAPSHOT_NOT_FOUND",
+            "Current requirement snapshot is unavailable",
+        )
     strategy_payload: dict[str, object] = {
         "schema_version": 1,
         "strategy": payload.strategy,
-        "requirement_snapshot_id": str(task.current_requirement_snapshot_id),
+        "requirement_snapshot_id": str(requirement_snapshot.id),
     }
     fingerprint = _fingerprint(strategy_payload)
     strategy_snapshot = StrategySnapshot(
@@ -850,6 +899,22 @@ def confirm_strategy(
         confirmed_at=now,
     )
     db.add(strategy_snapshot)
+    db.add(
+        DependencyEdge(
+            id=uuid4(),
+            store_id=store_id,
+            task_id=task.id,
+            upstream_type="requirement_snapshot",
+            upstream_id=requirement_snapshot.id,
+            upstream_version_id=requirement_snapshot.id,
+            upstream_fingerprint=requirement_snapshot.content_fingerprint,
+            downstream_type="strategy_snapshot",
+            downstream_id=strategy_snapshot.id,
+            downstream_version_id=strategy_snapshot.id,
+            downstream_fingerprint=strategy_snapshot.content_fingerprint,
+            impact_policy="invalidate",
+        )
+    )
 
     steps = _task_steps_for_update(db, store_id, task.id)
     step = next(
@@ -897,7 +962,7 @@ def confirm_strategy(
         event_type="strategy.confirmed",
         event_payload={
             "strategy_snapshot_id": str(strategy_snapshot.id),
-            "requirement_snapshot_id": str(task.current_requirement_snapshot_id),
+            "requirement_snapshot_id": str(requirement_snapshot.id),
             "snapshot_no": snapshot_no,
         },
         audit_action="marketing_task.strategy.confirmed",

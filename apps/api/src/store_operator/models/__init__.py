@@ -1,5 +1,17 @@
 from store_operator.models.base import Base
-from store_operator.models.content_delivery import Artifact, ArtifactVersion, ReviewRecord
+from store_operator.models.content_delivery import (
+    Artifact,
+    ArtifactVersion,
+    ChannelContent,
+    ChannelContentArtifactRef,
+    PublishConfirmation,
+    PublishPackage,
+    PublishPackageFactRef,
+    PublishPackageItem,
+    QualityReport,
+    QualityResolution,
+    ReviewRecord,
+)
 from store_operator.models.identity import (
     AuditEvent,
     AuthSession,
@@ -44,6 +56,14 @@ __all__ = [
     "Artifact",
     "ArtifactVersion",
     "ReviewRecord",
+    "ChannelContent",
+    "ChannelContentArtifactRef",
+    "QualityReport",
+    "QualityResolution",
+    "PublishPackage",
+    "PublishPackageItem",
+    "PublishPackageFactRef",
+    "PublishConfirmation",
     "PromptActivation",
     "PromptTemplate",
     "PromptVersion",

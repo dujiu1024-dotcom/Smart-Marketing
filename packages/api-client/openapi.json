@@ -94,88 +94,207 @@
                 "items": {
                   "type": "string"
                 },
+                "type": "array"
+              },
+              {
                 "type": "null"
               }
             ],
+            "title": "Consumption Scenarios Json"
           },
+          "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
             "type": "string"
           },
+          "purchase_motivations_json": {
             "anyOf": [
               {
                 "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
               {
+                "type": "null"
+              }
+            ],
             "title": "Purchase Motivations Json"
+          },
           "sample_size": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
                 "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Sample Size"
+          },
           "sampled_at": {
+            "anyOf": [
+              {
                 "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Sampled At"
+          },
           "segment_type": {
             "pattern": "^(core|secondary|seasonal|scenario)$",
             "title": "Segment Type",
             "type": "string"
           },
           "source_ref": {
+            "anyOf": [
+              {
                 "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Source Ref"
+          },
           "source_type": {
+            "anyOf": [
+              {
                 "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
           }
         },
         "required": [
+          "name",
+          "segment_type"
         ],
+        "title": "AudienceProfileCreate",
         "type": "object"
       },
+      "AudienceProfileList": {
         "properties": {
           "items": {
             "items": {
+              "$ref": "#/components/schemas/AudienceProfileRead"
             },
             "title": "Items",
             "type": "array"
+          },
+          "total": {
+            "title": "Total",
             "type": "integer"
           }
         },
         "required": [
+          "items",
+          "total"
+        ],
         "title": "AudienceProfileList",
+        "type": "object"
+      },
       "AudienceProfileRead": {
+        "properties": {
           "audience_description": {
+            "anyOf": [
+              {
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Audience Description"
+          },
           "common_objections_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Common Objections Json"
+          },
           "confidence_level": {
+            "anyOf": [
+              {
                 "maxLength": 24,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Confidence Level"
+          },
           "consumption_periods_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Consumption Periods Json"
+          },
           "consumption_scenarios_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Consumption Scenarios Json"
           },
           "current_version": {
             "title": "Current Version",
             "type": "integer"
+          },
+          "fact_status": {
+            "title": "Fact Status",
             "type": "string"
+          },
+          "id": {
+            "format": "uuid",
             "title": "Id",
             "type": "string"
           },
           "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
           },
           "purchase_motivations_json": {
             "anyOf": [
+              {
+                "items": {
+                  "type": "string"
                 },
                 "type": "array"
               },
@@ -207,9 +326,15 @@
                 "type": "null"
               }
             ],
+            "title": "Sampled At"
+          },
+          "segment_type": {
             "pattern": "^(core|secondary|seasonal|scenario)$",
             "title": "Segment Type",
             "type": "string"
+          },
+          "source_ref": {
+            "anyOf": [
               {
                 "maxLength": 500,
                 "type": "string"
@@ -225,108 +350,272 @@
               {
                 "maxLength": 40,
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Type"
+          },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "segment_type",
+          "id",
+          "store_id",
+          "fact_status",
+          "current_version"
+        ],
+        "title": "AudienceProfileRead",
+        "type": "object"
+      },
+      "AudienceProfileUpdate": {
+        "properties": {
+          "audience_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience Description"
+          },
+          "common_objections_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Common Objections Json"
+          },
+          "confidence_level": {
+            "anyOf": [
+              {
+                "maxLength": 24,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Level"
+          },
+          "consumption_periods_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumption Periods Json"
+          },
+          "consumption_scenarios_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumption Scenarios Json"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "purchase_motivations_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Motivations Json"
+          },
+          "sample_size": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Size"
+          },
+          "sampled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sampled At"
+          },
+          "segment_type": {
+            "anyOf": [
+              {
+                "pattern": "^(core|secondary|seasonal|scenario)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment Type"
+          },
+          "source_ref": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Ref"
+          },
+          "source_type": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
               }
             ],
             "title": "Source Type"
           }
         },
-          "id",
-          "store_id",
-          "fact_status",
+        "title": "AudienceProfileUpdate",
         "type": "object"
       },
-        "properties": {
-            "anyOf": [
-              {
-                "type": "string"
-            "title": "Audience Description"
-          "common_objections_json": {
-                  "type": "string"
-                "type": "null"
-              }
-            ],
-          },
-            "anyOf": [
-              {
-              },
-              {
-                "type": "null"
-              }
-            ],
-          },
-            "anyOf": [
-              {
-                "items": {
-              },
-              {
-            "title": "Consumption Periods Json"
-          "consumption_scenarios_json": {
-                  "type": "string"
-                },
-                "type": "null"
-              }
-            ],
-          },
-            "anyOf": [
-              {
-                "type": "string"
-            "title": "Name"
-          "purchase_motivations_json": {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-            "title": "Purchase Motivations Json"
-          "sample_size": {
-                "minimum": 0.0,
-                "type": "integer"
-            "title": "Sample Size"
-          "sampled_at": {
-                "format": "date-time",
-            "title": "Sampled At"
-          "segment_type": {
-                "pattern": "^(core|secondary|seasonal|scenario)$",
-            "title": "Segment Type"
-          "source_ref": {
-                "maxLength": 500,
-            "title": "Source Ref"
-          "source_type": {
-                "type": "string"
-              },
-              {
-            "title": "Source Type"
-        "title": "AudienceProfileUpdate",
       "BrandGuidelineCreate": {
+        "properties": {
           "brand_story": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Brand Story"
+          },
           "color_palette_json": {
+            "anyOf": [
+              {
                 "items": {
                   "additionalProperties": true,
                   "type": "object"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Color Palette Json"
+          },
           "common_phrases_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Common Phrases Json"
+          },
           "core_values_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Core Values Json"
+          },
           "cta_preferences_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Cta Preferences Json"
+          },
           "differentiators": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Differentiators"
+          },
           "font_preferences_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
@@ -342,8 +631,18 @@
             "anyOf": [
               {
                 "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Logo Asset Id"
+          },
           "positioning": {
+            "anyOf": [
+              {
+                "type": "string"
               },
               {
                 "type": "null"
@@ -359,11 +658,17 @@
                 },
                 "type": "array"
               },
+              {
+                "type": "null"
+              }
             ],
             "title": "Prohibited Phrases Json"
           },
           "tone_of_voice": {
             "anyOf": [
+              {
+                "type": "string"
+              },
               {
                 "type": "null"
               }
@@ -379,8 +684,16 @@
                 "type": "null"
               }
             ],
+            "title": "Visual Style"
+          }
+        },
         "title": "BrandGuidelineCreate",
+        "type": "object"
+      },
       "BrandGuidelineRead": {
+        "properties": {
+          "brand_story": {
+            "anyOf": [
               {
                 "type": "string"
               },
@@ -397,24 +710,39 @@
                   "additionalProperties": true,
                   "type": "object"
                 },
-                "type": "null"
-              }
-            ],
-          },
-            "anyOf": [
-              {
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
+            "title": "Color Palette Json"
           },
+          "common_phrases_json": {
             "anyOf": [
               {
                 "items": {
+                  "type": "string"
                 },
                 "type": "array"
               },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Common Phrases Json"
+          },
+          "core_values_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Core Values Json"
           },
@@ -429,28 +757,50 @@
               {
                 "type": "null"
               }
+            ],
+            "title": "Cta Preferences Json"
+          },
           "current_version": {
             "title": "Current Version",
             "type": "integer"
           },
+          "differentiators": {
+            "anyOf": [
+              {
                 "type": "string"
               },
+              {
+                "type": "null"
+              }
             ],
             "title": "Differentiators"
+          },
+          "fact_status": {
+            "title": "Fact Status",
+            "type": "string"
           },
           "font_preferences_json": {
             "anyOf": [
               {
+                "items": {
+                  "type": "string"
+                },
                 "type": "array"
               },
               {
                 "type": "null"
               }
+            ],
+            "title": "Font Preferences Json"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
           },
+          "logo_asset_id": {
+            "anyOf": [
+              {
                 "format": "uuid",
                 "type": "string"
               },
@@ -479,11 +829,22 @@
                 },
                 "type": "array"
               },
+              {
+                "type": "null"
+              }
             ],
             "title": "Prohibited Phrases Json"
           },
+          "store_id": {
+            "format": "uuid",
+            "title": "Store Id",
+            "type": "string"
+          },
           "tone_of_voice": {
             "anyOf": [
+              {
+                "type": "string"
+              },
               {
                 "type": "null"
               }
@@ -496,6 +857,9 @@
                 "type": "string"
               },
               {
+                "type": "null"
+              }
+            ],
             "title": "Visual Style"
           }
         },
@@ -511,54 +875,155 @@
       "BrandGuidelineUpdate": {
         "properties": {
           "brand_story": {
+            "anyOf": [
+              {
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Brand Story"
+          },
           "color_palette_json": {
+            "anyOf": [
+              {
                 "items": {
                   "additionalProperties": true,
                   "type": "object"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Color Palette Json"
+          },
           "common_phrases_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Common Phrases Json"
+          },
           "core_values_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Core Values Json"
+          },
           "cta_preferences_json": {
+            "anyOf": [
+              {
+                "items": {
                   "type": "string"
                 },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Cta Preferences Json"
           },
           "differentiators": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Differentiators"
+          },
           "font_preferences_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Font Preferences Json"
+          },
           "logo_asset_id": {
+            "anyOf": [
+              {
                 "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Logo Asset Id"
+          },
           "positioning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Positioning"
+          },
           "prohibited_phrases_json": {
+            "anyOf": [
+              {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Prohibited Phrases Json"
+          },
           "tone_of_voice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Tone Of Voice"
+          },
           "visual_style": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Visual Style"
           }
         },
@@ -568,11 +1033,29 @@
       "FactConfirmationRequest": {
         "properties": {
           "confirmation_note": {
+            "anyOf": [
+              {
                 "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Confirmation Note"
+          },
           "source_ref": {
+            "anyOf": [
+              {
                 "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Source Ref"
+          },
           "source_type": {
             "maxLength": 40,
             "minLength": 1,
@@ -608,27 +1091,86 @@
             "type": "string"
           },
           "content_hash": {
+            "anyOf": [
+              {
                 "maxLength": 64,
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Content Hash"
+          },
           "content_ref": {
+            "anyOf": [
+              {
                 "maxLength": 700,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Content Ref"
+          },
           "content_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Content Text"
+          },
           "effective_at": {
-                "format": "date-time",
-            "title": "Effective At"
-          "expires_at": {
+            "anyOf": [
+              {
                 "format": "date-time",
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective At"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Expires At"
+          },
           "source_ref": {
+            "anyOf": [
+              {
                 "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Source Ref"
+          },
           "source_type": {
+            "anyOf": [
+              {
                 "maxLength": 40,
                 "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Source Type"
           },
           "title": {
@@ -636,11 +1178,15 @@
             "minLength": 1,
             "title": "Title",
             "type": "string"
+          }
+        },
         "required": [
           "title",
           "category"
         ],
         "title": "KnowledgeItemCreate",
+        "type": "object"
+      },
       "KnowledgeItemList": {
         "properties": {
           "items": {
@@ -663,6 +1209,7 @@
         "type": "object"
       },
       "KnowledgeItemRead": {
+        "properties": {
           "category": {
             "maxLength": 40,
             "minLength": 1,
@@ -736,6 +1283,11 @@
             "title": "Fact Status",
             "type": "string"
           },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
           "source_ref": {
             "anyOf": [
               {
@@ -769,16 +1321,32 @@
             "maxLength": 240,
             "minLength": 1,
             "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
           "title",
           "category",
+          "id",
           "store_id",
           "fact_status",
           "current_version"
+        ],
         "title": "KnowledgeItemRead",
+        "type": "object"
+      },
       "KnowledgeItemUpdate": {
+        "properties": {
           "category": {
+            "anyOf": [
+              {
                 "maxLength": 40,
                 "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
             "title": "Category"
           },
@@ -3652,6 +4220,7 @@
               }
             },
             "description": "Successful Response"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -3659,11 +4228,15 @@
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
+            },
             "description": "Validation Error"
+          }
+        },
         "summary": "List Knowledge Items",
         "tags": [
           "store-knowledge"
         ]
+      },
       "post": {
         "operationId": "create_knowledge_item_api_v1_store_knowledge_post",
         "parameters": [
@@ -3682,6 +4255,8 @@
               ],
               "title": "X-Store-Id"
             }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3689,6 +4264,7 @@
                 "$ref": "#/components/schemas/KnowledgeItemCreate"
               }
             }
+          },
           "required": true
         },
         "responses": {
@@ -3701,6 +4277,7 @@
               }
             },
             "description": "Successful Response"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -3737,10 +4314,17 @@
             "name": "If-Match",
             "required": false,
             "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
                   "type": "null"
+                }
               ],
               "title": "If-Match"
             }
+          },
           {
             "in": "header",
             "name": "X-Store-ID",
@@ -3761,6 +4345,7 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -3770,14 +4355,25 @@
               }
             },
             "description": "Validation Error"
+          }
+        },
         "summary": "Delete Knowledge Item",
         "tags": [
           "store-knowledge"
         ]
       },
+      "get": {
         "operationId": "get_knowledge_item_api_v1_store_knowledge__record_id__get",
+        "parameters": [
+          {
+            "in": "path",
             "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
               "title": "Record Id",
+              "type": "string"
+            }
           },
           {
             "in": "header",
@@ -3794,6 +4390,9 @@
               ],
               "title": "X-Store-Id"
             }
+          }
+        ],
+        "responses": {
           "200": {
             "content": {
               "application/json": {
@@ -3809,23 +4408,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
             "description": "Validation Error"
           }
         },
+        "summary": "Get Knowledge Item",
         "tags": [
+          "store-knowledge"
         ]
+      },
       "patch": {
+        "operationId": "update_knowledge_item_api_v1_store_knowledge__record_id__patch",
         "parameters": [
           {
             "in": "path",
+            "name": "record_id",
             "required": true,
             "schema": {
               "format": "uuid",
+              "title": "Record Id",
               "type": "string"
             }
           },
           {
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
             "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
                 },
                 {
                   "type": "null"
@@ -3845,9 +4459,15 @@
                 },
                 {
                   "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/KnowledgeItemUpdate"
               }
@@ -3857,7 +4477,13 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
                   "$ref": "#/components/schemas/KnowledgeItemRead"
+                }
+              }
+            },
             "description": "Successful Response"
           },
           "422": {
@@ -3991,21 +4617,35 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
             "description": "Validation Error"
           }
         },
+        "summary": "Create Offer",
         "tags": [
+          "store-knowledge"
         ]
       }
     },
+    "/api/v1/store/offers/{record_id}": {
+      "delete": {
+        "operationId": "delete_offer_api_v1_store_offers__record_id__delete",
         "parameters": [
           {
             "in": "path",
             "name": "record_id",
             "required": true,
             "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
             }
           },
+          {
+            "in": "header",
+            "name": "If-Match",
             "required": false,
             "schema": {
               "anyOf": [
@@ -4033,9 +4673,15 @@
                 }
               ],
               "title": "X-Store-Id"
+            }
+          }
+        ],
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
@@ -4165,7 +4811,13 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
                   "$ref": "#/components/schemas/OfferRead"
+                }
+              }
+            },
             "description": "Successful Response"
           },
           "422": {
@@ -4686,10 +5338,17 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
             "description": "Validation Error"
           }
         },
+        "summary": "Create Store Profile",
         "tags": [
+          "store-knowledge"
+        ]
+      }
     },
     "/api/v1/store/{resource_type}/{record_id}/confirm-facts": {
       "post": {
@@ -4781,9 +5440,15 @@
             "description": "Validation Error"
           }
         },
+        "summary": "Confirm Store Facts",
+        "tags": [
+          "store-knowledge"
         ]
       }
     },
+    "/api/v1/system/info": {
+      "get": {
+        "operationId": "system_info_api_v1_system_info_get",
         "responses": {
           "200": {
             "content": {

@@ -44,10 +44,12 @@ All three Douyin OAuth settings must be supplied together. The Secret Manager re
 ## Frozen package account binding
 
 - Freeze items may select `delivery_mode=official_api` and a store-owned active Douyin account.
-- The API validates provider, active status and the required `user_info`, `video.create.bind` and `video.list` scopes.
+- The API validates provider, active status and the required `user_info`, `video.create` and `video.list` scopes.
 - `channel_account_id` is included in the item fingerprint and immutable frozen package payload.
 - Manual handoff rejects channel-account binding; official API mode rejects a missing account.
 - A composite same-store foreign key protects the package item account reference.
+- Douyin image-text posts use `POST /image/upload/` followed by `POST /image_text/create/`; each image is capped at 20 MiB for the pilot and a post accepts at most 30 images.
+- Video posts use `POST /video/upload/` and `POST /video/create/`; direct upload is capped at 128 MiB. Larger video files require the official multipart upload protocol, which remains disabled until implemented.
 - `GET /api/v1/channels/douyin/accounts` lists account metadata without exposing Secret Manager references or tokens.
 - `POST /api/v1/channels/douyin/accounts/{account_id}/refresh` refreshes credentials server-side and updates the secret only if the account has not changed concurrently.
 

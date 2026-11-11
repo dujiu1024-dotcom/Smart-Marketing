@@ -1327,7 +1327,6 @@ def execute_douyin_readback(
     context: JobExecutionContext,
     payload_ref: dict[str, object],
 ) -> dict[str, object]:
-    context.check_control()
     if context.store_id is None or payload_ref.get("schema_version") != 1:
         raise JobExecutionError(
             "DOUYIN_READBACK_PAYLOAD_INVALID",
@@ -1405,14 +1404,22 @@ def execute_douyin_readback(
             retryable=True,
             retry_delay_seconds=60,
         ) from exc
-    context.check_control()
     if found is not None:
-        _mark_douyin_operation(operation_id, status="published")
+        _mark_douyin_operation(
+            operation_id,
+            status="published",
+            readback_checked=True,
+        )
         return {
             "status": "published",
             "publish_operation_id": str(operation_id),
             "platform_item_id": item_id,
         }
+    _mark_douyin_operation(
+        operation_id,
+        status="processing",
+        readback_checked=True,
+    )
     if attempt >= DOUYIN_READBACK_MAX_ATTEMPTS:
         _mark_douyin_operation(
             operation_id,

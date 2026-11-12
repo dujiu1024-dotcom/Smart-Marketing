@@ -66,7 +66,7 @@ def _parse_published(value: str) -> datetime | None:
     except (TypeError, ValueError, OverflowError):
         try:
             # Atom timestamps are RFC 3339 / ISO 8601, unlike RSS pubDate.
-            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.strip())
         except (TypeError, ValueError, OverflowError):
             return None
     return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
@@ -146,7 +146,7 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
         if parsed_link.scheme != "https" or not link_host or parsed_link.username or parsed_link.password or link_host not in allowed:
             continue
         summary = str(entry.get("summary") or "")[:5000]
-        fingerprint = hashlib.sha256(f"{link}|{title}".encode("utf-8")).hexdigest()
+        fingerprint = hashlib.sha256(f"{link}|{title}".encode()).hexdigest()
         existing = db.scalar(select(HotTopic).where(
             HotTopic.source_id == source.id,
             (HotTopic.source_item_id == item_id) | (HotTopic.content_fingerprint == fingerprint),

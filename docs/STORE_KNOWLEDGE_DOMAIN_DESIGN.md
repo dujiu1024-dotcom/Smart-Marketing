@@ -335,7 +335,7 @@ PR #66 已合并至 main（commit `d2f0b5e839ba04676ae9f51e9f51a456d3540bfd`） 
 
 新增 API 测试覆盖授权确认幂等、版本冲突、下载门禁、品牌 Logo 引用阻断和归档状态。
 
-边界：上传完成仍进入 quarantined/scanning；ClamAV/恶意文件扫描、缩略图/尺寸元数据处理、Worker 回写 ready/rejected、过期 UploadIntent sweeper 和素材库前端接入仍未完成。不得将哈希/MIME 校验称为恶意文件扫描。
+边界更新（2026-11-12，PR 待 CI）：上传完成先进入 quarantined/scanning；Celery Worker 周期领取隔离素材，在事务行锁内校验对象大小/SHA-256、PNG/JPEG/WebP 文件头与尺寸上限，并通过 ClamAV INSTREAM 扫描。只有 ClamAV 明确返回 OK 且结构检查通过才写入 ready；FOUND 或文件结构/尺寸不合规写入 rejected。扫描服务不可用、超时或返回不确定结果时事务回滚，保持隔离等待重试，不允许 fail-open。完整解码、缩略图生成和过期 UploadIntent sweeper 仍未完成。
 
 
 ### PR #66 合并验证证据（2026-11-11）
@@ -353,4 +353,4 @@ Issue #6 仍 Open。恶意文件扫描、缩略图/尺寸元数据、Worker 扫�
 - `#store:assets` 已接入真实素材列表与上传/归档/使用权交互；前端上传使用服务端 upload-intent 与预签名 PUT，完成接口在服务端重新校验对象大小、MIME 和 SHA-256。
 - 私有对象存储配置拆分为内部 API/Worker endpoint 与浏览器 presigned URL endpoint，避免容器内 `localhost` 错误指向 API 容器，也避免向浏览器暴露不可解析的 Docker 服务主机名。
 - 本地 SeaweedFS CORS 仅允许两个本地开发 origin；生产对象存储必须配置精确的 Web Origin、PUT/GET 方法和必要请求头。
-- 文件上传完成仍停留在隔离/扫描状态；ClamAV/恶意文件扫描、Worker ready/rejected 回写、缩略图和 UploadIntent 过期清理未完成。哈希与 MIME 校验不等于恶意文件扫描。
+- 文件上传完成先停留在隔离/扫描状态；新增 ClamAV Worker 只有在对象完整性、图片头部/尺寸和恶意文件扫描均通过后才写入 ready，异常时保持隔离。缩略图/完整解码和 UploadIntent 过期清理仍未完成；哈希与 MIME 校验本身不等于恶意文件扫描。

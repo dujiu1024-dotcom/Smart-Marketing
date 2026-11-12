@@ -2,6 +2,8 @@ import os
 
 from celery import Celery  # type: ignore[import-untyped]
 
+from store_operator_worker.observability import configure_worker_logging
+
 broker_url = os.environ.get("REDIS_URL")
 if not broker_url:
     raise RuntimeError("REDIS_URL is required to start the worker")
@@ -17,6 +19,7 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     broker_transport_options={"visibility_timeout": 3600},
     task_default_queue="default",
+    worker_hijack_root_logger=False,
     beat_schedule={
         "relay-postgres-outbox-every-second": {
             "task": "jobs.relay_outbox",
@@ -40,6 +43,8 @@ celery_app.conf.update(
         },
     },
 )
+
+configure_worker_logging()
 
 from store_operator_worker import ai_handlers as _ai_handlers  # noqa: F401
 from store_operator_worker import ai_image_handlers as _ai_image_handlers  # noqa: F401

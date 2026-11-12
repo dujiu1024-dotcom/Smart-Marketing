@@ -14,8 +14,6 @@ from uuid import UUID, uuid4
 
 import httpx
 from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
-from celery.exceptions import CeleryError  # type: ignore[import-untyped]
-from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
@@ -83,6 +81,7 @@ from store_operator_worker.media_scanner import (
     scan_with_clamd,
     validate_image_dimensions,
 )
+from store_operator_worker.observability import emit_operational_alert
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
@@ -106,9 +105,30 @@ if MAX_RUNNING_JOBS_PER_STORE < 1 or CONCURRENCY_DEFER_SECONDS < 1:
     raise RuntimeError("Worker store concurrency settings must be positive")
 
 
+def _normalize_outbox_batch_size(batch_size: int) -> int:
+    if not isinstance(batch_size, int) or isinstance(batch_size, bool):
+        raise TypeError("Outbox batch_size must be an integer")
+    if batch_size < 1:
+        raise ValueError("Outbox batch_size must be positive")
+    return min(batch_size, 500)
+
+
+def _parse_dispatch_job_id(payload: object) -> UUID:
+    if not isinstance(payload, dict):
+        raise TypeError("Outbox payload must be a JSON object")
+    job_id = payload.get("job_id")
+    if not isinstance(job_id, str):
+        raise TypeError("Outbox job_id is invalid")
+    try:
+        return UUID(job_id)
+    except ValueError as exc:
+        raise ValueError("Outbox job_id must be a UUID") from exc
+
+
 @celery_app.task(name="jobs.relay_outbox", ignore_result=True)  # type: ignore[untyped-decorator]
 def relay_outbox(batch_size: int = 50) -> int:
     """Publish committed Outbox rows; a crash after publish can cause safe redelivery."""
+    safe_batch_size = _normalize_outbox_batch_size(batch_size)
     now = datetime.now(UTC)
     relay_id = f"{WORKER_ID}:{uuid4()}"
     with SessionLocal.begin() as db:
@@ -120,12 +140,15 @@ def relay_outbox(batch_size: int = 50) -> int:
                     OutboxEvent.status == "pending",
                     (
                         (OutboxEvent.status == "publishing")
-                        & (OutboxEvent.locked_until < now)
+                        & or_(
+                            OutboxEvent.locked_until <= now,
+                            OutboxEvent.locked_until.is_(None),
+                        )
                     ),
                 ),
             )
             .order_by(OutboxEvent.created_at, OutboxEvent.id)
-            .limit(batch_size)
+            .limit(safe_batch_size)
             .with_for_update(skip_locked=True)
         ).all()
         for event in events:
@@ -146,20 +169,24 @@ def relay_outbox(batch_size: int = 50) -> int:
             ):
                 continue
             event_type = event.event_type
-            payload = dict(event.payload_json)
+            aggregate_type = event.aggregate_type
+            aggregate_id = event.aggregate_id
+            raw_payload = event.payload_json
         try:
             if event_type != "job.dispatch_requested":
                 raise ValueError("Unsupported Outbox event type")
-            job_id = payload.get("job_id")
-            if not isinstance(job_id, str):
-                raise TypeError("Outbox job_id is invalid")
+            parsed_job_id = _parse_dispatch_job_id(raw_payload)
+            if aggregate_type != "job" or aggregate_id != parsed_job_id:
+                raise ValueError("Outbox aggregate does not match its dispatch Job")
             celery_app.send_task(
                 "jobs.execute",
-                args=[job_id],
+                args=[str(parsed_job_id)],
                 task_id=str(event_id),
                 queue="default",
             )
-        except (CeleryError, OperationalError, OSError, TypeError, ValueError):
+        except Exception:  # noqa: BLE001 - any broker/client failure must release the Outbox lease
+            dead_lettered = False
+            attempt_count = 0
             with SessionLocal.begin() as db:
                 event = db.scalar(
                     select(OutboxEvent)
@@ -174,15 +201,24 @@ def relay_outbox(batch_size: int = 50) -> int:
                 ):
                     continue
                 event.last_error = "Outbox dispatch failed; inspect sanitized worker logs"
+                attempt_count = event.publish_attempts
                 event.locked_by = None
                 event.locked_until = None
                 if event.publish_attempts >= OUTBOX_MAX_ATTEMPTS:
                     event.status = "dead"
+                    dead_lettered = True
                 else:
                     event.status = "pending"
                     event.available_at = datetime.now(UTC) + timedelta(
                         seconds=min(300, 2 ** min(event.publish_attempts, 8))
                     )
+            if dead_lettered:
+                emit_operational_alert(
+                    event="outbox.dead_letter",
+                    severity="critical",
+                    correlation_id=str(event_id),
+                    attributes={"event_type": event_type, "publish_attempts": attempt_count},
+                )
             continue
 
         with SessionLocal.begin() as db:
@@ -242,6 +278,12 @@ def execute_job(job_id: str) -> dict[str, str]:
                 error_summary="No domain handler is registered for this job type.",
                 retryable=False,
             )
+        emit_operational_alert(
+            event="job.handler_missing",
+            severity="critical",
+            correlation_id=str(claimed_job_id),
+            attributes={"job_type": job_type},
+        )
         return {"status": "failed", "reason": "handler_not_registered"}
 
     stop_heartbeat = Event()
@@ -371,6 +413,12 @@ def execute_job(job_id: str) -> dict[str, str]:
                 retryable=False,
                 side_effect_state=SideEffectState.UNKNOWN,
             )
+        emit_operational_alert(
+            event="job.timeout",
+            severity="critical",
+            correlation_id=str(claimed_job_id),
+            attributes={"job_type": job_type, "attempt_id": str(attempt_id)},
+        )
         return {"status": "needs_human", "reason": "timeout"}
     except JobExecutionError as exc:
         with SessionLocal.begin() as db:
@@ -385,6 +433,21 @@ def execute_job(job_id: str) -> dict[str, str]:
                 side_effect_state=exc.side_effect_state,
                 retry_delay_seconds=exc.retry_delay_seconds,
             )
+        event = (
+            "channel.delivery.failure"
+            if job_type.startswith(("channel.", "douyin.")) or "publish" in job_type
+            else "job.execution.failure"
+        )
+        emit_operational_alert(
+            event=event,
+            severity="error",
+            correlation_id=str(claimed_job_id),
+            attributes={
+                "job_type": job_type,
+                "error_code": exc.code,
+                "side_effect_state": str(exc.side_effect_state),
+            },
+        )
         return {"status": "failed", "reason": exc.code}
     except ProviderError as exc:
         with SessionLocal.begin() as db:
@@ -403,6 +466,16 @@ def execute_job(job_id: str) -> dict[str, str]:
                     else 30
                 ),
             )
+        emit_operational_alert(
+            event="provider.failure",
+            severity="error",
+            correlation_id=str(claimed_job_id),
+            attributes={
+                "job_type": job_type,
+                "error_code": exc.code.value,
+                "side_effect_state": str(exc.side_effect_state),
+            },
+        )
         return {"status": "failed", "reason": exc.code.value}
     except Exception as exc:  # noqa: BLE001 - final sanitized execution boundary
         logger.error(
@@ -435,11 +508,20 @@ def execute_job(job_id: str) -> dict[str, str]:
                     "error_type": type(persist_exc).__name__,
                 },
             )
+        emit_operational_alert(
+            event="worker.unexpected_failure",
+            severity="critical",
+            correlation_id=str(claimed_job_id),
+            attributes={
+                "job_type": job_type,
+                "attempt_id": str(attempt_id),
+                "error_type": type(exc).__name__,
+            },
+        )
         return {"status": "needs_human", "reason": "unexpected_error"}
     finally:
         stop_heartbeat.set()
         heartbeat_thread.join(timeout=HEARTBEAT_INTERVAL_SECONDS + 1)
-
 
 
 @celery_app.task(
@@ -448,7 +530,15 @@ def execute_job(job_id: str) -> dict[str, str]:
 def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     with SessionLocal.begin() as db:
-        return int(recover_expired_jobs(db, batch_size=batch_size))
+        recovered = int(recover_expired_jobs(db, batch_size=batch_size))
+    if recovered:
+        emit_operational_alert(
+            event="worker.expired_leases_recovered",
+            severity="warning",
+            correlation_id=WORKER_ID,
+            attributes={"recovered_jobs": recovered},
+        )
+    return recovered
 
 
 @celery_app.task(

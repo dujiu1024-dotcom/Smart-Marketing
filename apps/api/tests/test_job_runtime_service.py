@@ -20,7 +20,15 @@ from store_operator.jobs import (
     resolve_job,
     retry_failed_job,
 )
-from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent, Store, User
+from store_operator.models import (
+    Job,
+    JobAttempt,
+    JobEvent,
+    OutboxEvent,
+    Store,
+    StoreMembership,
+    User,
+)
 
 
 def create_actor_and_store(db_session):
@@ -30,6 +38,16 @@ def create_actor_and_store(db_session):
     )
     store = Store(name="Job Runtime Test Store", timezone="Asia/Tokyo")
     db_session.add_all([user, store])
+    db_session.flush()
+    db_session.add(
+        StoreMembership(
+            store_id=store.id,
+            user_id=user.id,
+            role="owner",
+            status="active",
+            joined_at=datetime.now(UTC),
+        )
+    )
     db_session.flush()
     return user, store
 
@@ -622,3 +640,61 @@ def test_expired_lease_recovery_fences_worker_and_requires_reconciliation(
 def test_expired_lease_recovery_validates_batch_size(db_session) -> None:
     with pytest.raises(ValueError, match="batch_size"):
         recover_expired_jobs(db_session, batch_size=0)
+
+
+
+def test_revoked_creator_membership_prevents_worker_claim(db_session) -> None:
+    user, store = create_actor_and_store(db_session)
+    job = create_store_job(
+        db_session, user, store, idempotency_key="revoked-before-worker-claim"
+    )
+    membership = db_session.scalar(
+        select(StoreMembership).where(
+            StoreMembership.store_id == store.id,
+            StoreMembership.user_id == user.id,
+        )
+    )
+    assert membership is not None
+    membership.status = "removed"
+    db_session.flush()
+
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="worker-after-revocation",
+        now=datetime.now(UTC),
+    )
+
+    assert claim is None
+    db_session.refresh(job)
+    assert job.status == "cancelled"
+    assert job.error_code == "ACTOR_MEMBERSHIP_REVOKED"
+    assert job.cancelled_at is not None
+    assert db_session.scalars(
+        select(JobAttempt).where(JobAttempt.job_id == job.id)
+    ).all() == []
+
+
+def test_inactive_store_prevents_worker_claim(db_session) -> None:
+    user, store = create_actor_and_store(db_session)
+    job = create_store_job(
+        db_session, user, store, idempotency_key="inactive-store-before-worker-claim"
+    )
+    store.status = "suspended"
+    db_session.flush()
+
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="worker-after-store-suspension",
+        now=datetime.now(UTC),
+    )
+
+    assert claim is None
+    db_session.refresh(job)
+    assert job.status == "cancelled"
+    assert job.error_code == "STORE_NOT_ACTIVE"
+    assert job.cancelled_at is not None
+    assert db_session.scalars(
+        select(JobAttempt).where(JobAttempt.job_id == job.id)
+    ).all() == []

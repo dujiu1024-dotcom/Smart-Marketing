@@ -99,6 +99,8 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     assert created_profile.status_code == 201, created_profile.text
     assert created_profile.json()["fact_status"] == "pending_confirmation"
     assert created_profile.json()["current_version"] == 1
+    hidden_profile = identity_client.get("/api/v1/store/profile", headers=headers_b)
+    assert hidden_profile.status_code == 404
 
     updated_profile = identity_client.patch(
         "/api/v1/store/profile",
@@ -108,6 +110,12 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     assert updated_profile.status_code == 200, updated_profile.text
     assert updated_profile.json()["current_version"] == 2
     assert updated_profile.json()["city"] == "Osaka"
+    hidden_profile_update = identity_client.patch(
+        "/api/v1/store/profile",
+        headers={**headers_a, "X-Store-ID": str(store_b.id), "If-Match": '"2"'},
+        json={"city": "Cross-store write"},
+    )
+    assert hidden_profile_update.status_code == 404
 
     stale_profile = identity_client.patch(
         "/api/v1/store/profile",
@@ -159,6 +167,17 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     )
     assert hidden_from_other_store.status_code == 404
     assert hidden_from_other_store.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
+    hidden_product_update = identity_client.patch(
+        f"/api/v1/store/products/{product['id']}",
+        headers={**headers_a, "X-Store-ID": str(store_b.id), "If-Match": '"1"'},
+        json={"description": "Cross-store write must fail"},
+    )
+    assert hidden_product_update.status_code == 404
+    hidden_product_delete = identity_client.delete(
+        f"/api/v1/store/products/{product['id']}",
+        headers={**headers_a, "X-Store-ID": str(store_b.id), "If-Match": '"1"'},
+    )
+    assert hidden_product_delete.status_code == 404
 
     updated_product = identity_client.patch(
         f"/api/v1/store/products/{product['id']}",
@@ -330,6 +349,7 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
     user = create_user(db_session, "asset-upload@example.com")
     store = create_store(db_session, user, "Asset Upload Store")
+    store_b = create_store(db_session, user, "Other Asset Upload Store")
     login = identity_client.post(
         "/api/v1/auth/login",
         json={"email": "asset-upload@example.com", "password": "test-password-123"},
@@ -343,6 +363,7 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
         "X-Store-ID": str(store.id),
         "Idempotency-Key": "asset-upload-intent-1",
     }
+    headers_b = {**headers, "X-Store-ID": str(store_b.id)}
     sha256 = "a" * 64
     monkeypatch.setattr(
         knowledge_router,
@@ -370,6 +391,12 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
     assert intent.store_id == store.id
     assert intent.object_key.startswith(f"stores/{store.id}/quarantine/")
     assert ".." not in intent.object_key
+
+    hidden_completion = identity_client.post(
+        f"/api/v1/store/assets/upload-intents/{intent.id}/complete",
+        headers={**headers_b, "Idempotency-Key": "asset-upload-cross-store-complete"},
+    )
+    assert hidden_completion.status_code == 404
 
     monkeypatch.setattr(
         knowledge_router,
@@ -607,3 +634,129 @@ def test_media_asset_archive_checks_references_and_is_audited(
     assert archived.status_code == 200, archived.text
     assert archived.json()["status"] == "archived"
     assert db_session.get(MediaAsset, asset.id).status == "archived"
+
+
+
+def test_offer_knowledge_audience_and_asset_download_are_store_scoped(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = create_user(db_session, "store-resource-idor@example.com")
+    store_a = create_store(db_session, user, "Resource Store A")
+    store_b = create_store(db_session, user, "Resource Store B")
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "store-resource-idor@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    headers_a = {
+        **ORIGIN,
+        "X-CSRF-Token": login.json()["csrf_token"],
+        "X-Store-ID": str(store_a.id),
+    }
+    headers_b = {**headers_a, "X-Store-ID": str(store_b.id)}
+
+    offer = identity_client.post(
+        "/api/v1/store/offers",
+        headers={**headers_a, "Idempotency-Key": "resource-idor-offer"},
+        json={
+            "title": "Store A only offer",
+            "offer_type": "bundle",
+            "terms_json": {"discount": "10%"},
+            "status": "draft",
+        },
+    )
+    assert offer.status_code == 201, offer.text
+    offer_id = offer.json()["id"]
+    assert identity_client.get(
+        f"/api/v1/store/offers/{offer_id}", headers=headers_b
+    ).status_code == 404
+    assert identity_client.patch(
+        f"/api/v1/store/offers/{offer_id}",
+        headers={**headers_b, "If-Match": '"1"'},
+        json={"title": "Store B injection"},
+    ).status_code == 404
+    assert identity_client.delete(
+        f"/api/v1/store/offers/{offer_id}",
+        headers={**headers_b, "If-Match": '"1"'},
+    ).status_code == 404
+
+    knowledge = identity_client.post(
+        "/api/v1/store/knowledge",
+        headers={**headers_a, "Idempotency-Key": "resource-idor-knowledge"},
+        json={
+            "title": "Store A policy",
+            "category": "policy",
+            "content_text": "Private Store A operating note",
+            "source_type": "merchant_input",
+        },
+    )
+    assert knowledge.status_code == 201, knowledge.text
+    assert identity_client.get(
+        f"/api/v1/store/knowledge/{knowledge.json()['id']}", headers=headers_b
+    ).status_code == 404
+    assert identity_client.patch(
+        f"/api/v1/store/knowledge/{knowledge.json()['id']}",
+        headers={**headers_b, "If-Match": '"1"'},
+        json={"content_text": "Cross-store write"},
+    ).status_code == 404
+    assert identity_client.delete(
+        f"/api/v1/store/knowledge/{knowledge.json()['id']}",
+        headers={**headers_b, "If-Match": '"1"'},
+    ).status_code == 404
+
+    audience = identity_client.post(
+        "/api/v1/store/audiences",
+        headers={**headers_a, "Idempotency-Key": "resource-idor-audience"},
+        json={
+            "name": "Store A customers",
+            "segment_type": "core",
+            "audience_description": "Store A only audience",
+        },
+    )
+    assert audience.status_code == 201, audience.text
+    assert identity_client.get(
+        f"/api/v1/store/audiences/{audience.json()['id']}", headers=headers_b
+    ).status_code == 404
+    assert identity_client.patch(
+        f"/api/v1/store/audiences/{audience.json()['id']}",
+        headers={**headers_b, "If-Match": '"1"'},
+        json={"audience_description": "Cross-store write"},
+    ).status_code == 404
+    assert identity_client.delete(
+        f"/api/v1/store/audiences/{audience.json()['id']}",
+        headers={**headers_b, "If-Match": '"1"'},
+    ).status_code == 404
+
+    asset = MediaAsset(
+        id=uuid4(),
+        store_id=store_a.id,
+        object_key=f"stores/{store_a.id}/quarantine/idor-test.png",
+        sha256="c" * 64,
+        mime_type="image/png",
+        byte_size=1024,
+        asset_type="product_image",
+        source_type="merchant_upload",
+        usage_rights_status="unknown",
+        status="quarantined",
+        created_by_user_id=user.id,
+    )
+    db_session.add(asset)
+    db_session.flush()
+    hidden_asset_list = identity_client.get("/api/v1/store/assets", headers=headers_b)
+    assert hidden_asset_list.status_code == 200, hidden_asset_list.text
+    assert str(asset.id) not in hidden_asset_list.text
+    hidden_download = identity_client.get(
+        f"/api/v1/store/assets/{asset.id}/download-url",
+        headers={"X-Store-ID": str(store_b.id)},
+    )
+    assert hidden_download.status_code == 404
+    own_download = identity_client.get(
+        f"/api/v1/store/assets/{asset.id}/download-url",
+        headers={"X-Store-ID": str(store_a.id)},
+    )
+    assert own_download.status_code == 409
+    assert own_download.json()["error"]["code"] == "MEDIA_ASSET_NOT_READY"

@@ -167,6 +167,13 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
             </svg>}
           </div>)}
         </div> : <p className="muted">{overview?.data_quality?.reason ?? "暂无可用于趋势分析的已核验周期数据。"}</p>}
+        <div className="catalog-list">
+          <h3>互动转化率</h3>
+          {(overview?.conversion_rates ?? []).length > 0 ? overview?.conversion_rates.map(item => <div className="catalog-item" key={item.metric_key + item.period_end}>
+            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.numerator_value} / {item.denominator_value} · {new Date(item.period_start).toLocaleDateString()}–{new Date(item.period_end).toLocaleDateString()}</p></div>
+              <span className="status-chip">{item.status === "available" ? `${item.value_percent}%` : "分母为 0，不计算"}</span></div>
+          </div>) : <p className="muted">缺少同周期、同口径的已核验分子与分母数据，暂不计算转化率。</p>}
+        </div>
         {(overview?.content_performance ?? []).length > 0 && <div className="catalog-list">
           <h3>按作品查看内容表现</h3>
           {overview?.content_performance.map(work => <div className="catalog-item" key={work.published_work_id + work.metric_key}>

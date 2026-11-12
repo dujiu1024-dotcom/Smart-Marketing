@@ -206,17 +206,17 @@ class PublishOperationAttempt(Base):
             name="fk_publish_operation_attempts_operation_same_store",
             ondelete="RESTRICT",
         ),
-        CheckConstraint("attempt_no >= 1", name="attempt_no_positive"),
+        CheckConstraint("attempt_no >= 1", name="ck_publish_operation_attempts_attempt_no_positive"),
         CheckConstraint(
             "action IN ('upload_image', 'publish_image_text', 'readback')",
-            name="action",
+            name="ck_publish_operation_attempts_action",
         ),
         CheckConstraint(
             (
                 "normalized_status IN ('started', 'accepted', 'verified', "
                 "'not_found', 'failed', 'unknown')"
             ),
-            name="normalized_status",
+            name="ck_publish_operation_attempts_normalized_status",
         ),
         Index(
             "ix_publish_operation_attempts_operation_created",

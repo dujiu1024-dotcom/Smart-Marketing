@@ -30,7 +30,10 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [outcomeCurrency, setOutcomeCurrency] = useState("CNY");
   const [outcomeSourceId, setOutcomeSourceId] = useState("");
   const [outcomeEvidence, setOutcomeEvidence] = useState("");
-  const [outcomeOccurredAt, setOutcomeOccurredAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [outcomeOccurredAt, setOutcomeOccurredAt] = useState(() => {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+
 @pytest.fixture
 def worker_tasks(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://ci:ci@localhost:5432/ci")
@@ -74,7 +75,7 @@ def test_orphan_image_cleanup_deletes_only_unreferenced_store_scoped_objects(
         lambda *, object_key: deleted.append(object_key),
     )
 
-    result = worker_tasks.cleanup_orphaned_ai_image_objects.run()
+    result = worker_worker_tasks.cleanup_orphaned_ai_image_objects.run()
 
     assert result == 1
     assert deleted == [invocation.response_ref_json["object_key"]]
@@ -84,6 +85,7 @@ def test_orphan_image_cleanup_deletes_only_unreferenced_store_scoped_objects(
 
 def test_orphan_image_cleanup_protects_registered_or_referenced_objects(
     monkeypatch: pytest.MonkeyPatch,
+    worker_tasks,
 ) -> None:
     store_id = uuid4()
     invocation = SimpleNamespace(
@@ -96,9 +98,9 @@ def test_orphan_image_cleanup_protects_registered_or_referenced_objects(
     )
     database = FakeDatabase([invocation], protected=True)
     deleted: list[str] = []
-    monkeypatch.setattr(tasks, "SessionLocal", FakeSessionFactory(database))
+    monkeypatch.setattr(worker_tasks, "SessionLocal", FakeSessionFactory(database))
     monkeypatch.setattr(
-        tasks,
+        worker_tasks,
         "delete_object",
         lambda *, object_key: deleted.append(object_key),
     )
@@ -112,6 +114,7 @@ def test_orphan_image_cleanup_protects_registered_or_referenced_objects(
 
 def test_orphan_image_cleanup_never_deletes_cross_store_or_traversal_keys(
     monkeypatch: pytest.MonkeyPatch,
+    worker_tasks,
 ) -> None:
     store_id = uuid4()
     invocation = SimpleNamespace(

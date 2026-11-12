@@ -1,13 +1,12 @@
 import base64
 from datetime import UTC, datetime, timedelta
-from io import BytesIO
-from zipfile import ZipFile
 from decimal import Decimal
+from io import BytesIO
 from uuid import UUID, uuid4
+from zipfile import ZipFile
 
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
-from store_operator.models.marketing_task import MarketingTask
 from store_operator.models.marketing_task import MarketingTask
 from store_operator.models.opportunity_effects import (
     BusinessOutcomeEvidence,

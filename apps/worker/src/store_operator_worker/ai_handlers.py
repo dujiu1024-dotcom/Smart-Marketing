@@ -25,6 +25,7 @@ from store_operator.ai_gateway import (
 )
 from store_operator.ai_gateway.secrets import (
     EnvironmentSecretResolver,
+    ProviderSecretResolver,
     SecretStoreProviderResolver,
 )
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
@@ -51,7 +52,7 @@ def _safe_error(code: str, summary: str) -> JobExecutionError:
     return JobExecutionError(code, summary, retryable=False)
 
 
-def _provider_secret_resolver(secret_ref: str):
+def _provider_secret_resolver(secret_ref: str) -> ProviderSecretResolver:
     if secret_ref.startswith("env://"):
         return EnvironmentSecretResolver()
     region = (
@@ -172,11 +173,11 @@ def _prompt_variables(
             "AI_PROMPT_VARIABLE_SCHEMA_INVALID",
             "The published prompt variable schema is invalid.",
         )
-    unknown = set(required) - set(values)
+    unknown = set(properties) - set(values)
     if unknown:
         raise _safe_error(
             "AI_PROMPT_VARIABLE_UNSUPPORTED",
-            "The published prompt requires variables not supplied by the marketing task.",
+            "The published prompt declares variables not supplied by the marketing task.",
         )
     return {key: values[key] for key in properties if key in values}
 

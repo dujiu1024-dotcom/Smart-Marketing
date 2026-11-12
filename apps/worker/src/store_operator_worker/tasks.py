@@ -455,10 +455,13 @@ def cleanup_orphaned_ai_image_objects(
     with SessionLocal() as db:
         invocations = db.scalars(
             select(AIInvocation)
+            .join(Job, AIInvocation.job_id == Job.id)
             .where(
                 AIInvocation.capability == "image",
                 AIInvocation.status == "succeeded",
                 AIInvocation.job_id.is_not(None),
+                AIInvocation.store_id == Job.store_id,
+                Job.status.in_(("succeeded", "failed", "cancelled", "needs_human")),
                 AIInvocation.created_at <= cutoff,
                 AIInvocation.response_ref_json.is_not(None),
             )
@@ -477,16 +480,6 @@ def cleanup_orphaned_ai_image_objects(
                 continue
             object_key = response_ref.get("object_key")
             if not isinstance(object_key, str) or not object_key:
-                continue
-            if invocation.job_id is None:
-                continue
-            job = db.get(Job, invocation.job_id)
-            if (
-                job is None
-                or job.status
-                not in {"succeeded", "failed", "cancelled", "needs_human"}
-                or job.store_id != invocation.store_id
-            ):
                 continue
             media_asset_id = db.scalar(
                 select(MediaAsset.id).where(MediaAsset.object_key == object_key)

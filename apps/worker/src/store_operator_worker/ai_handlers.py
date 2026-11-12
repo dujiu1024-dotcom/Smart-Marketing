@@ -13,18 +13,19 @@ from sqlalchemy.orm import Session
 
 from store_operator.ai_gateway import (
     AIProviderExecutor,
-    EnvironmentSecretResolver,
     HttpProviderEnvironmentConfig,
     ProviderCallContext,
     ProviderCapability,
-    ProviderError,
-    ProviderTaskType,
-    SecretStoreProviderResolver,
+    validate_structured_output,
     TextGenerateRequest,
     build_http_provider_registry,
     parse_and_validate_structured_output,
     render_published_prompt,
     validate_prompt_task_contract,
+)
+from store_operator.ai_gateway.secrets import (
+    EnvironmentSecretResolver,
+    SecretStoreProviderResolver,
 )
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
 from store_operator.models import (
@@ -131,6 +132,11 @@ def _published_prompt(
             "AI_PROMPT_VERSION_UNAVAILABLE",
             "The active published prompt version is unavailable.",
         )
+    validate_prompt_task_contract(
+        task_type,
+        capability=templates[0].capability,
+        output_schema=dict(version.output_schema_json),
+    )
     return version
 
 
@@ -204,8 +210,6 @@ def _call_text_provider(
     )
     response = asyncio.run(executor.generate_text(request, provider_id=provider_id))
     if response.structured_output is not None:
-        from store_operator.ai_gateway import validate_structured_output
-
         return validate_structured_output(
             response.structured_output,
             dict(version.output_schema_json),

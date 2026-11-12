@@ -1078,6 +1078,7 @@ export interface BusinessOutcomeEvidenceRecord {
 }
 export interface AttributionEvidenceRecord {
   id: string; marketing_task_id: string; published_work_id: string; outcome_evidence_id: string;
+  attribution_version: number; supersedes_attribution_id: string | null;
   attribution_method: string; evidence_strength: string; allocation_percent: string;
   status: string; snapshot: Record<string, unknown>; reversal_reason: string | null; reversed_at: string | null;
 }

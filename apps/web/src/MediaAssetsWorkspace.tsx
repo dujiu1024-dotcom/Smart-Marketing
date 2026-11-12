@@ -9,7 +9,7 @@ const MAX_BYTES = 25_000_000;
 const MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const statusLabels: Record<MediaAsset["status"], string> = {
   uploading: "上传中", quarantined: "待隔离处理", scanning: "安全扫描中",
-  ready: "扫描通过", rejected: "扫描未通过", archived: "已归档",
+  ready: "扫描通过", rejected: "安全扫描未通过", scan_failed: "扫描服务异常", archived: "已归档",
 };
 const rightsLabels: Record<MediaAsset["usage_rights_status"], string> = {
   unknown: "使用权未确认", confirmed_allowed: "已确认可使用", restricted: "限制使用",

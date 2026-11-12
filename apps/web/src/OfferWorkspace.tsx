@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  confirmOfferFacts, createOffer, deleteOffer, getOffer, getProducts, listOffers, updateOffer,
+  confirmOfferFacts, createOffer, getOffer, getProducts, listOffers, updateOffer,
   type Offer, type OfferInput, type Product,
 } from "./api";
 
@@ -141,7 +141,6 @@ export default function OfferWorkspace({ storeId }: { storeId: string }) {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [deletePending, setDeletePending] = useState(false);
   const createKey = useRef("");
 
   const refresh = useCallback(async () => {
@@ -222,13 +221,6 @@ export default function OfferWorkspace({ storeId }: { storeId: string }) {
     finally { setSaving(false); }
   }
 
-  async function remove() {
-    if (!offer || !deletePending) return;
-    setSaving(true); setError("");
-    try { await deleteOffer(storeId, offer); back(); }
-    catch (reason) { setError(message(reason)); }
-    finally { setSaving(false); setDeletePending(false); }
-  }
 
   if (!route) return <>
     <div className="page-heading"><div><p className="eyebrow">OFFERS & PROMOTIONS</p><h1>活动与优惠</h1><p className="muted">维护真实优惠机制、适用商品、限制和有效期；未知条件不自动补全。</p></div><button className="primary" type="button" onClick={() => open("new")}>新增活动</button></div>
@@ -276,10 +268,8 @@ export default function OfferWorkspace({ storeId }: { storeId: string }) {
       <div className="form-footer"><p>保存后生成新版本并重置事实确认状态。</p><div className="form-actions">
         <button className="secondary" type="button" onClick={back}>返回清单</button>
         {offer && offer.fact_status !== "confirmed" && <button className="secondary" type="button" onClick={() => void confirmFacts()} disabled={saving || dirty} title={dirty ? "请先保存修改，再确认活动事实" : undefined}>确认事实</button>}
-        {offer && <button className="secondary" type="button" onClick={() => setDeletePending(true)} disabled={saving}>删除</button>}
         <button className="primary" type="submit" disabled={saving || !form.title.trim()}>{saving ? "处理中…" : offer ? "保存修改" : "创建活动"}</button>
       </div></div>
     </form>
-    {deletePending && <div className="alert error" role="alert"><span>确认删除活动「{offer?.title}」？系统会保留审计历史。</span><button className="text-button" type="button" onClick={() => setDeletePending(false)}>取消</button><button className="text-button" type="button" onClick={() => void remove()} disabled={saving}>确认删除</button></div>}
   </>;
 }

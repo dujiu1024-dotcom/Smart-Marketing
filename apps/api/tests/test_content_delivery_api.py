@@ -293,3 +293,78 @@ def test_artifact_versions_and_reviews_are_version_bound(
     )
     assert rejected.status_code == 422
     assert rejected.json()["error"]["code"] == "MEDIA_ASSET_NOT_USABLE"
+
+
+def test_artifact_list_version_and_review_are_store_scoped(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = create_user(db_session, "content-idor@example.com")
+    store_a = create_store(db_session, user)
+    store_b = create_store(db_session, user)
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "content-idor@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    csrf = login.json()["csrf_token"]
+    headers_a = {**ORIGIN, "X-CSRF-Token": csrf, "X-Store-ID": str(store_a.id)}
+    headers_b = {**ORIGIN, "X-CSRF-Token": csrf, "X-Store-ID": str(store_b.id)}
+
+    task = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers={**headers_a, "Idempotency-Key": "content-idor-task"},
+        json=task_payload(),
+    )
+    assert task.status_code == 201, task.text
+    task_id = task.json()["id"]
+    artifact = identity_client.post(
+        f"/api/v1/marketing-tasks/{task_id}/artifacts",
+        headers={**headers_a, "Idempotency-Key": "content-idor-artifact"},
+        json={
+            "artifact_type": "copy",
+            "version": {
+                "source_type": "manual_edit",
+                "content_json": {"title": "Private copy", "body": "Store A only"},
+            },
+        },
+    )
+    assert artifact.status_code == 201, artifact.text
+    artifact_id = artifact.json()["id"]
+    version_id = artifact.json()["current_version_id"]
+
+    hidden_list = identity_client.get(
+        f"/api/v1/marketing-tasks/{task_id}/artifacts",
+        headers={"X-Store-ID": str(store_b.id)},
+    )
+    assert hidden_list.status_code == 404
+
+    hidden_version_write = identity_client.post(
+        f"/api/v1/marketing-tasks/{task_id}/artifacts/{artifact_id}/versions",
+        headers={**headers_b, "Idempotency-Key": "content-idor-version"},
+        json={
+            "expected_version": 1,
+            "source_type": "manual_edit",
+            "content_json": {"title": "Injected", "body": "Must not be written"},
+        },
+    )
+    assert hidden_version_write.status_code == 404
+
+    hidden_review_write = identity_client.post(
+        (
+            f"/api/v1/marketing-tasks/{task_id}/artifacts/"
+            f"{artifact_id}/versions/{version_id}/reviews"
+        ),
+        headers={**headers_b, "Idempotency-Key": "content-idor-review"},
+        json={"expected_version": 1, "review_type": "copy", "decision": "approved"},
+    )
+    assert hidden_review_write.status_code == 404
+    assert db_session.query(ArtifactVersion).filter(
+        ArtifactVersion.artifact_id == artifact_id
+    ).count() == 1
+    assert db_session.query(ReviewRecord).filter(
+        ReviewRecord.artifact_id == artifact_id
+    ).count() == 0

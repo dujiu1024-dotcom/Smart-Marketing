@@ -148,6 +148,12 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
         headers={**headers_b, "Idempotency-Key": "cross-store-job-cancel"},
     )
     assert hidden_cancel.status_code == 404
+    visible_after_cross_store_attempt = identity_client.get(
+        f"/api/v1/jobs/{queued.id}",
+        headers={"X-Store-ID": str(store.id)},
+    )
+    assert visible_after_cross_store_attempt.status_code == 200
+    assert visible_after_cross_store_attempt.json()["status"] == "queued"
     cancelled = identity_client.post(
         f"/api/v1/jobs/{queued.id}/cancel",
         headers=headers,

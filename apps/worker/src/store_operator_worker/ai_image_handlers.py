@@ -881,7 +881,7 @@ def _complete_image(
                     dedupe_key=f"content.artifact_version_created:{artifact_version.id}",
                 )
             )
-    except JobExecutionError as persistence_error:
+    except JobExecutionError:
         if not object_already_registered:
             _delete_generated_object(image_result.asset_object_key)
         raise

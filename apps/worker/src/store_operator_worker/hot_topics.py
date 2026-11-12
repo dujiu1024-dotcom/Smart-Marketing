@@ -413,7 +413,8 @@ def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], contex
             content_angle=(f"围绕{best_product.name}回应当前话题" if best_product else None),
             reason_summary=(
                 f"门店资料文本相关度 {profile_score:.2f}，区域文本相关度 {region_score:.2f}，"
-                f"品牌规范文本相关度 {brand_score:.2f}；区域匹配：{'匹配' if region_match is True else '不匹配' if region_match is False else '未提供区域证据'}；"
+                f"品牌规范文本相关度 {brand_score:.2f}；"
+                f"区域匹配：{'匹配' if region_match is True else '不匹配' if region_match is False else '未提供区域证据'}；"
                 "该分值仅代表文本相关性，不代表趋势热度或经营效果。"
             ),
             risk_flags_json=risk_flags, eligibility_status=status, matched_at=datetime.now(UTC),

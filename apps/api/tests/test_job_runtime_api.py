@@ -132,6 +132,7 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
 ):
     user = create_user(db_session)
     store = create_store(db_session, user, "Jobs Mutations")
+    store_b = create_store(db_session, user, "Other Jobs Mutations")
     csrf = login(identity_client, monkeypatch)
     headers = {
         **ORIGIN,
@@ -140,7 +141,13 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
         "Idempotency-Key": "cancel-job-key-1",
     }
 
+    headers_b = {**headers, "X-Store-ID": str(store_b.id)}
     queued = create_job_for_store(db_session, user, store, "queued-cancel-1")
+    hidden_cancel = identity_client.post(
+        f"/api/v1/jobs/{queued.id}/cancel",
+        headers={**headers_b, "Idempotency-Key": "cross-store-job-cancel"},
+    )
+    assert hidden_cancel.status_code == 404
     cancelled = identity_client.post(
         f"/api/v1/jobs/{queued.id}/cancel",
         headers=headers,
@@ -175,6 +182,15 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
         **headers,
         "Idempotency-Key": "manual-retry-api-1",
     }
+    hidden_retry = identity_client.post(
+        f"/api/v1/jobs/{retry.id}/retry",
+        headers={**headers_b, "Idempotency-Key": "cross-store-job-retry"},
+        json={
+            "reason": "Provider confirmed no side effect",
+            "side_effects_confirmed_absent": True,
+        },
+    )
+    assert hidden_retry.status_code == 404
     retried = identity_client.post(
         f"/api/v1/jobs/{retry.id}/retry",
         headers=retry_headers,
@@ -254,6 +270,15 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
     )
     assert resolved.status_code == 200, resolved.text
     assert resolved.json()["status"] == "failed"
+    hidden_resolve = identity_client.post(
+        f"/api/v1/jobs/{job.id}/resolve",
+        headers={**headers, "X-Store-ID": str(store_b.id), "Idempotency-Key": "cross-store-job-resolve"},
+        json={
+            "resolution": "fail",
+            "reason": "Store B must not resolve Store A job",
+        },
+    )
+    assert hidden_resolve.status_code == 404
 
     invocation = AIInvocation(
         id=uuid4(),

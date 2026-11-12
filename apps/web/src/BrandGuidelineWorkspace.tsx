@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   ApiError,
   confirmBrandGuidelineFacts,
@@ -121,7 +121,7 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  async function reload() {
+  const reload = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -138,9 +138,9 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
     } finally {
       setLoading(false);
     }
-  }
+  }, [storeId]);
 
-  useEffect(() => { void reload(); }, [storeId]);
+  useEffect(() => { void reload(); }, [reload]);
 
   function change<K extends keyof BrandForm>(key: K, value: BrandForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));

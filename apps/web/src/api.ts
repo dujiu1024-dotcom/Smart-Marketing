@@ -358,3 +358,55 @@ export async function confirmProductFacts(storeId: string, product: Product): Pr
     }),
   }, storeId);
 }
+
+
+export interface BrandGuideline {
+  id: string; store_id: string; brand_story: string | null; positioning: string | null; differentiators: string | null;
+  core_values_json: string[] | null; tone_of_voice: string | null; common_phrases_json: string[] | null;
+  prohibited_phrases_json: string[] | null; cta_preferences_json: string[] | null; logo_asset_id: string | null;
+  color_palette_json: Array<Record<string, unknown>> | null; font_preferences_json: string[] | null;
+  visual_style: string | null; fact_status: string; current_version: number;
+}
+export type BrandGuidelineInput = Omit<BrandGuideline, "id" | "store_id" | "fact_status" | "current_version">;
+export async function getBrandGuideline(storeId: string): Promise<BrandGuideline> {
+  return request("/store/brand-guideline", {}, storeId);
+}
+export async function createBrandGuideline(storeId: string, input: BrandGuidelineInput): Promise<BrandGuideline> {
+  return request("/store/brand-guideline", { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify(input) }, storeId);
+}
+export async function updateBrandGuideline(storeId: string, current: BrandGuideline, input: BrandGuidelineInput): Promise<BrandGuideline> {
+  return request("/store/brand-guideline", { method: "PATCH", headers: { "If-Match": String(current.current_version) }, body: JSON.stringify(input) }, storeId);
+}
+export async function confirmBrandGuidelineFacts(storeId: string, current: BrandGuideline): Promise<BrandGuideline> {
+  return request(`/store/brand-guideline/${current.id}/confirm-facts`, {
+    method: "POST", headers: { "If-Match": String(current.current_version) },
+    body: JSON.stringify({ source_type: "merchant_ui_confirmation", source_ref: "store-brand-guideline-page", confirmation_note: "由当前门店成员核对品牌定位与规范后确认" }),
+  }, storeId);
+}
+
+export interface AudienceProfile {
+  id: string; store_id: string; name: string; segment_type: "core" | "secondary" | "seasonal" | "scenario";
+  audience_description: string | null; consumption_scenarios_json: string[] | null; consumption_periods_json: string[] | null;
+  purchase_motivations_json: string[] | null; common_objections_json: string[] | null; source_type: string | null;
+  source_ref: string | null; sample_size: number | null; sampled_at: string | null; confidence_level: string | null;
+  fact_status: string; current_version: number;
+}
+export type AudienceProfileInput = Omit<AudienceProfile, "id" | "store_id" | "fact_status" | "current_version">;
+export async function getAudienceProfiles(storeId: string): Promise<{ items: AudienceProfile[]; total: number }> {
+  return request("/store/audiences?limit=200&offset=0", {}, storeId);
+}
+export async function createAudienceProfile(storeId: string, input: AudienceProfileInput): Promise<AudienceProfile> {
+  return request("/store/audiences", { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify(input) }, storeId);
+}
+export async function updateAudienceProfile(storeId: string, current: AudienceProfile, input: AudienceProfileInput): Promise<AudienceProfile> {
+  return request(`/store/audiences/${current.id}`, { method: "PATCH", headers: { "If-Match": String(current.current_version) }, body: JSON.stringify(input) }, storeId);
+}
+export async function deleteAudienceProfile(storeId: string, current: AudienceProfile): Promise<void> {
+  return request(`/store/audiences/${current.id}`, { method: "DELETE", headers: { "If-Match": String(current.current_version) } }, storeId);
+}
+export async function confirmAudienceFacts(storeId: string, current: AudienceProfile): Promise<AudienceProfile> {
+  return request(`/store/audiences/${current.id}/confirm-facts`, {
+    method: "POST", headers: { "If-Match": String(current.current_version) },
+    body: JSON.stringify({ source_type: "merchant_ui_confirmation", source_ref: "store-audience-page", confirmation_note: "由当前门店成员核对客群描述与样本来源后确认" }),
+  }, storeId);
+}

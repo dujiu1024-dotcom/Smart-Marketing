@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from store_operator.ai_gateway.circuit_breaker import CircuitBreaker
 from store_operator.ai_gateway.http_provider import (
     HttpImageProvider,
     HttpJsonTransport,
@@ -49,6 +50,8 @@ class HttpProviderEnvironmentConfig:
     models: Mapping[ProviderCapability, tuple[str, ...]]
     region: str | None = None
     timeout_seconds: float = 45
+    circuit_failure_threshold: int = 5
+    circuit_reset_timeout_seconds: float = 30
 
     @classmethod
     def from_environment(
@@ -96,6 +99,17 @@ class HttpProviderEnvironmentConfig:
             raise ValueError("AI_PROVIDER_TIMEOUT_SECONDS must be numeric") from exc
         if not 0 < timeout_seconds <= 300:
             raise ValueError("AI_PROVIDER_TIMEOUT_SECONDS must be between 0 and 300")
+        try:
+            circuit_failure_threshold = int(
+                environ.get(prefix + "CIRCUIT_FAILURE_THRESHOLD", "5")
+            )
+            circuit_reset_timeout_seconds = float(
+                environ.get(prefix + "CIRCUIT_RESET_SECONDS", "30")
+            )
+        except ValueError as exc:
+            raise ValueError("AI provider circuit breaker settings must be numeric") from exc
+        if circuit_failure_threshold < 1 or not 0 < circuit_reset_timeout_seconds <= 3600:
+            raise ValueError("AI provider circuit breaker settings are outside allowed bounds")
         provider_id = values["ID"]
         display_name = values["DISPLAY_NAME"]
         if len(provider_id) > 80 or len(display_name) > 120:
@@ -108,6 +122,8 @@ class HttpProviderEnvironmentConfig:
             models=configured_models,
             region=environ.get(prefix + "REGION") or None,
             timeout_seconds=timeout_seconds,
+            circuit_failure_threshold=circuit_failure_threshold,
+            circuit_reset_timeout_seconds=circuit_reset_timeout_seconds,
         )
 
 
@@ -124,6 +140,10 @@ def build_http_provider_registry(
         api_key=api_key,
         timeout_seconds=config.timeout_seconds,
         client=client,
+        circuit_breaker=CircuitBreaker(
+            failure_threshold=config.circuit_failure_threshold,
+            reset_timeout_seconds=config.circuit_reset_timeout_seconds,
+        ),
     )
     descriptor = ProviderDescriptor(
         provider_id=config.provider_id,

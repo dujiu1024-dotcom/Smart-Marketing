@@ -384,10 +384,10 @@ export async function getBrandGuideline(storeId: string): Promise<BrandGuideline
   return request("/store/brand-guideline", {}, storeId);
 }
 
-export async function createBrandGuideline(storeId: string, input: BrandGuidelineInput): Promise<BrandGuideline> {
+export async function createBrandGuideline(storeId: string, input: BrandGuidelineInput, idempotencyKey: string = crypto.randomUUID()): Promise<BrandGuideline> {
   return request("/store/brand-guideline", {
     method: "POST",
-    headers: { "Idempotency-Key": crypto.randomUUID() },
+    headers: { "Idempotency-Key": idempotencyKey },
     body: JSON.stringify(input),
   }, storeId);
 }

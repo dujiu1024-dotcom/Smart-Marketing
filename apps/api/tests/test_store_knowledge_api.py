@@ -169,7 +169,7 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     assert hidden_product_update.status_code == 404
     hidden_product_delete = identity_client.delete(
         f"/api/v1/store/products/{product['id']}",
-        headers={**headers_a, "X-Store-ID": str(store_b.id)},
+        headers={**headers_a, "X-Store-ID": str(store_b.id), "If-Match": '"1"'},
     )
     assert hidden_product_delete.status_code == 404
 

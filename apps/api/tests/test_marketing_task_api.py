@@ -471,6 +471,14 @@ def test_requirement_and_strategy_confirmation_freeze_exact_source_versions(
     assert business_fact.source_version == 3
     assert business_fact.content_fingerprint == "b" * 64
     assert business_fact.confirmation_status == "confirmed"
+
+    fact_list = identity_client.get(
+        f"/api/v1/marketing-tasks/{task_id}/business-facts",
+        headers=headers,
+    )
+    assert fact_list.status_code == 200, fact_list.text
+    assert fact_list.json()[0]["id"] == str(business_fact.id)
+    assert fact_list.json()[0]["confirmation_status"] == "confirmed"
     fact_edges = db_session.scalars(
         select(DependencyEdge).where(DependencyEdge.task_id == task_id)
     ).all()

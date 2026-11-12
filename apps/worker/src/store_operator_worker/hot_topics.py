@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 
 import httpx
 from sqlalchemy import select
+from sqlalchemy.orm import Session, sessionmaker
 
 from store_operator.config import settings
 from store_operator.models import (
@@ -25,8 +26,6 @@ from store_operator.models import (
     StoreOpportunity,
     StoreProfile,
 )
-from sqlalchemy.orm import Session, sessionmaker
-
 from store_operator_worker.handlers import (
     JobExecutionContext,
     JobExecutionError,

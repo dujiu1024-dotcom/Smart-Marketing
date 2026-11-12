@@ -190,7 +190,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           includes_image: taskType === "merchant_content" ? includesImage : scope.includes_image,
           opportunity_applicable: false,
           selected_channel_keys: channelSelected ? ["douyin"] : [],
-          requires_external_delivery: externalDelivery,
+          requires_external_delivery: externalDelivery && channelSelected,
         },
       };
       if (!input.requirement_draft.goal) throw new Error("请先填写营销目标。");

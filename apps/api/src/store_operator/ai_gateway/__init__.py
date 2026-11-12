@@ -20,6 +20,12 @@ from store_operator.ai_gateway.prompt_runtime import (
     validate_json_schema,
     validate_structured_output,
 )
+from store_operator.ai_gateway.prompt_contracts import (
+    PROMPT_TASK_CONTRACTS,
+    PromptTaskContract,
+    PromptTaskType,
+    validate_prompt_task_contract,
+)
 from store_operator.ai_gateway.protocols import (
     ImageProvider,
     OCRProvider,
@@ -65,6 +71,9 @@ __all__ = [
     "OCRRequest",
     "OCRResponse",
     "PromptContractError",
+    "PromptTaskContract",
+    "PromptTaskType",
+    "PROMPT_TASK_CONTRACTS",
     "ProviderCallContext",
     "ProviderCapability",
     "ProviderDescriptor",
@@ -83,5 +92,6 @@ __all__ = [
     "parse_and_validate_structured_output",
     "render_published_prompt",
     "validate_json_schema",
+    "validate_prompt_task_contract",
     "validate_structured_output",
 ]

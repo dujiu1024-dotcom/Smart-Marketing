@@ -30,6 +30,13 @@ services:
     ports: ["8333:8333", "9333:9333", "8888:8888"]
     volumes: ["seaweed_data:/data"]
 
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    environment:
+      CLAMD_CONF_StreamMaxLength: 30M
+    volumes: ["clamav_data:/var/lib/clamav"]
+
   api:
     build:
       context: ../..
@@ -57,9 +64,12 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
       REDIS_URL: redis://redis:6379/0
+      CLAMD_HOST: clamav
+      CLAMD_PORT: 3310
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      clamav: { condition: service_started }
     healthcheck:
       test:
         - CMD-SHELL
@@ -86,9 +96,12 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
       REDIS_URL: redis://redis:6379/0
+      CLAMD_HOST: clamav
+      CLAMD_PORT: 3310
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      clamav: { condition: service_started }
 
   web:
     build:
@@ -108,3 +121,4 @@ volumes:
   postgres_data:
   redis_data:
   seaweed_data:
+  clamav_data:

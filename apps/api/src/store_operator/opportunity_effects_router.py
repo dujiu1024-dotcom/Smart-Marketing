@@ -2072,7 +2072,9 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                         format_id = int(xf.attrib.get("numFmtId", "0"))
                         format_code = custom_formats.get(format_id, "")
                         normalized_format = re.sub(r'"[^"]*"|\\\\.', "", format_code)
-                        if format_id in built_in_dates or re.search(r"(?i)[ymdhis]", normalized_format):
+                        if format_id in built_in_dates or re.search(
+                            r"(?i)[ymdhis]", normalized_format
+                        ):
                             date_style_ids.add(style_index)
             sheet_xml = ET.fromstring(archive.read(sheet_path))
             sheet_data = sheet_xml.find("main:sheetData", ns)
@@ -2096,7 +2098,9 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                     while len(cells) < column_index:
                         cells.append(None)
                     if cell.find("main:f", ns) is not None:
-                        raise ValueError("Formula cells are not supported; import calculated values")
+                        raise ValueError(
+                            "Formula cells are not supported; import calculated values"
+                        )
                     cell_type = cell.attrib.get("t")
                     value_node = cell.find("main:v", ns)
                     value = value_node.text if value_node is not None else None
@@ -2167,7 +2171,8 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
     except ApiError:
         raise
     except (
-        KeyError, IndexError, ValueError, TypeError, zipfile.BadZipFile, ET.ParseError, OverflowError
+        KeyError, IndexError, ValueError, TypeError, zipfile.BadZipFile, ET.ParseError,
+        OverflowError
     ) as exc:
         raise ApiError(
             422, "XLSX_INVALID", f"Workbook could not be read: {str(exc)[:200]}"

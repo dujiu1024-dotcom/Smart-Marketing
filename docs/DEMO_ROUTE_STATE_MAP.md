@@ -91,3 +91,11 @@ Demo 使用 `location.hash` 作为页面路由；`demo/app.js` 监听 `hashchang
 ## 7. 浏览器验收覆盖
 
 PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromium 冒烟：一级路由、八个门店资料 Tab、七个任务 Tab、平台管理页面、门店详情/运行详情/提示词编辑、商品/活动编辑页以及浏览器历史导航。它只证明路由与页面壳可访问，不替代 `docs/DEMO_ACCEPTANCE_MATRIX.md` 中的完整业务流程、字段、异常、响应式、可访问性和生产服务验收。
+
+
+## 8. 首个生产 Web 页面映射（2026-11-12）
+
+- Demo 的 `#store:profile` 门店档案页面已开始生产接入，首个页面位于当前 React 门店工作台入口。
+- 真实数据源为 `GET/POST/PATCH /api/v1/store/profile`；所有请求携带当前 `X-Store-ID`，写请求携带 CSRF Token；更新使用 `If-Match` 版本。
+- 页面包含登录、当前用户 Session 恢复、门店选择、门店档案创建/编辑、营业时间/服务能力/临时停业字段和显式事实确认。
+- 其他 Demo 路由、七个门店资料分类、营销任务和平台管理页面尚未由生产 Web 实现。导航对未接入模块明确禁用/标记，不将 Demo 的 localStorage 作为生产数据。

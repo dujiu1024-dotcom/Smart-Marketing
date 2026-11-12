@@ -17,17 +17,17 @@ async def main() -> None:
         response = await page.goto(base_url, wait_until="networkidle")
         assert response is not None and response.ok, "Web application did not return HTTP 2xx"
 
-        await page.get_by_role("heading", name="登录工作台").wait_for(state="visible")
-        await page.get_by_label("邮箱").wait_for(state="visible")
-        await page.get_by_label("密码").wait_for(state="visible")
+        await page.get_by_role("heading", name="登录门店工作台").wait_for(state="visible")
+        await page.get_by_label("邮箱 *").wait_for(state="visible")
+        await page.get_by_label("密码 *").wait_for(state="visible")
         await page.get_by_role("button", name="登录").wait_for(state="visible")
         await page.get_by_text(
-            "登录凭证由服务端通过 HttpOnly Cookie 管理；页面不会保存 Session Token。",
+            "登录使用服务端 Session Cookie 与 CSRF 防护；本页面不保存密码。",
             exact=True,
         ).wait_for(state="visible")
 
         assert not page_errors, f"Uncaught browser errors: {page_errors}"
-        print("Playwright E2E passed: login entry, credential fields and Session security notice rendered.")
+        print("Playwright E2E passed: store workspace login, credential fields and Session/CSRF security notice rendered.")
         await browser.close()
 
 

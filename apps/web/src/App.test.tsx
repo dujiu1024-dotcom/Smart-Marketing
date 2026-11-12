@@ -1,90 +1,114 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import App from "./App";
+import { ApiError } from "./api";
 
-function jsonResponse(payload: unknown, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => payload,
-  } as Response;
+afterEach(() => cleanup());
+
+const api = vi.hoisted(() => ({
+  login: vi.fn(),
+  getCurrentUser: vi.fn(),
+  getStores: vi.fn(),
+  setActiveStore: vi.fn(),
+  getStoreProfile: vi.fn(),
+  createStoreProfile: vi.fn(),
+  updateStoreProfile: vi.fn(),
+  confirmStoreProfileFacts: vi.fn(),
+  clearCsrfToken: vi.fn(),
+}));
+
+vi.mock("./api", async () => {
+  const actual = await vi.importActual<typeof import("./api")>("./api");
+  return { ...actual, ...api };
+});
+
+const user = { id: "user-1", email: "owner@example.test" };
+const store = { id: "store-1", name: "拾光茶研社", role: "owner" as const };
+const profile = {
+  id: "profile-1",
+  store_id: store.id,
+  display_name: "拾光茶研社",
+  business_type: "直营门店",
+  industry_category: "饮品",
+  brand_name: "拾光",
+  introduction: "现制茶饮",
+  country_code: "CN",
+  region: "钱江新城",
+  province: "浙江省",
+  city: "杭州市",
+  district: "上城区",
+  address: "钱江路 158 号",
+  phone: "0571-12345678",
+  opening_hours_json: { summary: "10:00-22:00", weekday: "10:00-22:00" },
+  temporary_closures_json: [],
+  service_radius: "3 公里",
+  service_capabilities_json: ["堂食", "自取"],
+  fact_status: "pending_confirmation",
+  current_version: 1,
+};
+
+async function signIn() {
+  render(<App />);
+  await screen.findByRole("heading", { name: "登录门店工作台" });
+  fireEvent.change(screen.getByLabelText("邮箱 *"), { target: { value: user.email } });
+  fireEvent.change(screen.getByLabelText("密码 *"), { target: { value: "correct-password" } });
+  fireEvent.click(screen.getByRole("button", { name: "登录" }));
 }
 
-const user = { id: "user-1", email: "owner@example.com" };
-const store = { id: "store-1", name: "测试门店", role: "owner" as const };
-
-describe("identity and store context", () => {
+describe("store profile workspace", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.unstubAllGlobals();
-  });
-
-  it("logs in, loads memberships and selects a store through the server", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input);
-      if (path.endsWith("/auth/me")) return jsonResponse({ error: { message: "Unauthenticated" } }, 401);
-      if (path.endsWith("/auth/login")) return jsonResponse({ user, csrf_token: "csrf-login", session: { expires_at: "2030-01-01T00:00:00Z" } });
-      if (path.endsWith("/me/stores")) return jsonResponse({ items: [store], active_store_id: null });
-      if (path.endsWith("/session/active-store") && init?.method === "POST") return jsonResponse({ active_store: { id: store.id, name: store.name }, membership: { role: "owner" } });
-      throw new Error(`Unexpected request: ${path}`);
+    vi.clearAllMocks();
+    api.getCurrentUser.mockRejectedValue(new ApiError("Unauthenticated", 401, "UNAUTHENTICATED"));
+    api.login.mockResolvedValue(user);
+    api.getStores.mockResolvedValue({ items: [store], active_store_id: store.id });
+    api.setActiveStore.mockResolvedValue(undefined);
+    api.getStoreProfile.mockResolvedValue(profile);
+    api.updateStoreProfile.mockResolvedValue({
+      ...profile,
+      display_name: "拾光茶研社（万象城店）",
+      current_version: 2,
     });
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<App />);
-    await screen.findByRole("heading", { name: "登录工作台" });
-    fireEvent.change(screen.getByLabelText("邮箱"), { target: { value: user.email } });
-    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "correct-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "登录" }));
-
-    await screen.findByRole("heading", { name: "选择门店" });
-    fireEvent.click(screen.getByRole("button", { name: /测试门店/ }));
-    await screen.findByRole("heading", { name: "门店工作台" });
-
-    const selection = fetchMock.mock.calls.find(([input, init]) => String(input).endsWith("/session/active-store") && init?.method === "POST");
-    expect(selection).toBeDefined();
-    expect((selection?.[1]?.headers as Record<string, string>)["X-CSRF-Token"]).toBe("csrf-login");
-    expect(screen.getByText("当前门店：测试门店")).toBeInTheDocument();
+    api.confirmStoreProfileFacts.mockResolvedValue({
+      ...profile,
+      fact_status: "confirmed",
+      current_version: 2,
+    });
   });
 
-  it("restores an existing HttpOnly-cookie session and obtains a fresh CSRF token", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const path = String(input);
-      if (path.endsWith("/auth/me")) return jsonResponse({ user, active_store: { id: store.id, name: store.name }, session: { expires_at: "2030-01-01T00:00:00Z" } });
-      if (path.endsWith("/auth/csrf")) return jsonResponse({ csrf_token: "csrf-restored" });
-      if (path.endsWith("/me/stores")) return jsonResponse({ items: [store], active_store_id: store.id });
-      throw new Error(`Unexpected request: ${path}`);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
+  it("requires authentication and labels unconnected store modules", async () => {
     render(<App />);
-    await screen.findByRole("heading", { name: "门店工作台" });
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/auth/csrf",
-      expect.objectContaining({ method: "POST", credentials: "include" }),
-    ));
-    expect(screen.getByText("当前门店：测试门店")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "登录门店工作台" })).toBeInTheDocument();
+    expect(screen.getByText("使用已开通门店成员权限的账号登录。")).toBeInTheDocument();
   });
 
-  it("logs out with the in-memory CSRF token", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input);
-      if (path.endsWith("/auth/me")) return jsonResponse({ user, active_store: { id: store.id, name: store.name }, session: { expires_at: "2030-01-01T00:00:00Z" } });
-      if (path.endsWith("/auth/csrf")) return jsonResponse({ csrf_token: "csrf-restored" });
-      if (path.endsWith("/me/stores")) return jsonResponse({ items: [store], active_store_id: store.id });
-      if (path.endsWith("/auth/logout") && init?.method === "POST") return { ok: true, status: 204 } as Response;
-      throw new Error(`Unexpected request: ${path}`);
-    });
-    vi.stubGlobal("fetch", fetchMock);
+  it("loads a real store profile and saves it with the current version", async () => {
+    await signIn();
+    expect(await screen.findByDisplayValue("拾光茶研社")).toBeInTheDocument();
+    expect(await screen.findByText("V1 · 待确认")).toBeInTheDocument();
 
-    render(<App />);
-    await screen.findByRole("heading", { name: "门店工作台" });
-    fireEvent.click(screen.getByRole("button", { name: "退出" }));
-    await screen.findByRole("heading", { name: "登录工作台" });
-    const logout = fetchMock.mock.calls.find(([input]) => String(input).endsWith("/auth/logout"));
-    expect((logout?.[1]?.headers as Record<string, string>)["X-CSRF-Token"]).toBe("csrf-restored");
+    fireEvent.change(screen.getByLabelText("门店名称 *"), {
+      target: { value: "拾光茶研社（万象城店）" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存档案" }));
+
+    await waitFor(() => {
+      expect(api.updateStoreProfile).toHaveBeenCalledWith(
+        store.id,
+        profile,
+        expect.objectContaining({ display_name: "拾光茶研社（万象城店）" }),
+      );
+    });
+    expect(await screen.findByText(/门店档案已保存为 V2/)).toBeInTheDocument();
+  });
+
+  it("requires an explicit action to confirm store facts", async () => {
+    await signIn();
+    expect(await screen.findByText("V1 · 待确认")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认资料" }));
+
+    await waitFor(() => {
+      expect(api.confirmStoreProfileFacts).toHaveBeenCalledWith(store.id, profile);
+    });
+    expect(await screen.findByText("V2 · 已确认")).toBeInTheDocument();
   });
 });

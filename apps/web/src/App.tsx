@@ -1,229 +1,494 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  ApiError,
+  clearCsrfToken,
+  confirmStoreProfileFacts,
+  createStoreProfile,
+  getCurrentUser,
+  getStoreProfile,
+  getStores,
+  login,
+  logout,
+  refreshCsrfToken,
+  setActiveStore,
+  updateStoreProfile,
+  type ProfileInput,
+  type StoreMembership,
+  type StoreProfile,
+  type User,
+} from "./api";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
+interface ProfileForm {
+  display_name: string;
+  business_type: string;
+  industry_category: string;
+  brand_name: string;
+  introduction: string;
+  country_code: string;
+  region: string;
+  province: string;
+  city: string;
+  district: string;
+  address: string;
+  phone: string;
+  opening_summary: string;
+  weekday_hours: string;
+  weekend_hours: string;
+  holiday_hours: string;
+  temporary_closures: string;
+  service_radius: string;
+  service_capabilities: string;
+}
 
-type ApiError = Error & { status?: number };
-type User = { id: string; email: string };
-type Store = { id: string; name: string; role: "owner" | "member" };
-type StoresResponse = { items: Store[]; active_store_id: string | null };
-type MeResponse = {
-  user: User;
-  active_store: { id: string; name: string } | null;
-  session: { expires_at: string };
+const emptyForm: ProfileForm = {
+  display_name: "",
+  business_type: "",
+  industry_category: "",
+  brand_name: "",
+  introduction: "",
+  country_code: "CN",
+  region: "",
+  province: "",
+  city: "",
+  district: "",
+  address: "",
+  phone: "",
+  opening_summary: "",
+  weekday_hours: "",
+  weekend_hours: "",
+  holiday_hours: "",
+  temporary_closures: "[]",
+  service_radius: "",
+  service_capabilities: "",
 };
-type LoginResponse = { user: User; csrf_token: string; session: { expires_at: string } };
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
-      ...init.headers,
-    },
-  });
-  if (!response.ok) {
-    let message = "请求失败，请稍后重试";
-    try {
-      const payload = await response.json();
-      message = payload.error?.message ?? message;
-    } catch {
-      // Keep the stable public message when the response is not JSON.
-    }
-    const error = new Error(message) as ApiError;
-    error.status = response.status;
-    throw error;
+function formFromProfile(profile: StoreProfile): ProfileForm {
+  const hours = profile.opening_hours_json ?? {};
+  return {
+    display_name: profile.display_name,
+    business_type: profile.business_type ?? "",
+    industry_category: profile.industry_category ?? "",
+    brand_name: profile.brand_name ?? "",
+    introduction: profile.introduction ?? "",
+    country_code: profile.country_code ?? "CN",
+    region: profile.region ?? "",
+    province: profile.province ?? "",
+    city: profile.city ?? "",
+    district: profile.district ?? "",
+    address: profile.address ?? "",
+    phone: profile.phone ?? "",
+    opening_summary: String(hours.summary ?? ""),
+    weekday_hours: String(hours.weekday ?? ""),
+    weekend_hours: String(hours.weekend ?? ""),
+    holiday_hours: String(hours.holiday ?? ""),
+    temporary_closures: JSON.stringify(profile.temporary_closures_json ?? [], null, 2),
+    service_radius: profile.service_radius ?? "",
+    service_capabilities: (profile.service_capabilities_json ?? []).join("、"),
+  };
+}
+
+function profileInput(form: ProfileForm): ProfileInput {
+  let closures: unknown;
+  try {
+    closures = JSON.parse(form.temporary_closures.trim() || "[]");
+  } catch {
+    throw new Error("临时停业日期必须是有效 JSON 数组");
   }
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  if (!Array.isArray(closures) || closures.some((item) => !item || typeof item !== "object" || Array.isArray(item))) {
+    throw new Error("临时停业日期必须是对象数组，例如 [{\"date\":\"2026-12-25\",\"reason\":\"节假日停业\"}]");
+  }
+  return {
+    display_name: form.display_name.trim(),
+    business_type: form.business_type.trim(),
+    industry_category: form.industry_category.trim(),
+    brand_name: form.brand_name.trim(),
+    introduction: form.introduction.trim(),
+    country_code: form.country_code.trim().toUpperCase(),
+    region: form.region.trim(),
+    province: form.province.trim(),
+    city: form.city.trim(),
+    district: form.district.trim(),
+    address: form.address.trim(),
+    phone: form.phone.trim(),
+    opening_hours_json: {
+      summary: form.opening_summary.trim(),
+      weekday: form.weekday_hours.trim(),
+      weekend: form.weekend_hours.trim(),
+      holiday: form.holiday_hours.trim(),
+    },
+    temporary_closures_json: closures as Array<Record<string, unknown>>,
+    service_radius: form.service_radius.trim(),
+    service_capabilities_json: form.service_capabilities
+      .split(/[、,，]/)
+      .map((value) => value.trim())
+      .filter(Boolean),
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "发生未知错误，请稍后重试";
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  return (
+    <label className="field">
+      <span>{label}{required ? " *" : ""}</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        required={required}
+      />
+    </label>
+  );
 }
 
 export default function App() {
-  const [view, setView] = useState<"loading" | "login" | "stores" | "workspace">("loading");
   const [user, setUser] = useState<User | null>(null);
-  const [stores, setStores] = useState<Store[]>([]);
-  const [activeStore, setActiveStore] = useState<{ id: string; name: string } | null>(null);
-  const [csrfToken, setCsrfToken] = useState("");
+  const [stores, setStores] = useState<StoreMembership[]>([]);
+  const [storeId, setStoreId] = useState("");
+  const [profile, setProfile] = useState<StoreProfile | null>(null);
+  const [form, setForm] = useState<ProfileForm>(emptyForm);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  const loadStores = useCallback(async () => {
-    const result = await request<StoresResponse>("/me/stores");
-    setStores(result.items);
-    const active = result.items.find((store) => store.id === result.active_store_id);
-    if (active) {
-      setActiveStore({ id: active.id, name: active.name });
-      setView("workspace");
-    } else {
-      setActiveStore(null);
-      setView("stores");
+  const loadStoreContext = useCallback(async () => {
+    const response = await getStores();
+    if (!response.items.length) {
+      setStores([]);
+      setStoreId("");
+      return;
     }
+    let activeId = response.active_store_id;
+    if (!activeId || !response.items.some((store) => store.id === activeId)) {
+      activeId = response.items[0].id;
+      await setActiveStore(activeId);
+    }
+    setStores(response.items);
+    setStoreId(activeId);
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function restoreSession() {
-      try {
-        const me = await request<MeResponse>("/auth/me");
-        const csrf = await request<{ csrf_token: string }>("/auth/csrf", { method: "POST" });
-        if (cancelled) return;
-        setUser(me.user);
-        setCsrfToken(csrf.csrf_token);
-        await loadStores();
-      } catch (reason) {
-        if (cancelled) return;
-        const failure = reason as ApiError;
-        if (failure.status === 401) {
-          setView("login");
-        } else {
-          setError(failure.message);
-          setView("login");
+    let active = true;
+    void getCurrentUser()
+      .then(async (currentUser) => {
+        if (!active) return;
+        setUser(currentUser);
+        await refreshCsrfToken();
+        await loadStoreContext();
+      })
+      .catch((reason: unknown) => {
+        if (active && !(reason instanceof ApiError && reason.status === 401)) {
+          setError(errorMessage(reason));
         }
-      }
-    }
-    void restoreSession();
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     return () => {
-      cancelled = true;
+      active = false;
     };
-  }, [loadStores]);
+  }, [loadStoreContext]);
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (!storeId) {
+      setProfile(null);
+      setForm(emptyForm);
+      return;
+    }
+    let active = true;
+    setProfileLoading(true);
+    setError("");
+    void getStoreProfile(storeId)
+      .then((value) => {
+        if (!active) return;
+        setProfile(value);
+        setForm(formFromProfile(value));
+      })
+      .catch((reason: unknown) => {
+        if (!active) return;
+        if (reason instanceof ApiError && reason.status === 404) {
+          setProfile(null);
+          setForm(emptyForm);
+        } else {
+          setError(errorMessage(reason));
+        }
+      })
+      .finally(() => {
+        if (active) setProfileLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [storeId]);
+
+  function change<K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) {
+    setForm((current) => ({ ...current, [key]: value }));
+    setNotice("");
+  }
+
+  async function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
+    setLoading(true);
     setError("");
     try {
-      const result = await request<LoginResponse>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
-      setUser(result.user);
-      setCsrfToken(result.csrf_token);
-      setPassword("");
-      await loadStores();
+      const currentUser = await login(email, password);
+      setUser(currentUser);
+      await loadStoreContext();
     } catch (reason) {
-      setError((reason as Error).message);
+      setError(errorMessage(reason));
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
-  async function handleSelectStore(store: Store) {
-    setBusy(true);
+  async function changeStore(nextStoreId: string) {
     setError("");
+    setNotice("");
     try {
-      await request("/session/active-store", {
-        method: "POST",
-        headers: { "X-CSRF-Token": csrfToken },
-        body: JSON.stringify({ store_id: store.id }),
-      });
-      setActiveStore({ id: store.id, name: store.name });
-      setView("workspace");
+      await setActiveStore(nextStoreId);
+      setStoreId(nextStoreId);
     } catch (reason) {
-      setError((reason as Error).message);
-    } finally {
-      setBusy(false);
+      setError(errorMessage(reason));
     }
   }
 
-  async function handleLogout() {
-    setBusy(true);
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!storeId) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const payload = profileInput(form);
+      const saved = profile
+        ? await updateStoreProfile(storeId, profile, payload)
+        : await createStoreProfile(storeId, payload);
+      setProfile(saved);
+      setForm(formFromProfile(saved));
+      setNotice(`门店档案已保存为 V${saved.current_version}。关键经营事实变更后需要重新确认。`);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmFacts() {
+    if (!storeId || !profile) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const confirmed = await confirmStoreProfileFacts(storeId, profile);
+      setProfile(confirmed);
+      setForm(formFromProfile(confirmed));
+      setNotice(`门店档案 V${confirmed.current_version} 已确认。`);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function reloadProfile() {
+    if (!storeId) return;
+    setProfileLoading(true);
     setError("");
     try {
-      await request("/auth/logout", {
-        method: "POST",
-        headers: { "X-CSRF-Token": csrfToken },
-      });
+      const latest = await getStoreProfile(storeId);
+      setProfile(latest);
+      setForm(formFromProfile(latest));
+      setNotice("已加载服务器最新版本。");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function signOut() {
+    setError("");
+    try {
+      await logout();
+      clearCsrfToken();
       setUser(null);
       setStores([]);
-      setActiveStore(null);
-      setCsrfToken("");
-      setView("login");
+      setStoreId("");
+      setProfile(null);
+      setPassword("");
+      setNotice("");
     } catch (reason) {
-      setError((reason as Error).message);
-    } finally {
-      setBusy(false);
+      setError(errorMessage(reason));
     }
   }
 
-  if (view === "loading") {
-    return <main className="auth-shell"><p role="status">正在验证登录状态…</p></main>;
+  if (loading) {
+    return <main className="center-state"><span className="spinner" />正在验证登录状态…</main>;
   }
 
-  if (view === "login") {
+  if (!user) {
     return (
-      <main className="auth-shell">
-        <section className="auth-card" aria-labelledby="login-title">
-          <div className="brand-lockup"><span className="brand-mark">AI</span><strong>AI 门店运营官</strong></div>
-          <p className="eyebrow">STORE OPERATOR</p>
-          <h1 id="login-title">登录工作台</h1>
+      <main className="auth-layout">
+        <section className="auth-card">
+          <div className="brand-line"><span className="brand-mark">AI</span><strong>AI 门店运营官</strong></div>
+          <p className="eyebrow">STORE OPERATIONS</p>
+          <h1>登录门店工作台</h1>
           <p className="muted">使用已开通门店成员权限的账号登录。</p>
-          <form onSubmit={handleLogin}>
-            <label htmlFor="email">邮箱</label>
-            <input id="email" type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} />
-            <label htmlFor="password">密码</label>
-            <input id="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
-            {error && <p className="error" role="alert">{error}</p>}
-            <button type="submit" disabled={busy}>{busy ? "正在登录…" : "登录"}</button>
+          {error && <div className="alert error" role="alert">{error}</div>}
+          <form onSubmit={submitLogin}>
+            <Field label="邮箱" value={email} onChange={setEmail} placeholder="name@example.com" required />
+            <label className="field">
+              <span>密码 *</span>
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+            </label>
+            <button className="primary full" type="submit" disabled={!email.trim() || !password || loading}>
+              {loading ? "登录中…" : "登录"}
+            </button>
           </form>
-          <p className="security-note">登录凭证由服务端通过 HttpOnly Cookie 管理；页面不会保存 Session Token。</p>
-        </section>
-      </main>
-    );
-  }
-
-  if (view === "stores") {
-    return (
-      <main className="auth-shell">
-        <section className="auth-card store-card" aria-labelledby="store-title">
-          <div className="brand-lockup"><span className="brand-mark">AI</span><strong>AI 门店运营官</strong></div>
-          <p className="eyebrow">STORE CONTEXT</p>
-          <h1 id="store-title">选择门店</h1>
-          <p className="muted">{user?.email} · 请选择本次要操作的门店</p>
-          {error && <p className="error" role="alert">{error}</p>}
-          {stores.length === 0 ? (
-            <div className="empty-state"><strong>当前账号暂无可访问门店</strong><p>请联系门店管理员确认成员关系。</p></div>
-          ) : (
-            <ul className="store-list">
-              {stores.map((store) => (
-                <li key={store.id}>
-                  <button className="store-choice" type="button" disabled={busy} onClick={() => void handleSelectStore(store)}>
-                    <span><strong>{store.name}</strong><small>{store.role === "owner" ? "门店负责人" : "门店成员"}</small></span>
-                    <span aria-hidden="true">进入 →</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <button className="text-button" type="button" disabled={busy} onClick={() => void handleLogout()}>退出登录</button>
+          <p className="footnote">登录使用服务端 Session Cookie 与 CSRF 防护；本页面不保存密码。</p>
         </section>
       </main>
     );
   }
 
   return (
-    <div className="shell">
+    <div className="app-shell">
       <header className="topbar">
-        <div className="brand-lockup"><span className="brand-mark">AI</span><strong>AI 门店运营官</strong></div>
-        <div className="account-actions">
-          <span className="active-store">{activeStore?.name}</span>
-          <button className="secondary-button" type="button" onClick={() => setView("stores")}>切换门店</button>
-          <button className="text-button" type="button" disabled={busy} onClick={() => void handleLogout()}>退出</button>
+        <div className="brand-line"><span className="brand-mark">AI</span><strong>AI 门店运营官</strong></div>
+        <div className="top-actions">
+          {stores.length > 0 && (
+            <label className="store-picker">
+              <span>当前门店</span>
+              <select value={storeId} onChange={(event) => void changeStore(event.target.value)}>
+                {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
+              </select>
+            </label>
+          )}
+          <span className="user-email">{user.email}</span>
+          <button className="quiet-button" type="button" onClick={() => void signOut()}>退出</button>
         </div>
       </header>
-      <main className="workspace">
-        <p className="eyebrow">STORE WORKSPACE</p>
-        <h1>门店工作台</h1>
-        <p className="muted">当前门店：{activeStore?.name}</p>
-        <section className="notice">
-          <strong>身份与门店上下文已连接</strong>
-          <p>登录、Session Cookie、CSRF 校验和服务端门店成员授权已接入。</p>
-          <p>门店档案、商品服务、活动优惠、品牌规范、客群、知识库和素材资产页面将按 Demo v1.8 分批接入；当前尚未开放这些业务操作。</p>
-        </section>
-        {error && <p className="error" role="alert">{error}</p>}
-      </main>
-      <footer>当前阶段仅开放身份认证与门店上下文，不代表完整业务页面已交付。</footer>
+      <div className="workspace">
+        <aside className="sidebar">
+          <div className="side-label">门店工作台</div>
+          <div className="side-link disabled" aria-disabled="true">AI 营销 · 待接入</div>
+          <div className="side-link disabled" aria-disabled="true">营销任务 · 待接入</div>
+          <div className="side-label spaced">门店资料</div>
+          <a className="side-link active" href="#store:profile">门店档案</a>
+          <div className="side-link disabled" aria-disabled="true">商品与服务 · 待接入</div>
+          <div className="side-link disabled" aria-disabled="true">活动与优惠 · 待接入</div>
+          <div className="side-link disabled" aria-disabled="true">品牌规范 · 待接入</div>
+          <div className="side-link disabled" aria-disabled="true">客群与经营 · 待接入</div>
+          <div className="side-link disabled" aria-disabled="true">门店知识库 · 待接入</div>
+          <div className="side-link disabled" aria-disabled="true">素材资产库 · 待接入</div>
+          <div className="side-link disabled" aria-disabled="true">渠道账号 · 待接入</div>
+          <div className="sidebar-foot">当前仅接入真实门店档案。未接入模块明确标记，不使用演示数据冒充生产数据。</div>
+        </aside>
+        <main className="content">
+          <div className="page-heading">
+            <div>
+              <p className="eyebrow">STORE PROFILE</p>
+              <h1>门店档案</h1>
+              <p className="muted">维护门店基础经营事实，为后续策略与内容生成提供可信上下文。</p>
+            </div>
+            {profile && <div className="version-chip">V{profile.current_version} · {profile.fact_status === "confirmed" ? "已确认" : "待确认"}</div>}
+          </div>
+          {error && (
+            <div className="alert error" role="alert">
+              <span>{error}</span>
+              {error.includes("changed") || error.includes("冲突") ? <button className="text-button" onClick={() => void reloadProfile()}>重新加载</button> : null}
+            </div>
+          )}
+          {notice && <div className="alert success" role="status">{notice}</div>}
+          {!stores.length ? (
+            <section className="empty-card">
+              <h2>当前账号尚未加入门店</h2>
+              <p>请联系门店所有者邀请你加入后，再维护门店经营资料。</p>
+            </section>
+          ) : profileLoading ? (
+            <div className="loading-card"><span className="spinner" />正在读取门店档案…</div>
+          ) : (
+            <form className="profile-form" onSubmit={saveProfile}>
+              <section className="form-card">
+                <div className="section-title"><div><h2>门店基本信息</h2><p>门店主体、业态和品牌归属。</p></div></div>
+                <div className="form-grid">
+                  <Field label="门店名称" value={form.display_name} onChange={(value) => change("display_name", value)} required />
+                  <Field label="品牌 / 连锁归属" value={form.brand_name} onChange={(value) => change("brand_name", value)} />
+                  <Field label="门店类型" value={form.business_type} onChange={(value) => change("business_type", value)} placeholder="直营门店 / 加盟门店 / 单体门店" />
+                  <Field label="业态分类" value={form.industry_category} onChange={(value) => change("industry_category", value)} placeholder="餐饮、饮品、美容、零售…" />
+                  <div className="field span-2">
+                    <span>门店简介</span>
+                    <textarea rows={3} value={form.introduction} onChange={(event) => change("introduction", event.target.value)} placeholder="介绍门店主营业务、服务特色和经营定位。" />
+                  </div>
+                </div>
+              </section>
+              <section className="form-card">
+                <div className="section-title"><div><h2>联系方式与地址</h2><p>请填写可用于经营信息核对的真实资料。</p></div></div>
+                <div className="form-grid">
+                  <Field label="国家 / 地区代码" value={form.country_code} onChange={(value) => change("country_code", value)} placeholder="CN" />
+                  <Field label="联系电话" value={form.phone} onChange={(value) => change("phone", value)} />
+                  <Field label="省 / 州" value={form.province} onChange={(value) => change("province", value)} />
+                  <Field label="城市" value={form.city} onChange={(value) => change("city", value)} />
+                  <Field label="区 / 县" value={form.district} onChange={(value) => change("district", value)} />
+                  <Field label="区域 / 商圈" value={form.region} onChange={(value) => change("region", value)} />
+                  <div className="field span-2">
+                    <span>详细地址</span>
+                    <input value={form.address} onChange={(event) => change("address", event.target.value)} placeholder="街道、门牌号、楼层及店铺位置" />
+                  </div>
+                </div>
+              </section>
+              <section className="form-card">
+                <div className="section-title"><div><h2>营业与接待</h2><p>明确营业时间和服务边界，避免 AI 对外作出未经确认的承诺。</p></div></div>
+                <div className="form-grid">
+                  <Field label="营业时间摘要" value={form.opening_summary} onChange={(value) => change("opening_summary", value)} placeholder="例如 10:00–22:00" />
+                  <Field label="工作日营业时间" value={form.weekday_hours} onChange={(value) => change("weekday_hours", value)} />
+                  <Field label="周末营业时间" value={form.weekend_hours} onChange={(value) => change("weekend_hours", value)} />
+                  <Field label="节假日营业时间" value={form.holiday_hours} onChange={(value) => change("holiday_hours", value)} />
+                  <Field label="服务半径" value={form.service_radius} onChange={(value) => change("service_radius", value)} placeholder="例如 3 公里" />
+                  <Field label="服务能力" value={form.service_capabilities} onChange={(value) => change("service_capabilities", value)} placeholder="堂食、自取、外卖（用顿号分隔）" />
+                  <div className="field span-2">
+                    <span>临时停业日期（JSON 数组）</span>
+                    <textarea rows={3} value={form.temporary_closures} onChange={(event) => change("temporary_closures", event.target.value)} />
+                    <small>示例：[{"{"}"date":"2026-12-25","reason":"节假日停业"{"}"}]</small>
+                  </div>
+                </div>
+              </section>
+              <div className="form-footer">
+                <p>保存会创建新版本，并将档案事实状态重置为「待确认」。</p>
+                <div className="form-actions">
+                  {profile && <button className="secondary" type="button" onClick={() => void reloadProfile()}>放弃修改</button>}
+                  {profile && profile.fact_status !== "confirmed" && (
+                    <button className="secondary" type="button" onClick={() => void confirmFacts()} disabled={saving}>
+                      确认资料
+                    </button>
+                  )}
+                  <button className="primary" type="submit" disabled={saving || !form.display_name.trim()}>
+                    {saving ? "处理中…" : profile ? "保存档案" : "创建门店档案"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

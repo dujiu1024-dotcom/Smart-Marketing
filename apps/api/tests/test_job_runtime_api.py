@@ -1,12 +1,20 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
+
+import pytest
 
 from sqlalchemy.orm import Session
 
 from store_operator.ai_gateway.errors import SideEffectState
 from store_operator.auth.security import hash_password
 from store_operator.jobs import claim_job, create_job, fail_job
+from store_operator.jobs.service import (
+    JobIdempotencyConflict,
+    LeaseLostError,
+    complete_job,
+    recover_expired_jobs,
+)
 from store_operator.models import (
     AIInvocation,
     AIUsageRecord,
@@ -15,6 +23,7 @@ from store_operator.models import (
     StoreMembership,
     User,
 )
+from store_operator.models.job_runtime import JobAttempt, OutboxEvent
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -330,3 +339,102 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
     )
     assert hidden.status_code == 404
     assert hidden.json()["error"]["code"] == "AI_INVOCATION_NOT_FOUND"
+
+
+
+def test_job_creation_idempotency_creates_only_one_outbox_event(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Idempotent Job Store")
+
+    first = create_job_for_store(db_session, user, store, "same-job-request")
+    replay = create_job_for_store(db_session, user, store, "same-job-request")
+
+    assert replay.id == first.id
+    events = (
+        db_session.query(OutboxEvent)
+        .filter(OutboxEvent.aggregate_id == first.id)
+        .all()
+    )
+    assert len(events) == 1
+    assert events[0].event_type == "job.dispatch_requested"
+
+    with pytest.raises(JobIdempotencyConflict):
+        create_job(
+            db_session,
+            job_type="copy.generate",
+            payload_ref={"schema_version": 1, "different": True},
+            idempotency_key="same-job-request",
+            store_id=store.id,
+            actor_type="user",
+            actor_user_id=user.id,
+        )
+
+
+def test_revoked_store_membership_cancels_job_before_worker_claim(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Revoked Membership Store")
+    job = create_job_for_store(db_session, user, store, "membership-revoked-job")
+    membership = (
+        db_session.query(StoreMembership)
+        .filter(
+            StoreMembership.store_id == store.id,
+            StoreMembership.user_id == user.id,
+        )
+        .one()
+    )
+    membership.status = "revoked"
+    db_session.flush()
+
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="revoked-membership-worker",
+        now=datetime.now(UTC),
+    )
+
+    assert claim is None
+    db_session.refresh(job)
+    assert job.status == "cancelled"
+    assert job.error_code == "ACTOR_MEMBERSHIP_REVOKED"
+    assert job.lease_token is None
+
+
+def test_expired_worker_lease_is_fenced_and_requires_reconciliation(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Expired Lease Store")
+    job = create_job_for_store(db_session, user, store, "expired-lease-job")
+    claimed_at = datetime.now(UTC)
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="worker-before-restart",
+        lease_seconds=1,
+        now=claimed_at,
+    )
+    assert claim is not None
+
+    recovered_at = claimed_at + timedelta(seconds=2)
+    assert recover_expired_jobs(db_session, now=recovered_at) == 1
+    db_session.refresh(job)
+    db_session.refresh(claim.attempt)
+
+    assert job.status == "needs_human"
+    assert job.error_code == "WORKER_LEASE_EXPIRED"
+    assert job.lease_token is None
+    assert claim.attempt.status == "lease_expired"
+
+    with pytest.raises(LeaseLostError):
+        complete_job(
+            db_session,
+            job_id=job.id,
+            lease_token=claim.attempt.lease_token,
+            worker_id="worker-before-restart",
+            result_ref={"should_not_commit": True},
+            now=recovered_at + timedelta(seconds=1),
+        )

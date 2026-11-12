@@ -1,11 +1,14 @@
 import socket
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import httpcore
+import httpx
 
 from store_operator_worker.hot_topics import (
     _PinnedSyncBackend,
+    MAX_FEED_BYTES,
+    _collect_source,
     _brand_guideline_text,
     _brand_risk_flags,
     _match_score,
@@ -146,3 +149,147 @@ def test_pinned_backend_never_resolves_the_original_hostname_again(monkeypatch):
     )
     backend = _PinnedSyncBackend("feeds.example.test", "93.184.216.34")
     assert backend.connect_tcp("feeds.example.test", 443) == "93.184.216.34"
+
+
+class _FakeResponse:
+    def __init__(self, chunks, status_code=200, url="https://feeds.example.test/rss"):
+        self.chunks = chunks
+        self.status_code = status_code
+        self.url = url
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def raise_for_status(self):
+        if self.status_code >= 400 or 300 <= self.status_code < 400:
+            request = httpx.Request("GET", self.url)
+            response = httpx.Response(self.status_code, request=request)
+            raise httpx.HTTPStatusError("upstream status", request=request, response=response)
+
+    def iter_bytes(self):
+        yield from self.chunks
+
+
+class _FakeClient:
+    response = None
+    init_kwargs = None
+
+    def __init__(self, *args, **kwargs):
+        type(self).init_kwargs = kwargs
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+    def stream(self, method, url):
+        return type(self).response
+
+
+class _FakeDatabase:
+    def __init__(self, existing=None):
+        self.existing = existing
+        self.added = []
+
+    def scalar(self, statement):
+        return self.existing
+
+    def add(self, item):
+        self.added.append(item)
+
+    def flush(self):
+        return None
+
+
+def _fake_public_dns(monkeypatch):
+    monkeypatch.setattr(
+        "store_operator_worker.hot_topics.socket.getaddrinfo",
+        lambda *args, **kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))
+        ],
+    )
+
+
+def _fake_source():
+    return SimpleNamespace(
+        id="source-1",
+        source_url="https://feeds.example.test/rss",
+        terms_url="https://feeds.example.test/terms",
+        permitted_use="Public feed permitted for editorial discovery",
+        health_status="unknown",
+        last_success_at=None,
+        last_failure_at=None,
+    )
+
+
+def test_collect_source_rejects_oversized_stream_before_buffering(monkeypatch):
+    _fake_public_dns(monkeypatch)
+    _FakeClient.response = _FakeResponse([b"x" * (MAX_FEED_BYTES + 1)])
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _FakeClient)
+    from store_operator_worker.handlers import JobExecutionError
+
+    try:
+        _collect_source(_FakeDatabase(), _fake_source(), {"feeds.example.test"})
+    except JobExecutionError as exc:
+        assert exc.code == "SOURCE_FEED_TOO_LARGE"
+        assert exc.retryable is False
+    else:
+        raise AssertionError("oversized feed must be rejected")
+    assert _FakeClient.init_kwargs["follow_redirects"] is False
+
+
+def test_collect_source_maps_non_2xx_to_retryable_fetch_error(monkeypatch):
+    _fake_public_dns(monkeypatch)
+    _FakeClient.response = _FakeResponse([], status_code=503)
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _FakeClient)
+    from store_operator_worker.handlers import JobExecutionError
+
+    try:
+        _collect_source(_FakeDatabase(), _fake_source(), {"feeds.example.test"})
+    except JobExecutionError as exc:
+        assert exc.code == "SOURCE_FETCH_FAILED"
+        assert exc.retryable is True
+    else:
+        raise AssertionError("non-2xx feed response must fail")
+
+
+def test_collect_source_deduplicates_existing_topic_and_marks_source_healthy(monkeypatch):
+    _fake_public_dns(monkeypatch)
+    payload = b"""<?xml version="1.0"?>
+    <rss version="2.0"><channel><item>
+      <guid>story-1</guid><title>Local spring drink trend</title>
+      <link>https://feeds.example.test/story/1</link>
+      <description>Seasonal drink launch</description>
+    </item></channel></rss>"""
+    _FakeClient.response = _FakeResponse([payload])
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _FakeClient)
+    existing = SimpleNamespace(
+        last_seen_at=None,
+        expires_at=datetime.now(UTC) + timedelta(days=1),
+        evidence_status="collected",
+    )
+    db = _FakeDatabase(existing=existing)
+    source = _fake_source()
+
+    inserted = _collect_source(db, source, {"feeds.example.test"})
+
+    assert inserted == 0
+    assert db.added == []
+    assert existing.last_seen_at is not None
+    assert source.health_status == "healthy"
+    assert source.last_success_at is not None
+
+
+def test_safe_https_url_rejects_nonstandard_https_ports(monkeypatch):
+    from store_operator_worker.handlers import JobExecutionError
+
+    try:
+        _safe_https_url("https://feeds.example.test:8443/rss", {"feeds.example.test"})
+    except JobExecutionError as exc:
+        assert exc.code == "SOURCE_URL_INVALID"
+    else:
+        raise AssertionError("nonstandard HTTPS ports must be rejected")

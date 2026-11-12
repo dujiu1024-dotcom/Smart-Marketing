@@ -789,6 +789,34 @@ def test_failed_step_recovery_cancel_and_archive_transitions(
     )
     assert task is not None
     assert step is not None
+    requirement_snapshot = RequirementSnapshot(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task_id,
+        snapshot_no=1,
+        payload_json={"requirement": {}, "business_facts": []},
+        content_fingerprint="a" * 64,
+        created_by_user_id=user.id,
+        confirmed_by_user_id=user.id,
+        confirmed_at=datetime.now(UTC),
+    )
+    db_session.add(requirement_snapshot)
+    db_session.flush()
+    strategy_snapshot = StrategySnapshot(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task_id,
+        requirement_snapshot_id=requirement_snapshot.id,
+        snapshot_no=1,
+        payload_json={"strategy": {}},
+        content_fingerprint="b" * 64,
+        created_by_user_id=user.id,
+        confirmed_by_user_id=user.id,
+        confirmed_at=datetime.now(UTC),
+    )
+    db_session.add(strategy_snapshot)
+    task.current_requirement_snapshot_id = requirement_snapshot.id
+    task.current_strategy_snapshot_id = strategy_snapshot.id
     task.lifecycle_status = "failed"
     task.version = 2
     step.status = "failed"

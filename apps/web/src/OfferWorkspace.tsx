@@ -106,6 +106,9 @@ function toOfferInput(form: OfferForm): OfferInput {
     if (form.discount_type === "percent" && value > 100) throw new Error("折扣比例不能超过 100。");
     terms = { minimum_spend: form.minimum_spend.trim(), currency: form.currency.trim().toUpperCase(), discount_type: form.discount_type, discount_value: form.discount_value.trim() };
   }
+  const start = zonedTimestamp(form.starts_at, "开始时间");
+  const end = zonedTimestamp(form.ends_at, "结束时间");
+  if (start && end && Date.parse(end) <= Date.parse(start)) throw new Error("结束时间必须晚于开始时间。");
   const usage = form.usage_limit.trim();
   if (usage && (!Number.isInteger(Number(usage)) || Number(usage) < 1)) throw new Error("使用次数上限必须为正整数。");
   return {
@@ -113,8 +116,8 @@ function toOfferInput(form: OfferForm): OfferInput {
     offer_type: form.offer_type,
     terms_json: terms,
     eligibility_rules_json: eligibility as Record<string, unknown>,
-    starts_at: zonedTimestamp(form.starts_at, "开始时间"),
-    ends_at: zonedTimestamp(form.ends_at, "结束时间"),
+    starts_at: start,
+    ends_at: end,
     stacking_policy: form.stacking_policy.trim() || null,
     usage_limit: usage ? Number(usage) : null,
     status: form.status,
@@ -234,7 +237,7 @@ export default function OfferWorkspace({ storeId }: { storeId: string }) {
       <section className="empty-card"><h2>还没有活动或优惠</h2><p>添加真实活动规则和适用范围，保存后由门店成员核对并确认。</p><button className="primary" type="button" onClick={() => open("new")}>创建第一项活动</button></section> :
       <section className="form-card"><div className="section-title"><div><h2>活动与优惠清单</h2><p>共 {items.length} 项</p></div></div><div className="product-list">
         {items.map((item) => <button className="product-row" type="button" key={item.id} onClick={() => open(item.id)}>
-          <span className="product-main"><strong>{item.title}</strong><small>{item.offer_type} · {item.starts_at ? new Date(item.starts_at).toLocaleString() : "未设开始时间"} – {item.ends_at ? new Date(item.ends_at).toLocaleString() : "未设结束时间"}</small></span>
+          <span className="product-main"><strong>{item.title}</strong><small>{item.offer_type} · {item.starts_at ? item.starts_at : "未设开始时间"} – {item.ends_at ? item.ends_at : "未设结束时间"}</small></span>
           <span className="product-meta">{({draft:"草稿",active:"生效中",paused:"已暂停",expired:"已过期",archived:"已归档"})[item.status]}</span>
           <span className={item.fact_status === "confirmed" ? "fact-status confirmed" : "fact-status pending"}>{item.fact_status === "confirmed" ? "已确认" : "待确认"}</span><span>›</span>
         </button>)}
@@ -262,7 +265,7 @@ export default function OfferWorkspace({ storeId }: { storeId: string }) {
         {form.offer_type === "gift" && <Field label="赠品说明" value={form.gift_description} onChange={(v) => change("gift_description", v)} />}
         {form.offer_type === "threshold_discount" && <><Field label="最低消费金额" type="number" value={form.minimum_spend} onChange={(v) => change("minimum_spend", v)} /><Field label="币种代码" value={form.currency} onChange={(v) => change("currency", v)} placeholder="CNY" /><label className="field"><span>优惠方式</span><select value={form.discount_type} onChange={(e) => change("discount_type", e.target.value as OfferForm["discount_type"])}><option value="amount">减免金额</option><option value="percent">折扣比例</option></select></label><Field label="优惠值" type="number" value={form.discount_value} onChange={(v) => change("discount_value", v)} /></>}
       </div>
-      {(form.offer_type === "buy_x_get_y" || form.offer_type === "gift") && <div className="field" style={{marginTop:16}}><span>适用商品</span>{products.length ? products.map((p) => <label key={p.id} className="product-check"><input type="checkbox" checked={form.eligible_product_ids.includes(p.id)} onChange={(e) => toggleProduct(p.id, e.target.checked)} /><span>{p.name}</span></label>) : <small>当前门店尚无商品资料，请先维护商品与服务。</small>}</div>}
+      {(form.offer_type === "buy_x_get_y" || form.offer_type === "gift") && <div className="field product-check-list"><span>适用商品</span>{products.length ? products.map((p) => <label key={p.id} className="product-check"><input type="checkbox" checked={form.eligible_product_ids.includes(p.id)} onChange={(e) => toggleProduct(p.id, e.target.checked)} /><span>{p.name}</span></label>) : <small>当前门店尚无商品资料，请先维护商品与服务。</small>}</div>}
       </section>
       <section className="form-card"><div className="section-title"><div><h2>适用条件与有效期</h2><p>有效时间使用 ISO 8601 并显式带时区，例如 +08:00。</p></div></div><div className="form-grid">
         <Field label="开始时间（含时区）" value={form.starts_at} onChange={(v) => change("starts_at", v)} placeholder="2026-12-01T09:00:00+08:00" />

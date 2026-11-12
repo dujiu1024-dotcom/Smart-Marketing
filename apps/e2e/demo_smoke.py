@@ -179,6 +179,21 @@ async def main() -> None:
             state="visible"
         )
 
+        # Mobile viewport and keyboard navigation are part of the Demo acceptance gate.
+        await page.set_viewport_size({"width": 390, "height": 844})
+        brief_tab = page.locator('[data-task-tab="brief"]')
+        await brief_tab.focus()
+        await brief_tab.press("ArrowRight")
+        assert await page.locator('[data-task-tab="strategy"]').get_attribute(
+            "aria-selected"
+        ) == "true"
+        horizontal_overflow = await page.evaluate(
+            "document.documentElement.scrollWidth - window.innerWidth"
+        )
+        assert horizontal_overflow <= 2, (
+            f"Mobile Demo has unexpected horizontal overflow: {horizontal_overflow}px"
+        )
+
         assert not page_errors, f"Uncaught browser errors: {page_errors}"
         print(
             "Frozen Demo Playwright smoke passed: 9 store routes, 8 store tabs, "

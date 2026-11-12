@@ -1053,6 +1053,22 @@ export interface MetricObservationRecord {
   published_work_id: string | null;
   marketing_task_id: string | null;
 }
+export interface PublishedWorkRecord {
+  id: string; task_id: string | null; publish_operation_id: string | null;
+  channel_account_id: string | null; channel_key: string; external_work_id: string;
+  title: string | null; permalink: string | null; published_at: string | null;
+  ownership_status: string; verified_at: string | null; source_snapshot: Record<string, unknown>;
+}
+export interface BusinessOutcomeEvidenceRecord {
+  id: string; outcome_type: string; value_numeric: string; currency: string | null;
+  source_system: string; source_record_id: string | null; source_evidence_ref: string | null;
+  occurred_at: string; authenticity_status: string; integrity_status: string;
+}
+export interface AttributionEvidenceRecord {
+  id: string; marketing_task_id: string; published_work_id: string; outcome_evidence_id: string;
+  attribution_method: string; evidence_strength: string; allocation_percent: string;
+  status: string; snapshot: Record<string, unknown>;
+}
 export interface EffectsOverview {
   items: Array<{
     metric_key: string; display_name: string; metric_tier: string; value: string | null;
@@ -1101,6 +1117,8 @@ export function createMetricObservation(storeId: string, payload: {
   metric_key: string; value_numeric: string | null; currency: string | null; period_start: string | null;
   period_end: string | null; period_timezone: string; source_record_id: string | null;
   source_evidence_ref: string | null;
+  published_work_id?: string | null;
+  marketing_task_id?: string | null;
 }): Promise<{ item: MetricObservationRecord; message: string }> {
   return request("/effects/observations", { method: "POST", body: JSON.stringify(payload) }, storeId);
 }
@@ -1111,6 +1129,22 @@ export function importMetricCsv(storeId: string, csvText: string): Promise<{
   return request("/effects/import", { method: "POST", body: JSON.stringify({ csv_text: csvText }) }, storeId);
 }
 
+export function getPublishedWorks(storeId: string): Promise<{ items: PublishedWorkRecord[]; total: number; verified_count: number }> {
+  return request("/effects/published-works", {}, storeId);
+}
+export function getBusinessOutcomes(storeId: string): Promise<{ items: BusinessOutcomeEvidenceRecord[]; total: number }> {
+  return request("/effects/business-outcomes", {}, storeId);
+}
+export function getAttributions(storeId: string): Promise<{ items: AttributionEvidenceRecord[]; total: number }> {
+  return request("/effects/attributions", {}, storeId);
+}
+export function registerPublishedWorkFromReadback(storeId: string, operationId: string): Promise<{ item: PublishedWorkRecord; replayed: boolean }> {
+  return request(
+    `/effects/published-works/from-publish-operation/${encodeURIComponent(operationId)}`,
+    { method: "POST" },
+    storeId,
+  );
+}
 export function requestOpportunityCollection(storeId: string, idempotencyKey: string): Promise<{
   status: string; job_id: string | null; source_count?: number; message?: string;
 }> {

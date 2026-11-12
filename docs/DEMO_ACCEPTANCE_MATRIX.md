@@ -322,3 +322,17 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | Demo 全量页面与导航 | 未完成 | 本 PR 仅接入门店档案，不代表完整 Demo 已生产化 |
 
 该 PR 同时为 Vite 开发服务与 Compose Nginx 增加同源 `/api` 代理。CI 验收必须覆盖前端测试、构建、E2E 与 Infrastructure；本地测试未执行。
+
+
+## 2026-11-12 #6 商品与服务生产 Web 接入（PR pending）
+
+| 能力 | 当前状态 | 边界 |
+|---|---|---|
+| 商品列表 | 接入 GET /api/v1/store/products，按当前 X-Store-ID 查询 | 仅展示服务端记录，不使用 Demo seed |
+| 商品新建/编辑 | 独立二级路由 #store-editor:product:new / :id；POST/PATCH 使用 Idempotency-Key / If-Match | 版本冲突显示服务端错误，不静默覆盖 |
+| 商品事实确认 | 接入 /products/{id}/confirm-facts | 有未保存修改时禁用确认，保存后再确认新版本 |
+| 价格/库存 | Decimal 字符串传输；价格与币种成对提交，未知值保留为空 | 不推断或填充虚构价格/库存 |
+| 商品删除 | 使用 If-Match 版本校验并保留服务端审计历史 | 删除需二次确认 |
+| 活动优惠、品牌、客群、知识、素材、渠道账号 | 尚未接入 | 不显示模拟数据冒充生产数据 |
+
+本轮增加 ProductWorkspace 组件与 Vitest 列表/新建测试；完整浏览器回归及真实门店账号验收仍待执行。

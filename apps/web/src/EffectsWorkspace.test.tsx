@@ -15,7 +15,7 @@ describe("effects workspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.getEffectsOverview.mockResolvedValue({
-      items: [], trends: [],
+      items: [], trends: [], content_performance: [],
       data_quality: { total_observations: 0, verified_observations: 0, delayed_observations: 0,
         incomplete_or_anomalous_observations: 0, status: "unavailable", reason: "暂无可核验数据" },
       data_status: "unavailable",

@@ -708,7 +708,7 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
                 data.period_start.isoformat() if data.period_start else "",
                 data.period_end.isoformat() if data.period_end else "", data.source_record_id or "",
                 str(data.value_numeric) if data.value_numeric is not None else "NULL",
-                    data.currency or ""])
+                data.currency or "", ""])
             dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
             existed = db.scalar(select(MetricObservation.id).where(
                 MetricObservation.store_id == store_id,

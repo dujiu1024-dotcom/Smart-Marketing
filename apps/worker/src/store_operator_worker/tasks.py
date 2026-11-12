@@ -138,7 +138,7 @@ def relay_outbox(batch_size: int = 50) -> int:
                     (
                         (OutboxEvent.status == "publishing")
                         & or_(
-                            OutboxEvent.locked_until < now,
+                            OutboxEvent.locked_until <= now,
                             OutboxEvent.locked_until.is_(None),
                         )
                     ),

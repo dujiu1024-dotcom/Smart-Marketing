@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, importMetricCsv,
+import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, importMetricCsv,
   type EffectsOverview, type MetricDefinitionRecord, type MetricObservationRecord, type PublishedWorkRecord,
-  type BusinessOutcomeEvidenceRecord, type AttributionEvidenceRecord } from "./api";
+  type BusinessOutcomeEvidenceRecord, type AttributionEvidenceRecord, type DataSourceCapabilitySnapshotRecord } from "./api";
 
 const tierLabels = { content_performance: "内容表现", intent: "互动意向", business_outcome: "经营结果" } as const;
 const errorText = (error: unknown) => error instanceof Error ? error.message : "请求失败，请稍后重试。";
@@ -13,6 +13,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [publishedWorks, setPublishedWorks] = useState<PublishedWorkRecord[]>([]);
   const [businessOutcomes, setBusinessOutcomes] = useState<BusinessOutcomeEvidenceRecord[]>([]);
   const [attributions, setAttributions] = useState<AttributionEvidenceRecord[]>([]);
+  const [capabilities, setCapabilities] = useState<DataSourceCapabilitySnapshotRecord[]>([]);
   const [tier, setTier] = useState<"all" | keyof typeof tierLabels>("all");
   const [metricKey, setMetricKey] = useState("");
   const [value, setValue] = useState("");
@@ -31,12 +32,14 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [summary, dictionary, history, works, outcomes, attributionHistory] = await Promise.all([
+      const [summary, dictionary, history, works, outcomes, attributionHistory, capabilityHistory] = await Promise.all([
         getEffectsOverview(storeId), getMetricDefinitions(), getMetricObservations(storeId),
         getPublishedWorks(storeId), getBusinessOutcomes(storeId), getAttributions(storeId),
+        getDataSourceCapabilities(storeId),
       ]);
       setOverview(summary); setDefinitions(dictionary.items); setObservations(history.items);
       setPublishedWorks(works.items); setBusinessOutcomes(outcomes.items); setAttributions(attributionHistory.items);
+      setCapabilities(capabilityHistory.items);
       setMetricKey(current => current || dictionary.items[0]?.metric_key || "");
     } catch (reason) { setError(errorText(reason)); }
     finally { setLoading(false); }
@@ -104,6 +107,13 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
           <div><strong>已核验作品：{publishedWorks.filter(item => ["verified_system_publish", "verified_platform_api"].includes(item.ownership_status) && item.verified_at).length}</strong><p className="muted">待核验或商家自行申报的作品不会进入归因。</p></div>
           <div><strong>经营结果证据：{businessOutcomes.length}</strong><p className="muted">商家报告与已核验结果分开记录。</p></div>
           <div><strong>有效归因：{attributions.length}</strong><p className="muted">归因保存证据快照和分摊比例。</p></div>
+        </div>
+        <div className="catalog-list">
+          {capabilities.map(item => <div className="catalog-item" key={item.id}>
+            <div className="catalog-item-main"><div><h3>{item.channel_key} · {item.capability_key}</h3><p>能力快照 v{item.snapshot_version}</p></div><span className="status-chip">{item.status}</span></div>
+            <p className="catalog-description">检查时间：{new Date(item.checked_at).toLocaleString()} · 已授权范围：{item.granted_scopes.join(", ") || "无"}</p>
+          </div>)}
+          {!capabilities.length && <p className="muted">暂无渠道数据读取能力快照；发布授权不代表已获得数据读取权限。</p>}
         </div>
         <div className="catalog-list">
           {publishedWorks.map(work => <div className="catalog-item" key={work.id}>

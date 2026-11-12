@@ -7,9 +7,9 @@ import logging
 import os
 import socket
 from collections.abc import Mapping
-from urllib.request import Request, urlopen
 from datetime import UTC, datetime
 from typing import Any
+from urllib.request import Request, urlopen
 
 _SENSITIVE_KEY_FRAGMENTS = (
     "password",

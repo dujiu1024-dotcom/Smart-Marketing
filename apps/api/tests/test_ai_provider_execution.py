@@ -17,7 +17,9 @@ from store_operator.ai_gateway import (
     SideEffectState,
     TextGenerateRequest,
     TextGenerateResponse,
-)from store_operator.models import AIInvocation, AIUsageRecord, Store
+)
+
+from store_operator.models import AIInvocation, AIUsageRecord, Store
 
 
 class FakeTextProvider:

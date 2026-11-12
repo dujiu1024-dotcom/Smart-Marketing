@@ -146,7 +146,8 @@
 | 渠道账号 / Provider | `test_channel_spec_api.py`、`test_channel_delivery_security.py`、抖音 Adapter/Webhook 测试覆盖渠道规格授权、密钥存储、OAuth state、发布确认和回读核验；PR #141 增加 ChannelAccount capability 跨店 404/凭据不泄露测试 | 账号列表、刷新、凭据状态和授权撤销后的访问矩阵仍需补齐 |
 | Job / AI Invocation | `test_job_runtime_api.py`、`test_ai_invocation_service.py` 覆盖 Job 和 AI Invocation 门店范围、取消/重试/人工恢复；`test_job_runtime_service.py` 覆盖幂等、租约 fencing、超时恢复、重复投递相关服务规则和未知副作用 | Job 创建后成员撤销、资源归属不一致、Worker 执行前权限重验及完整 API 越权矩阵仍需补齐 |
 | 日志 / Trace | `test_observability.py`、`test_tracing.py`、`test_health.py` 覆盖递归敏感字段脱敏、Trace 导出、请求 ID 和错误响应 | Cookie/Token/个人数据在所有日志、Trace、Provider 错误和 Worker 日志路径的端到端脱敏仍需补证 |
-| 经营指标 | 当前 API 代码树未发现门店经营指标/效果数据资源端点；现有 Demo 效果数据为本地模拟 | 目前无后端经营指标资源可执行 IDOR 测试；未来新增 API 必须以 StoreMembership 和 store_id 做服务端授权，不得依赖前端过滤 |\n| 文件 / 缓存 / 并发 | `test_object_storage_download.py` 与素材 API 测试覆盖部分下载和素材授权边界 | 缓存串店、对象直链、连接池上下文泄漏、并发切店、授权后撤销再写入等场景仍需自动化验证 |
+| 经营指标 | 当前 API 代码树未发现门店经营指标/效果数据资源端点；现有 Demo 效果数据为本地模拟 | 目前无后端经营指标资源可执行 IDOR 测试；未来新增 API 必须以 StoreMembership 和 store_id 做服务端授权，不得依赖前端过滤 |
+| 文件 / 缓存 / 并发 | `test_object_storage_download.py` 与素材 API 测试覆盖部分下载和素材授权边界 | 缓存串店、对象直链、连接池上下文泄漏、并发切店、授权后撤销再写入等场景仍需自动化验证 |
 
 ### Issue #135 本轮 E2E 状态
 

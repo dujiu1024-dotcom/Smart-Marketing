@@ -58,6 +58,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
       REDIS_URL: redis://redis:6379/0
+      OBJECT_STORAGE_ENDPOINT_URL: http://seaweedfs:8333
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -87,6 +88,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
       REDIS_URL: redis://redis:6379/0
+      OBJECT_STORAGE_ENDPOINT_URL: http://seaweedfs:8333
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }

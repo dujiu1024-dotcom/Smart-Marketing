@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -26,14 +26,22 @@ from store_operator.auth.errors import ApiError
 from store_operator.config import settings
 from store_operator.db import get_db
 from store_operator.jobs.service import JobIdempotencyConflict, create_job
+from store_operator.models.channel_delivery import ChannelAccount, PublishOperation
+from store_operator.models.content_delivery import PublishPackage, PublishPackageItem
+from store_operator.models.marketing_task import MarketingTask
 from store_operator.models.opportunity_effects import (
+    AttributionEvidence,
+    BusinessOutcomeEvidence,
+    DataSourceCapabilitySnapshot,
     HotTopic,
     HotTopicSource,
     MetricDefinition,
     MetricImportBatch,
     MetricObservation,
     OpportunityDecision,
+    PublishedWork,
     StoreOpportunity,
+    WorkOwnershipEvidence,
 )
 
 router = APIRouter(tags=["opportunities", "effects"])
@@ -65,6 +73,8 @@ class MetricObservationInput(BaseModel):
     source_record_id: str | None = Field(default=None, max_length=300)
     source_evidence_ref: str | None = Field(default=None, max_length=2048)
     supersedes_observation_id: UUID | None = None
+    published_work_id: UUID | None = None
+    marketing_task_id: UUID | None = None
 
     @field_validator("period_start", "period_end")
     @classmethod
@@ -109,6 +119,8 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
             else None
         ),
         "import_batch_id": str(item.import_batch_id) if item.import_batch_id else None,
+        "published_work_id": str(item.published_work_id) if item.published_work_id else None,
+        "marketing_task_id": str(item.marketing_task_id) if item.marketing_task_id else None,
     }
 
 def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservationInput,
@@ -134,7 +146,9 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
             payload.source_record_id or "",
         str(payload.value_numeric) if payload.value_numeric is not None else "NULL",
         payload.currency or "",
-        str(supersedes_observation_id) if supersedes_observation_id else ""])
+        str(supersedes_observation_id) if supersedes_observation_id else "",
+        str(payload.published_work_id) if payload.published_work_id else "",
+        str(payload.marketing_task_id) if payload.marketing_task_id else ""])
     dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
     existing = db.scalar(select(MetricObservation).where(
         MetricObservation.store_id == store_id, MetricObservation.deduplication_key == dedupe))
@@ -150,7 +164,9 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
         collected_at=datetime.now(UTC), definition_version=definition.definition_version,
         integrity_status="unknown", authenticity_status=authenticity, sync_status="current",
         deduplication_key=dedupe, supersedes_observation_id=supersedes_observation_id,
-        import_batch_id=import_batch_id)
+        import_batch_id=import_batch_id,
+        published_work_id=payload.published_work_id,
+        marketing_task_id=payload.marketing_task_id)
     db.add(item)
     db.flush()
     return item
@@ -767,7 +783,9 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
                 period_timezone=(row.get("period_timezone") or "").strip(),
                 currency=(row.get("currency") or "").strip().upper() or None,
                 source_record_id=(row.get("source_record_id") or "").strip() or None,
-                source_evidence_ref=(row.get("source_evidence_ref") or "").strip() or None)
+                source_evidence_ref=(row.get("source_evidence_ref") or "").strip() or None,
+                published_work_id=UUID(row["published_work_id"]) if row.get("published_work_id") else None,
+                marketing_task_id=UUID(row["marketing_task_id"]) if row.get("marketing_task_id") else None)
             material = "|".join([str(store_id), "manual", data.metric_key,
                 data.period_start.isoformat() if data.period_start else "",
                 data.period_end.isoformat() if data.period_end else "", data.source_record_id or "",

@@ -8,7 +8,7 @@ interface FormState {
   allergens: string; serviceProcess: string; deliveryMethod: string;
 }
 const empty: FormState = {
-  name: "", category: "", sku: "", specification: "", unit: "", price: "", currency: "CNY",
+  name: "", category: "", sku: "", specification: "", unit: "", price: "", currency: "",
   availability: "unknown", inventory: "", sellingPoints: "", description: "", materials: "",
   allergens: "", serviceProcess: "", deliveryMethod: "",
 };
@@ -39,10 +39,10 @@ function toProductInput(f: FormState): ProductInput {
     service_process: f.serviceProcess.trim() || null, delivery_method: f.deliveryMethod.trim() || null,
   };
 }
-function Input({ label, value, onChange, type = "text", placeholder }: {
-  label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string;
+function Input({ label, value, onChange, type = "text", placeholder, step, min }: {
+  label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; step?: string; min?: string;
 }) {
-  return <label className="field"><span>{label}</span><input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} /></label>;
+  return <label className="field"><span>{label}</span><input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} step={step} min={min} /></label>;
 }
 
 export default function ProductWorkspace({ storeId }: { storeId: string }) {
@@ -74,7 +74,7 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
     if (!route) { void refresh(); return; }
     if (route === "new") { setProduct(null); setForm(empty); setDirty(false); setError(""); setNotice(""); return; }
     let active = true;
-    setLoading(true); setError("");
+    setLoading(true); setError(""); setProduct(null); setForm(empty); setDirty(false);
     void getProduct(storeId, route).then((p) => {
       if (!active) return;
       setProduct(p); setForm(fromProduct(p)); setDirty(false);
@@ -156,10 +156,10 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
         <Input label="交付方式" value={form.deliveryMethod} onChange={(v) => change("deliveryMethod", v)} placeholder="堂食、自取、配送、到店服务…" />
       </div></section>
       <section className="form-card"><div className="section-title"><div><h2>价格与供应</h2><p>价格和币种必须同时填写；未知数据留空。</p></div></div><div className="form-grid">
-        <Input label="价格" type="number" value={form.price} onChange={(v) => change("price", v)} placeholder="例如 28.00" />
+        <Input label="价格" type="number" step="0.01" min="0" value={form.price} onChange={(v) => change("price", v)} placeholder="例如 28.00" />
         <Input label="币种代码" value={form.currency} onChange={(v) => change("currency", v)} placeholder="CNY" />
         <label className="field"><span>供应状态</span><select value={form.availability} onChange={(e) => change("availability", e.target.value as FormState["availability"])}><option value="unknown">未知</option><option value="available">在售</option><option value="unavailable">停售</option><option value="seasonal">季节供应</option><option value="limited">限量供应</option></select></label>
-        <Input label="库存 / 可用数量" type="number" value={form.inventory} onChange={(v) => change("inventory", v)} placeholder="未知可留空" />
+        <Input label="库存 / 可用数量" type="number" step="0.001" min="0" value={form.inventory} onChange={(v) => change("inventory", v)} placeholder="未知可留空" />
       </div></section>
       <section className="form-card"><div className="section-title"><div><h2>营销事实与服务说明</h2><p>影响 AI 对商品卖点和服务承诺的表达。</p></div></div><div className="form-grid">
         <label className="field span-2"><span>核心卖点（每行一项）</span><textarea rows={3} value={form.sellingPoints} onChange={(e) => change("sellingPoints", e.target.value)} /></label>

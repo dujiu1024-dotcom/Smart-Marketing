@@ -272,7 +272,11 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
     assert resolved.json()["status"] == "failed"
     hidden_resolve = identity_client.post(
         f"/api/v1/jobs/{job.id}/resolve",
-        headers={**headers, "X-Store-ID": str(store_b.id), "Idempotency-Key": "cross-store-job-resolve"},
+        headers={
+            **headers,
+            "X-Store-ID": str(store_b.id),
+            "Idempotency-Key": "cross-store-job-resolve",
+        },
         json={
             "resolution": "fail",
             "reason": "Store B must not resolve Store A job",

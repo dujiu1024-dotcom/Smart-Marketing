@@ -3,6 +3,20 @@ from store_operator.ai_gateway.errors import (
     ProviderErrorCode,
     SideEffectState,
 )
+from store_operator.ai_gateway.http_provider import (
+    HttpImageProvider,
+    HttpJsonTransport,
+    HttpOCRProvider,
+    HttpTextProvider,
+    HttpVisionProvider,
+    ProviderEndpoints,
+)
+from store_operator.ai_gateway.prompt_runtime import (
+    PromptContractError,
+    parse_and_validate_structured_output,
+    render_published_prompt,
+    validate_json_schema,
+)
 from store_operator.ai_gateway.protocols import (
     ImageProvider,
     OCRProvider,
@@ -26,6 +40,11 @@ from store_operator.ai_gateway.schemas import (
 )
 
 __all__ = [
+    "HttpImageProvider",
+    "HttpJsonTransport",
+    "HttpOCRProvider",
+    "HttpTextProvider",
+    "HttpVisionProvider",
     "ImageEditRequest",
     "ImageGenerateRequest",
     "ImageGenerateResponse",
@@ -33,9 +52,11 @@ __all__ = [
     "OCRProvider",
     "OCRRequest",
     "OCRResponse",
+    "PromptContractError",
     "ProviderCallContext",
     "ProviderCapability",
     "ProviderDescriptor",
+    "ProviderEndpoints",
     "ProviderError",
     "ProviderErrorCode",
     "ProviderRegistry",
@@ -46,4 +67,7 @@ __all__ = [
     "VisionInspectRequest",
     "VisionInspectResponse",
     "VisionProvider",
+    "parse_and_validate_structured_output",
+    "render_published_prompt",
+    "validate_json_schema",
 ]

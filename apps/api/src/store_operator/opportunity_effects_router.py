@@ -2178,16 +2178,13 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             422, "XLSX_INVALID", f"Workbook could not be read: {str(exc)[:200]}"
         ) from exc
     csv_payload = MetricImportInput(csv_text=output.getvalue(), source_format="xlsx")
-    return import_manual_observations(csv_payload, request, auth, context, db)
+    return _import_manual_observations(csv_payload, request, auth, context, db)
 
 
-@router.post("/effects/import")
-def import_manual_observations(payload: MetricImportInput, request: Request,
+def _import_manual_observations(payload: MetricImportInput, request: Request,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
-    if payload.source_format != "csv":
-        raise ApiError(422, "IMPORT_FORMAT_MISMATCH", "CSV endpoint only accepts CSV source format")
     store_id = _store_id(context)
     reader = csv.DictReader(io.StringIO(payload.csv_text))
     required = {"metric_key", "value_numeric", "period_timezone"}
@@ -2305,3 +2302,17 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
         "authenticity_status": "merchant_reported",
         "message": "导入记录均标记为商家报告；未经独立核验的数据不会进入正式经营结果或 ROI 计算。",
     }
+
+
+@router.post("/effects/import")
+def import_manual_observations(payload: MetricImportInput, request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+    if payload.source_format != "csv":
+        raise ApiError(
+            422,
+            "IMPORT_FORMAT_MISMATCH",
+            "CSV endpoint only accepts CSV source format",
+        )
+    return _import_manual_observations(payload, request, auth, context, db)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import {
-  archiveMediaAsset, completeAssetUpload, confirmMediaAssetUsageRights,
+  ApiError, archiveMediaAsset, completeAssetUpload, confirmMediaAssetUsageRights,
   createAssetUploadIntent, getMediaAssetDownloadUrl, getMediaAssets, putAssetFile,
   type MediaAsset,
 } from "./api";
@@ -51,16 +51,45 @@ export default function MediaAssetsWorkspace({ storeId }: { storeId: string }) {
       if (file.size <= 0 || file.size > MAX_BYTES) throw new Error("图片大小必须大于 0 且不超过 25 MB。");
       const digest = await sha256(file);
       const keyName = "store-operator.asset-upload." + storeId + "." + digest;
-      const idempotencyKey = sessionStorage.getItem(keyName) ?? crypto.randomUUID();
-      sessionStorage.setItem(keyName, idempotencyKey);
-      const intent = await createAssetUploadIntent(storeId, {
-        expected_mime_type: file.type as "image/jpeg" | "image/png" | "image/webp",
-        expected_byte_size: file.size,
-        expected_sha256: digest,
-        original_filename: file.name,
-      }, idempotencyKey);
-      await putAssetFile(intent, file);
-      const completed = await completeAssetUpload(storeId, intent.id);
+      const storedState = sessionStorage.getItem(keyName);
+      const state: { idempotencyKey: string; intentId?: string } = storedState
+        ? JSON.parse(storedState) as { idempotencyKey: string; intentId?: string }
+        : { idempotencyKey: crypto.randomUUID() };
+      sessionStorage.setItem(keyName, JSON.stringify(state));
+      let intentId = state.intentId;
+      if (!intentId) {
+        const intent = await createAssetUploadIntent(storeId, {
+          expected_mime_type: file.type as "image/jpeg" | "image/png" | "image/webp",
+          expected_byte_size: file.size,
+          expected_sha256: digest,
+          original_filename: file.name,
+        }, state.idempotencyKey);
+        intentId = intent.id;
+        state.intentId = intentId;
+        sessionStorage.setItem(keyName, JSON.stringify(state));
+      }
+      let completed: Awaited<ReturnType<typeof completeAssetUpload>> | null = null;
+      if (storedState && intentId) {
+        try { completed = await completeAssetUpload(storeId, intentId); }
+        catch (reason) {
+          if (!(reason instanceof ApiError && reason.code === "UPLOAD_OBJECT_NOT_FOUND")) throw reason;
+        }
+      }
+      if (!completed) {
+        const intent = await createAssetUploadIntent(storeId, {
+          expected_mime_type: file.type as "image/jpeg" | "image/png" | "image/webp",
+          expected_byte_size: file.size,
+          expected_sha256: digest,
+          original_filename: file.name,
+        }, state.idempotencyKey);
+        if (intent.id !== intentId) {
+          intentId = intent.id;
+          state.intentId = intentId;
+          sessionStorage.setItem(keyName, JSON.stringify(state));
+        }
+        await putAssetFile(intent, file);
+        completed = await completeAssetUpload(storeId, intent.id);
+      }
       sessionStorage.removeItem(keyName);
       setNotice("图片已上传并完成服务端哈希校验，当前状态：" + (statusLabels[completed.asset.status] ?? completed.status) + "。安全扫描完成前不会开放下载或用于营销内容。");
       await reload();

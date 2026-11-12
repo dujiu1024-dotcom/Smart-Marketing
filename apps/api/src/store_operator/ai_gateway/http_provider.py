@@ -5,7 +5,9 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
+
+from typing import TypeVar
 
 from store_operator.ai_gateway.errors import ProviderError, ProviderErrorCode, SideEffectState
 from store_operator.ai_gateway.schemas import (
@@ -30,6 +32,9 @@ class ProviderEndpoints:
     image_edit: str = "/v1/images/edit"
     vision_inspect: str = "/v1/vision/inspect"
     ocr_extract: str = "/v1/ocr/extract"
+
+
+ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
 
 
 class HttpJsonTransport:
@@ -168,7 +173,10 @@ class HttpJsonTransport:
         return payload
 
     @staticmethod
-    def validate_response(model: type[Any], payload: dict[str, Any]) -> Any:
+    def validate_response(
+        model: type[ResponseModel],
+        payload: dict[str, Any],
+    ) -> ResponseModel:
         try:
             return model.model_validate(payload)
         except ValidationError as exc:

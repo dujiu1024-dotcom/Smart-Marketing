@@ -304,7 +304,7 @@ Each configured provider endpoint implements POST JSON requests with `schema_ver
 | Vision inspection | `/v1/vision/inspect` | `vision.inspect` |
 | OCR | `/v1/ocr/extract` | `ocr.extract` |
 
-Endpoint paths can be replaced by constructing `ProviderEndpoints`. Responses must satisfy the existing Pydantic response contracts. The adapter normalizes 429, authentication, timeout, transport, request and malformed-output failures without returning provider response bodies or credentials to callers. Image mutations mark timeout outcomes as unknown side effects; the adapter never starts an internal retry loop.
+Endpoint paths can be replaced by constructing `ProviderEndpoints`. Responses must satisfy the existing Pydantic response contracts. The adapter normalizes 429, authentication, timeout, transport, request and malformed-output failures without returning provider response bodies or credentials to callers. A per-provider circuit breaker opens after a configurable transient-failure threshold and permits one half-open recovery probe after its cooldown. Image mutations mark timeout outcomes as unknown side effects; the adapter never starts an internal retry loop.
 
 ### Configuration and security
 

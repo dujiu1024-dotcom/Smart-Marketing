@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from store_operator.ai_gateway.prompt_contracts import validate_prompt_task_contract
 from store_operator.auth.audit import record_audit
 from store_operator.auth.dependencies import (
     AuthenticatedSession,
@@ -133,7 +134,12 @@ def _activation_read(activation: PromptActivation) -> dict[str, object]:
     }
 
 
-def _validate_prompt_version(version: PromptVersion) -> None:
+def _validate_prompt_version(
+    version: PromptVersion,
+    *,
+    task_type: str | None = None,
+    capability: str | None = None,
+) -> None:
     schema = version.variables_schema_json
     if schema.get("type") != "object" or not isinstance(schema.get("properties"), dict):
         raise ApiError(
@@ -168,6 +174,19 @@ def _validate_prompt_version(version: PromptVersion) -> None:
             "PROMPT_OUTPUT_SCHEMA_INVALID",
             "output_schema_json must declare a JSON Schema type",
         )
+    if task_type is not None and capability is not None:
+        try:
+            validate_prompt_task_contract(
+                task_type,
+                capability,
+                version.output_schema_json,
+            )
+        except ValueError as exc:
+            raise ApiError(
+                422,
+                "PROMPT_TASK_CONTRACT_INVALID",
+                str(exc),
+            ) from exc
 
 
 def _request_fingerprint(*parts: str) -> str:
@@ -368,7 +387,11 @@ def publish_prompt_version(
             "PROMPT_VERSION_NOT_DRAFT",
             "Only active templates and draft versions can be published",
         )
-    _validate_prompt_version(version)
+    _validate_prompt_version(
+        version,
+        task_type=template.task_type,
+        capability=template.capability,
+    )
     previous_id = template.current_published_version_id
     now = datetime.now(UTC)
     version.status = "published"

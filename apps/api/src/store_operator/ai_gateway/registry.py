@@ -24,6 +24,7 @@ class ProviderRegistry:
         capability: ProviderCapability,
         *,
         provider_id: str | None = None,
+        model_id: str | None = None,
         region: str | None = None,
     ) -> object:
         if provider_id is not None:
@@ -38,18 +39,25 @@ class ProviderRegistry:
         for descriptor, adapter in candidates:
             if not descriptor.enabled or capability not in descriptor.capabilities:
                 continue
+            if model_id is not None and model_id not in descriptor.supported_models[capability]:
+                continue
             if region is not None and descriptor.region not in (None, region):
                 continue
-            return adapter
+            capability_adapter = getattr(adapter, "for_capability", None)
+            return capability_adapter(capability) if callable(capability_adapter) else adapter
 
         if provider_id is not None and provider_id not in self._providers:
             summary = "The configured AI provider is not available."
             code = ProviderErrorCode.UNAVAILABLE
-        elif region is not None:
+        elif region is not None and any(
+            capability in descriptor.capabilities
+            and (model_id is None or model_id in descriptor.supported_models[capability])
+            for descriptor, _ in self._providers.values()
+        ):
             summary = "No enabled AI provider is allowed for the requested region."
             code = ProviderErrorCode.REGION_NOT_ALLOWED
         else:
-            summary = "No enabled AI provider supports the requested capability."
+            summary = "No enabled AI provider supports the requested capability or model."
             code = ProviderErrorCode.CAPABILITY_UNSUPPORTED
         raise ProviderError(code, retryable=False, user_safe_summary=summary)
 

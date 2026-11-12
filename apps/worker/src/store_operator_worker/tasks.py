@@ -119,7 +119,10 @@ def relay_outbox(batch_size: int = 50) -> int:
                     OutboxEvent.status == "pending",
                     (
                         (OutboxEvent.status == "publishing")
-                        & (OutboxEvent.locked_until < now)
+                        & or_(
+                            OutboxEvent.locked_until < now,
+                            OutboxEvent.locked_until.is_(None),
+                        )
                     ),
                 ),
             )
@@ -161,7 +164,7 @@ def relay_outbox(batch_size: int = 50) -> int:
                 task_id=str(event_id),
                 queue="default",
             )
-        except (CeleryError, OperationalError, OSError, TypeError, ValueError):
+        except Exception:  # noqa: BLE001 - any broker/client failure must release the Outbox lease
             dead_lettered = False
             attempt_count = 0
             with SessionLocal.begin() as db:

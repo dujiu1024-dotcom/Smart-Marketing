@@ -1,14 +1,19 @@
 import socket
+from contextlib import contextmanager
+from threading import Event
+from uuid import uuid4
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import httpcore
 import httpx
+from store_operator_worker.handlers import JobExecutionContext, clear_job_handlers_for_testing, resolve_job_handler
 
 from store_operator_worker.hot_topics import (
     _PinnedSyncBackend,
     MAX_FEED_BYTES,
     _collect_source,
+    register_hot_topic_handlers,
     _brand_guideline_text,
     _brand_risk_flags,
     _match_score,
@@ -334,3 +339,56 @@ def test_collect_source_marks_reseen_expired_topic_as_expired(monkeypatch):
 
     assert existing.evidence_status == "expired"
     assert existing.last_seen_at is not None
+
+
+def test_collection_handler_marks_source_failed_and_preserves_retryability(monkeypatch):
+    from store_operator_worker.handlers import JobExecutionError
+
+    _fake_public_dns(monkeypatch)
+
+    class _TimeoutClient(_FakeClient):
+        def stream(self, method, url):
+            raise httpx.ReadTimeout("upstream timed out")
+
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _TimeoutClient)
+    monkeypatch.setattr("store_operator_worker.hot_topics._allowed_hosts", lambda: {"feeds.example.test"})
+
+    source = _fake_source()
+    source.id = uuid4()
+    source.enabled = True
+
+    class _SessionFactory:
+        def __init__(self):
+            self.sessions = [_FakeDatabase(existing=source), _FakeDatabase(existing=source)]
+
+        @contextmanager
+        def begin(self):
+            yield self.sessions.pop(0)
+
+    context = JobExecutionContext(
+        job_id=uuid4(),
+        store_id=uuid4(),
+        attempt_id=uuid4(),
+        lease_token=uuid4(),
+        worker_id="worker-test",
+        deadline_at=datetime.now(UTC) + timedelta(minutes=1),
+        cancellation_requested=Event(),
+        lease_lost=Event(),
+        update_progress_callback=lambda current, total: None,
+    )
+    clear_job_handlers_for_testing()
+    try:
+        register_hot_topic_handlers(_SessionFactory())
+        handler = resolve_job_handler("hot_topics.collect_and_match.v1")
+        assert handler is not None
+        try:
+            handler(context, {"schema_version": 1, "source_ids": [str(source.id)]})
+        except JobExecutionError as exc:
+            assert exc.code == "SOURCE_FETCH_FAILED"
+            assert exc.retryable is True
+        else:
+            raise AssertionError("source fetch timeout must bubble up as retryable job failure")
+        assert source.health_status == "failed"
+        assert source.last_failure_at is not None
+    finally:
+        clear_job_handlers_for_testing()

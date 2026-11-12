@@ -281,3 +281,16 @@
 | Provider/模型并发 | 未实现；ProviderDescriptor.max_concurrency 仍只是声明 | 未接入 |
 
 该能力只完成首期门店级限流；不代表全局/队列/Provider 多维配额、成本预算、公平调度和完整故障注入验收已完成。
+
+
+## 2026-11-12 #9 Worker 崩溃租约恢复（PR #74）
+
+| 验收项 | 状态 |
+|---|---|
+| 过期 Worker lease fencing | 已有；迟到 heartbeat/complete 被拒绝 |
+| Sweeper 将过期 Job 转为 needs_human | 已有；抽取为可独立测试的 domain service |
+| Attempt lease_expired 与审计事件 | 已有；记录原 lease token，便于追踪 |
+| 重复 Sweeper 不重复写恢复事件 | 新增集成测试覆盖 |
+| 自动重试未知外部副作用 | 明确禁止；需人工对账确认后恢复 |
+
+当前 PR CI 结果以 PR 检查为准；本地未执行。

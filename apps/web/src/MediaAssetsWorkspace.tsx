@@ -50,7 +50,7 @@ export default function MediaAssetsWorkspace({ storeId }: { storeId: string }) {
       if (!MIME_TYPES.has(file.type)) throw new Error("仅支持 JPEG、PNG、WebP 图片。");
       if (file.size <= 0 || file.size > MAX_BYTES) throw new Error("图片大小必须大于 0 且不超过 25 MB。");
       const digest = await sha256(file);
-      const keyName = "store-operator.asset-upload." + storeId + "." + digest;
+      const keyName = "store-operator.asset-upload." + storeId + "." + digest + "." + encodeURIComponent(file.name);
       const storedState = sessionStorage.getItem(keyName);
       const state: { idempotencyKey: string; intentId?: string } = storedState
         ? JSON.parse(storedState) as { idempotencyKey: string; intentId?: string }

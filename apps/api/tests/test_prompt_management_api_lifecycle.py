@@ -77,7 +77,7 @@ def test_platform_admin_can_create_publish_and_rollback_prompt_versions(
             "template_key": "store-social-post",
             "display_name": "Store social post",
             "industry_key": "retail",
-            "task_type": "copy_only",
+            "task_type": "copy_generation",
             "capability": "text",
         },
     )
@@ -101,7 +101,16 @@ def test_platform_admin_can_create_publish_and_rollback_prompt_versions(
                     "properties": {"store_name": {"type": "string"}},
                     "required": ["store_name"],
                 },
-                "output_schema_json": {"type": "object", "properties": {}},
+                "output_schema_json": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string"},
+                        "body": {"type": "string"},
+                        "hashtags": {"type": "array", "items": {"type": "string"}},
+                        "call_to_action": {"type": "string"},
+                    },
+                    "required": ["title", "body", "hashtags", "call_to_action"],
+                },
                 "schema_version": 1,
                 "input_policy_json": {"confirmed_facts_only": True},
                 "changelog": changelog,

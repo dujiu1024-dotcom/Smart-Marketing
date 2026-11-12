@@ -121,6 +121,104 @@ async def main() -> None:
         await page.go_back(wait_until="networkidle")
         await route_to("tasks", "营销任务")
 
+
+        # Full local Demo marketing workflow: verify gates, review, quality and frozen handoff.
+        await route_to("tasks", "营销任务")
+        await page.locator('[data-action="open-task"]').first.click()
+        await route_to("task", "当季草莓鲜奶新品推广")
+
+        await page.locator('[data-task-tab="strategy"]').click()
+        await page.get_by_role("heading", name="请先完成需求理解").wait_for(state="visible")
+        await page.locator('[data-task-tab="brief"]').click()
+        await page.locator('[data-action="confirm-brief"]').click()
+        await page.locator('[data-task-tab="strategy"]').wait_for(state="visible")
+        await page.locator("#hotspotDecision").select_option("skipped")
+        await page.locator("#hotspotDecisionReason").fill("本次按明确新品推广需求执行，不依赖外部热点。")
+        await page.locator('[data-action="confirm-strategy"]').click()
+
+        # Image production must remain blocked until every target copy is approved.
+        await page.locator('[data-task-tab="image"]').click()
+        await page.locator('[data-action="generate-image"]').click()
+        await page.get_by_text("请先审核通过所有目标渠道的文案版本").wait_for(state="visible")
+
+        await page.locator('[data-task-tab="copy"]').click()
+        for platform in ["xhs", "douyin"]:
+            await page.locator(f'[data-copy-platform="{platform}"]').click()
+            await page.locator('[data-action="approve-copy"]').click()
+
+        # A copy revision invalidates the dependent image and requires re-review.
+        await page.locator('[data-copy-platform="xhs"]').click()
+        await page.locator("#copyInstruction").fill("标题更简洁，突出新品和门店特色。")
+        await page.locator('[data-action="revise-copy"]').click()
+        await page.get_by_text("已生成修改后的文案新版本，等待审核").wait_for(state="visible")
+
+        await page.locator('[data-task-tab="image"]').click()
+        await page.locator('[data-action="generate-image"]').click()
+        await page.get_by_text("请先审核通过所有目标渠道的文案版本").wait_for(state="visible")
+
+        await page.locator('[data-task-tab="copy"]').click()
+        await page.locator('[data-copy-platform="xhs"]').click()
+        await page.locator('[data-action="approve-copy"]').click()
+
+        await page.locator('[data-task-tab="image"]').click()
+        await page.locator('[data-action="generate-image"]').click()
+        await page.locator('[data-action="approve-image"]').click()
+
+        await page.locator("#imageInstruction").fill("优化背景层次，保持商品主体和品牌标识不变。")
+        await page.locator('[data-action="revise-image"]').click()
+        await page.get_by_text("图片整改版本已创建，等待审核").wait_for(state="visible")
+        await page.locator('[data-action="approve-image"]').click()
+
+        await page.locator('[data-task-tab="channel"]').click()
+        for platform in ["小红书", "抖音"]:
+            await page.locator(f'[data-action="preview-channel"][data-id="{platform}"]').click()
+            await page.get_by_role("button", name="关闭").click()
+
+        await page.locator('[data-task-tab="quality"]').click()
+        await page.locator('[data-action="run-quality"]').click()
+        await page.get_by_text("质检通过", exact=True).wait_for(state="visible")
+
+        await page.locator('[data-task-tab="publish"]').click()
+        await page.locator("#publishNote").fill("已核对需求、策略、文案、图片及商品事实，确认冻结当前版本。")
+        await page.locator("#publishConfirm").check()
+        await page.locator('[data-action="save-publish"]').click()
+        package_label = page.get_by_text("内容包编号：", exact=False)
+        await package_label.wait_for(state="visible")
+        package_text = await package_label.inner_text()
+        assert "pkg-" in package_text, f"Unexpected frozen package label: {package_text!r}"
+        package_id = "pkg-" + package_text.split("pkg-", 1)[1].split()[0]
+
+        # A repeated submission of the same approved content version must reuse the frozen package.
+        await page.locator('[data-action="save-publish"]').click()
+        await page.get_by_text("当前内容版本已冻结，无需重复提交").wait_for(state="visible")
+        assert package_id in await package_label.inner_text()
+
+        # Refresh must restore the frozen package without pretending an external publish occurred.
+        await page.reload(wait_until="networkidle")
+        await route_to("task", "当季草莓鲜奶新品推广")
+        await page.locator('[data-task-tab="publish"]').click()
+        restored_package = page.get_by_text("内容包编号：", exact=False)
+        await restored_package.wait_for(state="visible")
+        assert package_id in await restored_package.inner_text()
+        await page.get_by_text("只保存冻结版本的内容包。渠道未连接时，不会向外部平台发布。").wait_for(
+            state="visible"
+        )
+
+        # Mobile viewport and keyboard navigation are part of the Demo acceptance gate.
+        await page.set_viewport_size({"width": 390, "height": 844})
+        brief_tab = page.locator('[data-task-tab="brief"]')
+        await brief_tab.focus()
+        await brief_tab.press("ArrowRight")
+        assert await page.locator('[data-task-tab="strategy"]').get_attribute(
+            "aria-selected"
+        ) == "true"
+        horizontal_overflow = await page.evaluate(
+            "document.documentElement.scrollWidth - window.innerWidth"
+        )
+        assert horizontal_overflow <= 2, (
+            f"Mobile Demo has unexpected horizontal overflow: {horizontal_overflow}px"
+        )
+
         assert not page_errors, f"Uncaught browser errors: {page_errors}"
         print(
             "Frozen Demo Playwright smoke passed: 9 store routes, 8 store tabs, "

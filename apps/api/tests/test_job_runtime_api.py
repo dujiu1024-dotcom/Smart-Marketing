@@ -1,12 +1,19 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
 from sqlalchemy.orm import Session
 
 from store_operator.ai_gateway.errors import SideEffectState
 from store_operator.auth.security import hash_password
 from store_operator.jobs import claim_job, create_job, fail_job
+from store_operator.jobs.service import (
+    JobIdempotencyConflict,
+    LeaseLostError,
+    complete_job,
+    recover_expired_jobs,
+)
 from store_operator.models import (
     AIInvocation,
     AIUsageRecord,
@@ -15,6 +22,7 @@ from store_operator.models import (
     StoreMembership,
     User,
 )
+from store_operator.models.job_runtime import OutboxEvent
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -132,6 +140,7 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
 ):
     user = create_user(db_session)
     store = create_store(db_session, user, "Jobs Mutations")
+    store_b = create_store(db_session, user, "Other Jobs Mutations")
     csrf = login(identity_client, monkeypatch)
     headers = {
         **ORIGIN,
@@ -140,6 +149,7 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
         "Idempotency-Key": "cancel-job-key-1",
     }
 
+    headers_b = {**headers, "X-Store-ID": str(store_b.id)}
     queued = create_job_for_store(db_session, user, store, "queued-cancel-1")
     cancelled = identity_client.post(
         f"/api/v1/jobs/{queued.id}/cancel",
@@ -147,6 +157,18 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
     )
     assert cancelled.status_code == 200, cancelled.text
     assert cancelled.json()["status"] == "cancelled"
+
+    hidden_cancel = identity_client.post(
+        f"/api/v1/jobs/{queued.id}/cancel",
+        headers={**headers_b, "Idempotency-Key": "cross-store-job-cancel"},
+    )
+    assert hidden_cancel.status_code == 404
+    visible_after_cross_store_attempt = identity_client.get(
+        f"/api/v1/jobs/{queued.id}",
+        headers={"X-Store-ID": str(store.id)},
+    )
+    assert visible_after_cross_store_attempt.status_code == 200
+    assert visible_after_cross_store_attempt.json()["status"] == "cancelled"
 
     retry = create_job_for_store(
         db_session, user, store, "failed-retry-api-1"
@@ -196,6 +218,16 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
     )
     assert replay.status_code == 200, replay.text
     assert replay.json()["status"] == "queued"
+
+    hidden_retry = identity_client.post(
+        f"/api/v1/jobs/{retry.id}/retry",
+        headers={**headers_b, "Idempotency-Key": "cross-store-job-retry"},
+        json={
+            "reason": "Provider confirmed no side effect",
+            "side_effects_confirmed_absent": True,
+        },
+    )
+    assert hidden_retry.status_code == 404
 
     missing_csrf = identity_client.post(
         f"/api/v1/jobs/{retry.id}/retry",
@@ -254,6 +286,19 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
     )
     assert resolved.status_code == 200, resolved.text
     assert resolved.json()["status"] == "failed"
+    hidden_resolve = identity_client.post(
+        f"/api/v1/jobs/{job.id}/resolve",
+        headers={
+            **headers,
+            "X-Store-ID": str(store_b.id),
+            "Idempotency-Key": "cross-store-job-resolve",
+        },
+        json={
+            "resolution": "fail",
+            "reason": "Store B must not resolve Store A job",
+        },
+    )
+    assert hidden_resolve.status_code == 404
 
     invocation = AIInvocation(
         id=uuid4(),
@@ -293,3 +338,213 @@ def test_job_resolve_and_ai_invocation_are_store_scoped(
     )
     assert hidden.status_code == 404
     assert hidden.json()["error"]["code"] == "AI_INVOCATION_NOT_FOUND"
+
+
+
+def test_job_creation_idempotency_creates_only_one_outbox_event(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Idempotent Job Store")
+
+    first = create_job_for_store(db_session, user, store, "same-job-request")
+    replay = create_job_for_store(db_session, user, store, "same-job-request")
+
+    assert replay.id == first.id
+    events = (
+        db_session.query(OutboxEvent)
+        .filter(OutboxEvent.aggregate_id == first.id)
+        .all()
+    )
+    assert len(events) == 1
+    assert events[0].event_type == "job.dispatch_requested"
+
+    with pytest.raises(JobIdempotencyConflict):
+        create_job(
+            db_session,
+            job_type="copy.generate",
+            payload_ref={"schema_version": 1, "different": True},
+            idempotency_key="same-job-request",
+            store_id=store.id,
+            actor_type="user",
+            actor_user_id=user.id,
+        )
+
+
+def test_revoked_store_membership_cancels_job_before_worker_claim(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Revoked Membership Store")
+    job = create_job_for_store(db_session, user, store, "membership-revoked-job")
+    membership = (
+        db_session.query(StoreMembership)
+        .filter(
+            StoreMembership.store_id == store.id,
+            StoreMembership.user_id == user.id,
+        )
+        .one()
+    )
+    membership.status = "removed"
+    db_session.flush()
+
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="revoked-membership-worker",
+        now=datetime.now(UTC),
+    )
+
+    assert claim is None
+    db_session.refresh(job)
+    assert job.status == "cancelled"
+    assert job.error_code == "ACTOR_MEMBERSHIP_REVOKED"
+    assert job.lease_token is None
+
+
+def test_expired_worker_lease_is_fenced_and_requires_reconciliation(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Expired Lease Store")
+    job = create_job_for_store(db_session, user, store, "expired-lease-job")
+    claimed_at = datetime.now(UTC)
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="worker-before-restart",
+        lease_seconds=1,
+        now=claimed_at,
+    )
+    assert claim is not None
+
+    recovered_at = claimed_at + timedelta(seconds=2)
+    assert recover_expired_jobs(db_session, now=recovered_at) == 1
+    db_session.refresh(job)
+    db_session.refresh(claim.attempt)
+
+    assert job.status == "needs_human"
+    assert job.error_code == "WORKER_LEASE_EXPIRED"
+    assert job.lease_token is None
+    assert claim.attempt.status == "lease_expired"
+
+    with pytest.raises(LeaseLostError):
+        complete_job(
+            db_session,
+            job_id=job.id,
+            lease_token=claim.attempt.lease_token,
+            worker_id="worker-before-restart",
+            result_ref={"should_not_commit": True},
+            now=recovered_at + timedelta(seconds=1),
+        )
+
+
+
+def test_duplicate_worker_delivery_cannot_claim_running_job_twice(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Duplicate Delivery Store")
+    job = create_job_for_store(db_session, user, store, "duplicate-delivery-job")
+    first = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="first-delivery-worker",
+        now=datetime.now(UTC),
+    )
+    assert first is not None
+
+    duplicate = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="duplicate-delivery-worker",
+        now=datetime.now(UTC),
+    )
+
+    assert duplicate is None
+    db_session.refresh(job)
+    assert job.status == "running"
+    assert job.attempt_count == 1
+    assert job.lease_owner == "first-delivery-worker"
+
+
+
+def test_retryable_failure_atomically_schedules_next_outbox_dispatch(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Retry Dispatch Store")
+    job = create_job_for_store(db_session, user, store, "retry-dispatch-job")
+    started_at = datetime.now(UTC)
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="retry-worker",
+        now=started_at,
+    )
+    assert claim is not None
+
+    failed_at = started_at + timedelta(seconds=5)
+    failed = fail_job(
+        db_session,
+        job_id=job.id,
+        lease_token=claim.attempt.lease_token,
+        worker_id="retry-worker",
+        error_code="PROVIDER_TEMPORARY",
+        error_summary="Temporary provider outage",
+        retryable=True,
+        retry_delay_seconds=45,
+        now=failed_at,
+    )
+
+    assert failed.status == "retry_wait"
+    assert failed.available_at == failed_at + timedelta(seconds=45)
+    retry_events = (
+        db_session.query(OutboxEvent)
+        .filter(
+            OutboxEvent.aggregate_id == job.id,
+            OutboxEvent.dedupe_key == f"job.dispatch:{job.id}:attempt:2",
+        )
+        .all()
+    )
+    assert len(retry_events) == 1
+    assert retry_events[0].status == "pending"
+    assert retry_events[0].available_at == failed.available_at
+    assert claim.attempt.status == "failed"
+
+
+def test_unknown_side_effect_failure_never_automatically_requeues(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Unknown Side Effect Store")
+    job = create_job_for_store(db_session, user, store, "unknown-side-effect-job")
+    started_at = datetime.now(UTC)
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="uncertain-worker",
+        now=started_at,
+    )
+    assert claim is not None
+
+    failed = fail_job(
+        db_session,
+        job_id=job.id,
+        lease_token=claim.attempt.lease_token,
+        worker_id="uncertain-worker",
+        error_code="PROVIDER_RESPONSE_LOST",
+        error_summary="Provider outcome is unknown",
+        retryable=True,
+        side_effect_state=SideEffectState.UNKNOWN,
+        now=started_at + timedelta(seconds=3),
+    )
+
+    assert failed.status == "needs_human"
+    assert (
+        db_session.query(OutboxEvent)
+        .filter(OutboxEvent.aggregate_id == job.id)
+        .count()
+        == 1
+    )
+    assert claim.attempt.status == "failed"

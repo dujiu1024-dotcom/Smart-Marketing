@@ -3,10 +3,11 @@
 import argparse
 from datetime import UTC, datetime
 from getpass import getpass
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password, normalize_email
 from store_operator.db import SessionLocal
@@ -17,6 +18,7 @@ from store_operator.models.identity import (
     StoreMembership,
     User,
 )
+from store_operator.models.job_runtime import Job, OutboxEvent
 
 
 def create_user(email: str) -> None:
@@ -196,6 +198,76 @@ def revoke_platform_admin(email: str, reason: str) -> None:
         print(f"Revoked platform-admin grant for user {user.id}.")
 
 
+
+def replay_dead_letter_outbox_event(
+    db: Session,
+    *,
+    event_id: UUID,
+    reason: str,
+    confirmation: str,
+) -> OutboxEvent:
+    """Requeue a dead job-dispatch event after an explicit operator reconciliation."""
+    if confirmation.strip() != str(event_id):
+        raise SystemExit("Confirmation must exactly match the Outbox event ID")
+    safe_reason = " ".join(reason.split())[:500]
+    if not safe_reason:
+        raise SystemExit("A non-empty recovery reason is required")
+
+    event = db.scalar(
+        select(OutboxEvent).where(OutboxEvent.id == event_id).with_for_update()
+    )
+    if event is None or event.status != "dead":
+        raise SystemExit("Only an existing dead Outbox event can be replayed")
+    if event.event_type != "job.dispatch_requested":
+        raise SystemExit("Only job dispatch Outbox events can be replayed")
+
+    payload = event.payload_json
+    if not isinstance(payload, dict):
+        raise SystemExit("Dead Outbox event has an invalid payload")
+    raw_job_id = payload.get("job_id")
+    try:
+        job_id = UUID(raw_job_id) if isinstance(raw_job_id, str) else None
+    except ValueError:
+        job_id = None
+    if job_id is None:
+        raise SystemExit("Dead Outbox event has an invalid job reference")
+    if event.aggregate_type != "job" or event.aggregate_id != job_id:
+        raise SystemExit("Dead Outbox event aggregate does not match its job reference")
+
+    job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+    if job is None or job.status not in {"queued", "retry_wait"}:
+        raise SystemExit("Only queued or retry-wait jobs can be redispatched")
+
+    previous_attempts = event.publish_attempts
+    event.status = "pending"
+    event.available_at = datetime.now(UTC)
+    event.publish_attempts = 0
+    event.locked_by = None
+    event.locked_until = None
+    event.last_error = None
+    db.add(
+        AuditEvent(
+            actor_type="system",
+            actor_id=None,
+            actor_user_id=None,
+            store_id=job.store_id,
+            action="outbox.dead_letter.replayed",
+            target_type="outbox_event",
+            target_id=str(event.id),
+            result="success",
+            request_id="outbox-recovery-cli",
+            metadata_json={
+                "job_id": str(job.id),
+                "event_type": event.event_type,
+                "previous_publish_attempts": previous_attempts,
+                "reason": safe_reason,
+            },
+        )
+    )
+    db.flush()
+    return event
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="store-operator")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -216,6 +288,11 @@ def main() -> None:
     revoke.add_argument("--email", required=True)
     revoke.add_argument("--reason", required=True)
 
+    replay = commands.add_parser("replay-dead-outbox")
+    replay.add_argument("--event-id", required=True)
+    replay.add_argument("--reason", required=True)
+    replay.add_argument("--confirm-event-id", required=True)
+
     args = parser.parse_args()
     if args.command == "create-user":
         create_user(args.email)
@@ -225,6 +302,20 @@ def main() -> None:
         grant_platform_admin(args.email, args.reason)
     elif args.command == "revoke-platform-admin":
         revoke_platform_admin(args.email, args.reason)
+    elif args.command == "replay-dead-outbox":
+        try:
+            event_id = UUID(args.event_id)
+        except ValueError as exc:
+            raise SystemExit("--event-id must be a valid UUID") from exc
+        with SessionLocal() as db:
+            replay_dead_letter_outbox_event(
+                db,
+                event_id=event_id,
+                reason=args.reason,
+                confirmation=args.confirm_event_id,
+            )
+            db.commit()
+        print(f"Requeued dead Outbox event {event_id}.")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password, normalize_email
 from store_operator.db import SessionLocal
@@ -199,7 +200,7 @@ def revoke_platform_admin(email: str, reason: str) -> None:
 
 
 def replay_dead_letter_outbox_event(
-    db,
+    db: Session,
     *,
     event_id: UUID,
     reason: str,

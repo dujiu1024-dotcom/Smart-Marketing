@@ -57,6 +57,10 @@ def _store_id(context: AuthContext) -> UUID:
         raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
     return context.request_store_id
 
+
+def _decimal_text(value: Decimal) -> str:
+    return format(value.normalize(), "f")
+
 class DecisionInput(BaseModel):
     decision: str
     reason: str | None = Field(default=None, max_length=1000)
@@ -259,6 +263,12 @@ def _attribution_read(item: AttributionEvidence) -> dict[str, object]:
         "evidence_strength": item.evidence_strength,
         "allocation_percent": str(item.allocation_percent),
         "status": item.status,
+        "attribution_version": item.attribution_version,
+        "supersedes_attribution_id": (
+            str(item.supersedes_attribution_id)
+            if item.supersedes_attribution_id is not None
+            else None
+        ),
         "snapshot": item.attribution_snapshot_json,
         "reversal_reason": item.reversal_reason,
         "reversed_at": item.reversed_at.isoformat() if item.reversed_at else None,
@@ -748,7 +758,7 @@ def effects_overview(
             {
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
-                "value": str(aggregate),
+                "value": _decimal_text(aggregate),
                 "sample_count": len(numeric_values),
                 "timezone": first.period_timezone,
                 "aggregation_rule": rule,
@@ -1080,7 +1090,7 @@ def effects_overview(
                 "display_name": definition.display_name,
                 "period_start": content_period_start.isoformat(),
                 "period_end": content_period_end.isoformat(),
-                "value": str(content_aggregate),
+                "value": _decimal_text(content_aggregate),
                 "sample_count": len(content_values),
                 "timezone": observation.period_timezone,
             }

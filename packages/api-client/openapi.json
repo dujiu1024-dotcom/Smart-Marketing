@@ -1802,6 +1802,62 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HotTopicSourceInput": {
+        "additionalProperties": false,
+        "properties": {
+          "attribution_template": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attribution Template"
+          },
+          "display_name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "permitted_use": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Permitted Use",
+            "type": "string"
+          },
+          "source_key": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Source Key",
+            "type": "string"
+          },
+          "source_url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Source Url",
+            "type": "string"
+          },
+          "terms_url": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Terms Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_key",
+          "display_name",
+          "source_url",
+          "terms_url",
+          "permitted_use"
+        ],
+        "title": "HotTopicSourceInput",
+        "type": "object"
+      },
       "JobDetailRead": {
         "properties": {
           "attempt_count": {
@@ -5830,6 +5886,118 @@
         ]
       }
     },
+    "/api/v1/admin/opportunity-sources": {
+      "get": {
+        "operationId": "list_hot_topic_sources_api_v1_admin_opportunity_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Hot Topic Sources Api V1 Admin Opportunity Sources Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Hot Topic Sources",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      },
+      "post": {
+        "operationId": "create_hot_topic_source_api_v1_admin_opportunity_sources_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HotTopicSourceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Hot Topic Source Api V1 Admin Opportunity Sources Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Hot Topic Source",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/admin/opportunity-sources/{source_id}/enable": {
+      "post": {
+        "operationId": "enable_hot_topic_source_api_v1_admin_opportunity_sources__source_id__enable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Enable Hot Topic Source Api V1 Admin Opportunity Sources  Source Id  Enable Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enable Hot Topic Source",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
     "/api/v1/admin/outbox-events/{event_id}/requeue": {
       "post": {
         "operationId": "requeue_dead_outbox_event_api_v1_admin_outbox_events__event_id__requeue_post",
@@ -9704,6 +9872,67 @@
           }
         },
         "summary": "List Opportunities",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/opportunities/collect": {
+      "post": {
+        "operationId": "request_opportunity_collection_api_v1_opportunities_collect_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Request Opportunity Collection Api V1 Opportunities Collect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Opportunity Collection",
         "tags": [
           "opportunities",
           "effects"

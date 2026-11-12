@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, getPublishReadbacks, registerPublishedWorkFromReadback, createBusinessOutcome, reverseAttribution, importMetricCsv,
+import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, checkDataSourceCapabilities, getPublishReadbacks, registerPublishedWorkFromReadback, createBusinessOutcome, reverseAttribution, importMetricCsv,
   type EffectsOverview, type MetricDefinitionRecord, type MetricObservationRecord, type PublishedWorkRecord,
   type BusinessOutcomeEvidenceRecord, type AttributionEvidenceRecord, type DataSourceCapabilitySnapshotRecord, type PublishReadbackCandidate } from "./api";
 
@@ -28,6 +28,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [attributions, setAttributions] = useState<AttributionEvidenceRecord[]>([]);
   const [capabilities, setCapabilities] = useState<DataSourceCapabilitySnapshotRecord[]>([]);
   const [publishReadbacks, setPublishReadbacks] = useState<PublishReadbackCandidate[]>([]);
+  const [checkingCapabilities, setCheckingCapabilities] = useState(false);
   const [tier, setTier] = useState<"all" | keyof typeof tierLabels>("all");
   const [metricKey, setMetricKey] = useState("");
   const [value, setValue] = useState("");
@@ -88,6 +89,15 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
       setValue(""); setCurrency(""); setSourceId(""); setEvidenceRef(""); await load();
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
+  }
+  async function refreshCapabilities() {
+    setCheckingCapabilities(true); setError(""); setNotice("");
+    try {
+      const result = await checkDataSourceCapabilities(storeId);
+      setNotice(`已刷新渠道能力快照：${result.total} 项。作品读回不代表已获得内容指标读取权限。`);
+      await load();
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setCheckingCapabilities(false); }
   }
   async function reverseAttributionEvidence(item: AttributionEvidenceRecord) {
     if (item.status !== "active") return;
@@ -192,6 +202,10 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
             }}>登记已核验作品</button>
           </div>)}
           {!publishReadbacks.length && <p className="muted">暂无待登记的官方发布读回记录。</p>}
+        </div>
+        <div className="section-title">
+          <div><h3>渠道数据读取能力</h3><p>分别核验作品归属读回、内容指标读取和经营结果读取；不会把发布授权当成数据读取授权。</p></div>
+          <button className="secondary" disabled={checkingCapabilities || saving} onClick={() => void refreshCapabilities()}>{checkingCapabilities ? "检测中…" : "检测渠道能力"}</button>
         </div>
         <div className="catalog-list">
           {capabilities.map(item => <div className="catalog-item" key={item.id}>

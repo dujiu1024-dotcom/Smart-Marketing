@@ -75,7 +75,7 @@ def test_orphan_image_cleanup_deletes_only_unreferenced_store_scoped_objects(
         lambda *, object_key: deleted.append(object_key),
     )
 
-    result = worker_worker_tasks.cleanup_orphaned_ai_image_objects.run()
+    result = worker_tasks.cleanup_orphaned_ai_image_objects.run()
 
     assert result == 1
     assert deleted == [invocation.response_ref_json["object_key"]]

@@ -1057,7 +1057,7 @@ def _register_douyin_verified_work(
         operation.next_attempt_at = None
         operation.last_error_code = None
         operation.last_error_summary = None
-        return work.id
+        return cast(UUID, work.id)
 
 
 def _begin_douyin_publish_attempt(

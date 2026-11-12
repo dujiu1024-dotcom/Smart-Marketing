@@ -51,6 +51,9 @@ services:
       DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
       REDIS_URL: redis://redis:6379/0
       OBJECT_STORAGE_ENDPOINT_URL: http://seaweedfs:8333
+      ASSET_SCANNER_HOST: clamav
+      ASSET_SCANNER_PORT: 3310
+      ASSET_SCANNER_TIMEOUT_SECONDS: 120
     ports: ["8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }

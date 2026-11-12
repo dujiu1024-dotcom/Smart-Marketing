@@ -19,6 +19,13 @@ class FakeRedis:
             result.append(self.values[key])
         return result
 
+    def incr(self, key):
+        self.values[key] = self.values.get(key, 0) + 1
+        return self.values[key]
+
+    def expire(self, key, seconds):
+        return True
+
     def delete(self, *keys):
         for key in keys:
             self.values.pop(key, None)

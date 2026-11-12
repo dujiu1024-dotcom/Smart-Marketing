@@ -666,7 +666,11 @@ def effects_overview(
                 ),
                 "reason": (
                     "统计窗口尚未结束，数据仍在积累。"
-                    if item.period_start is not None and item.period_end is not None and item.period_end > now
+                    if (
+                        item.period_start is not None
+                        and item.period_end is not None
+                        and item.period_end > now
+                    )
                     else "缺少完整统计窗口，暂不纳入趋势分析。"
                     if item.period_start is None or item.period_end is None
                     else None
@@ -909,7 +913,6 @@ def effects_overview(
                         "status": conversion_status,
                     }
                 )
-
 
     insights: list[dict[str, object]] = []
     for trend in trends:

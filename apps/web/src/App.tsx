@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   ApiError,
   clearCsrfToken,
+  confirmStoreProfileFacts,
   createStoreProfile,
   getCurrentUser,
   getStoreProfile,
@@ -290,6 +291,23 @@ export default function App() {
     }
   }
 
+  async function confirmFacts() {
+    if (!storeId || !profile) return;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const confirmed = await confirmStoreProfileFacts(storeId, profile);
+      setProfile(confirmed);
+      setForm(formFromProfile(confirmed));
+      setNotice(`门店档案 V${confirmed.current_version} 已确认。`);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function reloadProfile() {
     if (!storeId) return;
     setProfileLoading(true);
@@ -457,8 +475,13 @@ export default function App() {
                 <p>保存会创建新版本，并将档案事实状态重置为「待确认」。</p>
                 <div className="form-actions">
                   {profile && <button className="secondary" type="button" onClick={() => void reloadProfile()}>放弃修改</button>}
+                  {profile && profile.fact_status !== "confirmed" && (
+                    <button className="secondary" type="button" onClick={() => void confirmFacts()} disabled={saving}>
+                      确认资料
+                    </button>
+                  )}
                   <button className="primary" type="submit" disabled={saving || !form.display_name.trim()}>
-                    {saving ? "保存中…" : profile ? "保存档案" : "创建门店档案"}
+                    {saving ? "处理中…" : profile ? "保存档案" : "创建门店档案"}
                   </button>
                 </div>
               </div>

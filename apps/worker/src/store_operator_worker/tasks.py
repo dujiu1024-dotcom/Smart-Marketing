@@ -520,7 +520,7 @@ def execute_asset_scan(
             object_key=object_key,
             max_bytes=25_000_000,
         )
-    except (ObjectStorageNotConfigured, OSError, ValueError, Exception) as exc:
+    except Exception as exc:
         raise JobExecutionError(
             "ASSET_STORAGE_READ_FAILED",
             "The uploaded asset could not be read for security scanning.",

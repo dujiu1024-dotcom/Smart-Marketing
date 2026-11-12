@@ -45,6 +45,7 @@ from store_operator.marketing_tasks.schemas import (
     MarketingTaskSummary,
     TaskStepRead,
 )
+from store_operator.models.content_delivery import Artifact, ArtifactVersion
 from store_operator.models.job_runtime import Job
 from store_operator.models.marketing_task import (
     BusinessFactSnapshot,
@@ -1385,6 +1386,100 @@ def recover_marketing_task(
         idempotency_record_id=idempotency_record.id if idempotency_record else None,
     )
     db.add(decision)
+    image_job_id: str | None = None
+    if (
+        payload.step_key is TaskStepKey.IMAGE_PRODUCTION_REVIEW
+        and target_step_status is TaskStepStatus.RUNNING
+    ):
+        if (
+            task.current_requirement_snapshot_id is None
+            or task.current_strategy_snapshot_id is None
+        ):
+            raise ApiError(
+                409,
+                "IMAGE_RECOVERY_SNAPSHOTS_REQUIRED",
+                "Confirmed requirement and strategy snapshots are required to retry image generation",
+            )
+        requirement_snapshot = db.scalar(
+            select(RequirementSnapshot).where(
+                RequirementSnapshot.id == task.current_requirement_snapshot_id,
+                RequirementSnapshot.store_id == store_id,
+                RequirementSnapshot.task_id == task.id,
+            )
+        )
+        strategy_snapshot = db.scalar(
+            select(StrategySnapshot).where(
+                StrategySnapshot.id == task.current_strategy_snapshot_id,
+                StrategySnapshot.store_id == store_id,
+                StrategySnapshot.task_id == task.id,
+            )
+        )
+        if requirement_snapshot is None or strategy_snapshot is None:
+            raise ApiError(
+                409,
+                "IMAGE_RECOVERY_SNAPSHOT_UNAVAILABLE",
+                "The confirmed task snapshots are unavailable",
+            )
+        image_artifact = db.scalar(
+            select(Artifact)
+            .where(
+                Artifact.store_id == store_id,
+                Artifact.task_id == task.id,
+                Artifact.artifact_type == "image",
+            )
+            .with_for_update()
+        )
+        source_media_asset_id: str | None = None
+        if image_artifact is not None and image_artifact.current_version_id is not None:
+            current_image_version = db.scalar(
+                select(ArtifactVersion).where(
+                    ArtifactVersion.id == image_artifact.current_version_id,
+                    ArtifactVersion.store_id == store_id,
+                    ArtifactVersion.artifact_id == image_artifact.id,
+                )
+            )
+            image_content = (
+                dict(current_image_version.content_json or {})
+                if current_image_version is not None
+                else {}
+            )
+            media_asset_ref = image_content.get("media_asset_id")
+            if isinstance(media_asset_ref, str):
+                source_media_asset_id = media_asset_ref
+        step.input_fingerprint = strategy_snapshot.content_fingerprint
+        job_payload: dict[str, object] = {
+            "schema_version": 1,
+            "marketing_task_id": str(task.id),
+            "requirement_snapshot_id": str(requirement_snapshot.id),
+            "strategy_snapshot_id": str(strategy_snapshot.id),
+            "step_key": TaskStepKey.IMAGE_PRODUCTION_REVIEW.value,
+            "strategy_fingerprint": strategy_snapshot.content_fingerprint,
+            "revision_instruction": payload.reason,
+        }
+        if source_media_asset_id is not None:
+            job_payload["source_media_asset_id"] = source_media_asset_id
+        try:
+            image_job = create_job(
+                db,
+                job_type="marketing_task.generate_image",
+                payload_ref=job_payload,
+                idempotency_key=(
+                    f"marketing-task:{task.id}:image-recovery:{step.version}"
+                ),
+                store_id=store_id,
+                actor_type="user",
+                actor_user_id=auth.user.id,
+                marketing_task_id=task.id,
+                max_attempts=3,
+                timeout_seconds=900,
+            )
+        except JobIdempotencyConflict as exc:
+            raise ApiError(
+                409,
+                "IMAGE_RECOVERY_JOB_CONFLICT",
+                "A retry job already exists for this image step version",
+            ) from exc
+        image_job_id = str(image_job.id)
     if current_task_status is not MarketingTaskStatus.ACTIVE:
         task.lifecycle_status = MarketingTaskStatus.ACTIVE.value
     task.version += 1
@@ -1401,11 +1496,13 @@ def recover_marketing_task(
             "decision_id": str(decision.id),
             "from_status": current_step_status.value,
             "to_status": target_step_status.value,
+            "image_job_id": image_job_id,
         },
         audit_action="marketing_task.recovered",
         audit_metadata={
             "step_key": payload.step_key.value,
             "decision_id": str(decision.id),
+            "image_job_id": image_job_id,
         },
     )
 

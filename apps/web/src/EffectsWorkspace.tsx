@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, getPublishReadbacks, registerPublishedWorkFromReadback, createBusinessOutcome, importMetricCsv,
+import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, getPublishReadbacks, registerPublishedWorkFromReadback, createBusinessOutcome, reverseAttribution, importMetricCsv,
   type EffectsOverview, type MetricDefinitionRecord, type MetricObservationRecord, type PublishedWorkRecord,
   type BusinessOutcomeEvidenceRecord, type AttributionEvidenceRecord, type DataSourceCapabilitySnapshotRecord, type PublishReadbackCandidate } from "./api";
 
@@ -30,6 +30,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [outcomeCurrency, setOutcomeCurrency] = useState("CNY");
   const [outcomeSourceId, setOutcomeSourceId] = useState("");
   const [outcomeEvidence, setOutcomeEvidence] = useState("");
+  const [attributionReversalReason, setAttributionReversalReason] = useState("");
   const [outcomeOccurredAt, setOutcomeOccurredAt] = useState(() => {
     const now = new Date();
     return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -72,6 +73,17 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
       });
       setNotice("已保存为商家手工报告。该数据不会自动成为已核验经营结果或 ROI 依据。");
       setValue(""); setCurrency(""); setSourceId(""); setEvidenceRef(""); await load();
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+  async function reverseAttributionEvidence(item: AttributionEvidenceRecord) {
+    if (item.status !== "active") return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await reverseAttribution(storeId, item.id, attributionReversalReason);
+      setAttributionReversalReason("");
+      setNotice("归因已撤销，原始证据和归因快照保留。");
+      await load();
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
   }
@@ -200,7 +212,12 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         </div>
         {attributions.length > 0 && <div className="catalog-list">{attributions.map(item => <div className="catalog-item" key={item.id}>
           <p>营销任务 {item.marketing_task_id} · 作品 {item.published_work_id} · 经营结果 {item.outcome_evidence_id}</p>
-          <p className="catalog-description">{item.attribution_method} · {item.evidence_strength} · 分摊 {item.allocation_percent}%</p>
+          <p className="catalog-description">{item.attribution_method} · {item.evidence_strength} · 分摊 {item.allocation_percent}% · {item.status}</p>
+          {item.reversal_reason && <p className="catalog-description">撤销原因：{item.reversal_reason} · {item.reversed_at ? new Date(item.reversed_at).toLocaleString() : ""}</p>}
+          {item.status === "active" && <div className="form-actions">
+            <input aria-label={`撤销归因原因 ${item.id}`} value={attributionReversalReason} onChange={event => setAttributionReversalReason(event.target.value)} placeholder="填写撤销原因（至少 8 个字）" />
+            <button className="secondary" disabled={saving || attributionReversalReason.trim().length < 8} onClick={() => void reverseAttributionEvidence(item)}>撤销归因</button>
+          </div>}
         </div>)}</div>}
       </article>
       <article className="form-card">

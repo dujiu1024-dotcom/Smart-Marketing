@@ -466,3 +466,85 @@ def test_duplicate_worker_delivery_cannot_claim_running_job_twice(
     assert job.status == "running"
     assert job.attempt_count == 1
     assert job.lease_owner == "first-delivery-worker"
+
+
+
+def test_retryable_failure_atomically_schedules_next_outbox_dispatch(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Retry Dispatch Store")
+    job = create_job_for_store(db_session, user, store, "retry-dispatch-job")
+    started_at = datetime.now(UTC)
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="retry-worker",
+        now=started_at,
+    )
+    assert claim is not None
+
+    failed_at = started_at + timedelta(seconds=5)
+    failed = fail_job(
+        db_session,
+        job_id=job.id,
+        lease_token=claim.attempt.lease_token,
+        worker_id="retry-worker",
+        error_code="PROVIDER_TEMPORARY",
+        error_summary="Temporary provider outage",
+        retryable=True,
+        retry_delay_seconds=45,
+        now=failed_at,
+    )
+
+    assert failed.status == "retry_wait"
+    assert failed.available_at == failed_at + timedelta(seconds=45)
+    retry_events = (
+        db_session.query(OutboxEvent)
+        .filter(
+            OutboxEvent.aggregate_id == job.id,
+            OutboxEvent.dedupe_key == f"job.dispatch:{job.id}:attempt:2",
+        )
+        .all()
+    )
+    assert len(retry_events) == 1
+    assert retry_events[0].status == "pending"
+    assert retry_events[0].available_at == failed.available_at
+    assert claim.attempt.status == "failed"
+
+
+def test_unknown_side_effect_failure_never_automatically_requeues(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Unknown Side Effect Store")
+    job = create_job_for_store(db_session, user, store, "unknown-side-effect-job")
+    started_at = datetime.now(UTC)
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="uncertain-worker",
+        now=started_at,
+    )
+    assert claim is not None
+
+    failed = fail_job(
+        db_session,
+        job_id=job.id,
+        lease_token=claim.attempt.lease_token,
+        worker_id="uncertain-worker",
+        error_code="PROVIDER_RESPONSE_LOST",
+        error_summary="Provider outcome is unknown",
+        retryable=True,
+        side_effect_state=SideEffectState.UNKNOWN,
+        now=started_at + timedelta(seconds=3),
+    )
+
+    assert failed.status == "needs_human"
+    assert (
+        db_session.query(OutboxEvent)
+        .filter(OutboxEvent.aggregate_id == job.id)
+        .count()
+        == 1
+    )
+    assert claim.attempt.status == "failed"

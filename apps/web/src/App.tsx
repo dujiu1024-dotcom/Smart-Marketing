@@ -18,6 +18,7 @@ import {
   type User,
 } from "./api";
 import ProductWorkspace from "./ProductWorkspace";
+import OfferWorkspace from "./OfferWorkspace";
 
 interface ProfileForm {
   display_name: string;
@@ -172,6 +173,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [route, setRoute] = useState(window.location.hash || "#store:profile");
   const productRoute = route === "#store:products" || route.startsWith("#store-editor:product:");
+  const offerRoute = route === "#store:offers" || route.startsWith("#store-editor:offer:");
 
   const loadStoreContext = useCallback(async () => {
     const response = await getStores();
@@ -410,7 +412,7 @@ export default function App() {
           <div className="side-label spaced">门店资料</div>
           <a className={productRoute ? "side-link" : "side-link active"} href="#store:profile">门店档案</a>
           <a className={productRoute ? "side-link active" : "side-link"} href="#store:products">商品与服务</a>
-          <div className="side-link disabled" aria-disabled="true">活动与优惠 · 待接入</div>
+          <a className={offerRoute ? "side-link active" : "side-link"} href="#store:offers">活动与优惠</a>
           <div className="side-link disabled" aria-disabled="true">品牌规范 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">客群与经营 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">门店知识库 · 待接入</div>
@@ -419,7 +421,7 @@ export default function App() {
           <div className="sidebar-foot">当前仅接入真实门店档案。未接入模块明确标记，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
-          {productRoute ? <ProductWorkspace storeId={storeId} /> : <>
+          {productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : <>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STORE PROFILE</p>

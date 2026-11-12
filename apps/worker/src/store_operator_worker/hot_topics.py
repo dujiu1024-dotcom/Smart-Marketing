@@ -40,7 +40,13 @@ USER_AGENT = "AI-Store-Operator-HotTopicCollector/1.0"
 
 
 def _allowed_hosts() -> set[str]:
-    return {host.strip().lower() for host in settings.hot_topic_allowed_hosts.split(",") if host.strip()}
+    from store_operator.config import settings  # type: ignore[import-untyped]
+
+    return {
+        host.strip().lower()
+        for host in settings.hot_topic_allowed_hosts.split(",")
+        if host.strip()
+    }
 
 
 def _assert_public_host(host: str, allowed: set[str]) -> None:

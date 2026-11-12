@@ -427,7 +427,10 @@ class BusinessOutcomeEvidence(Base):
             name="integrity_status",
         ),
         CheckConstraint("value_numeric >= 0", name="value_nonnegative"),
-        CheckConstraint("outcome_type != 'revenue' OR currency IS NOT NULL", name="revenue_requires_currency"),
+        CheckConstraint(
+            "outcome_type != 'revenue' OR currency IS NOT NULL",
+            name="revenue_requires_currency",
+        ),
         Index("ix_business_outcome_evidence_store_occurred", "store_id", "occurred_at"),
     )
 

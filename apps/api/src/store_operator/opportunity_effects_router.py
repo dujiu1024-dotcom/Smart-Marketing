@@ -766,6 +766,43 @@ def effects_overview(
     }
 
 
+@router.get("/effects/data-source-capabilities")
+def list_data_source_capabilities(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    rows = db.scalars(
+        select(DataSourceCapabilitySnapshot)
+        .where(DataSourceCapabilitySnapshot.store_id == store_id)
+        .order_by(
+            DataSourceCapabilitySnapshot.channel_key,
+            DataSourceCapabilitySnapshot.capability_key,
+            DataSourceCapabilitySnapshot.snapshot_version.desc(),
+        )
+    ).all()
+    latest: dict[tuple[str, str], DataSourceCapabilitySnapshot] = {}
+    for item in rows:
+        latest.setdefault((item.channel_key, item.capability_key), item)
+    return {
+        "items": [
+            {
+                "id": str(item.id),
+                "channel_key": item.channel_key,
+                "capability_key": item.capability_key,
+                "status": item.status,
+                "required_scopes": item.required_scopes_json,
+                "granted_scopes": item.granted_scopes_json,
+                "evidence_ref": item.evidence_ref,
+                "snapshot_version": item.snapshot_version,
+                "checked_at": item.checked_at.isoformat(),
+            }
+            for item in latest.values()
+        ],
+        "total": len(latest),
+    }
+
+
 @router.get("/effects/published-works")
 def list_published_works(
     context: Annotated[AuthContext, Depends(require_store_context)],

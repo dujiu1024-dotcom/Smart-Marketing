@@ -377,9 +377,10 @@ Job 命令需包含 source/channel account ID、时间窗口、cursor、schema v
 An initial metrics slice is now implemented:
 
 - Metric definition dictionary and append-oriented metric observation storage are introduced by migration `0018_opportunity_effects`.
-- Store-scoped APIs expose observations and an effects overview.
+- Store-scoped APIs expose observations, a metric overview, period aggregation, period-over-period comparison and data-quality counts. Trend aggregation requires complete, current, verified observations with explicit period boundaries and uses the metric dictionary aggregation rule.
 - Manual observation entry and CSV-text import preserve period, IANA timezone, source reference and deduplication key. These records are always marked `merchant_reported`.
-- The overview only surfaces values marked `official_api` or `verified_import` as available. Merchant-reported and demo-sample values do not become verified results. ROI, sales growth and store-visit growth remain unavailable unless the required real evidence and cost basis exist.
-- The UI adds an independent `#effects` workspace and distinguishes content performance, intent and business outcomes.
+- Manual observation corrections append a new observation with `supersedes_observation_id`; the original record is never overwritten, and a database uniqueness constraint permits only one direct successor per observation.
+- The overview only surfaces values marked `official_api` or `verified_import` with complete/current integrity as available. Merchant-reported and demo-sample values do not become verified results. ROI, sales growth and store-visit growth remain unavailable unless the required real evidence and cost basis exist.
+- The UI adds an independent `#effects` workspace and distinguishes content performance, intent and business outcomes, with verified trend and data-quality presentation.
 
-**Current limits:** PublishedWork ownership verification, official channel metric sync, capability snapshots, BusinessOutcomeEvidence, AttributionEvidence, observation correction/supersession workflows, observation-window completeness, task-level attribution and the full EFF-01..EFF-30 suite are not implemented by this slice. Douyin publishing/readback is not treated as proof of metric-read permission. No production data source or business outcome is claimed.
+**Current limits:** PublishedWork ownership verification, official channel metric sync, capability snapshots, BusinessOutcomeEvidence, AttributionEvidence, observation-window completeness, task-level attribution and the full EFF-01..EFF-30 suite are not implemented by this slice. CSV batch identity/file hash and importer metadata remain incomplete. Douyin publishing/readback is not treated as proof of metric-read permission. No production data source or business outcome is claimed.

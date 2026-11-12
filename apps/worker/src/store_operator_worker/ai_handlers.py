@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from store_operator.ai_gateway import (  # type: ignore[import-untyped]
     AIProviderExecutor,
     HttpProviderEnvironmentConfig,
@@ -46,7 +46,13 @@ from store_operator_worker.handlers import (
     JobExecutionError,
     register_job_handler,
 )
-from store_operator_worker.tasks import SessionLocal
+
+
+def _session_factory() -> sessionmaker[Session]:
+    # Resolve lazily: tasks.py imports celery_app while its module globals are initializing.
+    from store_operator_worker.tasks import SessionLocal
+
+    return SessionLocal
 
 
 def _safe_error(code: str, summary: str) -> JobExecutionError:
@@ -100,7 +106,7 @@ def _load_executor() -> tuple[AIProviderExecutor, httpx.AsyncClient, str, str]:
         )
     executor = AIProviderExecutor(
         registry=registry,
-        session_context_factory=SessionLocal.begin,
+        session_context_factory=_session_factory().begin,
     )
     return executor, client, config.provider_id, model_id
 
@@ -245,7 +251,7 @@ def _complete_strategy(
     except ValueError as exc:
         raise _safe_error("AI_STRATEGY_PAYLOAD_INVALID", "Strategy generation payload is invalid.") from exc
 
-    with SessionLocal() as db:
+    with _session_factory()() as db:
         job = db.get(Job, context.job_id)
         task = db.scalar(
             select(MarketingTask)
@@ -286,7 +292,7 @@ def _complete_strategy(
         asyncio.run(client.aclose())
 
     context.check_control()
-    with SessionLocal.begin() as db:
+    with _session_factory().begin() as db:
         task = db.scalar(
             select(MarketingTask)
             .where(MarketingTask.id == task_id, MarketingTask.store_id == store_id)

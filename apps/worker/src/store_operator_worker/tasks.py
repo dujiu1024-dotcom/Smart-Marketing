@@ -762,7 +762,7 @@ def _begin_douyin_publish_attempt(
         )
         db.add(attempt)
         db.flush()
-        return attempt.id
+        return cast(UUID, attempt.id)
 
 
 def _finish_douyin_publish_attempt(

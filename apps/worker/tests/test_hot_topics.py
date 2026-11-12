@@ -15,12 +15,12 @@ from store_operator_worker.handlers import (
 )
 from store_operator_worker.hot_topics import (
     MAX_FEED_BYTES,
-    _PinnedSyncBackend,
     _brand_guideline_text,
     _brand_risk_flags,
     _collect_source,
     _match_score,
     _parse_feed,
+    _PinnedSyncBackend,
     _region_matches,
     _safe_https_url,
     _store_profile_text,

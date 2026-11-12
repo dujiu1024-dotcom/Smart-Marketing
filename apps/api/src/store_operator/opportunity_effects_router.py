@@ -981,7 +981,7 @@ def check_data_source_capabilities(
     ).all()
     active_accounts = [account for account in accounts if account.status == "active"]
     granted_scopes = sorted(
-        {scope for account in accounts for scope in (account.granted_scopes or [])}
+        {scope for account in active_accounts for scope in (account.granted_scopes or [])}
     )
     has_readback_scope = any(
         "video.list" in (account.granted_scopes or [])

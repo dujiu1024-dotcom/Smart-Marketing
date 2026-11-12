@@ -742,6 +742,62 @@ def effects_overview(
         for item, _ in rows
         if item.integrity_status in {"partial", "anomalous", "unknown"}
     )
+    period_index = {
+        (
+            metric_key,
+            str(point["period_start"]),
+            str(point["period_end"]),
+            str(point["timezone"]),
+        ): point
+        for metric_key, points in metric_periods.items()
+        for point in points
+    }
+    conversion_pairs = [
+        ("clicks", "views", "点击率"),
+        ("consultations", "views", "咨询率"),
+        ("booking_intents", "consultations", "咨询预约意向率"),
+        ("orders", "booking_intents", "预约意向订单率"),
+    ]
+    conversion_rates: list[dict[str, object]] = []
+    for numerator_key, denominator_key, display_name in conversion_pairs:
+        numerator_points = metric_periods.get(numerator_key, [])
+        for numerator_point in numerator_points:
+            period_key = (
+                str(numerator_point["period_start"]),
+                str(numerator_point["period_end"]),
+                str(numerator_point["timezone"]),
+            )
+            denominator_point = period_index.get((denominator_key, *period_key))
+            if denominator_point is None:
+                continue
+            denominator_value = Decimal(str(denominator_point["value"]))
+            numerator_value = Decimal(str(numerator_point["value"]))
+            if denominator_value <= 0:
+                conversion_status = "zero_denominator"
+                conversion_value = None
+            else:
+                conversion_status = "available"
+                conversion_value = str(
+                    (numerator_value / denominator_value * 100).quantize(
+                        Decimal("0.01")
+                    )
+                )
+            conversion_rates.append(
+                {
+                    "metric_key": f"{numerator_key}_per_{denominator_key}",
+                    "display_name": display_name,
+                    "numerator_key": numerator_key,
+                    "denominator_key": denominator_key,
+                    "period_start": numerator_point["period_start"],
+                    "period_end": numerator_point["period_end"],
+                    "timezone": numerator_point["timezone"],
+                    "numerator_value": str(numerator_value),
+                    "denominator_value": str(denominator_value),
+                    "value_percent": conversion_value,
+                    "status": conversion_status,
+                }
+            )
+
     content_rows = db.execute(
         select(MetricObservation, MetricDefinition, PublishedWork)
         .join(
@@ -878,6 +934,7 @@ def effects_overview(
     return {
         "items": cards,
         "trends": trends,
+        "conversion_rates": conversion_rates,
         "content_performance": content_performance,
         "data_quality": {
             "total_observations": total_observations,

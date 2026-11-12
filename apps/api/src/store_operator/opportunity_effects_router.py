@@ -682,7 +682,9 @@ def effects_overview(
 
     trends = []
     for metric_key, points in metric_periods.items():
-        points.sort(key=lambda point: str(point["period_end"]))
+        points.sort(
+            key=lambda point: datetime.fromisoformat(str(point["period_end"])).astimezone(UTC)
+        )
         previous = points[-2] if len(points) > 1 else None
         current = points[-1] if points else None
         comparison: dict[str, object] = {

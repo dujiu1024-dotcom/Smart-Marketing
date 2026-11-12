@@ -448,3 +448,14 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 恶意文件扫描 | ClamAV INSTREAM；明确 OK 才进入 ready，FOUND 进入 rejected | 服务不可用、超时或未知响应均 fail-closed，保持隔离等待重试 |
 | 部署 | Compose 增加内网 ClamAV 和持久化签名卷；Worker/Scheduler 指向 clamd；不发布宿主机扫描端口 | StreamMaxLength=30M 覆盖 25 MiB 上传上限；生产需等价私有扫描服务和签名更新 |
 | 未完成 | 过期 UploadIntent 清理、完整解码/缩略图、真实对象存储与 ClamAV 浏览器端到端联调 | Issue #6 继续 Open |
+
+
+## 2026-11-12 #12 抖音门店账号 Web 接入（PR 待 CI）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 门店渠道入口 | `#store:channels` 接入门店资料导航 | 不新增渠道管理中心 |
+| 官方 OAuth | Web 调用 `POST /api/v1/channels/douyin/oauth/authorize`，展示服务端返回授权链接 | 只使用官方 OAuth；应用凭据/Secret Manager 未配置时明确显示服务端错误，不创建模拟账号 |
+| 账号列表 | 读取当前门店 Douyin ChannelAccount，显示外部账号 ID、授权范围、状态和到期时间 | Token 不返回前端；后端按当前门店隔离 |
+| 授权刷新 | 账号 active 时可请求服务端重新验证/刷新 Token | 不显示已发布；真实 OAuth、scope 和发布读回仍需账号验收 |
+| 未完成 | 断开/撤销 UI、能力快照、ChannelSpecVersion 管理/发现、内容适配、真实授权/发布 E2E | Issue #12 继续 Open |

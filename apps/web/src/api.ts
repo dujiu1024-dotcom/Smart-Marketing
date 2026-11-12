@@ -1048,6 +1048,8 @@ export interface MetricObservationRecord {
   integrity_status: string;
   authenticity_status: string;
   sync_status: string;
+  supersedes_observation_id: string | null;
+  import_batch_id: string | null;
 }
 export interface EffectsOverview {
   items: Array<{
@@ -1101,7 +1103,8 @@ export function createMetricObservation(storeId: string, payload: {
   return request("/effects/observations", { method: "POST", body: JSON.stringify(payload) }, storeId);
 }
 export function importMetricCsv(storeId: string, csvText: string): Promise<{
-  created: number; duplicates_skipped: number; authenticity_status: string; message: string;
+  created: number; duplicates_skipped: number; import_batch_id: string;
+  content_sha256: string; authenticity_status: string; message: string;
 }> {
   return request("/effects/import", { method: "POST", body: JSON.stringify({ csv_text: csvText }) }, storeId);
 }

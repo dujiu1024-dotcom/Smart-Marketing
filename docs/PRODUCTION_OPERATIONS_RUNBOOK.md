@@ -89,6 +89,19 @@ Set OPS_ALERT_WEBHOOK_URL in the Worker/Scheduler environment to receive sanitiz
 
 Alerts include a correlation ID and sanitized attributes. Webhook delivery has a short timeout and cannot fail the underlying job. Delivery failures are logged as ops.alert_delivery_failed; configure receiver availability and escalation in the external alerting system.
 
+### Dead-letter Outbox recovery
+
+Only replay a dead event after the broker/transport incident is resolved and the referenced job is confirmed to remain in `queued` or `retry_wait`. The command refuses non-dispatch events, terminal/running jobs, missing events and a mismatched confirmation ID. It resets the dispatch retry counter, preserves the original event ID/dedupe key, and writes an audit event with the previous attempt count and operator reason.
+
+```bash
+uv run --locked --directory apps/api python -m store_operator.cli replay-dead-outbox \
+  --event-id <OUTBOX_EVENT_UUID> \
+  --reason "Broker recovered; verified job is still queued" \
+  --confirm-event-id <SAME_OUTBOX_EVENT_UUID>
+```
+
+Do not replay a dispatch event when the job is running, succeeded, failed, cancelled or awaiting human reconciliation. For unknown external side effects, reconcile the provider/platform state first; Outbox replay only re-enqueues the job and does not authorize repeating an external side effect.
+
 ## 7. Recovery and fault-injection evidence
 
 - API CI runs real PostgreSQL migrations up/down/up and the API test suite.

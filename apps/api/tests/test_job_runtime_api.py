@@ -437,3 +437,32 @@ def test_expired_worker_lease_is_fenced_and_requires_reconciliation(
             result_ref={"should_not_commit": True},
             now=recovered_at + timedelta(seconds=1),
         )
+
+
+
+def test_duplicate_worker_delivery_cannot_claim_running_job_twice(
+    db_session: Session,
+) -> None:
+    user = create_user(db_session)
+    store = create_store(db_session, user, "Duplicate Delivery Store")
+    job = create_job_for_store(db_session, user, store, "duplicate-delivery-job")
+    first = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="first-delivery-worker",
+        now=datetime.now(UTC),
+    )
+    assert first is not None
+
+    duplicate = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="duplicate-delivery-worker",
+        now=datetime.now(UTC),
+    )
+
+    assert duplicate is None
+    db_session.refresh(job)
+    assert job.status == "running"
+    assert job.attempt_count == 1
+    assert job.lease_owner == "first-delivery-worker"

@@ -827,12 +827,21 @@ def list_published_works(
         .where(PublishedWork.store_id == store_id)
         .order_by(PublishedWork.created_at.desc())
     ).all()
+    verified_work_ids = set(
+        db.scalars(
+            select(WorkOwnershipEvidence.published_work_id).where(
+                WorkOwnershipEvidence.store_id == store_id,
+                WorkOwnershipEvidence.evidence_status == "verified",
+            )
+        ).all()
+    )
     return {
         "items": [_published_work_read(item) for item in rows],
         "total": len(rows),
         "verified_count": sum(
             1 for item in rows
-            if item.ownership_status in {"verified_system_publish", "verified_platform_api"}
+            if item.id in verified_work_ids
+            and item.ownership_status in {"verified_system_publish", "verified_platform_api"}
             and item.verified_at is not None
         ),
     }
@@ -1084,7 +1093,7 @@ def create_attribution(
         select(BusinessOutcomeEvidence).where(
             BusinessOutcomeEvidence.id == payload.outcome_evidence_id,
             BusinessOutcomeEvidence.store_id == store_id,
-        )
+        ).with_for_update()
     )
     if work is None or task is None or outcome is None:
         raise ApiError(404, "ATTRIBUTION_SOURCE_NOT_FOUND", "Attribution source not found")

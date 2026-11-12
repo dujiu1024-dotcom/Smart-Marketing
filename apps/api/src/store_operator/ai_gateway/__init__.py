@@ -11,11 +11,16 @@ from store_operator.ai_gateway.http_provider import (
     HttpVisionProvider,
     ProviderEndpoints,
 )
-from store_operator.ai_gateway.provider_config import (\n    HttpProviderBundle,\n    HttpProviderEnvironmentConfig,\n    build_http_provider_registry,\n)\nfrom store_operator.ai_gateway.prompt_runtime import (
+from store_operator.ai_gateway.prompt_runtime import (
     PromptContractError,
     parse_and_validate_structured_output,
     render_published_prompt,
     validate_json_schema,
+)
+from store_operator.ai_gateway.provider_config import (
+    HttpProviderBundle,
+    HttpProviderEnvironmentConfig,
+    build_http_provider_registry,
 )
 from store_operator.ai_gateway.protocols import (
     ImageProvider,
@@ -42,7 +47,9 @@ from store_operator.ai_gateway.schemas import (
 __all__ = [
     "HttpImageProvider",
     "HttpJsonTransport",
-    "HttpOCRProvider",\n    "HttpProviderBundle",\n    "HttpProviderEnvironmentConfig",
+    "HttpOCRProvider",
+    "HttpProviderBundle",
+    "HttpProviderEnvironmentConfig",
     "HttpTextProvider",
     "HttpVisionProvider",
     "ImageEditRequest",
@@ -67,7 +74,8 @@ __all__ = [
     "VisionInspectRequest",
     "VisionInspectResponse",
     "VisionProvider",
+    "build_http_provider_registry",
     "parse_and_validate_structured_output",
     "render_published_prompt",
-    "validate_json_schema",\n    "build_http_provider_registry",
+    "validate_json_schema",
 ]

@@ -274,3 +274,8 @@ AIInvocation 由 #9 持有。每次调用必须关联：
 - 开始实现前必须冻结 Provider 接口/错误码、Prompt schema、AIInvocation 字段、数据安全策略和 Demo 页面状态映射。
 - Provider 选型须由项目负责人确认；本设计不授权自行采购、开通或绑定供应商账号。
 
+
+
+## 产品范围约束：AI 不生成视频（2026-11-12）
+
+#10 的 Provider capability 仅覆盖文本（含视频脚本文本）、图片生成/编辑，以及经确认需要的 Vision/OCR 质检。不得增加 text-to-video、image-to-video、video editing、video rendering 或视频转码 Provider 能力。视频脚本按普通文本 Schema 生成、审核和版本化，不建立 VideoArtifact。

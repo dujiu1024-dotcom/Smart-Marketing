@@ -72,7 +72,7 @@ def download_object_bytes(*, object_key: str, max_bytes: int) -> bytes:
 
 
 def delete_object(*, object_key: str) -> None:
-    from store_operator.object_storage import delete_object as delete  # type: ignore[import-untyped]
+    from store_operator.object_storage import delete_object as delete
 
     delete(object_key=object_key)
 

@@ -367,7 +367,7 @@ def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
         definition="Verified clicks in a period",
         aggregation_rule="sum",
         period_semantics="period_delta",
-        definition_version=1,
+        definition_version=2,
         status="active",
     )
     db_session.add_all([definition, click_definition])
@@ -410,7 +410,7 @@ def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
                     period_end=period_end,
                     period_timezone="Asia/Tokyo",
                     collected_at=datetime(2026, 11, 4 + index, tzinfo=UTC),
-                    definition_version=1,
+                    definition_version=metric_definition.definition_version,
                     integrity_status="complete",
                     authenticity_status="official_api",
                     sync_status="current",

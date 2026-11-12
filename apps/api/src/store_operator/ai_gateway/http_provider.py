@@ -8,6 +8,10 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from store_operator.ai_gateway.errors import ProviderError, ProviderErrorCode, SideEffectState
+from store_operator.ai_gateway.prompt_runtime import (
+    parse_and_validate_structured_output,
+    validate_structured_output,
+)
 from store_operator.ai_gateway.schemas import (
     ImageEditRequest,
     ImageGenerateRequest,
@@ -193,7 +197,15 @@ class HttpTextProvider:
         payload = await self.transport.post(
             self.transport.endpoints.text_generate, "text.generate", request
         )
-        return self.transport.validate_response(TextGenerateResponse, payload)
+        response = self.transport.validate_response(TextGenerateResponse, payload)
+        if request.output_schema is None:
+            return response
+        structured = (
+            validate_structured_output(response.structured_output, request.output_schema)
+            if response.structured_output is not None
+            else parse_and_validate_structured_output(response.text, request.output_schema)
+        )
+        return response.model_copy(update={"structured_output": structured})
 
 
 class HttpImageProvider:

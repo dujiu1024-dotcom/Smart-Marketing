@@ -2087,6 +2087,8 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                         raise ValueError("Worksheet exceeds the 50-column limit")
                     while len(cells) < column_index:
                         cells.append(None)
+                    if cell.find("main:f", ns) is not None:
+                        raise ValueError("Formula cells are not supported; replace formulas with values")
                     cell_type = cell.attrib.get("t")
                     value_node = cell.find("main:v", ns)
                     value = value_node.text if value_node is not None else None
@@ -2153,6 +2155,8 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+    if payload.source_format != "csv":
+        raise ApiError(422, "IMPORT_FORMAT_MISMATCH", "CSV endpoint only accepts CSV source format")
     store_id = _store_id(context)
     reader = csv.DictReader(io.StringIO(payload.csv_text))
     required = {"metric_key", "value_numeric", "period_timezone"}

@@ -43,13 +43,17 @@ def upgrade() -> None:
             name="fk_publish_operation_attempts_operation_same_store",
             ondelete="RESTRICT",
         ),
-        sa.CheckConstraint("attempt_no >= 1", name="ck_publish_operation_attempts_attempt_no_positive"),
+        sa.CheckConstraint(
+            "attempt_no >= 1",
+            name="ck_publish_operation_attempts_attempt_no_positive",
+        ),
         sa.CheckConstraint(
             "action IN ('upload_image', 'publish_image_text', 'readback')",
             name="ck_publish_operation_attempts_action",
         ),
         sa.CheckConstraint(
-            "normalized_status IN ('started', 'accepted', 'verified', 'not_found', 'failed', 'unknown')",
+            "normalized_status IN ('started', 'accepted', 'verified', "
+            "'not_found', 'failed', 'unknown')",
             name="ck_publish_operation_attempts_normalized_status",
         ),
     )

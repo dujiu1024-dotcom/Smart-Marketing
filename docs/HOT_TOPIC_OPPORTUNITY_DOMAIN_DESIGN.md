@@ -82,7 +82,7 @@
 
 建议字段：
 - id、store_id、hot_topic_id
-- store_context_fingerprint、matching_version、prompt_version_id（nullable）
+- store_context_fingerprint、matching_version、matching_algorithm_version、prompt_version_id（nullable）
 - relevance_score（nullable）、match_method（rules/semantic/hybrid/manual）
 - matched_product_ids、matched_offer_ids、matched_audience_profile_ids
 - suggested_scenario、content_angle、reason_summary
@@ -140,7 +140,7 @@
 2. 确定性特征：业态、商品、活动时间窗、客群、季节/节日、地域和门店经营目标。
 3. AI 语义排序：仅对规则通过的候选调用 #10 Provider；输出结构化 JSON、理由和引用的事实 ID，不得创造价格、库存、优惠、门店地址或经营结论。
 4. 结果校验：模型输出必须引用输入中存在的事实 ID；超出 Schema、引用不存在事实、事实冲突时降级为 unassessed/review_required。
-5. 按门店事实 fingerprint + matching_version + prompt_version 缓存；任何相关事实修订、来源更新、prompt 版本变化都使旧结果 stale。
+5. 按门店事实 fingerprint + matching_version + matching_algorithm_version + prompt_version 缓存；任何相关事实修订、来源更新、匹配算法或 prompt 版本变化都使旧结果 stale。
 6. 未配置真实 Provider 时只允许确定性规则结果，并明确展示“规则匹配”；不得用随机分数或静态演示样例伪装 AI 匹配。
 
 relevance_score 为 NULL 表示尚未计算；0 仅表示真实计算后得出的零分。列表排序优先级为 eligibility、有效期、相关性和来源可信度，不能将不同来源的 heat_value 混合排序。

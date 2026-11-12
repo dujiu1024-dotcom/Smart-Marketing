@@ -672,3 +672,27 @@ def test_revoked_creator_membership_prevents_worker_claim(db_session) -> None:
     assert db_session.scalars(
         select(JobAttempt).where(JobAttempt.job_id == job.id)
     ).all() == []
+
+
+def test_inactive_store_prevents_worker_claim(db_session) -> None:
+    user, store = create_actor_and_store(db_session)
+    job = create_store_job(
+        db_session, user, store, idempotency_key="inactive-store-before-worker-claim"
+    )
+    store.status = "suspended"
+    db_session.flush()
+
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="worker-after-store-suspension",
+        now=datetime.now(UTC),
+    )
+
+    assert claim is None
+    db_session.refresh(job)
+    assert job.status == "cancelled"
+    assert job.error_code == "STORE_NOT_ACTIVE"
+    assert db_session.scalars(
+        select(JobAttempt).where(JobAttempt.job_id == job.id)
+    ).all() == []

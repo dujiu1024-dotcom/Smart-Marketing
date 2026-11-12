@@ -1,8 +1,8 @@
-from datetime import UTC, datetime
 import socket
+from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import httpcore
-from types import SimpleNamespace
 
 from store_operator_worker.hot_topics import (
     _PinnedSyncBackend,

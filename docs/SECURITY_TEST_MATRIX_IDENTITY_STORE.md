@@ -1,6 +1,6 @@
 # Identity & Store Security Test Matrix（Issue #5）
 
-> 状态：测试设计/准备，全部未执行。实际命令、结果和证据待工程骨架验收后补录。
+> 状态：完整安全场景设计矩阵。PR #141 已补充并执行部分跨店 API/Worker 测试；具体通过证据与未覆盖缺口以本文“当前实现与覆盖盘点”和 PR CI 为准，不将未执行场景标记为通过。
 > 工具：pytest + HTTPX + PostgreSQL integration + Playwright；不得用 SQLite 冒充生产数据库行为。
 
 ## 测试夹具
@@ -104,7 +104,7 @@
 - 每个跨店拒绝用例断言 HTTP 结果、数据库无变更、无 Job/Provider/签名 URL 副作用。
 - 使用隔离 fixture；禁止在生产数据上执行破坏性测试。
 
-**当前全部用例待执行。** 工程基础未验收前，不记录虚构命令、结果或安全通过结论。
+**注意：** A–G 是目标安全覆盖清单，不代表每个场景都已自动化。PR #141 的实际覆盖只以已提交测试和通过的 CI 结果为准；表格中仍列出的缺口继续保持待补状态。
 
 
 ## F. 平台管理员与成员管理边界
@@ -139,13 +139,13 @@
 |---|---|---|
 | 认证 / Session | `test_identity.py` 覆盖登录 Cookie/CSRF、登录限流、Session 过期/撤销、登出全部设备、密码轮换、双标签页请求门店上下文、成员撤销即时生效、审计追加写 | 匿名与无效 Cookie 全矩阵、禁用用户、token 轮换边界、CORS 凭据、所有 Origin/CSRF 组合仍需逐项核验 |
 | 门店上下文 / 成员 | `test_identity.py` 覆盖请求级门店选择器、非成员门店拒绝、双标签页隔离、成员撤销后拒绝 | PR #141 增加门店 suspended 后下一请求立即拒绝并写审计的测试；成员角色变更、最后 owner、并发撤销与 TOCTOU 的完整组合仍需补证 |
-| 门店资料 / 商品 / 活动 / 素材 | `test_store_knowledge_api.py` 覆盖资料/商品租户范围、资料跨店读取、商品跨店读取/更新/删除拒绝、活动/知识/客群跨店读取/更新/删除、活动跨店更新、素材列表/上传完成/下载跨店拒绝、上传校验、权限和归档约束 | 其余资源详情/删除/批量路径的 A→B 与 B→A 矩阵、上传回调归属和无副作用断言仍需补齐 |
-| 营销任务 | `test_marketing_task_api.py` 覆盖任务列表/详情门店隔离、跨店取消/归档拒绝、创建幂等、确认快照、恢复/取消/归档 | 跨店写入、路径 ID 与 body ID 混用、并发操作及所有状态转换的资源级 IDOR 仍需补齐 |
+| 门店资料 / 商品 / 活动 / 素材 | `test_store_knowledge_api.py` 覆盖资料跨店读取/更新、商品跨店读取/更新/删除、活动/知识/客群跨店读取/更新/删除、素材列表/上传完成/下载跨店拒绝及无权限对象不泄露；覆盖方向以测试断言为准 | 其余资源批量路径、完整 A→B 与 B→A 对称矩阵、上传回调的无副作用断言仍需补齐 |
+| 营销任务 | `test_marketing_task_api.py` 覆盖任务列表/详情门店隔离、跨店取消/归档拒绝、创建幂等、确认快照、恢复/取消/归档 | PR #141 增加跨店取消/归档拒绝；路径 ID 与 body ID 混用、创建后成员撤销、并发操作及所有状态转换的资源级 IDOR 仍需补齐 |
 | 内容版本 / 审核 | `test_content_delivery_api.py`、`test_content_delivery_models.py` 覆盖版本绑定、审核版本绑定和同店约束；PR #141 增加 Artifact 列表、版本创建和审核写入的跨店 404/无写入测试 | Artifact/Version 的跨店详情、读取、恢复等 API IDOR 矩阵尚未证明完整 |
 | 质检 / 发布包 | `test_content_quality_api.py`、`test_publish_package_api.py` 覆盖当前文案审核门禁、幂等、质检阻断、已确认事实和发布包约束；PR #141 增加发布包列表、冻结和确认的跨店 404/无写入测试 | 发布操作读取及所有关联 ID 替换的 404/无副作用断言仍需补齐 |
-| 渠道账号 / Provider | `test_channel_spec_api.py`、`test_channel_delivery_security.py`、抖音 Adapter/Webhook 测试覆盖渠道规格授权、密钥存储、OAuth state、发布确认和回读核验；PR #141 增加 ChannelAccount 列表过滤、capability 跨店 404/凭据不泄露及 refresh 跨店拒绝测试 | 账号列表、刷新、凭据状态和授权撤销后的访问矩阵仍需补齐 |
-| Job / AI Invocation | `test_job_runtime_api.py`、`test_ai_invocation_service.py` 覆盖 Job 和 AI Invocation 门店范围、跨店取消/重试/人工恢复拒绝；`test_job_runtime_service.py` 覆盖幂等、租约 fencing、超时恢复、重复投递相关服务规则和未知副作用 | Job 创建后成员撤销、资源归属不一致、Worker 执行前权限重验及完整 API 越权矩阵仍需补齐 |
-| 日志 / Trace | `test_observability.py`、`test_tracing.py`、`test_health.py` 覆盖递归敏感字段脱敏、Trace 导出、请求 ID 和错误响应 | Cookie/Token/个人数据在所有日志、Trace、Provider 错误和 Worker 日志路径的端到端脱敏仍需补证 |
+| 渠道账号 / Provider | `test_channel_spec_api.py`、`test_channel_delivery_security.py`、抖音 Adapter/Webhook 测试覆盖渠道规格授权、密钥存储、OAuth state、发布确认和回读核验；PR #141 增加 ChannelAccount 列表过滤、capability 跨店 404/凭据不泄露及 refresh 跨店拒绝测试 | 账号列表/capability/refresh 的跨店拒绝已有测试；授权撤销后的访问矩阵、OAuth 回调归属和真实渠道权限仍需真机验收 |
+| Job / AI Invocation | `test_job_runtime_api.py`、`test_ai_invocation_service.py` 覆盖 Job 和 AI Invocation 门店范围、跨店取消/重试/人工恢复拒绝；`test_job_runtime_service.py` 覆盖幂等、租约 fencing、超时恢复、重复投递相关服务规则和未知副作用 | Job 创建后成员撤销、资源归属不一致、Worker 执行前权限重验及所有操作的完整 API 越权矩阵仍需补齐 |
+| 日志 / Trace | `test_observability.py`、`test_tracing.py`、`test_health.py` 覆盖递归敏感字段脱敏、Trace 导出、请求 ID 和错误响应 | PR #141 增加 Worker JSON 日志、job correlation_id、递归敏感字段脱敏和告警 webhook 单元测试；Cookie/Token/个人数据在所有 Trace、Provider 错误和端到端 Worker 路径的脱敏仍需补证 |
 | 经营指标 | 当前 API 代码树未发现门店经营指标/效果数据资源端点；现有 Demo 效果数据为本地模拟 | 目前无后端经营指标资源可执行 IDOR 测试；未来新增 API 必须以 StoreMembership 和 store_id 做服务端授权，不得依赖前端过滤 |
 | 文件 / 缓存 / 并发 | `test_object_storage_download.py` 与素材 API 测试覆盖部分下载和素材授权边界 | 缓存串店、对象直链、连接池上下文泄漏、并发切店、授权后撤销再写入等场景仍需自动化验证 |
 
@@ -153,11 +153,11 @@
 
 - 原有 `apps/web/e2e/smoke.py` 只验证生产 Web 登录入口，不是完整营销业务 E2E。
 - 原有 `apps/e2e/demo_smoke.py` 主要验证 Demo 路由、Tab、编辑页和浏览器历史，不覆盖完整业务提交流程。
-- PR #141 在 `apps/e2e/demo_smoke.py` 增加需求/策略门禁、文案审核、图片审核、渠道预览、质检、最终确认、发布包冻结及刷新恢复流程。该新增测试必须以 PR CI 实际结果为准。
+- PR #141 在 `apps/e2e/demo_smoke.py` 增加需求/策略门禁、文案整改及审核、图片整改/依赖失效及重新审核、渠道预览、质检、最终确认、同版本重复冻结幂等、刷新恢复、移动视口和键盘 Tab 导航。该测试使用本地 Demo 模拟能力，不代表生产 React/API、真实 LLM、生图服务或官方平台发布已完成；以 PR CI 实际结果为准。
 
 ### 生产运维质量门禁状态
 
 - 主干已有 JSON 结构化日志、请求 ID、OpenTelemetry Trace、递归脱敏及健康检查。
-- Issue #135 分支新增 PostgreSQL custom-format 备份与显式确认恢复脚本，并在 CI Infrastructure Job 中加入备份/破坏性恢复演练。
+- Issue #135 分支新增 PostgreSQL custom-format 备份与显式确认恢复脚本，并在 CI Infrastructure Job 中加入备份/变更/恢复/校验演练、目录/文件权限和未确认恢复拒绝测试。
 - Worker 已增加 provider.failure、channel.delivery.failure、job.timeout、worker.unexpected_failure、worker.expired_leases_recovered、outbox.dead_letter 等结构化告警事件；可通过 OPS_ALERT_WEBHOOK_URL 向外部接收器发送脱敏 JSON。部署/备份/恢复步骤见 `docs/PRODUCTION_OPERATIONS_RUNBOOK.md`。
 - 生产告警接收器、路由/升级策略和通知送达仍依赖部署环境配置；本仓库没有真实生产 webhook 凭据，也未执行生产 Provider/渠道/消息队列故障演练。

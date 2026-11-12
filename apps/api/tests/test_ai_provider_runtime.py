@@ -411,3 +411,23 @@ def test_configured_registry_resolves_capability_specific_adapters_and_models() 
         )
     assert caught.value.code is ProviderErrorCode.CAPABILITY_UNSUPPORTED
     asyncio.run(client.aclose())
+
+
+def test_http_text_provider_rejects_non_json_structured_output() -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"model_id": "text-v1", "text": "not-json"})
+
+    client_transport = transport(handler)
+    provider = HttpTextProvider(client_transport)
+    request = TextGenerateRequest(
+        context=context(),
+        model_id="text-v1",
+        system_instruction="Be accurate",
+        user_input="Write",
+        output_schema={"type": "object"},
+    )
+    with pytest.raises(ProviderError) as caught:
+        asyncio.run(provider.generate(request))
+
+    assert caught.value.code is ProviderErrorCode.OUTPUT_INVALID
+    asyncio.run(client_transport._client.aclose())

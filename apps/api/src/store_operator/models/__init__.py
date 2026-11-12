@@ -51,13 +51,18 @@ from store_operator.models.marketing_task import (
     TaskStep,
 )
 from store_operator.models.opportunity_effects import (
+    AttributionEvidence,
+    BusinessOutcomeEvidence,
+    DataSourceCapabilitySnapshot,
     HotTopic,
     HotTopicSource,
     MetricDefinition,
     MetricImportBatch,
     MetricObservation,
     OpportunityDecision,
+    PublishedWork,
     StoreOpportunity,
+    WorkOwnershipEvidence,
 )
 from store_operator.models.prompt_management import PromptActivation, PromptTemplate, PromptVersion
 from store_operator.models.store_knowledge import (
@@ -75,10 +80,12 @@ from store_operator.models.store_knowledge import (
 
 __all__ = [
     "Artifact",
+    "AttributionEvidence",
     "ChannelSpec",
     "ChannelSpecVersion",
     "ChannelCapabilitySnapshot",
     "ChannelAccount",
+    "DataSourceCapabilitySnapshot",
     "DouyinWebhookReceipt",
     "OAuthAuthorizationAttempt",
     "PublishOperation",
@@ -104,6 +111,7 @@ __all__ = [
     "Base",
     "BrandGuideline",
     "BusinessFactSnapshot",
+    "BusinessOutcomeEvidence",
     "DependencyEdge",
     "IdempotencyRecord",
     "Job",
@@ -122,6 +130,7 @@ __all__ = [
     "Offer",
     "OutboxEvent",
     "PlatformAdminGrant",
+    "PublishedWork",
     "Product",
     "RequirementSnapshot",
     "StepDecision",
@@ -134,4 +143,5 @@ __all__ = [
     "TaskStep",
     "UploadIntent",
     "User",
+    "WorkOwnershipEvidence",
 ]

@@ -152,7 +152,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
             <div className="catalog-item-main"><div><h3>{trend.display_name}</h3><p>{trend.metric_key}</p></div>
               <span className="status-chip">{trend.comparison.status === "available" ? `环比 ${trend.comparison.change_percent}%` : "样本不足"}</span></div>
             <div className="catalog-meta">{trend.points.map(point => <span key={point.period_end}>{new Date(point.period_start).toLocaleDateString()} – {new Date(point.period_end).toLocaleDateString()}：{point.value}（n={point.sample_count}）</span>)}</div>
-            {trend.points.length > 1 && <svg className="metric-trend-chart" viewBox="0 0 600 120" role="img" aria-label={`${trend.display_name}趋势图`}>
+            {trend.points.length > 1 && <svg className="metric-trend-chart" width="100%" height="120" viewBox="0 0 600 120" role="img" aria-label={`${trend.display_name}趋势图`}>
               <polyline fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={chartPoints(trend.points)} />
             </svg>}
           </div>)}

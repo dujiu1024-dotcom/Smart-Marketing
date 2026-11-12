@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from store_operator_worker.ai_handlers import _prompt_variables
+from store_operator_worker.ai_handlers import _merge_copy_revision, _prompt_variables
 from store_operator_worker.handlers import JobExecutionError
 
 
@@ -111,3 +111,41 @@ def test_prompt_variables_fail_closed_for_unmapped_schema_properties() -> None:
         )
 
     assert exc_info.value.code == "AI_PROMPT_VARIABLE_UNSUPPORTED"
+
+def test_copy_revision_preserves_existing_delivery_fields_and_video_script() -> None:
+    previous_copy = {
+        "title": "Old title",
+        "body": "Old body",
+        "hashtags": ["#store"],
+        "call_to_action": "Visit today",
+        "video_script": {
+            "theme": "Product story",
+            "spoken_script": "Old script",
+            "storyboard": [],
+            "shooting_guidance": "Close-up",
+        },
+    }
+    revision_output = {
+        "title": "New title",
+        "body": "New body",
+        "change_summary": "Tightened the offer message",
+    }
+    schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "body": {"type": "string"},
+            "hashtags": {"type": "array", "items": {"type": "string"}},
+            "call_to_action": {"type": "string"},
+        },
+        "required": ["title", "body", "hashtags", "call_to_action"],
+    }
+
+    merged = _merge_copy_revision(previous_copy, revision_output, schema)
+
+    assert merged["title"] == "New title"
+    assert merged["body"] == "New body"
+    assert merged["hashtags"] == ["#store"]
+    assert merged["call_to_action"] == "Visit today"
+    assert merged["change_summary"] == "Tightened the offer message"
+    assert merged["video_script"] == previous_copy["video_script"]

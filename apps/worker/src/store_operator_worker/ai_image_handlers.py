@@ -5,11 +5,14 @@ import hashlib
 import logging
 import json
 import os
+
+from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from store_operator.ai_gateway import (
     ImageEditRequest,
@@ -839,10 +842,10 @@ def _complete_image(
                     dedupe_key=f"content.artifact_version_created:{artifact_version.id}",
                 )
             )
-    except Exception as persistence_error:
+    except (JobExecutionError, SQLAlchemyError) as persistence_error:
         try:
             delete_object(object_key=image_result.asset_object_key)
-        except (ObjectStorageNotConfigured, OSError) as cleanup_error:
+        except (ObjectStorageNotConfigured, BotoCoreError, OSError) as cleanup_error:
             logger.warning(
                 "Could not clean up generated image after persistence failure (%s)",
                 type(cleanup_error).__name__,

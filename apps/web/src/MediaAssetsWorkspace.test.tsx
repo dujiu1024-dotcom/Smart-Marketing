@@ -87,6 +87,7 @@ describe("media assets workspace", () => {
       expect.objectContaining({ expected_mime_type: "image/png", expected_byte_size: 5, expected_sha256: "0".repeat(64) }),
       "stable-upload-key",
     ));
+    await waitFor(() => expect(api.createAssetUploadIntent).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(api.putAssetFile).toHaveBeenCalledWith(expect.objectContaining({ id: "intent-1" }), file));
     await waitFor(() => expect(api.completeAssetUpload).toHaveBeenCalledWith("store-1", "intent-1"));
   });

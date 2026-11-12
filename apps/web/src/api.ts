@@ -451,3 +451,40 @@ export async function confirmAudienceFacts(storeId: string, current: AudiencePro
     body: JSON.stringify({ source_type: "merchant_ui_confirmation", source_ref: "store-audience-page", confirmation_note: "由当前门店成员核对客群描述与样本来源后确认" }),
   }, storeId);
 }
+
+
+export interface KnowledgeItem {
+  id: string;
+  store_id: string;
+  title: string;
+  category: string;
+  content_text: string | null;
+  content_ref: string | null;
+  content_hash: string | null;
+  source_type: string | null;
+  source_ref: string | null;
+  effective_at: string | null;
+  expires_at: string | null;
+  fact_status: string;
+  current_version: number;
+}
+export type KnowledgeItemInput = Omit<KnowledgeItem, "id" | "store_id" | "fact_status" | "current_version">;
+export async function getKnowledgeItems(storeId: string): Promise<{ items: KnowledgeItem[]; total: number }> {
+  return request("/store/knowledge?limit=200&offset=0", {}, storeId);
+}
+export async function createKnowledgeItem(storeId: string, input: KnowledgeItemInput, idempotencyKey: string = crypto.randomUUID()): Promise<KnowledgeItem> {
+  return request("/store/knowledge", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(input) }, storeId);
+}
+export async function updateKnowledgeItem(storeId: string, current: KnowledgeItem, input: KnowledgeItemInput): Promise<KnowledgeItem> {
+  return request(`/store/knowledge/${encodeURIComponent(current.id)}`, { method: "PATCH", headers: { "If-Match": String(current.current_version) }, body: JSON.stringify(input) }, storeId);
+}
+export async function deleteKnowledgeItem(storeId: string, current: KnowledgeItem): Promise<void> {
+  return request(`/store/knowledge/${encodeURIComponent(current.id)}`, { method: "DELETE", headers: { "If-Match": String(current.current_version) } }, storeId);
+}
+export async function confirmKnowledgeFacts(storeId: string, current: KnowledgeItem): Promise<KnowledgeItem> {
+  return request(`/store/knowledge/${encodeURIComponent(current.id)}/confirm-facts`, {
+    method: "POST",
+    headers: { "If-Match": String(current.current_version) },
+    body: JSON.stringify({ source_type: "merchant_ui_confirmation", source_ref: "store-knowledge-page", confirmation_note: "由当前门店成员核对知识内容与来源后确认" }),
+  }, storeId);
+}

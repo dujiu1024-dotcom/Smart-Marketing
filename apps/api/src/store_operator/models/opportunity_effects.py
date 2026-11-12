@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -460,11 +461,13 @@ class BusinessOutcomeEvidence(Base):
 class AttributionEvidence(Base):
     __tablename__ = "attribution_evidence"
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_attribution_evidence_active_outcome_task",
             "store_id",
             "outcome_evidence_id",
             "marketing_task_id",
-            name="uq_attribution_evidence_store_outcome_task",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
         ),
         ForeignKeyConstraint(
             ["store_id", "marketing_task_id"],
@@ -514,6 +517,11 @@ class AttributionEvidence(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")
     attribution_snapshot_json: Mapped[dict[str, object]] = mapped_column(
         JSONB, nullable=False, server_default="{}"
+    )
+    reversal_reason: Mapped[str | None] = mapped_column(String(500))
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reversed_by_user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

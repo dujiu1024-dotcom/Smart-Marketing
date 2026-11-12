@@ -6,6 +6,7 @@ from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
 from store_operator.models.opportunity_effects import (
     HotTopic,
+    MetricObservation,
     HotTopicSource,
     MetricDefinition,
     StoreOpportunity,
@@ -325,3 +326,76 @@ def test_manual_observation_correction_appends_without_mutating_original(
         },
     )
     assert duplicate.status_code == 409
+
+
+def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store = _identity(db_session, "trend@example.com", "Trend Shop")
+    definition = MetricDefinition(
+        id=uuid4(),
+        source_system="official_api",
+        metric_key="views",
+        metric_tier="content_performance",
+        display_name="播放/浏览",
+        value_type="count",
+        definition="Verified views in a period",
+        aggregation_rule="sum",
+        period_semantics="period_delta",
+        definition_version=1,
+        status="active",
+    )
+    db_session.add(definition)
+    db_session.flush()
+    periods = [
+        (
+            datetime.fromisoformat("2026-11-01T00:00:00+09:00"),
+            datetime.fromisoformat("2026-11-02T00:00:00+09:00"),
+            Decimal("100"),
+        ),
+        (
+            datetime.fromisoformat("2026-11-02T00:00:00+09:00"),
+            datetime.fromisoformat("2026-11-03T00:00:00+09:00"),
+            Decimal("125"),
+        ),
+    ]
+    for index, (period_start, period_end, value) in enumerate(periods):
+        db_session.add(
+            MetricObservation(
+                id=uuid4(),
+                store_id=store.id,
+                metric_definition_id=definition.id,
+                metric_key="views",
+                metric_tier="content_performance",
+                value_numeric=value,
+                unit="count",
+                source_system="official_api",
+                source_record_id=f"post-{index}",
+                period_start=period_start,
+                period_end=period_end,
+                period_timezone="Asia/Tokyo",
+                collected_at=datetime(2026, 11, 4 + index, tzinfo=UTC),
+                definition_version=1,
+                integrity_status="complete",
+                authenticity_status="official_api",
+                sync_status="current",
+                deduplication_key=f"{index}" * 64,
+            )
+        )
+    db_session.flush()
+    headers = _login(identity_client, "trend@example.com", store.id)
+
+    response = identity_client.get("/api/v1/effects/overview", headers=headers)
+
+    assert response.status_code == 200, response.text
+    overview = response.json()
+    assert overview["data_status"] == "available"
+    assert overview["items"][0]["value"] == "125"
+    assert overview["data_quality"]["verified_observations"] == 2
+    trend = overview["trends"][0]
+    assert len(trend["points"]) == 2
+    assert trend["comparison"]["status"] == "available"
+    assert trend["comparison"]["change_percent"] == "25.00"

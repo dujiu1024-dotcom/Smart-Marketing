@@ -5,7 +5,6 @@ import hashlib
 import json
 import logging
 import os
-
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from uuid import UUID, uuid4

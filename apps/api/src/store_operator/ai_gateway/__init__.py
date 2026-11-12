@@ -1,4 +1,5 @@
 from store_operator.ai_gateway.circuit_breaker import CircuitBreaker
+from store_operator.ai_gateway.execution import AIProviderExecutor
 from store_operator.ai_gateway.errors import (
     ProviderError,
     ProviderErrorCode,
@@ -47,6 +48,7 @@ from store_operator.ai_gateway.schemas import (
 )
 
 __all__ = [
+    "AIProviderExecutor",
     "HttpImageProvider",
     "HttpJsonTransport",
     "HttpOCRProvider",

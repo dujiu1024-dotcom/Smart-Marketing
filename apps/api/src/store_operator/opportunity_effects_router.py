@@ -863,9 +863,15 @@ def effects_overview(
         if observation.period_start is None or observation.period_end is None:
             continue
         period_key = "|".join(
-            [observation.period_start.isoformat(), observation.period_end.isoformat(), observation.period_timezone]
+            [
+                observation.period_start.isoformat(),
+                observation.period_end.isoformat(),
+                observation.period_timezone,
+            ]
         )
-        group_key = "|".join([str(work.id), observation.metric_key, observation.source_system, period_key])
+        group_key = "|".join(
+            [str(work.id), observation.metric_key, observation.source_system, period_key]
+        )
         content_groups.setdefault(group_key, []).append((observation, definition, work))
 
     content_periods: dict[str, list[dict[str, object]]] = {}

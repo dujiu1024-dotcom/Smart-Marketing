@@ -939,7 +939,7 @@ def effects_overview(
             change = Decimal(str(change_percent))
             if change > 0:
                 observation_text = (
-                    f"相邻等长周期内上升 {change_percent}%，属于已核验指标变化，不代表单一因素导致。"
+                    f"已核验指标上升 {change_percent}%，但不代表单一因素导致。"
                 )
             elif change < 0:
                 observation_text = (

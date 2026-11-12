@@ -21,6 +21,7 @@ from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.jobs.service import JobIdempotencyConflict, create_job
+from store_operator.models.channel_spec import ChannelSpec, ChannelSpecVersion
 from store_operator.models.content_delivery import (
     Artifact,
     ArtifactVersion,
@@ -208,6 +209,28 @@ def create_channel_content(
                 "Every referenced image version must be approved",
             )
         image_versions.append(image_version)
+
+    spec_version = db.scalar(
+        select(ChannelSpecVersion)
+        .join(ChannelSpec, ChannelSpec.id == ChannelSpecVersion.channel_spec_id)
+        .where(
+            ChannelSpecVersion.id == payload.channel_spec_version_id,
+            ChannelSpec.channel_key == payload.channel_key,
+            ChannelSpec.status == "active",
+        )
+    )
+    if spec_version is None:
+        raise ApiError(
+            404,
+            "CHANNEL_SPEC_VERSION_NOT_FOUND",
+            "Channel specification version not found for this channel",
+        )
+    if spec_version.verification_status != "verified":
+        raise ApiError(
+            409,
+            "CHANNEL_SPEC_UNVERIFIED",
+            "Channel specification version has not been verified against official sources",
+        )
 
     fingerprint = _fingerprint(
         {

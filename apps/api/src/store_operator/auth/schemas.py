@@ -79,3 +79,13 @@ class MemberPatchRequest(BaseModel):
 
 class LogoutAllRequest(BaseModel):
     password: SecretStr = Field(min_length=1, max_length=1024)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: SecretStr = Field(min_length=1, max_length=1024)
+    new_password: SecretStr = Field(min_length=12, max_length=128)
+
+
+class PasswordChangeResponse(BaseModel):
+    session: SessionSummary
+    csrf_token: str

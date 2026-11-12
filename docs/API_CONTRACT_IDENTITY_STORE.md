@@ -131,3 +131,15 @@ PRODUCT_DESIGN.md v1.8 将门店用户管理明确归属平台管理员的门店
 ## 11. 门店初始化参数
 
 离线命令 `bootstrap-store-owner` 必须同时接收 `--email`、`--store-name` 与 `--timezone`。时区必须是有效 IANA 标识，由服务端校验；不允许以部署服务器时区或隐式 UTC 代替门店时区。
+
+
+## Password change
+
+`POST /api/v1/auth/password/change`
+
+- Auth: current Session Cookie + trusted Origin + `X-CSRF-Token`.
+- Request: `{ "current_password": "…", "new_password": "…" }`; new password is 12–128 characters.
+- Success: HTTP 200 with the new Session absolute expiry and a new CSRF token; response rotates the `__Host-ai_store_session` Cookie.
+- Failure: `401 REAUTHENTICATION_REQUIRED` for a wrong current password; `422 PASSWORD_UNCHANGED` if the new password is identical.
+- Transaction: update Argon2id password hash and User.auth_version; revoke every active Session; insert a new Session linked through `rotated_from_session_id`; append audit event. No other device remains authenticated.
+- This endpoint is authenticated password change only. Password reset, registration and invitations remain out of scope pending product/vendor decisions.

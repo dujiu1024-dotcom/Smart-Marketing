@@ -138,8 +138,8 @@ export default function StoreCatalog({ storeId, initialTab }: { storeId: string;
         {input("活动名称 *", offerForm.title, v => setOfferForm(p => ({...p,title:v})))}
         <label className="field"><span>活动类型</span><select value={offerForm.offer_type} onChange={e => setOfferForm(p => ({...p,offer_type:e.target.value}))}>
           {["discount","bundle","gift","threshold","other"].map(v => <option key={v} value={v}>{({discount:"折扣",bundle:"组合优惠",gift:"赠品",threshold:"满额优惠",other:"其他"} as Record<string,string>)[v]}</option>)}</select></label>
-        {input("开始时间", offerForm.starts_at, v => setOfferForm(p => ({...p,starts_at:v}), "datetime-local"))}
-        {input("结束时间", offerForm.ends_at, v => setOfferForm(p => ({...p,ends_at:v}), "datetime-local"))}
+        {input("开始时间", offerForm.starts_at, v => setOfferForm(p => ({...p,starts_at:v})), "datetime-local")}
+        {input("结束时间", offerForm.ends_at, v => setOfferForm(p => ({...p,ends_at:v})), "datetime-local")}
         {input("使用次数上限", offerForm.usage_limit, v => setOfferForm(p => ({...p,usage_limit:v ? Number(v) : null})), "number")}
         <label className="field"><span>状态</span><select value={offerForm.status} onChange={e => setOfferForm(p => ({...p,status:e.target.value as OfferInput["status"]}))}>
           {["draft","active","paused","expired","archived"].map(v => <option key={v} value={v}>{({draft:"草稿",active:"生效中",paused:"已暂停",expired:"已过期",archived:"已归档"} as Record<string,string>)[v]}</option>)}</select></label>

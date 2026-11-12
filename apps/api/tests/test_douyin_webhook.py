@@ -111,7 +111,9 @@ def test_webhook_verification_echoes_challenge_without_token_or_database_access(
     assert json.loads(response.body) == {"challenge": 98765}
 
 
-def test_unauthorize_webhook_revokes_matching_accounts_and_persists_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_unauthorize_webhook_revokes_matching_accounts_and_persists_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import asyncio
 
     monkeypatch.setattr(settings, "douyin_client_key", "test-client")
@@ -147,7 +149,9 @@ def test_unauthorize_webhook_revokes_matching_accounts_and_persists_hash(monkeyp
     assert receipt.message_id == "msg-001"
 
 
-def test_duplicate_message_id_is_acknowledged_without_reprocessing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_duplicate_message_id_is_acknowledged_without_reprocessing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import asyncio
 
     monkeypatch.setattr(settings, "douyin_client_key", "test-client")

@@ -26,7 +26,7 @@ services:
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.53
-    command: "server -s3 -dir=/data"
+    command: "server -s3 -dir=/data -s3.allowedOrigins=http://localhost:5173,http://127.0.0.1:5173"
     ports: ["8333:8333", "9333:9333", "8888:8888"]
     volumes: ["seaweed_data:/data"]
 

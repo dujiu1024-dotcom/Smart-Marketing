@@ -1099,7 +1099,8 @@ export interface EffectsOverview {
   }>;
   conversion_rates: Array<{
     metric_key: string; display_name: string; numerator_key: string; denominator_key: string;
-    source_system: string; channel_key: string | null; definition_version: number;
+    source_system: string; channel_key: string | null;
+    numerator_definition_version: number; denominator_definition_version: number;
     period_start: string; period_end: string; timezone: string;
     numerator_value: string; denominator_value: string;
     value_percent: string | null; status: string;

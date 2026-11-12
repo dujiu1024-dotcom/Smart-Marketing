@@ -354,6 +354,7 @@ def _cancel_before_claim(
     job.status = "cancelled"
     job.error_code = error_code
     job.error_summary = "Execution authorization is no longer active."
+    job.cancelled_at = now
     job.finished_at = now
     _clear_lease(job)
     _append_event(db, job, "job.cancelled", data={"reason": reason})

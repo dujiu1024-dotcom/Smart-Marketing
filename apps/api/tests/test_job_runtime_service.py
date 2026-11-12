@@ -20,7 +20,15 @@ from store_operator.jobs import (
     resolve_job,
     retry_failed_job,
 )
-from store_operator.models import Job, JobAttempt, JobEvent, OutboxEvent, Store, User
+from store_operator.models import (
+    Job,
+    JobAttempt,
+    JobEvent,
+    OutboxEvent,
+    Store,
+    StoreMembership,
+    User,
+)
 
 
 def create_actor_and_store(db_session):
@@ -30,6 +38,16 @@ def create_actor_and_store(db_session):
     )
     store = Store(name="Job Runtime Test Store", timezone="Asia/Tokyo")
     db_session.add_all([user, store])
+    db_session.flush()
+    db_session.add(
+        StoreMembership(
+            store_id=store.id,
+            user_id=user.id,
+            role="owner",
+            status="active",
+            joined_at=datetime.now(UTC),
+        )
+    )
     db_session.flush()
     return user, store
 

@@ -320,3 +320,20 @@ def test_channel_account_capabilities_are_store_scoped(
     )
     assert hidden.status_code == 404
     assert "store-a-open-id" not in hidden.text
+
+    accounts_in_other_store = identity_client.get(
+        "/api/v1/channels/douyin/accounts",
+        headers=headers_b,
+    )
+    assert accounts_in_other_store.status_code == 200, accounts_in_other_store.text
+    assert str(account.id) not in accounts_in_other_store.text
+    assert "store-a-open-id" not in accounts_in_other_store.text
+
+    import store_operator.channel_douyin_router as douyin_router
+
+    monkeypatch.setattr(douyin_router, "_require_oauth_configuration", lambda: (None, None))
+    hidden_refresh = identity_client.post(
+        f"/api/v1/channels/douyin/accounts/{account.id}/refresh",
+        headers=headers_b,
+    )
+    assert hidden_refresh.status_code == 404

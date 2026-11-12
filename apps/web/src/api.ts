@@ -125,6 +125,18 @@ export async function login(email: string, password: string): Promise<User> {
   return response.user;
 }
 
+export async function refreshCsrfToken(): Promise<void> {
+  const response = await request<{ csrf_token: string }>("/auth/csrf", {
+    method: "POST",
+  });
+  sessionStorage.setItem(CSRF_KEY, response.csrf_token);
+}
+
+export async function logout(): Promise<void> {
+  await request<void>("/auth/logout", { method: "POST" });
+  sessionStorage.removeItem(CSRF_KEY);
+}
+
 export async function getCurrentUser(): Promise<User> {
   const response = await request<{ user: User }>("/auth/me");
   return response.user;

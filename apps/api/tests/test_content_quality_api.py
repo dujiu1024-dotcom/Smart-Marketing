@@ -2,7 +2,15 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from store_operator.auth.security import hash_password
-from store_operator.models import MediaAsset, QualityReport, Store, StoreMembership, User
+from store_operator.models import (
+    ChannelSpec,
+    ChannelSpecVersion,
+    MediaAsset,
+    QualityReport,
+    Store,
+    StoreMembership,
+    User,
+)
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 

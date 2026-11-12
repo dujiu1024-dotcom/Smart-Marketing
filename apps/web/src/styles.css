@@ -184,3 +184,12 @@ h1 { margin: 0; color: #1f3029; font-size: clamp(25px, 3vw, 32px); letter-spacin
   .task-overview-stats { text-align: left; }
   .task-home-footer { align-items: flex-start; flex-direction: column; }
 }
+
+.task-content-artifacts { display: grid; gap: 12px; margin: 16px 0; }
+.task-content-artifact { display: grid; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--border, #e4e9e5); border-radius: 12px; }
+.task-content-artifact .task-readonly-grid { margin-top: 4px; }
+.task-content-artifact .task-readonly-grid > div { grid-template-columns: 1fr; }
+.task-content-artifact .task-readonly-grid span { max-height: 180px; overflow: auto; }
+@media (max-width: 760px) {
+  .task-content-artifact .task-step-actions { flex-wrap: wrap; }
+}

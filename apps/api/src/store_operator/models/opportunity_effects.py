@@ -106,6 +106,7 @@ class OpportunityDecision(Base):
     __table_args__ = (
         ForeignKeyConstraint(["store_id", "opportunity_id"], ["store_opportunities.store_id", "store_opportunities.id"], ondelete="RESTRICT"),
         CheckConstraint("decision IN ('adopt', 'ignore', 'snooze')", name="decision"),
+        UniqueConstraint("store_id", "actor_user_id", "idempotency_key", name="uq_opportunity_decisions_idempotency"),
         Index("ix_opportunity_decisions_store_created", "store_id", "created_at"),
     )
 
@@ -150,7 +151,6 @@ class MetricObservation(Base):
     __tablename__ = "metric_observations"
     __table_args__ = (
         UniqueConstraint("store_id", "deduplication_key", name="uq_metric_observations_store_dedupe"),
-        ForeignKeyConstraint(["metric_definition_id"], ["metric_definitions.id"], ondelete="RESTRICT"),
         CheckConstraint("integrity_status IN ('complete', 'partial', 'anomalous', 'unknown')", name="integrity_status"),
         CheckConstraint("authenticity_status IN ('official_api', 'verified_import', 'merchant_reported', 'demo_sample')", name="authenticity_status"),
         CheckConstraint("sync_status IN ('current', 'delayed', 'failed', 'unavailable')", name="sync_status"),

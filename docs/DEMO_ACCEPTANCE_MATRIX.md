@@ -362,3 +362,17 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 - 买赠与赠品规则通过当前门店真实商品清单选择 Product ID；不要求商家手工输入 UUID。
 - 创建幂等键在同一编辑草稿的重试期间保持稳定；未保存修改时禁止确认旧版本事实。
 - 活动使用 `archived` 状态归档，不提供物理删除入口。
+
+## 2026-11-12 #6 品牌规范与客群经营生产 Web（PR 待验收）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 品牌规范读取 | GET /api/v1/store/brand-guideline | 单门店唯一记录；404 呈现真实首次创建态 |
+| 品牌规范创建/编辑 | POST/PATCH /api/v1/store/brand-guideline | 创建 Idempotency-Key；更新 If-Match |
+| 品牌事实确认 | POST /api/v1/store/brand-guideline/{id}/confirm-facts | 显式确认；未保存的修改禁止确认 |
+| 品牌字段 | 品牌故事、定位、差异化、核心价值、语气、常用/禁用表达、CTA、色板、字体、视觉风格 | Logo 资产关联暂只保留现有关联，不在此页上传 |
+| 客群列表/创建/编辑/删除 | GET/POST/PATCH/DELETE /api/v1/store/audiences | 当前门店隔离；创建幂等、更新/删除版本绑定 |
+| 客群事实确认 | POST /api/v1/store/audiences/{id}/confirm-facts | 来源/样本/置信度可追溯；显式确认 |
+| 客群字段 | 客群类型、描述、消费场景/时段、购买动机、常见异议、来源、样本量、采样时间、置信等级 | 未知样本量和置信度保持空值 |
+| 页面路由 | #store:brand；#store:audience；#store-editor:audience:new；#store-editor:audience:<id> | 对照 Demo 门店资料 Tab 与独立客群编辑页 |
+| 未完成 | 品牌 Logo 上传/选择、客群与商品/活动的联动、完整浏览器和移动端/可访问性人工验收 | 不据此关闭 Issue #6 |

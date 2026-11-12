@@ -139,11 +139,11 @@
 |---|---|---|
 | 认证 / Session | `test_identity.py` 覆盖登录 Cookie/CSRF、登录限流、Session 过期/撤销、登出全部设备、密码轮换、双标签页请求门店上下文、成员撤销即时生效、审计追加写 | 匿名与无效 Cookie 全矩阵、禁用用户、token 轮换边界、CORS 凭据、所有 Origin/CSRF 组合仍需逐项核验 |
 | 门店上下文 / 成员 | `test_identity.py` 覆盖请求级门店选择器、非成员门店拒绝、双标签页隔离、成员撤销后拒绝 | PR #141 增加门店 suspended 后下一请求立即拒绝并写审计的测试；成员角色变更、最后 owner、并发撤销与 TOCTOU 的完整组合仍需补证 |
-| 门店资料 / 商品 / 活动 / 素材 | `test_store_knowledge_api.py` 覆盖资料/商品租户范围、资料跨店读取、商品跨店读取/更新/删除拒绝、活动/知识/客群跨店读取、活动跨店更新、素材跨店下载拒绝、上传校验、权限和归档约束 | 其余资源详情/删除/批量路径的 A→B 与 B→A 矩阵、上传回调归属和无副作用断言仍需补齐 |
+| 门店资料 / 商品 / 活动 / 素材 | `test_store_knowledge_api.py` 覆盖资料/商品租户范围、资料跨店读取、商品跨店读取/更新/删除拒绝、活动/知识/客群跨店读取/更新/删除、活动跨店更新、素材列表/上传完成/下载跨店拒绝、上传校验、权限和归档约束 | 其余资源详情/删除/批量路径的 A→B 与 B→A 矩阵、上传回调归属和无副作用断言仍需补齐 |
 | 营销任务 | `test_marketing_task_api.py` 覆盖任务列表/详情门店隔离、跨店取消/归档拒绝、创建幂等、确认快照、恢复/取消/归档 | 跨店写入、路径 ID 与 body ID 混用、并发操作及所有状态转换的资源级 IDOR 仍需补齐 |
 | 内容版本 / 审核 | `test_content_delivery_api.py`、`test_content_delivery_models.py` 覆盖版本绑定、审核版本绑定和同店约束；PR #141 增加 Artifact 列表、版本创建和审核写入的跨店 404/无写入测试 | Artifact/Version 的跨店详情、读取、恢复等 API IDOR 矩阵尚未证明完整 |
 | 质检 / 发布包 | `test_content_quality_api.py`、`test_publish_package_api.py` 覆盖当前文案审核门禁、幂等、质检阻断、已确认事实和发布包约束；PR #141 增加发布包列表、冻结和确认的跨店 404/无写入测试 | 发布操作读取及所有关联 ID 替换的 404/无副作用断言仍需补齐 |
-| 渠道账号 / Provider | `test_channel_spec_api.py`、`test_channel_delivery_security.py`、抖音 Adapter/Webhook 测试覆盖渠道规格授权、密钥存储、OAuth state、发布确认和回读核验；PR #141 增加 ChannelAccount capability 跨店 404/凭据不泄露测试 | 账号列表、刷新、凭据状态和授权撤销后的访问矩阵仍需补齐 |
+| 渠道账号 / Provider | `test_channel_spec_api.py`、`test_channel_delivery_security.py`、抖音 Adapter/Webhook 测试覆盖渠道规格授权、密钥存储、OAuth state、发布确认和回读核验；PR #141 增加 ChannelAccount 列表过滤、capability 跨店 404/凭据不泄露及 refresh 跨店拒绝测试 | 账号列表、刷新、凭据状态和授权撤销后的访问矩阵仍需补齐 |
 | Job / AI Invocation | `test_job_runtime_api.py`、`test_ai_invocation_service.py` 覆盖 Job 和 AI Invocation 门店范围、取消/重试/人工恢复；`test_job_runtime_service.py` 覆盖幂等、租约 fencing、超时恢复、重复投递相关服务规则和未知副作用 | Job 创建后成员撤销、资源归属不一致、Worker 执行前权限重验及完整 API 越权矩阵仍需补齐 |
 | 日志 / Trace | `test_observability.py`、`test_tracing.py`、`test_health.py` 覆盖递归敏感字段脱敏、Trace 导出、请求 ID 和错误响应 | Cookie/Token/个人数据在所有日志、Trace、Provider 错误和 Worker 日志路径的端到端脱敏仍需补证 |
 | 经营指标 | 当前 API 代码树未发现门店经营指标/效果数据资源端点；现有 Demo 效果数据为本地模拟 | 目前无后端经营指标资源可执行 IDOR 测试；未来新增 API 必须以 StoreMembership 和 store_id 做服务端授权，不得依赖前端过滤 |

@@ -47,6 +47,14 @@ const profile = {
   current_version: 1,
 };
 
+async function signIn() {
+  render(<App />);
+  await screen.findByRole("heading", { name: "登录门店工作台" });
+  fireEvent.change(screen.getByLabelText("邮箱 *"), { target: { value: user.email } });
+  fireEvent.change(screen.getByLabelText("密码 *"), { target: { value: "correct-password" } });
+  fireEvent.click(screen.getByRole("button", { name: "登录" }));
+}
+
 describe("store profile workspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,8 +63,16 @@ describe("store profile workspace", () => {
     api.getStores.mockResolvedValue({ items: [store], active_store_id: store.id });
     api.setActiveStore.mockResolvedValue(undefined);
     api.getStoreProfile.mockResolvedValue(profile);
-    api.updateStoreProfile.mockResolvedValue({ ...profile, display_name: "拾光茶研社（万象城店）", current_version: 2 });
-    api.confirmStoreProfileFacts.mockResolvedValue({ ...profile, fact_status: "confirmed", current_version: 2 });
+    api.updateStoreProfile.mockResolvedValue({
+      ...profile,
+      display_name: "拾光茶研社（万象城店）",
+      current_version: 2,
+    });
+    api.confirmStoreProfileFacts.mockResolvedValue({
+      ...profile,
+      fact_status: "confirmed",
+      current_version: 2,
+    });
   });
 
   it("requires authentication and labels unconnected store modules", async () => {
@@ -66,12 +82,7 @@ describe("store profile workspace", () => {
   });
 
   it("loads a real store profile and saves it with the current version", async () => {
-    render(<App />);
-    await screen.findByRole("heading", { name: "登录门店工作台" });
-    fireEvent.change(screen.getByLabelText("邮箱 *"), { target: { value: user.email } });
-    fireEvent.change(screen.getByLabelText("密码 *"), { target: { value: "correct-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "登录" }));
-
+    await signIn();
     expect(await screen.findByDisplayValue("拾光茶研社")).toBeInTheDocument();
     expect(await screen.findByText("V1 · 待确认")).toBeInTheDocument();
 
@@ -89,15 +100,9 @@ describe("store profile workspace", () => {
     });
     expect(await screen.findByText(/门店档案已保存为 V2/)).toBeInTheDocument();
   });
-});
-
 
   it("requires an explicit action to confirm store facts", async () => {
-    render(<App />);
-    fireEvent.change(screen.getByLabelText("邮箱 *"), { target: { value: user.email } });
-    fireEvent.change(screen.getByLabelText("密码 *"), { target: { value: "correct-password" } });
-    fireEvent.click(screen.getByRole("button", { name: "登录" }));
-
+    await signIn();
     expect(await screen.findByText("V1 · 待确认")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认资料" }));
 
@@ -106,3 +111,4 @@ describe("store profile workspace", () => {
     });
     expect(await screen.findByText("V2 · 已确认")).toBeInTheDocument();
   });
+});

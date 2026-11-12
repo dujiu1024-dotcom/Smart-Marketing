@@ -474,7 +474,7 @@ def test_requirement_and_strategy_confirmation_freeze_exact_source_versions(
 
     fact_list = identity_client.get(
         f"/api/v1/marketing-tasks/{task_id}/business-facts",
-        headers=headers,
+        headers=confirm_headers,
     )
     assert fact_list.status_code == 200, fact_list.text
     assert fact_list.json()[0]["id"] == str(business_fact.id)

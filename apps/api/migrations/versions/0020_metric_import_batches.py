@@ -47,9 +47,9 @@ def upgrade() -> None:
             "content_sha256",
             name="uq_metric_import_batches_store_hash",
         ),
-        sa.CheckConstraint("row_count >= 0", name="ck_metric_import_batches_row_count"),
-        sa.CheckConstraint("created_count >= 0", name="ck_metric_import_batches_created_count"),
-        sa.CheckConstraint("skipped_count >= 0", name="ck_metric_import_batches_skipped_count"),
+        sa.CheckConstraint("row_count >= 0", name="ck_metric_import_batches_row_count_nonnegative"),
+        sa.CheckConstraint("created_count >= 0", name="ck_metric_import_batches_created_count_nonnegative"),
+        sa.CheckConstraint("skipped_count >= 0", name="ck_metric_import_batches_skipped_count_nonnegative"),
     )
     op.create_index(
         "ix_metric_import_batches_store_created",

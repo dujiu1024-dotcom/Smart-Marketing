@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypeVar
 from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel, ValidationError
-
-from typing import TypeVar
 
 from store_operator.ai_gateway.errors import ProviderError, ProviderErrorCode, SideEffectState
 from store_operator.ai_gateway.schemas import (

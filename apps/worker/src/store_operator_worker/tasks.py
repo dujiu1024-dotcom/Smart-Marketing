@@ -74,13 +74,13 @@ from store_operator_worker.handlers import (
     register_job_handler,
     resolve_job_handler,
 )
-from store_operator_worker.observability import emit_operational_alert
 from store_operator_worker.media_scanner import (
     MalwareDetected,
     image_dimensions,
     scan_with_clamd,
     validate_image_dimensions,
 )
+from store_operator_worker.observability import emit_operational_alert
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:

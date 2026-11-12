@@ -51,11 +51,11 @@ from store_operator.models import (  # type: ignore[import-untyped]
     MediaAsset,
     OutboxEvent,
     PublishConfirmation,
+    PublishedWork,
     PublishOperation,
     PublishOperationAttempt,
     PublishPackage,
     PublishPackageItem,
-    PublishedWork,
     QualityReport,
     ReviewRecord,
     UploadIntent,
@@ -78,13 +78,13 @@ from store_operator_worker.handlers import (
     resolve_job_handler,
 )
 from store_operator_worker.hot_topics import register_hot_topic_handlers
-from store_operator_worker.observability import emit_operational_alert
 from store_operator_worker.media_scanner import (
     MalwareDetected,
     image_dimensions,
     scan_with_clamd,
     validate_image_dimensions,
 )
+from store_operator_worker.observability import emit_operational_alert
 
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:

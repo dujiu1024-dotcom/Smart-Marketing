@@ -124,3 +124,15 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - `buy_x_get_y` 与 `gift` 的适用商品通过真实门店 Product 列表选择，并将对应 Product ID 写入 `terms_json.eligible_product_ids`。
 - `discount_percent`、`discount_amount`、`fixed_price`、`threshold_discount` 按各自字段校验金额、币种和折扣范围；不接受仅有自然语言标题而缺少规则数值的优惠。
 - 归档通过 Offer 的 `status=archived` 与 If-Match 版本更新完成，不物理删除业务记录。
+
+## 11. 品牌规范生产页面映射（PR 待验收）
+- Demo 门店资料 Tab brand 映射为 #store:brand。
+- 使用 Store Knowledge API /store/brand-guideline 读取单门店品牌规范；不存在时显示首次创建态。
+- 创建使用 Idempotency-Key；更新与事实确认使用 If-Match；未保存修改时禁止确认。
+- Logo asset_id 只保留现有关联，不在本页面伪造素材上传流程。
+
+## 12. 客群与经营生产页面映射（PR 待验收）
+- Demo 门店资料 Tab audience 映射为 #store:audience；新增/编辑映射为 #store-editor:audience:new 和 #store-editor:audience:<id>。
+- 使用门店隔离的 /store/audiences CRUD 与通用 confirm-facts API。
+- 记录客群类型、消费场景/时段、购买动机、常见异议、来源、样本量、采样时间和置信等级；未知值保持空白。
+- 客群与商品/活动联动和完整经营效果证据仍未接入。

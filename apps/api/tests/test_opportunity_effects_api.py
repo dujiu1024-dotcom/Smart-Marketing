@@ -756,3 +756,73 @@ def test_metric_observation_cannot_reference_another_stores_published_work(
     )
 
     assert response.status_code == 404
+
+
+def test_effects_overview_does_not_compare_gaps_or_zero_baselines(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store = _identity(db_session, "trend-edge@example.com", "Trend Edge Shop")
+    definitions = [
+        MetricDefinition(
+            id=uuid4(),
+            source_system="official_api",
+            metric_key=metric_key,
+            metric_tier="content_performance",
+            display_name=metric_key,
+            value_type="count",
+            definition="Verified period metric",
+            aggregation_rule="sum",
+            period_semantics="period_delta",
+            definition_version=1,
+            status="active",
+        )
+        for metric_key in ("gap_views", "zero_views")
+    ]
+    db_session.add_all(definitions)
+    db_session.flush()
+    observations = [
+        ("gap_views", "2026-11-01T00:00:00+00:00", "2026-11-02T00:00:00+00:00", "10", "g1"),
+        ("gap_views", "2026-11-04T00:00:00+00:00", "2026-11-05T00:00:00+00:00", "20", "g2"),
+        ("zero_views", "2026-11-01T00:00:00+00:00", "2026-11-02T00:00:00+00:00", "0", "z1"),
+        ("zero_views", "2026-11-02T00:00:00+00:00", "2026-11-03T00:00:00+00:00", "10", "z2"),
+    ]
+    definition_by_key = {item.metric_key: item for item in definitions}
+    for metric_key, start, end, value, key in observations:
+        db_session.add(
+            MetricObservation(
+                id=uuid4(),
+                store_id=store.id,
+                metric_definition_id=definition_by_key[metric_key].id,
+                metric_key=metric_key,
+                metric_tier="content_performance",
+                value_numeric=Decimal(value),
+                unit="count",
+                source_system="official_api",
+                source_record_id=key,
+                period_start=datetime.fromisoformat(start),
+                period_end=datetime.fromisoformat(end),
+                period_timezone="UTC",
+                collected_at=datetime(2026, 11, 6, tzinfo=UTC),
+                definition_version=1,
+                integrity_status="complete",
+                authenticity_status="official_api",
+                sync_status="current",
+                deduplication_key=key * 64,
+            )
+        )
+    db_session.flush()
+    headers = _login(identity_client, "trend-edge@example.com", store.id)
+
+    response = identity_client.get("/api/v1/effects/overview", headers=headers)
+
+    assert response.status_code == 200, response.text
+    comparisons = {
+        item["metric_key"]: item["comparison"] for item in response.json()["trends"]
+    }
+    assert comparisons["gap_views"]["status"] == "insufficient_samples"
+    assert comparisons["gap_views"]["change_percent"] is None
+    assert comparisons["zero_views"]["status"] == "zero_baseline"
+    assert comparisons["zero_views"]["change_percent"] is None

@@ -335,7 +335,7 @@ PR #66 已合并至 main（commit `d2f0b5e839ba04676ae9f51e9f51a456d3540bfd`） 
 
 新增 API 测试覆盖授权确认幂等、版本冲突、下载门禁、品牌 Logo 引用阻断和归档状态。
 
-边界：上传完成仍进入 quarantined/scanning；ClamAV/恶意文件扫描、缩略图/尺寸元数据处理、Worker 回写 ready/rejected、过期 UploadIntent sweeper 和素材库前端接入仍未完成。不得将哈希/MIME 校验称为恶意文件扫描。
+边界更新（2026-11-12，PR 待 CI）：上传完成仍先进入 quarantined/scanning；Worker 周期性领取隔离素材，在事务行锁内校验对象大小/SHA-256、PNG/JPEG/WebP 文件头与尺寸上限，并通过 ClamAV INSTREAM 扫描。只有 ClamAV 明确返回 OK 且结构校验通过才写入 ready；FOUND 或文件结构/尺寸不合规写入 rejected。扫描服务不可用、超时或返回不确定结果时事务回滚，保持隔离状态等待下一轮，不允许 fail-open。完整解码、缩略图生成、过期 UploadIntent sweeper 和素材库前端接入仍未完成。文件头/尺寸检查不等同于完整图像解码。
 
 
 ### PR #66 合并验证证据（2026-11-11）

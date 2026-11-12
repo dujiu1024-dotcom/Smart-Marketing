@@ -158,4 +158,5 @@
 
 - 主干已有 JSON 结构化日志、请求 ID、OpenTelemetry Trace、递归脱敏及健康检查。
 - Issue #135 分支新增 PostgreSQL custom-format 备份与显式确认恢复脚本，并在 CI Infrastructure Job 中加入备份/破坏性恢复演练。
-- 监控告警规则/告警路由、故障注入和恢复演练记录仍需单独核验；不能用日志或健康检查代替告警能力。
+- Worker 已增加 provider.failure、channel.delivery.failure、job.timeout、worker.unexpected_failure、worker.expired_leases_recovered、outbox.dead_letter 等结构化告警事件；可通过 OPS_ALERT_WEBHOOK_URL 向外部接收器发送脱敏 JSON。部署/备份/恢复步骤见 `docs/PRODUCTION_OPERATIONS_RUNBOOK.md`。
+- 生产告警接收器、路由/升级策略和通知送达仍依赖部署环境配置；本仓库没有真实生产 webhook 凭据，也未执行生产 Provider/渠道/消息队列故障演练。

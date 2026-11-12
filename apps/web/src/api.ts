@@ -581,6 +581,7 @@ export interface MarketingTaskOptions {
   includes_copy: boolean | null;
   includes_image: boolean | null;
   opportunity_applicable: boolean | null;
+  opportunity_snapshot?: Record<string, unknown> | null;
   selected_channel_keys: string[];
   requires_external_delivery: boolean;
 }
@@ -622,6 +623,7 @@ export interface MarketingTask extends MarketingTaskSummary {
 export interface MarketingTaskCreateInput {
   task_type: MarketingTaskType;
   title: string;
+  opportunity_id?: string | null;
   requirement_draft: Record<string, unknown>;
   task_options: MarketingTaskOptions;
 }

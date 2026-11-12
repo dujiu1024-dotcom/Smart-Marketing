@@ -13,18 +13,18 @@ from store_operator.ai_gateway.http_provider import (
     HttpVisionProvider,
     ProviderEndpoints,
 )
+from store_operator.ai_gateway.prompt_contracts import (
+    PROMPT_TASK_CONTRACTS,
+    PromptTaskContract,
+    PromptTaskType,
+    validate_prompt_task_contract,
+)
 from store_operator.ai_gateway.prompt_runtime import (
     PromptContractError,
     parse_and_validate_structured_output,
     render_published_prompt,
     validate_json_schema,
     validate_structured_output,
-)
-from store_operator.ai_gateway.prompt_contracts import (
-    PROMPT_TASK_CONTRACTS,
-    PromptTaskContract,
-    PromptTaskType,
-    validate_prompt_task_contract,
 )
 from store_operator.ai_gateway.protocols import (
     ImageProvider,

@@ -551,7 +551,7 @@ def test_suspended_store_is_rejected_on_the_next_request(
     assert after.json()["error"]["code"] == "STORE_NOT_FOUND"
     denied = (
         db_session.query(AuditEvent)
-        .filter_by(action="store.context.access", result="denied", target_id=store.id)
+        .filter_by(action="store.context.access", result="denied", target_id=str(store.id))
         .one()
     )
     assert denied.metadata_json["reason"] == "not_member_or_inactive"

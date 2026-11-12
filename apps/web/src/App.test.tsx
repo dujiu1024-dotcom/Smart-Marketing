@@ -101,6 +101,21 @@ describe("store profile workspace", () => {
     expect(await screen.findByText(/门店档案已保存为 V2/)).toBeInTheDocument();
   });
 
+  it("does not confirm stale profile data while edits are unsaved", async () => {
+    await signIn();
+    expect(await screen.findByText("V1 · 待确认")).toBeInTheDocument();
+
+    const nameInput = screen.getByLabelText("门店名称 *");
+    fireEvent.change(nameInput, { target: { value: "未保存的新门店名称" } });
+
+    const confirmButton = screen.getByRole("button", { name: "确认资料" });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.click(confirmButton);
+
+    expect(api.confirmStoreProfileFacts).not.toHaveBeenCalled();
+    expect(nameInput).toHaveValue("未保存的新门店名称");
+  });
+
   it("requires an explicit action to confirm store facts", async () => {
     await signIn();
     expect(await screen.findByText("V1 · 待确认")).toBeInTheDocument();

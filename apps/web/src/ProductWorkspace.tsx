@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { ApiError, confirmProductFacts, createProduct, deleteProduct, getProduct, listProducts, updateProduct, type Product, type ProductInput } from "./api";
+import { confirmProductFacts, createProduct, deleteProduct, getProduct, listProducts, updateProduct, type Product, type ProductInput } from "./api";
 
 interface FormState {
   name: string; category: string; sku: string; specification: string; unit: string;

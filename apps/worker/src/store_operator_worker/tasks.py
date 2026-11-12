@@ -1329,7 +1329,12 @@ def execute_douyin_image_text_publish(
                 )
             except (DouyinApiError, httpx.HTTPError) as exc:
                 _finish_douyin_publish_attempt(
-                    attempt_id, normalized_status="failed", retryable=True,\n                    error_code=exc.code if isinstance(exc, DouyinApiError) else "HTTP_TRANSPORT_ERROR"
+                    attempt_id, normalized_status="failed", retryable=True,
+                    error_code=(
+                        exc.code
+                        if isinstance(exc, DouyinApiError)
+                        else "HTTP_TRANSPORT_ERROR"
+                    )
                 )
                 raise
             _finish_douyin_publish_attempt(

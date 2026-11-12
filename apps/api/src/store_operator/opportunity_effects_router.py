@@ -202,7 +202,7 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
     return {
         "id": str(item.id), "metric_key": item.metric_key, "metric_tier": item.metric_tier,
         "display_name": definition.display_name,
-        "value_numeric": str(item.value_numeric) if item.value_numeric is not None else None,
+        "value_numeric": _decimal_text(item.value_numeric) if item.value_numeric is not None else None,
         "unit": item.unit, "currency": item.currency, "source_system": item.source_system,
         "source_record_id": item.source_record_id, "source_evidence_ref": item.source_evidence_ref,
         "period_start": item.period_start.isoformat() if item.period_start else None,
@@ -242,7 +242,7 @@ def _business_outcome_read(item: BusinessOutcomeEvidence) -> dict[str, object]:
     return {
         "id": str(item.id),
         "outcome_type": item.outcome_type,
-        "value_numeric": str(item.value_numeric),
+        "value_numeric": _decimal_text(item.value_numeric),
         "currency": item.currency,
         "source_system": item.source_system,
         "source_record_id": item.source_record_id,
@@ -675,7 +675,7 @@ def effects_overview(
                 "metric_key": item.metric_key,
                 "display_name": definition.display_name,
                 "metric_tier": item.metric_tier,
-                "value": str(item.value_numeric),
+                "value": _decimal_text(item.value_numeric),
                 "status": (
                     "accumulating"
                     if (

@@ -30,6 +30,10 @@ celery_app.conf.update(
             "task": "media.scan_quarantined_assets",
             "schedule": 15.0,
         },
+        "cleanup-orphaned-ai-image-objects-every-15-minutes": {
+            "task": "media.cleanup_orphaned_ai_image_objects",
+            "schedule": 900.0,
+        },
         "recover-expired-job-leases-every-30-seconds": {
             "task": "jobs.recover_expired_leases",
             "schedule": 30.0,

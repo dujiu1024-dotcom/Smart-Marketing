@@ -1,4 +1,7 @@
+import base64
 from datetime import UTC, datetime, timedelta
+from io import BytesIO
+from zipfile import ZipFile
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -11,6 +14,7 @@ from store_operator.models.opportunity_effects import (
     HotTopic,
     HotTopicSource,
     MetricDefinition,
+    MetricImportBatch,
     MetricObservation,
     PublishedWork,
     StoreOpportunity,
@@ -968,3 +972,84 @@ def test_future_observation_window_is_marked_accumulating_and_excluded_from_tren
     assert overview.json()["items"][0]["status"] == "accumulating"
     assert history.status_code == 200, history.text
     assert history.json()["items"][0]["observation_window_status"] == "accumulating"
+
+
+def _minimal_metrics_xlsx() -> bytes:
+    workbook = BytesIO()
+    with ZipFile(workbook, "w") as archive:
+        archive.writestr(
+            "xl/workbook.xml",
+            """<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <sheets><sheet name="Metrics" sheetId="1" r:id="rId1"/></sheets>
+            </workbook>""",
+        )
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            """<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+                Target="worksheets/sheet1.xml"/>
+            </Relationships>""",
+        )
+        archive.writestr(
+            "xl/worksheets/sheet1.xml",
+            """<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+              <sheetData>
+                <row r="1">
+                  <c r="A1" t="inlineStr"><is><t>metric_key</t></is></c>
+                  <c r="B1" t="inlineStr"><is><t>value_numeric</t></is></c>
+                  <c r="C1" t="inlineStr"><is><t>period_timezone</t></is></c>
+                </row>
+                <row r="2">
+                  <c r="A2" t="inlineStr"><is><t>views</t></is></c>
+                  <c r="B2"><v>120</v></c>
+                  <c r="C2" t="inlineStr"><is><t>Asia/Tokyo</t></is></c>
+                </row>
+              </sheetData>
+            </worksheet>""",
+        )
+    return workbook.getvalue()
+
+
+def test_xlsx_metric_import_creates_merchant_reported_observation(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store = _identity(db_session, "xlsx-import@example.com", "XLSX Import Shop")
+    db_session.add(
+        MetricDefinition(
+            id=uuid4(),
+            source_system="manual",
+            metric_key="views",
+            metric_tier="content_performance",
+            display_name="播放/浏览",
+            value_type="count",
+            definition="Views within a period",
+            aggregation_rule="sum",
+            period_semantics="period_delta",
+            definition_version=1,
+            status="active",
+        )
+    )
+    db_session.flush()
+    headers = _login(identity_client, "xlsx-import@example.com", store.id)
+
+    response = identity_client.post(
+        "/api/v1/effects/import-xlsx",
+        headers=headers,
+        json={
+            "file_name": "metrics.xlsx",
+            "file_base64": base64.b64encode(_minimal_metrics_xlsx()).decode("ascii"),
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["created"] == 1
+    assert response.json()["duplicates_skipped"] == 0
+    batch = db_session.query(MetricImportBatch).filter_by(store_id=store.id).one()
+    assert batch.source_format == "xlsx"
+    observation = db_session.query(MetricObservation).filter_by(store_id=store.id).one()
+    assert observation.value_numeric == Decimal("120")
+    assert observation.authenticity_status == "merchant_reported"

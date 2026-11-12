@@ -459,3 +459,16 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 账号列表 | 读取当前门店 Douyin ChannelAccount，显示外部账号 ID、授权范围、状态和到期时间 | Token 不返回前端；后端按当前门店隔离 |
 | 授权刷新 | 账号 active 时可请求服务端重新验证/刷新 Token | 不显示已发布；真实 OAuth、scope 和发布读回仍需账号验收 |
 | 未完成 | 断开/撤销 UI、能力快照、ChannelSpecVersion 管理/发现、内容适配、真实授权/发布 E2E | Issue #12 继续 Open |
+
+
+## 2026-11-12 #8 文案/图片产物与版本审核 Web 接入（PR 待 CI）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 文案产物 | 营销任务详情可手动编辑并创建 copy Artifact/ArtifactVersion | 明确标记商家手动编辑，不伪装为 AI 生成 |
+| 图片产物 | 从当前门店素材中选择 ready 且 confirmed_allowed 的素材创建 image ArtifactVersion | 来源 MediaAsset 不被覆盖；图片二进制仍由私有对象存储管理 |
+| 版本管理 | 修改已存在产物时创建不可变新版本；展示当前版本与版本历史 | 审核必须绑定当前精确版本；旧版本审核不继承 |
+| 双审核 | 文案/图片分别提供通过、要求修改、拒绝；要求修改必须填写意见 | API 服务端校验 review_type、expected_version 和 revision comment |
+| 未完成 | AI Provider 生成/图片编辑、渠道规格选择与 ChannelContent 适配、质检报告/人工复核、发布包冻结/最终确认/人工交付 UI | 由 #10/#12 及后续 #8 PR 完成；Issue #8 不关闭 |
+
+Web 单元测试覆盖手动文案产物创建和精确版本审核请求；真实 AI 生成与完整发布浏览器链路未在本 PR 中实现。

@@ -2,6 +2,7 @@ import hashlib
 
 import pytest
 from store_operator.ai_gateway.schemas import ImageGenerateResponse
+
 from store_operator_worker import ai_image_handlers
 from store_operator_worker.handlers import JobExecutionError
 

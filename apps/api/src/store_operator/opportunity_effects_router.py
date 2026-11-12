@@ -1,4 +1,6 @@
+import base64
 import csv
+import math
 import hashlib
 import io
 from datetime import UTC, datetime
@@ -7,6 +9,8 @@ from typing import Annotated, cast
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from openpyxl import load_workbook
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -164,6 +168,13 @@ class AttributionReversalInput(BaseModel):
 class MetricImportInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     csv_text: str = Field(min_length=1, max_length=5_000_000)
+    source_format: str = Field(default="csv", pattern="^(csv|xlsx)$")
+
+
+class MetricXlsxImportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    file_name: str = Field(min_length=5, max_length=255)
+    file_base64: str = Field(min_length=1, max_length=8_000_000)
 
 def _observation_window_status(item: MetricObservation) -> str:
     if item.period_start is None or item.period_end is None:
@@ -1999,6 +2010,73 @@ def correct_manual_observation(
     }
 
 
+
+@router.post("/effects/import-xlsx")
+def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+    if not payload.file_name.lower().endswith(".xlsx"):
+        raise ApiError(422, "XLSX_FILE_REQUIRED", "Only .xlsx workbooks are supported")
+    try:
+        raw = base64.b64decode(payload.file_base64, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise ApiError(422, "XLSX_INVALID_BASE64", "Workbook payload is not valid base64") from exc
+    if not raw or len(raw) > 5_000_000:
+        raise ApiError(413, "XLSX_FILE_SIZE_INVALID", "Workbook must be between 1 byte and 5 MB")
+    try:
+        workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        sheet = workbook.active
+        if sheet is None or sheet.max_row is None or sheet.max_column is None:
+            raise ValueError("Workbook has no active worksheet")
+        if sheet.max_row > 10001 or sheet.max_column > 50:
+            raise ValueError("Workbook exceeds the 10,000-row or 50-column limit")
+        rows = sheet.iter_rows(values_only=True)
+        headers = next(rows, None)
+        if not headers:
+            raise ValueError("Worksheet is empty")
+        normalized_headers = [str(value).strip() if value is not None else "" for value in headers]
+        if len(set(normalized_headers)) != len(normalized_headers) or any(not value for value in normalized_headers):
+            raise ValueError("Worksheet headers must be non-empty and unique")
+        required = {"metric_key", "value_numeric", "period_timezone"}
+        if not required.issubset(set(normalized_headers)):
+            raise ValueError("Worksheet must include metric_key, value_numeric, period_timezone")
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=normalized_headers, lineterminator="\\n")
+        writer.writeheader()
+        for row_number, values in enumerate(rows, start=2):
+            if row_number > 10001:
+                raise ValueError("Worksheet exceeds the 10,000-row limit")
+            mapped = {}
+            row_values = list(values)
+            for index, key in enumerate(normalized_headers):
+                value = row_values[index] if index < len(row_values) else None
+                if isinstance(value, datetime) and key in {"period_start", "period_end"}:
+                    timezone_name = str(row_values[normalized_headers.index("period_timezone")] or "").strip()
+                    try:
+                        zone = ZoneInfo(timezone_name)
+                    except (ZoneInfoNotFoundError, ValueError) as exc:
+                        raise ValueError(f"Row {row_number}: period_timezone must be a valid IANA timezone") from exc
+                    value = (value.replace(tzinfo=zone) if value.tzinfo is None else value).isoformat()
+                elif value is None:
+                    value = ""
+                elif isinstance(value, bool):
+                    value = "true" if value else "false"
+                elif isinstance(value, float) and not math.isfinite(value):
+                    raise ValueError(f"Row {row_number}: non-finite numeric cell")
+                else:
+                    value = str(value)
+                mapped[key] = value
+            writer.writerow(mapped)
+        workbook.close()
+    except ApiError:
+        raise
+    except Exception as exc:
+        raise ApiError(422, "XLSX_INVALID", f"Workbook could not be read: {str(exc)[:200]}") from exc
+    csv_payload = MetricImportInput(csv_text=output.getvalue(), source_format="xlsx")
+    return import_manual_observations(csv_payload, request, auth, context, db)
+
+
 @router.post("/effects/import")
 def import_manual_observations(payload: MetricImportInput, request: Request,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
@@ -2030,7 +2108,7 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
         id=uuid4(),
         store_id=store_id,
         content_sha256=content_sha256,
-        source_format="csv",
+        source_format=payload.source_format,
         imported_by_user_id=auth.user.id,
         row_count=0,
         created_count=0,

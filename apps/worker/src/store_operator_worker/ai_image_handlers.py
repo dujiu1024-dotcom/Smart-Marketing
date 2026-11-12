@@ -631,6 +631,23 @@ def _complete_image(
     context.check_control()
 
     content_hash = hashlib.sha256(content).hexdigest()
+    with _session_factory()() as db:
+        registered_asset = db.scalar(
+            select(MediaAsset).where(
+                MediaAsset.object_key == image_result.asset_object_key
+            )
+        )
+    object_already_registered = registered_asset is not None
+    if registered_asset is not None and (
+        registered_asset.store_id != store_id
+        or registered_asset.source_ref != str(job.id)
+        or registered_asset.sha256 != content_hash
+        or registered_asset.status != "ready"
+    ):
+        raise _safe_error(
+            "AI_IMAGE_OBJECT_KEY_CONFLICT",
+            "The generated image storage key is already bound to another asset.",
+        )
     input_fingerprint = hashlib.sha256(
         json.dumps(
             {
@@ -864,8 +881,14 @@ def _complete_image(
                     dedupe_key=f"content.artifact_version_created:{artifact_version.id}",
                 )
             )
-    except (JobExecutionError, SQLAlchemyError):
-        _delete_generated_object(image_result.asset_object_key)
+    except JobExecutionError as persistence_error:
+        if not object_already_registered:
+            _delete_generated_object(image_result.asset_object_key)
+        raise
+    except SQLAlchemyError:
+        logger.warning(
+            "Image artifact persistence failed; generated object retained for safe recovery"
+        )
         raise
 
     return {

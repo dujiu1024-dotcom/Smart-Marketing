@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -151,6 +151,21 @@ def _validate_feed_url(value: str) -> str:
         raise ApiError(422, "SOURCE_HOST_NOT_ALLOWED", "Feed URL must use HTTPS and an administrator-approved host")
     return value
 
+
+@router.get("/admin/opportunity-sources")
+def list_hot_topic_sources(
+    admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    sources = db.scalars(select(HotTopicSource).order_by(HotTopicSource.created_at.desc())).all()
+    return {"items": [{"id": str(item.id), "source_key": item.source_key,
+        "display_name": item.display_name, "source_type": item.source_type,
+        "source_url": item.source_url, "terms_url": item.terms_url, "enabled": item.enabled,
+        "health_status": item.health_status,
+        "last_success_at": item.last_success_at.isoformat() if item.last_success_at else None,
+        "last_failure_at": item.last_failure_at.isoformat() if item.last_failure_at else None}
+        for item in sources]}
+
 @router.post("/admin/opportunity-sources")
 def create_hot_topic_source(payload: HotTopicSourceInput,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
@@ -202,7 +217,7 @@ def request_opportunity_collection(request: Request,
             "message": "没有已启用且完成使用条款登记的热点来源；未创建采集任务。"}
     try:
         job = create_job(db, job_type="hot_topics.collect_and_match.v1",
-            payload_ref={"schema_version": 1, "source_ids": [str(item.id) for item in sources]},
+            payload_ref={"schema_version": 1, "source_ids": sorted(str(item.id) for item in sources)},
             idempotency_key=idempotency_key, store_id=store_id, actor_type="user",
             actor_user_id=auth.user.id, queue_name="default", priority=0,
             max_attempts=3, timeout_seconds=300)
@@ -221,12 +236,13 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
     status_filter: str | None = Query(default=None, alias="status")) -> dict[str, object]:
     store_id = _store_id(context)
     statement = select(StoreOpportunity, HotTopic).join(HotTopic, HotTopic.id == StoreOpportunity.hot_topic_id).where(
-        StoreOpportunity.store_id == store_id, StoreOpportunity.stale_at.is_(None),
+        StoreOpportunity.store_id == store_id, HotTopic.evidence_status == "collected", StoreOpportunity.stale_at.is_(None),
         (StoreOpportunity.expires_at.is_(None)) | (StoreOpportunity.expires_at > datetime.now(UTC)))
     if query:
         statement = statement.where(HotTopic.title.ilike(f"%{query[:120]}%"))
     if status_filter:
         statement = statement.where(StoreOpportunity.eligibility_status == status_filter)
+    total = db.scalar(statement.order_by(None).limit(None).offset(None).with_only_columns(func.count())) or 0
     rows = db.execute(statement.order_by(StoreOpportunity.relevance_score.desc().nullslast(),
         HotTopic.published_at.desc().nullslast()).limit(limit).offset(offset)).all()
     items: list[dict[str, object]] = []
@@ -245,7 +261,7 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
             "suggested_scenario": opportunity.suggested_scenario, "content_angle": opportunity.content_angle,
             "risk_flags": opportunity.risk_flags_json, "eligibility_status": opportunity.eligibility_status,
             "decision": decision.decision if decision else None})
-    return {"items": items, "total": len(items), "source_status": "available" if items else "unavailable",
+    return {"items": items, "total": total, "source_status": "available" if items else "unavailable",
         "empty_reason": None if items else "当前没有已核验来源生成的有效机会；请勿将演示样例视为实时热点。按需制作仍可直接使用。"}
 
 @router.get("/opportunities/{opportunity_id}")
@@ -284,11 +300,12 @@ def decide_opportunity(opportunity_id: UUID, payload: DecisionInput, request: Re
         if replay.opportunity_id != opportunity_id or replay.decision != payload.decision:
             raise ApiError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was reused for a different decision")
         return {"id": str(replay.id), "decision": replay.decision, "replayed": True}
-    opportunity = db.scalar(select(StoreOpportunity).where(
-        StoreOpportunity.id == opportunity_id, StoreOpportunity.store_id == store_id).with_for_update())
-    if opportunity is None:
+    row = db.execute(select(StoreOpportunity, HotTopic).join(HotTopic, HotTopic.id == StoreOpportunity.hot_topic_id).where(
+        StoreOpportunity.id == opportunity_id, StoreOpportunity.store_id == store_id).with_for_update()).first()
+    if row is None:
         raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
-    if payload.decision == "adopt" and (opportunity.eligibility_status != "eligible" or
+    opportunity, topic = row
+    if payload.decision == "adopt" and (topic.evidence_status != "collected" or opportunity.eligibility_status != "eligible" or
         opportunity.stale_at is not None or (opportunity.expires_at and opportunity.expires_at <= datetime.now(UTC))):
         raise ApiError(409, "OPPORTUNITY_NOT_ADOPTABLE", "Opportunity is expired, stale or requires review")
     item = OpportunityDecision(id=uuid4(), store_id=store_id, opportunity_id=opportunity_id,

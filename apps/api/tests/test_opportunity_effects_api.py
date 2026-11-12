@@ -45,7 +45,7 @@ def test_opportunity_decision_is_store_scoped_and_idempotent(identity_client, db
     _, store_a = _identity(db_session, "opportunity@example.com", "Opportunity A")
     _, store_b = _identity(db_session, "opportunity-b@example.com", "Opportunity B")
     source = HotTopicSource(id=uuid4(), source_key="approved-rss", display_name="Approved RSS",
-        source_type="rss", enabled=True, health_status="healthy")
+        source_type="rss", source_url="https://news.example.test/rss", enabled=True, health_status="healthy")
     db_session.add(source); db_session.flush()
     topic = HotTopic(id=uuid4(), source_id=source.id, source_item_id="item-1",
         canonical_url="https://example.test/topic/1", title="Local seasonal trend",

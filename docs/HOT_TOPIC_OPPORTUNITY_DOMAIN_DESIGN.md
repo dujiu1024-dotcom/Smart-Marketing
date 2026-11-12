@@ -224,3 +224,16 @@ IterWave 仓库声明 Apache-2.0；复制或改写任何代码前仍须核查具
 ## 12. 验收纪律
 
 本 PR 若仅提交本设计文档，不代表 Issue #11 的生产功能完成。自动化测试、来源合规核验、真实采集、跨店安全、AI 匹配和浏览器 E2E 均须在实现 PR 中逐项记录实际命令与证据；未执行必须明确标注“未执行”。
+
+
+## 13. Issue #137 implementation status (2026-11-12)
+
+A first executable slice has been added on branch `feat/issue-137-hotspots-effects`:
+
+- PostgreSQL migration `0018_opportunity_effects` and ORM models for sources, normalized topics, store matches, decisions and metric definitions/observations.
+- Store-scoped opportunity list/detail/decision APIs; adoption is blocked for expired, stale, ineligible or review-required matches.
+- Admin-only RSS source registration and explicit enablement. Feed and terms URLs must be HTTPS and use a host in `HOT_TOPIC_ALLOWED_HOSTS`; the Worker additionally rejects hosts resolving to non-public IP addresses and does not follow redirects.
+- Collection/matching is enqueued through the existing #9 Job/Outbox runtime. The Worker normalizes RSS/Atom entries, retains source URL and publication time, deduplicates per source, expires stale entries, and applies explainable keyword matching against confirmed store profile, product, offer and audience facts.
+- Matching scores describe text relevance only. They are not external heat scores, sales predictions or performance outcomes.
+
+**Current limits:** no source is pre-enabled or seeded; operators must complete source terms review, host allowlisting and administrator enablement. No real feed has been connected or tested in production. The current adoption decision is recorded but does not automatically create a marketing task or pass a structured opportunity snapshot into strategy; this handoff remains an implementation item. Semantic AI matching, source-level heat normalization, regional normalization and broader ranking calibration remain out of this slice.

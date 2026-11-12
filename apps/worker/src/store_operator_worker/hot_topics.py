@@ -8,7 +8,6 @@ import socket
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
-from typing import Any
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 

@@ -370,3 +370,16 @@ Job 命令需包含 source/channel account ID、时间窗口、cursor、schema v
 - [ ] 数据源官方文档、授权范围、数据条款、采集日期和测试证据入库。
 
 **状态声明：** 本文件只完成领域设计准备。没有新增生产 API、ORM、迁移、Worker、平台指标同步或经营数据源；没有执行 EFF-01..EFF-30；没有证明任何真实经营效果。Issue #13 应继续 Open，直至真实来源和实现验收具备证据。
+
+
+## 13. Issue #137 implementation status (2026-11-12)
+
+An initial metrics slice is now implemented:
+
+- Metric definition dictionary and append-oriented metric observation storage are introduced by migration `0018_opportunity_effects`.
+- Store-scoped APIs expose observations and an effects overview.
+- Manual observation entry and CSV-text import preserve period, IANA timezone, source reference and deduplication key. These records are always marked `merchant_reported`.
+- The overview only surfaces values marked `official_api` or `verified_import` as available. Merchant-reported and demo-sample values do not become verified results. ROI, sales growth and store-visit growth remain unavailable unless the required real evidence and cost basis exist.
+- The UI adds an independent `#effects` workspace and distinguishes content performance, intent and business outcomes.
+
+**Current limits:** PublishedWork ownership verification, official channel metric sync, capability snapshots, BusinessOutcomeEvidence, AttributionEvidence, observation correction/supersession workflows, observation-window completeness, task-level attribution and the full EFF-01..EFF-30 suite are not implemented by this slice. Douyin publishing/readback is not treated as proof of metric-read permission. No production data source or business outcome is claimed.

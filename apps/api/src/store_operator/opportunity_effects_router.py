@@ -289,7 +289,9 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
             "decision": decision.decision if decision else None})
     return {"items": items, "total": total,
         "source_status": "available" if total else "unavailable",
-        "empty_reason": None if items else "当前没有已核验来源生成的有效机会；请勿将演示样例视为实时热点。按需制作仍可直接使用。"}
+        "empty_reason": None if items else (
+            "当前没有已核验来源生成的有效机会；请勿将演示样例视为实时热点。按需制作仍可直接使用。"
+        )}
 
 @router.get("/opportunities/{opportunity_id}")
 def get_opportunity(opportunity_id: UUID, context: Annotated[AuthContext,
@@ -568,7 +570,11 @@ def create_manual_observation(payload: MetricObservationInput, request: Request,
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
     store_id = _store_id(context)
     if payload.supersedes_observation_id is not None:
-        raise ApiError(422, "CORRECTION_ENDPOINT_REQUIRED", "Use the observation corrections endpoint")
+        raise ApiError(
+            422,
+            "CORRECTION_ENDPOINT_REQUIRED",
+            "Use the observation corrections endpoint",
+        )
     item = _create_observation(db, store_id=store_id, payload=payload,
         authenticity="merchant_reported")
     definition = db.get(MetricDefinition, item.metric_definition_id)

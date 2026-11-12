@@ -1,6 +1,6 @@
 import hashlib
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from store_operator.ai_gateway.schemas import ImageGenerateResponse, VisionInspectResponse
@@ -39,25 +39,27 @@ def test_generated_image_is_verified_and_scanned(monkeypatch: pytest.MonkeyPatch
         "scan_with_clamd",
         lambda image_bytes, host, port: None,
     )
+    store_id = UUID("11111111-1111-4111-8111-111111111111")
     result = ImageGenerateResponse(
         model_id="image-model",
-        asset_object_key="stores/store-1/generated/image.png",
+        asset_object_key=f"stores/{store_id}/generated/image.png",
         sha256=digest,
         mime_type="image/png",
         width=1024,
         height=1024,
     )
 
-    verified, width, height = ai_image_handlers._verify_and_scan_image(result)
+    verified, width, height = ai_image_handlers._verify_and_scan_image(result, store_id=store_id)
 
     assert verified == content
     assert (width, height) == (1024, 1024)
 
 
 def test_generated_image_rejects_path_traversal_before_storage_access() -> None:
+    store_id = UUID("11111111-1111-4111-8111-111111111111")
     result = ImageGenerateResponse(
         model_id="image-model",
-        asset_object_key="stores/store-1/../other-store/image.png",
+        asset_object_key=f"stores/{store_id}/../other-store/image.png",
         sha256="a" * 64,
         mime_type="image/png",
         width=1024,
@@ -65,7 +67,7 @@ def test_generated_image_rejects_path_traversal_before_storage_access() -> None:
     )
 
     with pytest.raises(JobExecutionError) as exc_info:
-        ai_image_handlers._verify_and_scan_image(result)
+        ai_image_handlers._verify_and_scan_image(result, store_id=store_id)
 
     assert exc_info.value.code == "AI_IMAGE_OBJECT_KEY_INVALID"
 
@@ -212,3 +214,28 @@ def test_image_artifact_audit_refs_fail_closed_when_invocation_is_missing() -> N
         )
 
     assert exc_info.value.code == "AI_IMAGE_INVOCATION_AUDIT_MISSING"
+
+
+def test_generated_image_rejects_cross_store_object_key_before_download(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store_id = UUID("11111111-1111-4111-8111-111111111111")
+    other_store_id = UUID("22222222-2222-4222-8222-222222222222")
+    monkeypatch.setattr(
+        ai_image_handlers,
+        "download_object_bytes",
+        lambda **kwargs: pytest.fail("cross-store object must not be downloaded"),
+    )
+    result = ImageGenerateResponse(
+        model_id="image-model",
+        asset_object_key=f"stores/{other_store_id}/generated/image.png",
+        sha256="a" * 64,
+        mime_type="image/png",
+        width=1024,
+        height=1024,
+    )
+
+    with pytest.raises(JobExecutionError) as exc_info:
+        ai_image_handlers._verify_and_scan_image(result, store_id=store_id)
+
+    assert exc_info.value.code == "AI_IMAGE_OBJECT_STORE_MISMATCH"

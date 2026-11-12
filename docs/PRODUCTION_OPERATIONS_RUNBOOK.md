@@ -94,7 +94,7 @@ Alerts include a correlation ID and sanitized attributes. Webhook delivery has a
 Only replay a dead event after the broker/transport incident is resolved and the referenced job is confirmed to remain in `queued` or `retry_wait`. The command refuses non-dispatch events, terminal/running jobs, missing events and a mismatched confirmation ID. It resets the dispatch retry counter, preserves the original event ID/dedupe key, and writes an audit event with the previous attempt count and operator reason.
 
 ```bash
-uv run --locked --directory apps/api python -m store_operator.cli replay-dead-outbox \
+PYTHONPATH=src uv run --locked --directory apps/api python -m store_operator.cli replay-dead-outbox \
   --event-id <OUTBOX_EVENT_UUID> \
   --reason "Broker recovered; verified job is still queued" \
   --confirm-event-id <SAME_OUTBOX_EVENT_UUID>

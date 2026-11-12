@@ -301,7 +301,7 @@
             "title": "Content Json"
           },
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           },
@@ -510,8 +510,8 @@
       "AssetUploadIntentCreate": {
         "properties": {
           "expected_byte_size": {
-            "exclusiveMinimum": 0.0,
-            "maximum": 26214400.0,
+            "exclusiveMinimum": 0,
+            "maximum": 26214400,
             "title": "Expected Byte Size",
             "type": "integer"
           },
@@ -585,8 +585,8 @@
           "allocation_percent": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
-                "maximum": 100.0,
+                "exclusiveMinimum": 0,
+                "maximum": 100,
                 "type": "number"
               },
               {
@@ -720,7 +720,7 @@
           "sample_size": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -902,7 +902,7 @@
           "sample_size": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -1066,7 +1066,7 @@
           "sample_size": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -1630,7 +1630,7 @@
           "expected_version_no": {
             "anyOf": [
               {
-                "minimum": 1.0,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -1719,7 +1719,7 @@
           "value_numeric": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "number"
               },
               {
@@ -2801,7 +2801,7 @@
       "MarketingTaskAction": {
         "properties": {
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           },
@@ -3058,7 +3058,7 @@
       "MarketingTaskRecover": {
         "properties": {
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           },
@@ -3092,7 +3092,7 @@
             "type": "array"
           },
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           }
@@ -3107,7 +3107,7 @@
       "MarketingTaskRequirementUpdate": {
         "properties": {
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           },
@@ -3151,7 +3151,7 @@
       "MarketingTaskStepSkip": {
         "properties": {
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           },
@@ -3172,7 +3172,7 @@
       "MarketingTaskStrategyConfirm": {
         "properties": {
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           }
@@ -3186,7 +3186,7 @@
       "MarketingTaskStrategyUpdate": {
         "properties": {
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           },
@@ -3442,7 +3442,7 @@
             "type": "string"
           },
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           },
@@ -3683,7 +3683,7 @@
           "value_numeric": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "number"
               },
               {
@@ -3772,7 +3772,7 @@
           "usage_limit": {
             "anyOf": [
               {
-                "minimum": 1.0,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -3898,7 +3898,7 @@
           "usage_limit": {
             "anyOf": [
               {
-                "minimum": 1.0,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -4023,7 +4023,7 @@
           "usage_limit": {
             "anyOf": [
               {
-                "minimum": 1.0,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -4178,7 +4178,7 @@
           "inventory_quantity": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "number"
               },
               {
@@ -4213,7 +4213,7 @@
           "price_amount": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "number"
               },
               {
@@ -4589,7 +4589,7 @@
           "inventory_quantity": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "number"
               },
               {
@@ -4631,7 +4631,7 @@
           "price_amount": {
             "anyOf": [
               {
-                "minimum": 0.0,
+                "minimum": 0,
                 "type": "number"
               },
               {
@@ -4788,7 +4788,7 @@
           },
           "schema_version": {
             "default": 1,
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Schema Version",
             "type": "integer"
           },
@@ -4875,7 +4875,7 @@
       "PublishPackageFreezeRequest": {
         "properties": {
           "expected_task_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Task Version",
             "type": "integer"
           },
@@ -5032,7 +5032,7 @@
             "type": "string"
           },
           "expected_version": {
-            "minimum": 1.0,
+            "minimum": 1,
             "title": "Expected Version",
             "type": "integer"
           },
@@ -6001,11 +6001,34 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "MetricXlsxImportInput": {
+        "title": "MetricXlsxImportInput",
+        "required": [
+          "file_name",
+          "file_base64"
+        ],
+        "type": "object",
+        "properties": {
+          "file_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 5,
+            "title": "File Name"
+          },
+          "file_base64": {
+            "type": "string",
+            "maxLength": 8000000,
+            "minLength": 1,
+            "title": "File Base64"
+          }
+        },
+        "additionalProperties": false
       }
     }
   },
   "info": {
-    "title": "AI \u95e8\u5e97\u8fd0\u8425\u5b98 API",
+    "title": "AI 门店运营官 API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
@@ -13159,6 +13182,68 @@
         "tags": [
           "health"
         ]
+      }
+    },
+    "/api/v1/effects/import-xlsx": {
+      "post": {
+        "tags": [
+          "opportunities",
+          "effects"
+        ],
+        "summary": "Import Manual Observations Xlsx",
+        "operationId": "import_manual_observations_xlsx_api_v1_effects_import_xlsx_post",
+        "parameters": [
+          {
+            "name": "X-Store-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricXlsxImportInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Import Manual Observations Xlsx Api V1 Effects Import Xlsx Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

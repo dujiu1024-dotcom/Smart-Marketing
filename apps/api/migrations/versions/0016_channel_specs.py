@@ -85,7 +85,9 @@ def upgrade() -> None:
         ),
         sa.Column("source_document_ref", sa.Text()),
         sa.Column("published_at", sa.DateTime(timezone=True)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint(
             "channel_spec_id",
             "spec_version",
@@ -232,7 +234,9 @@ def upgrade() -> None:
         sa.Column("reason", sa.String(1000)),
         sa.Column("checked_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True)),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(
             ["store_id", "channel_account_id"],
             ["channel_accounts.store_id", "channel_accounts.id"],

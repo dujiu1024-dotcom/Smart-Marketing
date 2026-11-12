@@ -887,3 +887,28 @@ def test_failed_step_recovery_cancel_and_archive_transitions(
     assert archived.status_code == 200, archived.text
     assert archived.json()["lifecycle_status"] == "archived"
     assert archived.json()["version"] == 5
+
+
+def test_copy_task_can_opt_in_to_text_only_video_script(
+    identity_client, db_session, monkeypatch
+):
+    user = create_user(db_session, "video-script-task@example.com")
+    store = create_store(db_session, user, "Video Script Store")
+    csrf = login(identity_client, monkeypatch, "video-script-task@example.com")
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": csrf,
+        "X-Store-ID": str(store.id),
+        "Idempotency-Key": "video-script-task-create-1",
+    }
+    payload = task_payload("Product video script")
+    payload["task_options"]["includes_video_script"] = True
+
+    response = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers=headers,
+        json=payload,
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["task_options"]["includes_video_script"] is True

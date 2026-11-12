@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     auth_login_max_attempts: int = 10
     auth_login_window_seconds: int = 900
     object_storage_endpoint_url: str | None = None
+    object_storage_public_endpoint_url: str | None = None
     object_storage_region: str = "us-east-1"
     object_storage_bucket: str | None = None
     object_storage_access_key_id: str | None = None
@@ -65,6 +66,12 @@ class Settings(BaseSettings):
         if self.douyin_redirect_uri and not self.douyin_redirect_uri.startswith("https://"):
             raise ValueError("DOUYIN_REDIRECT_URI must use HTTPS")
         if self.environment == "production":
+            if not self.object_storage_public_endpoint_url:
+                raise ValueError(
+                    "OBJECT_STORAGE_PUBLIC_ENDPOINT_URL must be explicitly configured in production"
+                )
+            if not self.object_storage_public_endpoint_url.startswith("https://"):
+                raise ValueError("OBJECT_STORAGE_PUBLIC_ENDPOINT_URL must use HTTPS in production")
             if not self.object_storage_bucket:
                 raise ValueError(
                     "OBJECT_STORAGE_BUCKET must be explicitly configured in production"

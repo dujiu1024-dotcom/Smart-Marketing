@@ -488,7 +488,7 @@ def freeze_publish_package(
             "fact_key": fact.fact_key,
             "version": fact.version_no,
             "fingerprint": fact.content_fingerprint,
-        },
+        }
         for fact in facts
     ]
     package_fingerprint = _fingerprint(

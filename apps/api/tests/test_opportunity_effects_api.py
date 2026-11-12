@@ -79,6 +79,7 @@ def test_opportunity_decision_is_store_scoped_and_idempotent(identity_client, db
     visible = identity_client.get("/api/v1/opportunities", headers={"X-Store-ID": str(store_a.id)})
     assert visible.status_code == 200, visible.text
     assert visible.json()["items"][0]["id"] == str(opportunity.id)
+    assert visible.json()["items"][0]["matching_algorithm_version"] == 2
     hidden = identity_client.get(f"/api/v1/opportunities/{opportunity.id}",
         headers={"X-Store-ID": str(store_b.id)})
     assert hidden.status_code == 404

@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0024_attribution_snapshot_versions"
+revision: str = "0024_attribution_snap_versions"
 down_revision: str | None = "0023_hot_topic_matcher_version"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None

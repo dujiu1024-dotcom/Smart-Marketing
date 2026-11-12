@@ -483,7 +483,8 @@ def cleanup_orphaned_ai_image_objects(
             job = db.get(Job, invocation.job_id)
             if (
                 job is None
-                or job.status not in {"succeeded", "failed", "cancelled", "needs_human"}
+                or job.status
+                not in {"succeeded", "failed", "cancelled", "needs_human"}
                 or job.store_id != invocation.store_id
             ):
                 continue

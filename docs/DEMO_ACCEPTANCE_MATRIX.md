@@ -307,3 +307,18 @@
 | 真实账号授权、发布及读回 | 未执行；等待平台应用审核与授权账号 |
 
 PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元测试不能替代真实抖音平台验收。
+
+
+## 2026-11-12 #6 门店档案生产 Web 首个页面（PR #97）
+
+| 能力 | 当前状态 | 边界 |
+|---|---|---|
+| 登录 / Session | 接入 `/auth/login`、`/auth/me`、`/auth/csrf`、`/auth/logout` | Session Cookie HttpOnly；CSRF token 仅保存在当前 Tab 的 sessionStorage |
+| 门店选择 | 接入 `/me/stores` 与 `/session/active-store` | 服务端再次校验 membership，所有资料请求携带 X-Store-ID |
+| 门店档案读取 | 接入 `GET /store/profile` | 不存在时呈现真实创建态，不注入 Demo seed |
+| 门店档案创建/编辑 | 接入 POST/PATCH、Idempotency-Key、If-Match 版本控制 | 保存后事实状态回到 pending_confirmation |
+| 事实确认 | 接入 `POST /store/profile/{id}/confirm-facts` | 由当前登录门店成员显式确认并生成新版本 |
+| 其他七个门店资料模块 | 未接入，页面明确标记待接入 | 不使用 localStorage 演示数据冒充服务端记录 |
+| Demo 全量页面与导航 | 未完成 | 本 PR 仅接入门店档案，不代表完整 Demo 已生产化 |
+
+该 PR 同时为 Vite 开发服务与 Compose Nginx 增加同源 `/api` 代理。CI 验收必须覆盖前端测试、构建、E2E 与 Infrastructure；本地测试未执行。

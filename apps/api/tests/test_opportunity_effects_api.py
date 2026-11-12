@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
 from store_operator.models.marketing_task import MarketingTask
+from store_operator.models.marketing_task import MarketingTask
 from store_operator.models.opportunity_effects import (
     BusinessOutcomeEvidence,
     HotTopic,
@@ -616,3 +617,96 @@ def test_effects_overview_breaks_down_verified_content_metrics_by_published_work
     assert breakdown[0]["comparison"]["status"] == "available"
     assert breakdown[0]["comparison"]["change_percent"] == "50.00"
     assert [point["value"] for point in breakdown[0]["points"]] == ["20", "30"]
+
+
+def test_attribution_reversal_preserves_snapshot_and_allows_replacement(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user, store = _identity(db_session, "reversal@example.com", "Reversal Shop")
+    task = MarketingTask(
+        id=uuid4(),
+        store_id=store.id,
+        task_type="full_marketing",
+        lifecycle_status="draft",
+        title="Attribution reversal task",
+        version=1,
+        requirement_draft_json={"goal": "Test reversal"},
+        strategy_draft_json={},
+        task_options_json={},
+        created_by_user_id=user.id,
+    )
+    db_session.add(task)
+    db_session.flush()
+    work = PublishedWork(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task.id,
+        channel_key="douyin",
+        external_work_id="verified-work-reversal",
+        ownership_status="verified_platform_api",
+        verified_at=datetime.now(UTC),
+    )
+    db_session.add(work)
+    db_session.flush()
+    db_session.add(
+        WorkOwnershipEvidence(
+            id=uuid4(),
+            store_id=store.id,
+            published_work_id=work.id,
+            evidence_type="platform_api",
+            evidence_status="verified",
+            source_system="douyin",
+            evidence_ref="https://platform.example.test/works/verified-work-reversal",
+            evidence_payload_json={"verified": True},
+            verified_by_user_id=user.id,
+            verified_at=datetime.now(UTC),
+        )
+    )
+    outcome = BusinessOutcomeEvidence(
+        id=uuid4(),
+        store_id=store.id,
+        outcome_type="orders",
+        value_numeric=Decimal("5"),
+        source_system="douyin",
+        source_record_id="order-report-reversal",
+        source_evidence_ref="https://platform.example.test/orders/report-1",
+        occurred_at=datetime.now(UTC),
+        authenticity_status="official_api",
+        integrity_status="complete",
+        deduplication_key="r" * 64,
+    )
+    db_session.add(outcome)
+    db_session.flush()
+    headers = _login(identity_client, "reversal@example.com", store.id)
+    payload = {
+        "marketing_task_id": str(task.id),
+        "published_work_id": str(work.id),
+        "outcome_evidence_id": str(outcome.id),
+        "attribution_method": "platform_reported",
+        "evidence_strength": "strong",
+        "allocation_percent": "100",
+    }
+    first = identity_client.post("/api/v1/effects/attributions", headers=headers, json=payload)
+    assert first.status_code == 200, first.text
+    first_item = first.json()["item"]
+    original_snapshot = first_item["snapshot"]
+
+    reversed_response = identity_client.post(
+        f"/api/v1/effects/attributions/{first_item['id']}/reversal",
+        headers=headers,
+        json={"reason": "平台订单归属核对后发现关联错误"},
+    )
+    assert reversed_response.status_code == 200, reversed_response.text
+    reversed_item = reversed_response.json()["item"]
+    assert reversed_item["status"] == "rejected"
+    assert reversed_item["reversal_reason"] == "平台订单归属核对后发现关联错误"
+    assert reversed_item["snapshot"] == original_snapshot
+
+    replacement = identity_client.post(
+        "/api/v1/effects/attributions", headers=headers, json=payload
+    )
+    assert replacement.status_code == 200, replacement.text
+    assert replacement.json()["item"]["status"] == "active"

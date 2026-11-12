@@ -7,7 +7,7 @@ const api = vi.hoisted(() => ({
   archiveMarketingTask: vi.fn(), cancelMarketingTask: vi.fn(),
   confirmMarketingTaskRequirement: vi.fn(), confirmMarketingTaskStrategy: vi.fn(),
   createMarketingTask: vi.fn(), getAudienceProfiles: vi.fn(), getBrandGuideline: vi.fn(),
-  getKnowledgeItems: vi.fn(), getMarketingTask: vi.fn(), getOffers: vi.fn(),
+  getKnowledgeItems: vi.fn(), getMarketingTask: vi.fn(), listOffers: vi.fn(),
   getProducts: vi.fn(), getStoreProfile: vi.fn(), listMarketingTasks: vi.fn(),
   recoverMarketingTaskStep: vi.fn(), skipMarketingTaskStep: vi.fn(),
   updateMarketingTaskRequirement: vi.fn(), updateMarketingTaskStrategy: vi.fn(),
@@ -35,7 +35,7 @@ const task = {
 function mockFactSources() {
   api.getStoreProfile.mockResolvedValue({ id: "profile-1", display_name: "测试门店", fact_status: "confirmed", current_version: 2 });
   api.getProducts.mockResolvedValue({ items: [], total: 0 });
-  api.getOffers.mockResolvedValue({ items: [], total: 0 });
+  api.listOffers.mockResolvedValue({ items: [], total: 0 });
   api.getBrandGuideline.mockRejectedValue(new Error("not found"));
   api.getAudienceProfiles.mockResolvedValue({ items: [], total: 0 });
   api.getKnowledgeItems.mockResolvedValue({ items: [], total: 0 });

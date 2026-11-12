@@ -82,6 +82,17 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         </article>)}
       </div>
       <article className="form-card">
+        <div className="section-title"><div><h2>指标趋势与周期对比</h2><p>仅对完整、当前且已核验的数据进行聚合；周期长度不一致或样本不足时不计算环比。</p></div></div>
+        {(overview?.trends ?? []).length ? <div className="catalog-list">
+          {overview?.trends.map(trend => <div className="catalog-item" key={trend.metric_key}>
+            <div className="catalog-item-main"><div><h3>{trend.display_name}</h3><p>{trend.metric_key}</p></div>
+              <span className="status-chip">{trend.comparison.status === "available" ? `环比 ${trend.comparison.change_percent}%` : "样本不足"}</span></div>
+            <div className="catalog-meta">{trend.points.map(point => <span key={point.period_end}>{new Date(point.period_start).toLocaleDateString()} – {new Date(point.period_end).toLocaleDateString()}：{point.value}（n={point.sample_count}）</span>)}</div>
+          </div>)}
+        </div> : <p className="muted">{overview?.data_quality.reason ?? "暂无可用于趋势分析的已核验周期数据。"}</p>}
+        <p className="footnote">数据质量：观测 {overview?.data_quality.total_observations ?? 0} 条 · 已核验 {overview?.data_quality.verified_observations ?? 0} 条 · 延迟 {overview?.data_quality.delayed_observations ?? 0} 条 · 不完整/异常 {overview?.data_quality.incomplete_or_anomalous_observations ?? 0} 条</p>
+      </article>
+      <article className="form-card">
         <div className="section-title"><div><h2>经营结论门禁</h2><p>经营结果需要真实证据，内容热度不能推导销售或到店增长。</p></div></div>
         <div className="effects-outcomes"><div><span>ROI</span><strong>暂无数据</strong></div><div><span>销售增长</span><strong>暂无数据</strong></div><div><span>到店增长</span><strong>暂无数据</strong></div></div>
         <p className="footnote">{overview?.business_outcomes.reason ?? "缺少真实经营结果与成本证据时，不计算 ROI 或增长结论。"}</p>

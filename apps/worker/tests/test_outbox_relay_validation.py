@@ -22,6 +22,12 @@ def test_outbox_batch_size_rejects_non_positive_values(batch_size: int) -> None:
         _normalize_outbox_batch_size(batch_size)
 
 
+@pytest.mark.parametrize("batch_size", [True, 1.5, "10"])
+def test_outbox_batch_size_rejects_non_integer_values(batch_size: object) -> None:
+    with pytest.raises(TypeError, match="integer"):
+        _normalize_outbox_batch_size(batch_size)  # type: ignore[arg-type]
+
+
 def test_outbox_dispatch_payload_requires_object_and_uuid() -> None:
     job_id = uuid4()
     assert _parse_dispatch_job_id({"job_id": str(job_id)}) == job_id

@@ -488,3 +488,82 @@ export async function confirmKnowledgeFacts(storeId: string, current: KnowledgeI
     body: JSON.stringify({ source_type: "merchant_ui_confirmation", source_ref: "store-knowledge-page", confirmation_note: "由当前门店成员核对知识内容与来源后确认" }),
   }, storeId);
 }
+
+export interface MediaAsset {
+  id: string;
+  store_id: string;
+  asset_type: string;
+  mime_type: string;
+  byte_size: number;
+  sha256: string;
+  original_filename_sanitized: string | null;
+  usage_rights_status: "unknown" | "confirmed_allowed" | "restricted";
+  status: "uploading" | "quarantined" | "scanning" | "ready" | "rejected" | "archived";
+  parent_asset_id: string | null;
+  version_no: number;
+  created_at: string;
+}
+export interface AssetUploadIntent {
+  id: string;
+  upload_url: string;
+  method: "PUT";
+  required_headers: Record<string, string>;
+  expires_at: string;
+}
+export interface AssetUploadInput {
+  expected_mime_type: "image/jpeg" | "image/png" | "image/webp";
+  expected_byte_size: number;
+  expected_sha256: string;
+  original_filename: string;
+}
+export async function getMediaAssets(storeId: string): Promise<{ items: MediaAsset[]; total: number }> {
+  return request("/store/assets?limit=100&offset=0", {}, storeId);
+}
+export async function createAssetUploadIntent(storeId: string, input: AssetUploadInput, idempotencyKey: string): Promise<AssetUploadIntent> {
+  return request("/store/assets/upload-intents", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  }, storeId);
+}
+export async function putAssetFile(upload: AssetUploadIntent, file: File): Promise<void> {
+  const response = await fetch(upload.upload_url, {
+    method: upload.method,
+    headers: upload.required_headers,
+    body: file,
+    credentials: "omit",
+    redirect: "error",
+  });
+  if (!response.ok) throw new ApiError("文件上传到私有对象存储失败，请重试。", response.status, "OBJECT_UPLOAD_FAILED");
+}
+export async function completeAssetUpload(storeId: string, intentId: string): Promise<{ asset: MediaAsset; status: string }> {
+  return request("/store/assets/upload-intents/" + intentId + "/complete", { method: "POST" }, storeId);
+}
+export async function confirmMediaAssetUsageRights(
+  storeId: string,
+  asset: MediaAsset,
+  usageRightsStatus: "confirmed_allowed" | "restricted",
+  licenseNote: string,
+  idempotencyKey: string,
+): Promise<MediaAsset> {
+  return request("/store/assets/" + asset.id + "/confirm-usage-rights", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({
+      expected_version: asset.version_no,
+      expected_sha256: asset.sha256,
+      usage_rights_status: usageRightsStatus,
+      license_note: licenseNote,
+    }),
+  }, storeId);
+}
+export async function archiveMediaAsset(storeId: string, asset: MediaAsset, idempotencyKey: string): Promise<MediaAsset> {
+  return request("/store/assets/" + asset.id + "/archive", {
+    method: "POST",
+    headers: { "If-Match": String(asset.version_no), "Idempotency-Key": idempotencyKey },
+  }, storeId);
+}
+export async function getMediaAssetDownloadUrl(storeId: string, assetId: string): Promise<string> {
+  const response = await request<{ url: string }>("/store/assets/" + assetId + "/download-url", {}, storeId);
+  return response.url;
+}

@@ -44,3 +44,44 @@ def test_download_object_bytes_rejects_oversize_before_download(monkeypatch) -> 
         )
 
     assert client.get_called is False
+
+def test_presigned_urls_use_browser_facing_endpoint(monkeypatch) -> None:
+    from store_operator.config import settings
+
+    captured = {}
+
+    def fake_client(*args, **kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(object_storage.boto3, "client", fake_client)
+    monkeypatch.setattr(settings, "object_storage_bucket", "private-assets")
+    monkeypatch.setattr(settings, "object_storage_access_key_id", "access")
+    monkeypatch.setattr(settings, "object_storage_secret_access_key", "secret")
+    monkeypatch.setattr(settings, "object_storage_endpoint_url", "http://seaweedfs:8333")
+    monkeypatch.setattr(settings, "object_storage_public_endpoint_url", "https://assets.example.com")
+
+    object_storage._presign_client()
+
+    assert captured["endpoint_url"] == "https://assets.example.com"
+
+
+def test_presigned_urls_fall_back_to_internal_endpoint(monkeypatch) -> None:
+    from store_operator.config import settings
+
+    captured = {}
+
+    def fake_client(*args, **kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(object_storage.boto3, "client", fake_client)
+    monkeypatch.setattr(settings, "object_storage_bucket", "private-assets")
+    monkeypatch.setattr(settings, "object_storage_access_key_id", "access")
+    monkeypatch.setattr(settings, "object_storage_secret_access_key", "secret")
+    monkeypatch.setattr(settings, "object_storage_endpoint_url", "http://localhost:8333")
+    monkeypatch.setattr(settings, "object_storage_public_endpoint_url", None)
+
+    object_storage._presign_client()
+
+    assert captured["endpoint_url"] == "http://localhost:8333"

@@ -64,7 +64,13 @@ from store_operator.object_storage import (  # type: ignore[import-untyped]
 )
 
 from store_operator_worker.celery_app import celery_app
-from store_operator_worker.media_scanner import (\n    ClamAvError,\n    MalwareDetected,\n    image_dimensions,\n    scan_with_clamd,\n    validate_image_dimensions,\n)\nfrom store_operator_worker.handlers import (
+from store_operator_worker.media_scanner import (
+    MalwareDetected,
+    image_dimensions,
+    scan_with_clamd,
+    validate_image_dimensions,
+)
+from store_operator_worker.handlers import (
     JobCancelled,
     JobExecutionContext,
     JobExecutionError,
@@ -478,7 +484,8 @@ def scan_quarantined_assets(batch_size: int = 10) -> int:
                     object_key=asset.object_key,
                     max_bytes=25 * 1024 * 1024,
                 )
-                if len(content) != asset.byte_size or hashlib.sha256(content).hexdigest() != asset.sha256:
+                actual_sha256 = hashlib.sha256(content).hexdigest()
+                if len(content) != asset.byte_size or actual_sha256 != asset.sha256:
                     rejection_reason = "Uploaded media failed integrity verification"
                 else:
                     try:

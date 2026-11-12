@@ -57,6 +57,7 @@ export default function MediaAssetsWorkspace({ storeId }: { storeId: string }) {
         : { idempotencyKey: crypto.randomUUID() };
       sessionStorage.setItem(keyName, JSON.stringify(state));
       let intentId = state.intentId;
+      let uploadIntent: Awaited<ReturnType<typeof createAssetUploadIntent>> | null = null;
       if (!intentId) {
         const intent = await createAssetUploadIntent(storeId, {
           expected_mime_type: file.type as "image/jpeg" | "image/png" | "image/webp",
@@ -64,6 +65,7 @@ export default function MediaAssetsWorkspace({ storeId }: { storeId: string }) {
           expected_sha256: digest,
           original_filename: file.name,
         }, state.idempotencyKey);
+        uploadIntent = intent;
         intentId = intent.id;
         state.intentId = intentId;
         sessionStorage.setItem(keyName, JSON.stringify(state));
@@ -76,19 +78,21 @@ export default function MediaAssetsWorkspace({ storeId }: { storeId: string }) {
         }
       }
       if (!completed) {
-        const intent = await createAssetUploadIntent(storeId, {
-          expected_mime_type: file.type as "image/jpeg" | "image/png" | "image/webp",
-          expected_byte_size: file.size,
-          expected_sha256: digest,
-          original_filename: file.name,
-        }, state.idempotencyKey);
-        if (intent.id !== intentId) {
-          intentId = intent.id;
+        if (!uploadIntent) {
+          uploadIntent = await createAssetUploadIntent(storeId, {
+            expected_mime_type: file.type as "image/jpeg" | "image/png" | "image/webp",
+            expected_byte_size: file.size,
+            expected_sha256: digest,
+            original_filename: file.name,
+          }, state.idempotencyKey);
+        }
+        if (uploadIntent.id !== intentId) {
+          intentId = uploadIntent.id;
           state.intentId = intentId;
           sessionStorage.setItem(keyName, JSON.stringify(state));
         }
-        await putAssetFile(intent, file);
-        completed = await completeAssetUpload(storeId, intent.id);
+        await putAssetFile(uploadIntent, file);
+        completed = await completeAssetUpload(storeId, uploadIntent.id);
       }
       sessionStorage.removeItem(keyName);
       setNotice("图片已上传并完成服务端哈希校验，当前状态：" + (statusLabels[completed.asset.status] ?? completed.status) + "。安全扫描完成前不会开放下载或用于营销内容。");

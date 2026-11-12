@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -138,3 +138,59 @@ def test_outbox_relay_releases_lease_and_schedules_retry_on_broker_error(
     assert event.locked_by is None
     assert event.locked_until is None
     assert "broker credentials" not in (event.last_error or "")
+
+
+@pytest.mark.parametrize("lease_state", ["missing", "expired"])
+def test_outbox_relay_reclaims_stale_publishing_lease(monkeypatch, lease_state: str) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    from store_operator_worker import tasks
+
+    event = make_outbox_event()
+    event.status = "publishing"
+    event.locked_by = "previous-relay"
+    event.locked_until = (
+        None
+        if lease_state == "missing"
+        else datetime.now(UTC) - timedelta(seconds=1)
+    )
+    monkeypatch.setattr(tasks, "SessionLocal", RelaySessionFactory(event))
+    sent = []
+    monkeypatch.setattr(
+        tasks.celery_app,
+        "send_task",
+        lambda *args, **kwargs: sent.append((args, kwargs)),
+    )
+
+    assert tasks.relay_outbox() == 1
+    assert len(sent) == 1
+    assert event.status == "published"
+    assert event.locked_by is None
+
+
+def test_outbox_relay_dead_letters_after_retry_budget_and_alerts(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    from store_operator_worker import tasks
+
+    event = make_outbox_event(attempts=tasks.OUTBOX_MAX_ATTEMPTS - 1)
+    monkeypatch.setattr(tasks, "SessionLocal", RelaySessionFactory(event))
+    alerts = []
+    monkeypatch.setattr(
+        tasks,
+        "emit_operational_alert",
+        lambda **kwargs: alerts.append(kwargs),
+    )
+    monkeypatch.setattr(
+        tasks.celery_app,
+        "send_task",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("secret")),
+    )
+
+    assert tasks.relay_outbox() == 0
+    assert event.status == "dead"
+    assert event.publish_attempts == tasks.OUTBOX_MAX_ATTEMPTS
+    assert event.locked_by is None
+    assert len(alerts) == 1
+    assert alerts[0]["event"] == "outbox.dead_letter"
+    assert alerts[0]["correlation_id"] == str(event.id)

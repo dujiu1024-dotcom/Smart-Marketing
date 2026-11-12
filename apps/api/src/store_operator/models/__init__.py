@@ -1,11 +1,15 @@
 from store_operator.models.base import Base
-from store_operator.models.channel_spec import ChannelCapabilitySnapshot, ChannelSpec, ChannelSpecVersion
 from store_operator.models.channel_delivery import (
     ChannelAccount,
     DouyinWebhookReceipt,
     OAuthAuthorizationAttempt,
     PublishOperation,
     PublishOperationAttempt,
+)
+from store_operator.models.channel_spec import (
+    ChannelCapabilitySnapshot,
+    ChannelSpec,
+    ChannelSpecVersion,
 )
 from store_operator.models.content_delivery import (
     Artifact,

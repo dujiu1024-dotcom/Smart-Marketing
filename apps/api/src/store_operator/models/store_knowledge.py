@@ -299,7 +299,7 @@ class MediaAsset(StoreScoped, Base):
         ),
         CheckConstraint("byte_size > 0", name="byte_size_positive"),
         CheckConstraint(
-            "status IN ('uploading', 'quarantined', 'scanning', 'ready', 'rejected', 'archived')",
+            "status IN ('uploading', 'quarantined', 'scanning', 'ready', 'rejected', 'scan_failed', 'archived')",
             name="status",
         ),
         CheckConstraint(
@@ -341,7 +341,7 @@ class UploadIntent(StoreScoped, Base):
         UniqueConstraint("store_id", "id", name="uq_upload_intents_store_id"),
         UniqueConstraint("object_key", name="uq_upload_intents_object_key"),
         CheckConstraint(
-            "status IN ('created', 'uploaded', 'scanning', 'completed', 'rejected', 'expired')",
+            "status IN ('created', 'uploaded', 'scanning', 'completed', 'rejected', 'scan_failed', 'expired')",
             name="status",
         ),
         CheckConstraint("expected_byte_size > 0", name="expected_byte_size_positive"),

@@ -87,7 +87,7 @@ function toOfferInput(form: OfferForm): OfferInput {
     terms = { percent };
   } else if (form.offer_type === "discount_amount" || form.offer_type === "fixed_price") {
     const amount = Number(form.amount);
-    if (!Number.isFinite(amount) || amount < 0 || !/^\w{3}$/.test(form.currency.trim().toUpperCase())) {
+    if (!Number.isFinite(amount) || amount <= 0 || !/^[A-Z]{3}$/.test(form.currency.trim().toUpperCase())) {
       throw new Error("金额必须为非负数，并填写三位币种代码。");
     }
     terms = { amount: form.amount.trim(), currency: form.currency.trim().toUpperCase() };
@@ -102,7 +102,7 @@ function toOfferInput(form: OfferForm): OfferInput {
   } else {
     const minimum = Number(form.minimum_spend), value = Number(form.discount_value);
     if (!Number.isFinite(minimum) || minimum <= 0 || !Number.isFinite(value) || value <= 0) throw new Error("满减门槛和优惠值必须大于 0。");
-    if (!/^\w{3}$/.test(form.currency.trim().toUpperCase())) throw new Error("请填写三位币种代码。");
+    if (!/^[A-Z]{3}$/.test(form.currency.trim().toUpperCase())) throw new Error("请填写三位币种代码。");
     if (form.discount_type === "percent" && value > 100) throw new Error("折扣比例不能超过 100。");
     terms = { minimum_spend: form.minimum_spend.trim(), currency: form.currency.trim().toUpperCase(), discount_type: form.discount_type, discount_value: form.discount_value.trim() };
   }

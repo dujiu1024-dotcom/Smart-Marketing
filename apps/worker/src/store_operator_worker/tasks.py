@@ -158,6 +158,8 @@ def relay_outbox(batch_size: int = 50) -> int:
                 queue="default",
             )
         except (CeleryError, OperationalError, OSError, TypeError, ValueError):
+            dead_lettered = False
+            attempt_count = 0
             with SessionLocal.begin() as db:
                 event = db.scalar(
                     select(OutboxEvent)
@@ -172,15 +174,24 @@ def relay_outbox(batch_size: int = 50) -> int:
                 ):
                     continue
                 event.last_error = "Outbox dispatch failed; inspect sanitized worker logs"
+                attempt_count = event.publish_attempts
                 event.locked_by = None
                 event.locked_until = None
                 if event.publish_attempts >= OUTBOX_MAX_ATTEMPTS:
                     event.status = "dead"
+                    dead_lettered = True
                 else:
                     event.status = "pending"
                     event.available_at = datetime.now(UTC) + timedelta(
                         seconds=min(300, 2 ** min(event.publish_attempts, 8))
                     )
+            if dead_lettered:
+                emit_operational_alert(
+                    event="outbox.dead_letter",
+                    severity="critical",
+                    correlation_id=str(event_id),
+                    attributes={"event_type": event_type, "publish_attempts": attempt_count},
+                )
             continue
 
         with SessionLocal.begin() as db:

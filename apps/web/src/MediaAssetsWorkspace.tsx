@@ -155,7 +155,7 @@ export default function MediaAssetsWorkspace({ storeId }: { storeId: string }) {
         <div className="catalog-actions">
           {asset.status === "ready" && asset.usage_rights_status === "confirmed_allowed" && <button className="secondary" type="button" disabled={busy} onClick={() => void preview(asset)}>查看原图</button>}
           {asset.status === "ready" && asset.usage_rights_status === "unknown" && <button className="secondary" type="button" disabled={busy} onClick={() => {setRightsAssetId(asset.id);setRightsChoice("confirmed_allowed");setLicenseNote("");}}>确认使用权</button>}
-          {(asset.status === "ready" || asset.status === "rejected") && <button className="secondary" type="button" disabled={busy} onClick={() => void archive(asset)}>归档</button>}
+          {(asset.status === "ready" || asset.status === "rejected" || asset.status === "scan_failed") && <button className="secondary" type="button" disabled={busy} onClick={() => void archive(asset)}>归档</button>}
         </div>
       </article>)}
     </section>}

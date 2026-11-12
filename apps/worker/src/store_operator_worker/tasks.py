@@ -47,7 +47,6 @@ from store_operator.models import (  # type: ignore[import-untyped]
     ChannelAccount,
     ChannelContent,
     ChannelContentArtifactRef,
-    Job,
     MediaAsset,
     OutboxEvent,
     PublishConfirmation,

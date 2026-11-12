@@ -938,9 +938,13 @@ def effects_overview(
         if status == "available" and change_percent is not None:
             change = Decimal(str(change_percent))
             if change > 0:
-                observation_text = f"相邻等长周期内上升 {change_percent}%，属于已核验指标变化，不代表单一因素导致。"
+                observation_text = (
+                    f"相邻等长周期内上升 {change_percent}%，属于已核验指标变化，不代表单一因素导致。"
+                )
             elif change < 0:
-                observation_text = f"相邻等长周期内下降 {abs(change)}%，需要结合样本和内容差异复核。"
+                observation_text = (
+                    f"相邻等长周期内下降 {abs(change)}%，需要结合样本和内容差异复核。"
+                )
             else:
                 observation_text = "相邻等长周期内基本持平。"
         elif status == "zero_baseline":
@@ -948,7 +952,9 @@ def effects_overview(
         else:
             observation_text = "当前缺少连续、等长的已核验周期样本，暂不形成趋势判断。"
         if metric_tier == "content_performance":
-            next_action = "对比该渠道已核验作品的主题、素材和发布时间，再决定是否复用表现较好的内容方向。"
+            next_action = (
+                "对比该渠道已核验作品的主题、素材和发布时间，再决定是否复用表现较好的内容方向。"
+            )
         elif metric_tier == "intent":
             next_action = "检查咨询入口、行动号召和承接流程；不要仅凭点击或咨询数量推断订单增长。"
         else:
@@ -1077,7 +1083,7 @@ def effects_overview(
             }
         )
     content_performance = []
-    for key, points in content_periods.items():
+    for _key, points in content_periods.items():
         points.sort(
             key=lambda point: datetime.fromisoformat(str(point["period_end"])).astimezone(UTC)
         )

@@ -220,7 +220,10 @@ def replay_dead_letter_outbox_event(
     if event.event_type != "job.dispatch_requested":
         raise SystemExit("Only job dispatch Outbox events can be replayed")
 
-    raw_job_id = event.payload_json.get("job_id")
+    payload = event.payload_json
+    if not isinstance(payload, dict):
+        raise SystemExit("Dead Outbox event has an invalid payload")
+    raw_job_id = payload.get("job_id")
     try:
         job_id = UUID(raw_job_id) if isinstance(raw_job_id, str) else None
     except ValueError:

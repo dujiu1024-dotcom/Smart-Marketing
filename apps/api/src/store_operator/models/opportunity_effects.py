@@ -224,6 +224,8 @@ class MetricObservation(Base):
     deduplication_key: Mapped[str] = mapped_column(String(64), nullable=False)
     supersedes_observation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True),
         ForeignKey("metric_observations.id", ondelete="RESTRICT"))
+    import_batch_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True),
+        ForeignKey("metric_import_batches.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         server_default=func.now(), nullable=False)
 

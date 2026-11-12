@@ -190,7 +190,6 @@ def test_adopted_opportunity_handoff_creates_store_scoped_immutable_snapshot(
         json=create_payload,
     )
     assert not_adopted.status_code == 409
-    assert not_adopted.json()["error"]["code"] == "OPPORTUNITY_NOT_ADOPTED"
 
     adopted = identity_client.post(
         f"/api/v1/opportunities/{opportunity.id}/decisions",

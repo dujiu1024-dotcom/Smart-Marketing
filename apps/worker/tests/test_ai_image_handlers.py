@@ -1,11 +1,9 @@
 import hashlib
 from types import SimpleNamespace
 from uuid import uuid4
-from types import SimpleNamespace
-from uuid import uuid4
 
 import pytest
-from store_operator.ai_gateway.schemas import ImageGenerateResponse, VisionInspectResponse, VisionInspectResponse
+from store_operator.ai_gateway.schemas import ImageGenerateResponse, VisionInspectResponse
 
 from store_operator_worker import ai_image_handlers
 from store_operator_worker.handlers import JobExecutionError

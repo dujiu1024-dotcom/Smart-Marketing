@@ -108,3 +108,10 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - 列表、创建、更新、事实确认分别调用 Store Knowledge API；请求按当前门店上下文授权，创建带 Idempotency-Key，更新/确认带 If-Match。
 - 商品价格/币种同时为空代表未知价格；不以 0 伪造未知金额。
 - 商品/服务与活动优惠、品牌规范、客群经营、知识库、素材资产、渠道账号及营销任务仍未接入生产 Web。
+
+## 10. 第三个生产 Web 页面映射：活动与优惠（PR 待验收）
+- Demo #store:offers 映射为真实活动列表；#store-editor:offer:new 与 #store-editor:offer:<id> 映射为独立新增/编辑页面。
+- 列表、创建、更新、删除、事实确认调用现有 Store Knowledge API：/store/offers。
+- 创建携带 Idempotency-Key；更新、删除和事实确认携带 If-Match；所有请求携带当前 X-Store-ID 并通过 CSRF 防护。
+- 优惠规则与适用条件为结构化 JSON；未经商家显式确认的记录保持待确认。
+- 商品关联、其余资料模块与完整营销任务生产页面仍待接入。

@@ -1,27 +1,32 @@
 import socket
 from contextlib import contextmanager
-from threading import Event
-from uuid import uuid4
 from datetime import UTC, datetime, timedelta
+from threading import Event
 from types import SimpleNamespace
+from uuid import uuid4
 
 import httpcore
 import httpx
-from store_operator_worker.handlers import JobExecutionContext, clear_job_handlers_for_testing, resolve_job_handler
 
+from store_operator_worker.handlers import (
+    JobExecutionContext,
+    JobExecutionError,
+    clear_job_handlers_for_testing,
+    resolve_job_handler,
+)
 from store_operator_worker.hot_topics import (
-    _PinnedSyncBackend,
     MAX_FEED_BYTES,
-    _collect_source,
-    register_hot_topic_handlers,
+    _PinnedSyncBackend,
     _brand_guideline_text,
     _brand_risk_flags,
+    _collect_source,
     _match_score,
-    _region_matches,
     _parse_feed,
-    _store_profile_text,
+    _region_matches,
     _safe_https_url,
+    _store_profile_text,
     _tokens,
+    register_hot_topic_handlers,
 )
 
 

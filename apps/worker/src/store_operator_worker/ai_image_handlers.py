@@ -66,7 +66,6 @@ from store_operator_worker.media_scanner import (
     validate_image_dimensions,
 )
 
-
 logger = logging.getLogger(__name__)
 _MAX_IMAGE_BYTES = 25 * 1024 * 1024
 
@@ -842,7 +841,7 @@ def _complete_image(
                     dedupe_key=f"content.artifact_version_created:{artifact_version.id}",
                 )
             )
-    except (JobExecutionError, SQLAlchemyError) as persistence_error:
+    except (JobExecutionError, SQLAlchemyError):
         try:
             delete_object(object_key=image_result.asset_object_key)
         except (ObjectStorageNotConfigured, BotoCoreError, OSError) as cleanup_error:
@@ -850,7 +849,7 @@ def _complete_image(
                 "Could not clean up generated image after persistence failure (%s)",
                 type(cleanup_error).__name__,
             )
-        raise persistence_error
+        raise
 
     return {
         "schema_version": 1,

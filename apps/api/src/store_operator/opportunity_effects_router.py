@@ -2039,7 +2039,9 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             first_sheet = workbook_xml.find("main:sheets/main:sheet", ns)
             if first_sheet is None:
                 raise ValueError("Workbook has no worksheets")
-            relationship_id = first_sheet.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+            relationship_id = first_sheet.attrib.get(
+                "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+            )
             relationship = next((item for item in rels_xml.findall("pkg:Relationship", ns)
                 if item.attrib.get("Id") == relationship_id), None)
             if relationship is None:
@@ -2052,19 +2054,25 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             shared_strings = []
             if "xl/sharedStrings.xml" in archive.namelist():
                 shared_xml = ET.fromstring(archive.read("xl/sharedStrings.xml"))
-                shared_strings = ["".join(node.itertext()) for node in shared_xml.findall("main:si", ns)]
+                shared_strings = [
+                    "".join(node.itertext())
+                    for node in shared_xml.findall("main:si", ns)
+                ]
             date_style_ids = set()
             if "xl/styles.xml" in archive.namelist():
                 styles_xml = ET.fromstring(archive.read("xl/styles.xml"))
                 custom_formats = {int(item.attrib["numFmtId"]): item.attrib.get("formatCode", "")
                     for item in styles_xml.findall("main:numFmts/main:numFmt", ns)}
-                built_in_dates = set(range(14, 23)) | set(range(27, 37)) | {45, 46, 47} | set(range(50, 59))
+                built_in_dates = (
+                    set(range(14, 23)) | set(range(27, 37)) | {45, 46, 47} | set(range(50, 59))
+                )
                 xfs = styles_xml.find("main:cellXfs", ns)
                 if xfs is not None:
                     for style_index, xf in enumerate(list(xfs)):
                         format_id = int(xf.attrib.get("numFmtId", "0"))
                         format_code = custom_formats.get(format_id, "")
-                        if format_id in built_in_dates or re.search(r"(?i)[ymdhis]", re.sub(r'"[^"]*"|\\\\.', "", format_code)):
+                        normalized_format = re.sub(r'"[^"]*"|\\\\.', "", format_code)
+                        if format_id in built_in_dates or re.search(r"(?i)[ymdhis]", normalized_format):
                             date_style_ids.add(style_index)
             sheet_xml = ET.fromstring(archive.read(sheet_path))
             sheet_data = sheet_xml.find("main:sheetData", ns)
@@ -2088,7 +2096,7 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                     while len(cells) < column_index:
                         cells.append(None)
                     if cell.find("main:f", ns) is not None:
-                        raise ValueError("Formula cells are not supported; replace formulas with values")
+                        raise ValueError("Formula cells are not supported; import calculated values")
                     cell_type = cell.attrib.get("t")
                     value_node = cell.find("main:v", ns)
                     value = value_node.text if value_node is not None else None
@@ -2108,12 +2116,20 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             if not parsed_rows:
                 raise ValueError("Worksheet is empty")
             headers = parsed_rows[0]
-            normalized_headers = [str(value).strip() if value is not None else "" for value in headers]
-            if not normalized_headers or any(not value for value in normalized_headers) or len(set(normalized_headers)) != len(normalized_headers):
+            normalized_headers = [
+                str(value).strip() if value is not None else "" for value in headers
+            ]
+            if (
+                not normalized_headers
+                or any(not value for value in normalized_headers)
+                or len(set(normalized_headers)) != len(normalized_headers)
+            ):
                 raise ValueError("Worksheet headers must be non-empty and unique")
             required = {"metric_key", "value_numeric", "period_timezone"}
             if not required.issubset(set(normalized_headers)):
-                raise ValueError("Worksheet must include metric_key, value_numeric, period_timezone")
+                raise ValueError(
+                    "Worksheet must include metric_key, value_numeric, period_timezone"
+                )
             output = io.StringIO()
             writer = csv.DictWriter(output, fieldnames=normalized_headers, lineterminator="\n")
             writer.writeheader()
@@ -2123,12 +2139,18 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                     value = row_values[index] if index < len(row_values) else None
                     if isinstance(value, date) and key in {"period_start", "period_end"}:
                         timezone_index = normalized_headers.index("period_timezone")
-                        timezone_value = row_values[timezone_index] if timezone_index < len(row_values) else None
+                        timezone_value = (
+                            row_values[timezone_index]
+                            if timezone_index < len(row_values)
+                            else None
+                        )
                         timezone_name = str(timezone_value or "").strip()
                         try:
                             zone = ZoneInfo(timezone_name)
                         except (ZoneInfoNotFoundError, ValueError) as exc:
-                            raise ValueError(f"Row {row_number}: period_timezone must be a valid IANA timezone") from exc
+                            raise ValueError(
+                                f"Row {row_number}: period_timezone must be a valid IANA timezone"
+                            ) from exc
                         if isinstance(value, datetime):
                             value = value.replace(tzinfo=zone) if value.tzinfo is None else value
                         else:
@@ -2144,8 +2166,12 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                 writer.writerow(mapped)
     except ApiError:
         raise
-    except (KeyError, IndexError, ValueError, TypeError, zipfile.BadZipFile, ET.ParseError, OverflowError) as exc:
-        raise ApiError(422, "XLSX_INVALID", f"Workbook could not be read: {str(exc)[:200]}") from exc
+    except (
+        KeyError, IndexError, ValueError, TypeError, zipfile.BadZipFile, ET.ParseError, OverflowError
+    ) as exc:
+        raise ApiError(
+            422, "XLSX_INVALID", f"Workbook could not be read: {str(exc)[:200]}"
+        ) from exc
     csv_payload = MetricImportInput(csv_text=output.getvalue(), source_format="xlsx")
     return import_manual_observations(csv_payload, request, auth, context, db)
 

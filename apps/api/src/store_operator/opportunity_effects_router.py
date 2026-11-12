@@ -30,6 +30,7 @@ from store_operator.models.opportunity_effects import (
     HotTopic,
     HotTopicSource,
     MetricDefinition,
+    MetricImportBatch,
     MetricObservation,
     OpportunityDecision,
     StoreOpportunity,
@@ -106,7 +107,8 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
 
 def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservationInput,
                         authenticity: str, source_system: str = "manual",
-                        supersedes_observation_id: UUID | None = None) -> MetricObservation:
+                        supersedes_observation_id: UUID | None = None,
+                        import_batch_id: UUID | None = None) -> MetricObservation:
     definition = db.scalar(select(MetricDefinition).where(
         MetricDefinition.source_system == source_system,
         MetricDefinition.metric_key == payload.metric_key,
@@ -141,7 +143,8 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
         period_end=payload.period_end, period_timezone=payload.period_timezone,
         collected_at=datetime.now(UTC), definition_version=definition.definition_version,
         integrity_status="unknown", authenticity_status=authenticity, sync_status="current",
-        deduplication_key=dedupe, supersedes_observation_id=supersedes_observation_id)
+        deduplication_key=dedupe, supersedes_observation_id=supersedes_observation_id,
+        import_batch_id=import_batch_id)
     db.add(item)
     db.flush()
     return item
@@ -697,15 +700,45 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
     if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
         raise ApiError(422, "CSV_COLUMNS_REQUIRED",
             "CSV must include metric_key,value_numeric,period_timezone")
+    content_sha256 = hashlib.sha256(payload.csv_text.encode("utf-8")).hexdigest()
+    existing_batch = db.scalar(
+        select(MetricImportBatch).where(
+            MetricImportBatch.store_id == store_id,
+            MetricImportBatch.content_sha256 == content_sha256,
+        )
+    )
+    if existing_batch is not None:
+        return {
+            "created": 0,
+            "duplicates_skipped": existing_batch.row_count,
+            "import_batch_id": str(existing_batch.id),
+            "content_sha256": existing_batch.content_sha256,
+            "authenticity_status": "merchant_reported",
+            "message": "相同文件内容已导入，未重复创建观测。",
+        }
+    batch = MetricImportBatch(
+        id=uuid4(),
+        store_id=store_id,
+        content_sha256=content_sha256,
+        source_format="csv",
+        imported_by_user_id=auth.user.id,
+        row_count=0,
+        created_count=0,
+        skipped_count=0,
+    )
+    db.add(batch)
+    db.flush()
     created = 0
     skipped = 0
+    row_count = 0
     for line_number, row in enumerate(reader, start=2):
+        row_count += 1
         try:
             raw = (row.get("value_numeric") or "").strip()
             data = MetricObservationInput(metric_key=(row.get("metric_key") or "").strip(),
                 value_numeric=Decimal(raw) if raw else None,
-                period_start=datetime.fromisoformat(row["period_start"]) if row.get("period_start") else None,  # noqa: E501
-                period_end=datetime.fromisoformat(row["period_end"]) if row.get("period_end") else None,  # noqa: E501
+                period_start=datetime.fromisoformat(row["period_start"]) if row.get("period_start") else None,
+                period_end=datetime.fromisoformat(row["period_end"]) if row.get("period_end") else None,
                 period_timezone=(row.get("period_timezone") or "").strip(),
                 currency=(row.get("currency") or "").strip().upper() or None,
                 source_record_id=(row.get("source_record_id") or "").strip() or None,
@@ -718,20 +751,38 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
             dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
             existed = db.scalar(select(MetricObservation.id).where(
                 MetricObservation.store_id == store_id,
-                    MetricObservation.deduplication_key == dedupe))
-            _create_observation(db, store_id=store_id, payload=data,
-                authenticity="merchant_reported")
+                MetricObservation.deduplication_key == dedupe))
+            _create_observation(
+                db,
+                store_id=store_id,
+                payload=data,
+                authenticity="merchant_reported",
+                import_batch_id=batch.id,
+            )
             created += 1 if existed is None else 0
             skipped += 0 if existed is None else 1
         except (ValueError, InvalidOperation, KeyError) as exc:
             db.rollback()
             raise ApiError(422, "CSV_ROW_INVALID", f"CSV row {line_number} is invalid") from exc
+    batch.row_count = row_count
+    batch.created_count = created
+    batch.skipped_count = skipped
     record_audit(db, request, action="effects.observations.imported",
-        target_type="metric_observation",
-        target_id=None, actor_user_id=auth.user.id, store_id=store_id,
-        metadata={"created": created, "duplicates": skipped,
-            "authenticity_status": "merchant_reported"})
+        target_type="metric_import_batch",
+        target_id=batch.id, actor_user_id=auth.user.id, store_id=store_id,
+        metadata={
+            "created": created,
+            "duplicates": skipped,
+            "content_sha256": content_sha256,
+            "row_count": row_count,
+            "authenticity_status": "merchant_reported",
+        })
     db.commit()
-    return {"created": created, "duplicates_skipped": skipped,
+    return {
+        "created": created,
+        "duplicates_skipped": skipped,
+        "import_batch_id": str(batch.id),
+        "content_sha256": content_sha256,
         "authenticity_status": "merchant_reported",
-        "message": "导入记录均标记为商家报告；未经独立核验的数据不会进入正式经营结果或 ROI 计算。"}
+        "message": "导入记录均标记为商家报告；未经独立核验的数据不会进入正式经营结果或 ROI 计算。",
+    }

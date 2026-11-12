@@ -22,6 +22,7 @@ def upgrade() -> None:
         sa.Column("source_key", sa.String(100), nullable=False),
         sa.Column("display_name", sa.String(160), nullable=False),
         sa.Column("source_type", sa.String(32), nullable=False),
+        sa.Column("source_url", sa.String(2048), nullable=False),
         sa.Column("terms_url", sa.String(2048)),
         sa.Column("permitted_use", sa.Text()),
         sa.Column("attribution_template", sa.String(500)),

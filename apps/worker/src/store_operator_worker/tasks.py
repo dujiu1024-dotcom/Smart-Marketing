@@ -89,6 +89,10 @@ engine = create_engine(database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(
     bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
 )
+
+from store_operator_worker.hot_topics import register_hot_topic_handlers
+
+register_hot_topic_handlers(SessionLocal)
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
 LEASE_SECONDS = int(os.environ.get("WORKER_LEASE_SECONDS", "90"))
 if LEASE_SECONDS < 3:

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated
 from uuid import UUID, uuid4
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query, Request
@@ -15,10 +16,12 @@ from sqlalchemy.orm import Session
 
 from store_operator.auth.audit import record_audit
 from store_operator.auth.context import AuthContext
-from store_operator.auth.dependencies import AuthenticatedSession, require_csrf, require_store_context
+from store_operator.auth.dependencies import AuthenticatedSession, require_csrf, require_platform_admin, require_store_context
 from store_operator.auth.errors import ApiError
+from store_operator.config import settings
 from store_operator.db import get_db
-from store_operator.models.opportunity_effects import HotTopic, MetricDefinition, MetricObservation, OpportunityDecision, StoreOpportunity
+from store_operator.jobs.service import JobIdempotencyConflict, create_job
+from store_operator.models.opportunity_effects import HotTopic, HotTopicSource, MetricDefinition, MetricObservation, OpportunityDecision, StoreOpportunity
 
 router = APIRouter(tags=["opportunities", "effects"])
 
@@ -46,6 +49,7 @@ class MetricObservationInput(BaseModel):
     period_end: datetime | None = None
     period_timezone: str = Field(min_length=1, max_length=80)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
     source_record_id: str | None = Field(default=None, max_length=300)
     source_evidence_ref: str | None = Field(default=None, max_length=2048)
 
@@ -55,6 +59,11 @@ class MetricObservationInput(BaseModel):
         if value is not None and value.tzinfo is None:
             raise ValueError("timestamps must include timezone information")
         return value
+
+    @field_validator("currency")
+    @classmethod
+    def normalize_currency(cls, value: str | None) -> str | None:
+        return value.upper() if value else None
 
     @field_validator("currency")
     @classmethod
@@ -123,6 +132,87 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
     db.add(item)
     db.flush()
     return item
+
+
+class HotTopicSourceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_key: str = Field(min_length=1, max_length=100)
+    display_name: str = Field(min_length=1, max_length=160)
+    source_url: str = Field(min_length=1, max_length=2048)
+    terms_url: str = Field(min_length=1, max_length=2048)
+    permitted_use: str = Field(min_length=10, max_length=2000)
+    attribution_template: str | None = Field(default=None, max_length=500)
+
+def _validate_feed_url(value: str) -> str:
+    parsed = urlsplit(value)
+    allowed = {host.strip().lower() for host in settings.hot_topic_allowed_hosts.split(",") if host.strip()}
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not host or parsed.username or parsed.password or host not in allowed:
+        raise ApiError(422, "SOURCE_HOST_NOT_ALLOWED", "Feed URL must use HTTPS and an administrator-approved host")
+    return value
+
+@router.post("/admin/opportunity-sources")
+def create_hot_topic_source(payload: HotTopicSourceInput,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+    db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+    source = HotTopicSource(id=uuid4(), source_key=payload.source_key.strip(),
+        display_name=payload.display_name.strip(), source_type="rss",
+        source_url=_validate_feed_url(payload.source_url), terms_url=_validate_feed_url(payload.terms_url),
+        permitted_use=payload.permitted_use.strip(), attribution_template=payload.attribution_template,
+        enabled=False, health_status="unknown")
+    db.add(source)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ApiError(409, "SOURCE_KEY_CONFLICT", "Source key already exists") from exc
+    return {"id": str(source.id), "source_key": source.source_key, "enabled": False,
+        "message": "来源已登记但默认禁用。完成条款审查和网络出口配置后，管理员再启用。"}
+
+@router.post("/admin/opportunity-sources/{source_id}/enable")
+def enable_hot_topic_source(source_id: UUID,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+    db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+    source = db.scalar(select(HotTopicSource).where(HotTopicSource.id == source_id).with_for_update())
+    if source is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Source not found")
+    _validate_feed_url(source.source_url)
+    _validate_feed_url(source.terms_url or "")
+    if not source.permitted_use:
+        raise ApiError(409, "SOURCE_TERMS_REQUIRED", "Source usage terms must be reviewed before enabling")
+    source.enabled = True
+    source.health_status = "unknown"
+    db.commit()
+    return {"id": str(source.id), "enabled": True, "health_status": source.health_status}
+
+@router.post("/opportunities/collect")
+def request_opportunity_collection(request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]) -> dict[str, object]:
+    store_id = _store_id(context)
+    sources = db.scalars(select(HotTopicSource).where(HotTopicSource.enabled.is_(True),
+        HotTopicSource.source_type == "rss", HotTopicSource.terms_url.is_not(None),
+        HotTopicSource.permitted_use.is_not(None))).all()
+    if not sources:
+        return {"status": "unavailable", "job_id": None,
+            "message": "没有已启用且完成使用条款登记的热点来源；未创建采集任务。"}
+    try:
+        job = create_job(db, job_type="hot_topics.collect_and_match.v1",
+            payload_ref={"schema_version": 1, "source_ids": [str(item.id) for item in sources]},
+            idempotency_key=idempotency_key, store_id=store_id, actor_type="user",
+            actor_user_id=auth.user.id, queue_name="default", priority=0,
+            max_attempts=3, timeout_seconds=300)
+    except JobIdempotencyConflict as exc:
+        raise ApiError(409, "IDEMPOTENCY_KEY_REUSED", "Collection key was used for a different request") from exc
+    record_audit(db, request, action="opportunity.collection.requested", target_type="job",
+        target_id=job.id, actor_user_id=auth.user.id, store_id=store_id,
+        metadata={"source_count": len(sources)})
+    db.commit()
+    return {"status": job.status, "job_id": str(job.id), "source_count": len(sources)}
 
 @router.get("/opportunities")
 def list_opportunities(context: Annotated[AuthContext, Depends(require_store_context)],
@@ -297,6 +387,7 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
                 period_start=datetime.fromisoformat(row["period_start"]) if row.get("period_start") else None,
                 period_end=datetime.fromisoformat(row["period_end"]) if row.get("period_end") else None,
                 period_timezone=(row.get("period_timezone") or "").strip(),
+                currency=(row.get("currency") or "").strip().upper() or None,
                 currency=(row.get("currency") or "").strip().upper() or None,
                 source_record_id=(row.get("source_record_id") or "").strip() or None,
                 source_evidence_ref=(row.get("source_evidence_ref") or "").strip() or None)

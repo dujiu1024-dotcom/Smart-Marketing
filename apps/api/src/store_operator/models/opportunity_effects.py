@@ -26,6 +26,7 @@ class HotTopicSource(Base):
     source_key: Mapped[str] = mapped_column(String(100), nullable=False)
     display_name: Mapped[str] = mapped_column(String(160), nullable=False)
     source_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     terms_url: Mapped[str | None] = mapped_column(String(2048))
     permitted_use: Mapped[str | None] = mapped_column(Text)
     attribution_template: Mapped[str | None] = mapped_column(String(500))

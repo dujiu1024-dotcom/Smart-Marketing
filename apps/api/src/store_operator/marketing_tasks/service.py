@@ -46,7 +46,6 @@ from store_operator.marketing_tasks.schemas import (
     TaskStepRead,
 )
 from store_operator.models.job_runtime import Job
-from store_operator.models.opportunity_effects import HotTopic, OpportunityDecision, StoreOpportunity  # noqa: E501
 from store_operator.models.marketing_task import (
     BusinessFactSnapshot,
     DependencyEdge,

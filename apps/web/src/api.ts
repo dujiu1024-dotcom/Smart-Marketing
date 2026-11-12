@@ -1161,6 +1161,14 @@ export function importMetricCsv(storeId: string, csvText: string): Promise<{
 }> {
   return request("/effects/import", { method: "POST", body: JSON.stringify({ csv_text: csvText }) }, storeId);
 }
+export function importMetricXlsx(storeId: string, fileName: string, fileBase64: string): Promise<{
+  created: number; duplicates_skipped: number; import_batch_id: string;
+  content_sha256: string; authenticity_status: string; message: string;
+}> {
+  return request("/effects/import-xlsx", {
+    method: "POST", body: JSON.stringify({ file_name: fileName, file_base64: fileBase64 }),
+  }, storeId);
+}
 
 export function getDataSourceCapabilities(storeId: string): Promise<{ items: DataSourceCapabilitySnapshotRecord[]; total: number }> {
   return request("/effects/data-source-capabilities", {}, storeId);

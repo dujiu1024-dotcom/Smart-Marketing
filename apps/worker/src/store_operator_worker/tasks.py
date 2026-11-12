@@ -520,7 +520,9 @@ def scan_quarantined_assets(batch_size: int = 10) -> int:
             processed += 1
 
     return processed
-\n\n@register_job_handler("content.quality_check")
+
+
+@register_job_handler("content.quality_check")
 def execute_content_quality_check(
     context: JobExecutionContext,
     payload_ref: dict[str, object],

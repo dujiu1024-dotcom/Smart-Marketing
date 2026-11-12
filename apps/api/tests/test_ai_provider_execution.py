@@ -18,7 +18,6 @@ from store_operator.ai_gateway import (
     TextGenerateRequest,
     TextGenerateResponse,
 )
-
 from store_operator.models import AIInvocation, AIUsageRecord, Store
 
 

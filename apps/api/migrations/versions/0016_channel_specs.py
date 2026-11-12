@@ -24,34 +24,88 @@ def upgrade() -> None:
         sa.Column("channel_key", sa.String(80), nullable=False),
         sa.Column("current_version_id", postgresql.UUID(as_uuid=True)),
         sa.Column("status", sa.String(16), server_default="active", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("channel_key", name="uq_channel_specs_channel_key"),
         sa.UniqueConstraint("id", "current_version_id", name="uq_channel_specs_current_version"),
         sa.CheckConstraint("status IN ('active', 'archived')", name="ck_channel_specs_status"),
-        sa.CheckConstraint("length(trim(channel_key)) > 0", name="ck_channel_specs_channel_key_required"),
+        sa.CheckConstraint(
+            "length(trim(channel_key)) > 0",
+            name="ck_channel_specs_channel_key_required",
+        ),
     )
     op.create_table(
         "channel_spec_versions",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("channel_spec_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("spec_version", sa.Integer(), nullable=False),
-        sa.Column("text_constraints_json", postgresql.JSONB(), server_default=sa.text("'{}'::jsonb"), nullable=False),
-        sa.Column("media_constraints_json", postgresql.JSONB(), server_default=sa.text("'{}'::jsonb"), nullable=False),
-        sa.Column("hashtag_constraints_json", postgresql.JSONB(), server_default=sa.text("'{}'::jsonb"), nullable=False),
-        sa.Column("link_constraints_json", postgresql.JSONB(), server_default=sa.text("'{}'::jsonb"), nullable=False),
-        sa.Column("schedule_constraints_json", postgresql.JSONB(), server_default=sa.text("'{}'::jsonb"), nullable=False),
+        sa.Column(
+            "text_constraints_json",
+            postgresql.JSONB(),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "media_constraints_json",
+            postgresql.JSONB(),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "hashtag_constraints_json",
+            postgresql.JSONB(),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "link_constraints_json",
+            postgresql.JSONB(),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+        sa.Column(
+            "schedule_constraints_json",
+            postgresql.JSONB(),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
         sa.Column("draft_supported", sa.Boolean(), server_default=sa.text("false"), nullable=False),
-        sa.Column("publish_supported", sa.Boolean(), server_default=sa.text("false"), nullable=False),
-        sa.Column("verification_status", sa.String(32), server_default="pending_verification", nullable=False),
+        sa.Column(
+            "publish_supported", sa.Boolean(), server_default=sa.text("false"), nullable=False
+        ),
+        sa.Column(
+            "verification_status",
+            sa.String(32),
+            server_default="pending_verification",
+            nullable=False,
+        ),
         sa.Column("source_document_ref", sa.Text()),
         sa.Column("published_at", sa.DateTime(timezone=True)),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.UniqueConstraint("channel_spec_id", "spec_version", name="uq_channel_spec_versions_spec_version"),
+        sa.UniqueConstraint(
+            "channel_spec_id",
+            "spec_version",
+            name="uq_channel_spec_versions_spec_version",
+        ),
         sa.UniqueConstraint("channel_spec_id", "id", name="uq_channel_spec_versions_spec_id"),
-        sa.ForeignKeyConstraint(["channel_spec_id"], ["channel_specs.id"], name="fk_channel_spec_versions_spec", ondelete="RESTRICT"),
-        sa.CheckConstraint("spec_version >= 1", name="ck_channel_spec_versions_spec_version_positive"),
-        sa.CheckConstraint("verification_status IN ('pending_verification', 'verified', 'deprecated')", name="ck_channel_spec_versions_verification_status"),
+        sa.ForeignKeyConstraint(
+            ["channel_spec_id"],
+            ["channel_specs.id"],
+            name="fk_channel_spec_versions_spec",
+            ondelete="RESTRICT",
+        ),
+        sa.CheckConstraint(
+            "spec_version >= 1",
+            name="ck_channel_spec_versions_spec_version_positive",
+        ),
+        sa.CheckConstraint(
+            "verification_status IN ('pending_verification', 'verified', 'deprecated')",
+            name="ck_channel_spec_versions_verification_status",
+        ),
     )
     op.create_index(
         "ix_channel_spec_versions_spec_created",
@@ -168,7 +222,12 @@ def upgrade() -> None:
         sa.Column("channel_account_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("channel_spec_version_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("capability_key", sa.String(100), nullable=False),
-        sa.Column("support_status", sa.String(32), server_default="pending_verification", nullable=False),
+        sa.Column(
+            "support_status",
+            sa.String(32),
+            server_default="pending_verification",
+            nullable=False,
+        ),
         sa.Column("evidence_ref", sa.String(2048)),
         sa.Column("reason", sa.String(1000)),
         sa.Column("checked_at", sa.DateTime(timezone=True), nullable=False),
@@ -208,11 +267,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_channel_capability_snapshots_expiry", table_name="channel_capability_snapshots")
-    op.drop_index("ix_channel_capability_snapshots_account_checked", table_name="channel_capability_snapshots")
+    op.drop_index(
+        "ix_channel_capability_snapshots_expiry",
+        table_name="channel_capability_snapshots",
+    )
+    op.drop_index(
+        "ix_channel_capability_snapshots_account_checked",
+        table_name="channel_capability_snapshots",
+    )
     op.drop_table("channel_capability_snapshots")
     op.drop_constraint("fk_channel_contents_spec_version", "channel_contents", type_="foreignkey")
-    op.drop_constraint("fk_channel_specs_current_version_same_spec", "channel_specs", type_="foreignkey")
+    op.drop_constraint(
+        "fk_channel_specs_current_version_same_spec",
+        "channel_specs",
+        type_="foreignkey",
+    )
     op.drop_index("ix_channel_spec_versions_spec_created", table_name="channel_spec_versions")
     op.drop_table("channel_spec_versions")
     op.drop_table("channel_specs")

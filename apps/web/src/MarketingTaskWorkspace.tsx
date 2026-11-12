@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   archiveMarketingTask, cancelMarketingTask, confirmMarketingTaskRequirement,
-  confirmMarketingTaskStrategy, createMarketingTask, getAudienceProfiles,
-  getBrandGuideline, getKnowledgeItems, getMarketingTask, listOffers,
+  confirmMarketingTaskStrategy, createMarketingTask, getAudienceProfiles, getMediaAssets,
+  getBrandGuideline, getKnowledgeItems, getMarketingTask, listOffers, listTaskArtifacts,
+  createTaskArtifact, createTaskArtifactVersion, createTaskArtifactReview,
   getProducts, getStoreProfile, listMarketingTasks, recoverMarketingTaskStep,
   skipMarketingTaskStep, updateMarketingTaskRequirement, updateMarketingTaskStrategy,
-  type BusinessFactReference, type MarketingTask, type MarketingTaskCreateInput,
+  type BusinessFactReference, type ContentArtifact, type ArtifactVersionRecord,
+  type MediaAsset, type MarketingTask, type MarketingTaskCreateInput,
   type MarketingTaskSummary, type MarketingTaskType, type TaskStep, type TaskStepKey,
 } from "./api";
 
@@ -74,6 +76,13 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [task, setTask] = useState<MarketingTask | null>(null);
   const [facts, setFacts] = useState<FactOption[]>([]);
   const [selectedFacts, setSelectedFacts] = useState<string[]>([]);
+  const [artifacts, setArtifacts] = useState<ContentArtifact[]>([]);
+  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
+  const [copyTitle, setCopyTitle] = useState("");
+  const [copyBody, setCopyBody] = useState("");
+  const [copyHashtags, setCopyHashtags] = useState("");
+  const [selectedImageAssetId, setSelectedImageAssetId] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
   const [loading, setLoading] = useState(false);
   const [factsLoading, setFactsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -122,6 +131,20 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     finally { setLoading(false); }
   }, [storeId]);
 
+  const loadContent = useCallback(async (taskId: string) => {
+    try {
+      const [contentItems, assetItems] = await Promise.all([
+        listTaskArtifacts(storeId, taskId),
+        getMediaAssets(storeId),
+      ]);
+      setArtifacts(contentItems);
+      setMediaAssets(assetItems.items);
+      setSelectedImageAssetId(current => current || assetItems.items.find(item =>
+        item.status === "ready" && item.usage_rights_status === "confirmed_allowed" && item.mime_type.startsWith("image/")
+      )?.id || "");
+    } catch (reason) { setError(errorText(reason)); }
+  }, [storeId]);
+
   const loadFacts = useCallback(async () => {
     setFactsLoading(true);
     const options: FactOption[] = [];
@@ -159,13 +182,17 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   }, []);
   useEffect(() => {
     if (route === "#tasks") void loadTasks();
-    if (route === "#task") { void loadTask(); void loadFacts(); }
+    if (route === "#task") {
+      void loadTask(); void loadFacts();
+      const taskId = sessionStorage.getItem(selectedTaskKey(storeId));
+      if (taskId) void loadContent(taskId);
+    }
     if (route === "#create") {
       const key = createTaskKey(storeId);
       createKey.current = sessionStorage.getItem(key) ?? crypto.randomUUID();
       sessionStorage.setItem(key, createKey.current);
     }
-  }, [route, storeId, loadTasks, loadTask, loadFacts]);
+  }, [route, storeId, loadTasks, loadTask, loadFacts, loadContent]);
 
   const filteredItems = useMemo(() => filter === "all" ? items : items.filter(item => item.lifecycle_status === filter), [items, filter]);
   const stepProgress = task ? task.steps.filter(step => step.status === "succeeded" || step.status === "skipped").length : 0;
@@ -244,6 +271,58 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
   }
+  async function saveCopyArtifact() {
+    if (!task || saving || !copyBody.trim()) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const existing = artifacts.find(item => item.artifact_type === "copy");
+      const version = {
+        source_type: "manual_edit" as const,
+        instruction: "商家在营销任务工作区手动编辑文案",
+        content_json: {
+          title: copyTitle.trim(),
+          body: copyBody.trim(),
+          hashtags: copyHashtags.split(/[，,、\s]+/).map(item => item.trim().replace(/^#/, "")).filter(Boolean),
+        },
+      };
+      if (existing) await createTaskArtifactVersion(storeId, task.id, existing, version);
+      else await createTaskArtifact(storeId, task.id, "copy", version);
+      await loadContent(task.id);
+      setNotice(existing ? "文案新版本已保存，旧版本保留。" : "文案产物已创建。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+  async function saveImageArtifact() {
+    if (!task || saving || !selectedImageAssetId) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const existing = artifacts.find(item => item.artifact_type === "image");
+      const version = { source_type: "merchant_upload" as const, media_asset_id: selectedImageAssetId };
+      if (existing) await createTaskArtifactVersion(storeId, task.id, existing, version);
+      else await createTaskArtifact(storeId, task.id, "image", version);
+      await loadContent(task.id);
+      setNotice(existing ? "图片产物新版本已关联，旧版本保留。" : "图片产物已关联到门店已授权素材。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+  async function reviewArtifact(artifact: ContentArtifact, version: ArtifactVersionRecord, decision: "approved" | "revision_requested" | "rejected") {
+    if (!task || saving) return;
+    if (decision === "revision_requested" && !reviewComment.trim()) { setError("请填写具体的修改意见。"); return; }
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await createTaskArtifactReview(storeId, task.id, artifact, version, {
+        expected_version: version.version_no,
+        review_type: artifact.artifact_type,
+        decision,
+        comment: reviewComment.trim() || null,
+      });
+      setReviewComment("");
+      await loadContent(task.id);
+      setNotice(decision === "approved" ? "当前产物版本已审核通过。" : decision === "revision_requested" ? "已记录修改意见，请创建新版本后重新审核。" : "当前产物版本已标记为拒绝。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
   async function stepAction(step: TaskStep, action: "skip" | "recover") {
     if (!task || saving) return;
     const reason = window.prompt(action === "skip" ? "请说明跳过该可选步骤的原因（至少 8 个字）：" : "请说明恢复该步骤的原因（至少 8 个字）：");
@@ -322,6 +401,38 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
         {task.current_strategy_snapshot_id ? <pre className="task-json">{safeJson(task.strategy_draft)}</pre>
         : task.steps.find(step => step.step_key === "strategy_confirmation")?.status === "waiting_for_user" ? <><label className="field"><span>策略草稿（JSON）</span><textarea rows={8} value={strategyText} onChange={event => { setStrategyText(event.target.value); setStrategyDirty(true); }} /></label><div className="form-footer"><p>修改后必须先保存，再确认策略。</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || !strategyDirty} onClick={() => void saveStrategy()}>保存策略</button><button className="primary" type="button" disabled={saving || strategyDirty} onClick={() => void confirmStrategy()}>确认策略</button></div></div></>
         : <p className="muted">{task.current_requirement_snapshot_id ? "策略生成任务已提交，等待 Worker 返回可审核草稿。若执行失败，可在下方步骤中查看阻塞原因并恢复。" : "请先完成需求与经营事实确认。"}</p>}
+      </section>
+      <section className="task-panel">
+        <div className="section-title"><div><h2>文案与图片产物</h2><p>当前为商家手动编辑/已有素材关联路径；不会把未接入的 AI 生成伪装成真实结果。每次修改都会创建不可变新版本。</p></div><button className="text-button" type="button" onClick={() => task && void loadContent(task.id)}>刷新产物</button></div>
+        <div className="form-grid">
+          <Field label="文案标题" value={copyTitle} onChange={setCopyTitle} placeholder="填写内容标题" />
+          <Field label="话题标签（空格或逗号分隔）" value={copyHashtags} onChange={setCopyHashtags} placeholder="门店名称 周末活动" />
+          <Field label="文案正文" value={copyBody} onChange={setCopyBody} rows={5} placeholder="编辑本次营销文案。请勿填写未经确认的价格、库存或效果承诺。" />
+        </div>
+        <div className="form-footer"><p>保存文案会创建新版本；审核记录始终绑定具体版本。</p><div className="form-actions"><button className="primary" type="button" disabled={saving || !copyBody.trim()} onClick={() => void saveCopyArtifact()}>保存文案版本</button></div></div>
+        <div className="form-grid">
+          <label className="field span-2"><span>选择已通过扫描且已确认使用权的图片素材</span><select value={selectedImageAssetId} onChange={event => setSelectedImageAssetId(event.target.value)}><option value="">请选择门店图片素材</option>{mediaAssets.filter(item => item.status === "ready" && item.usage_rights_status === "confirmed_allowed" && item.mime_type.startsWith("image/")).map(item => <option key={item.id} value={item.id}>{item.original_filename_sanitized || item.id} · {item.mime_type} · V{item.version_no}</option>)}</select></label>
+        </div>
+        <div className="form-footer"><p>图片产物只引用门店已授权素材，不复制或覆盖来源资产。</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || !selectedImageAssetId} onClick={() => void saveImageArtifact()}>关联图片版本</button></div></div>
+        {artifacts.length === 0 ? <p className="muted">尚无文案或图片产物。保存文案或关联图片后，这里会显示版本与审核状态。</p> : <div className="task-content-artifacts">{artifacts.map(artifact => {
+          const current = artifact.versions.find(version => version.id === artifact.current_version_id);
+          const content = current?.content_json || {};
+          const body = typeof content.body === "string" ? content.body : "";
+          const titleText = typeof content.title === "string" ? content.title : "";
+          const asset = current?.source_refs.find(ref => ref.type === "media_asset");
+          return <article className="task-content-artifact" key={artifact.id}>
+            <div className="task-step-title"><strong>{artifact.artifact_type === "copy" ? "文案产物" : "图片产物"}</strong><span className="status-chip">{current ? `当前版本 V${current.version_no}` : "无当前版本"}</span></div>
+            {current && artifact.artifact_type === "copy" && <div className="task-readonly-grid"><div><strong>{titleText || "未填写标题"}</strong><span>{body}</span></div></div>}
+            {current && artifact.artifact_type === "image" && <p className="muted">已关联素材引用：{asset && typeof asset.id === "string" ? asset.id : current.content_hash}</p>}
+            <p className="muted">版本历史：{artifact.versions.map(version => `V${version.version_no}`).join(" · ")}</p>
+            {current && <div className="task-step-actions">
+              <button className="text-button" type="button" disabled={saving} onClick={() => void reviewArtifact(artifact, current, "approved")}>审核通过</button>
+              <button className="text-button" type="button" disabled={saving || !reviewComment.trim()} onClick={() => void reviewArtifact(artifact, current, "revision_requested")}>要求修改</button>
+              <button className="text-button" type="button" disabled={saving} onClick={() => void reviewArtifact(artifact, current, "rejected")}>拒绝当前版本</button>
+            </div>}
+          </article>;
+        })}</div>}
+        <label className="field"><span>审核修改意见（要求修改时必填）</span><textarea rows={2} value={reviewComment} onChange={event => setReviewComment(event.target.value)} placeholder="明确指出需要调整的内容、位置和原因" /></label>
       </section>
       <section className="task-panel"><div className="section-title"><div><h2>固定执行流程</h2><p>步骤状态由服务端状态机维护，必需审核节点不可跳过。</p></div><span className="status-chip">{stepProgress}/10 已完成</span></div>
         <div className="task-step-list">{task.steps.map((step, index) => <article className="task-step" key={step.id}><div className="task-step-index">{index + 1}</div><div className="task-step-body"><div className="task-step-title"><strong>{stepLabels[step.step_key]}</strong><span className={step.status === "failed" || step.block_code ? "status-chip danger" : "status-chip"}>{statusLabels[step.status]}</span><span className="task-applicability">{statusLabels[step.applicability]}</span></div>{step.block_code && <p className="task-block-reason">{step.block_code}{step.block_detail ? ` · ${JSON.stringify(step.block_detail)}` : ""}</p>}{step.skip_reason && <p className="muted">跳过原因：{step.skip_reason}</p>}{step.output_refs.length > 0 && <p className="muted">已关联 {step.output_refs.length} 项输出</p>}<div className="task-step-actions">{["active","waiting_for_user"].includes(task.lifecycle_status) && step.applicability === "optional" && step.status === "pending" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "skip")}>记录跳过原因</button>}{["active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && ["failed","stale","waiting_for_user"].includes(step.status) && step.applicability !== "not_applicable" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "recover")}>恢复此步骤</button>}</div></div></article>)}</div>

@@ -62,6 +62,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
   }
 
   async function decide(decision: "adopt" | "ignore" | "snooze") {
+    const id = typeof detail?.id === "string" ? detail.id : "";
     if (!id) return;
     setSaving(true); setError(""); setNotice("");
     try {
@@ -81,7 +82,6 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
   if (route.startsWith("#hotspot-detail:")) {
     const source = (detail?.source ?? {}) as Record<string, unknown>;
     const match = (detail?.match ?? {}) as Record<string, unknown>;
-    const id = typeof detail?.id === "string" ? detail.id : "";
     return <section className="opportunity-workspace">
       <div className="page-heading"><div><p className="eyebrow">MARKETING OPPORTUNITY</p><h1>机会详情</h1><p className="muted">核对来源证据、门店匹配理由和风险后再做决定。</p></div><button className="secondary" onClick={() => { window.location.hash = "#hotspots"; }}>返回机会列表</button></div>
       {error && <div className="alert error" role="alert">{error}</div>}

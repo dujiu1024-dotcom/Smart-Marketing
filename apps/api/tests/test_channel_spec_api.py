@@ -1,10 +1,18 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
-from store_operator.models import Store, StoreMembership, User
+from store_operator.models import (
+    ChannelAccount,
+    ChannelCapabilitySnapshot,
+    ChannelSpec,
+    ChannelSpecVersion,
+    Store,
+    StoreMembership,
+    User,
+)
 
 
 class FakeRedis:
@@ -97,3 +105,42 @@ def test_channel_specs_are_store_authenticated_and_unverified_by_default(
     )
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "CHANNEL_SPEC_NOT_FOUND"
+
+    spec_version = (
+        db_session.query(ChannelSpecVersion)
+        .join(ChannelSpec, ChannelSpec.id == ChannelSpecVersion.channel_spec_id)
+        .filter(ChannelSpec.channel_key == "douyin")
+        .one()
+    )
+    account = ChannelAccount(
+        id=uuid4(),
+        store_id=store.id,
+        provider="douyin",
+        external_account_id="open-id-1",
+        access_token_secret_ref="secret://access",
+        refresh_token_secret_ref="secret://refresh",
+        access_token_expires_at=datetime.now(UTC) + timedelta(days=1),
+        connected_by_user_id=user.id,
+        status="active",
+    )
+    db_session.add(account)
+    db_session.flush()
+    db_session.add(
+        ChannelCapabilitySnapshot(
+            id=uuid4(),
+            store_id=store.id,
+            channel_account_id=account.id,
+            channel_spec_version_id=spec_version.id,
+            capability_key="publish_image_text",
+            support_status="pending_verification",
+            checked_at=datetime.now(UTC),
+        )
+    )
+    db_session.flush()
+    capabilities = identity_client.get(
+        f"/api/v1/channels/douyin/accounts/{account.id}/capabilities",
+        headers=headers,
+    )
+    assert capabilities.status_code == 200, capabilities.text
+    assert capabilities.json()[0]["capability_key"] == "publish_image_text"
+    assert capabilities.json()[0]["support_status"] == "pending_verification"

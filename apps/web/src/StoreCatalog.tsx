@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
-  createOffer, createProduct, deleteOffer, deleteProduct, getOffers, getProducts,
+  confirmStoreRecordFacts, createOffer, createProduct, deleteOffer, deleteProduct, getOffers, getProducts,
   updateOffer, updateProduct, type OfferInput, type OfferRecord, type ProductInput, type ProductRecord,
 } from "./api";
 
 const emptyProduct: ProductInput = {
-  name: "", category: "", sku: "", specification: "", unit: "份", price_amount: null, currency: "CNY",
+  name: "", category: "", sku: "", specification: "", unit: "份", price_amount: null, currency: null,
   availability_status: "unknown", inventory_quantity: null, key_selling_points_json: [], description: "",
   ingredients_or_materials: "", allergens_and_restrictions_json: [], service_process: "", delivery_method: "",
 };
@@ -87,7 +87,7 @@ export default function StoreCatalog({ storeId, initialTab }: { storeId: string;
     } catch (reason) { setError(errorText(reason)); }
     finally { setBusy(false); }
   }
-  async function removeProduct(item: ProductRecord) {
+  async function confirmProduct(item: ProductRecord) {\n    setBusy(true); setError("");\n    try { await confirmStoreRecordFacts(storeId, "products", item); setNotice("商品 / 服务事实已确认。"); await reload(); }\n    catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }\n  }\n  async function confirmOffer(item: OfferRecord) {\n    setBusy(true); setError("");\n    try { await confirmStoreRecordFacts(storeId, "offers", item); setNotice("活动优惠事实已确认。"); await reload(); }\n    catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }\n  }\n  async function removeProduct(item: ProductRecord) {
     if (!window.confirm(`确认删除「${item.name}」？`)) return;
     setBusy(true); setError("");
     try { await deleteProduct(storeId, item); setNotice("商品 / 服务已删除。"); await reload(); }

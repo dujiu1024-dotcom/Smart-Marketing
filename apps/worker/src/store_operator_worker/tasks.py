@@ -14,8 +14,6 @@ from uuid import UUID, uuid4
 
 import httpx
 from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
-from celery.exceptions import CeleryError  # type: ignore[import-untyped]
-from kombu.exceptions import OperationalError
 from sqlalchemy import and_, create_engine, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
@@ -49,6 +47,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
     ChannelAccount,
     ChannelContent,
     ChannelContentArtifactRef,
+    Job,
     MediaAsset,
     OutboxEvent,
     PublishConfirmation,
@@ -79,6 +78,7 @@ from store_operator_worker.handlers import (
     resolve_job_handler,
 )
 from store_operator_worker.hot_topics import register_hot_topic_handlers
+from store_operator_worker.observability import emit_operational_alert
 from store_operator_worker.media_scanner import (
     MalwareDetected,
     image_dimensions,

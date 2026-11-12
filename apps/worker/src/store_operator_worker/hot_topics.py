@@ -89,7 +89,7 @@ def _assert_public_host(host: str, allowed: set[str]) -> str:
             "Feed host resolves to a non-public network address.",
             retryable=False,
         )
-    return sorted(addresses)[0]
+    return min(addresses)
 
 
 def _safe_https_url(value: str, allowed: set[str]) -> tuple[str, str]:
@@ -319,8 +319,7 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
             timeout=HTTP_TIMEOUT,
             follow_redirects=False,
             headers=headers,
-        ) as client:
-            with client.stream("GET", feed_url) as response:
+        ) as client, client.stream("GET", feed_url) as response:
                 response.raise_for_status()
                 chunks: list[bytes] = []
                 total_bytes = 0

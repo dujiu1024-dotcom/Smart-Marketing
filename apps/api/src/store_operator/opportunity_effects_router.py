@@ -235,37 +235,50 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
         raise ApiError(422, "UNKNOWN_METRIC",
             "Metric key is not present in the active metric dictionary")
     if payload.published_work_id is not None:
-        published_work = db.scalar(
+        work = db.scalar(
             select(PublishedWork).where(
                 PublishedWork.id == payload.published_work_id,
                 PublishedWork.store_id == store_id,
             )
         )
-        if published_work is None:
+        if work is None:
             raise ApiError(404, "PUBLISHED_WORK_NOT_FOUND", "Published work not found")
-        if published_work.ownership_status not in {
-            "verified_system_publish",
-            "verified_platform_api",
-        } or published_work.verified_at is None:
+        if (
+            work.ownership_status not in {"verified_system_publish", "verified_platform_api"}
+            or work.verified_at is None
+        ):
             raise ApiError(
                 409,
                 "PUBLISHED_WORK_NOT_VERIFIED",
-                "Unverified or merchant-claimed works cannot be used for attribution",
+                "Unverified or merchant-claimed works cannot be linked to observations",
             )
-        if published_work.task_id is None:
+        verified_evidence_id = db.scalar(
+            select(WorkOwnershipEvidence.id).where(
+                WorkOwnershipEvidence.store_id == store_id,
+                WorkOwnershipEvidence.published_work_id == work.id,
+                WorkOwnershipEvidence.evidence_status == "verified",
+            )
+        )
+        if verified_evidence_id is None:
+            raise ApiError(
+                409,
+                "PUBLISHED_WORK_EVIDENCE_MISSING",
+                "A verified ownership evidence record is required",
+            )
+        if work.task_id is None:
             if payload.marketing_task_id is not None:
                 raise ApiError(
                     409,
                     "PUBLISHED_WORK_TASK_MISMATCH",
                     "This published work has no verified marketing task association",
                 )
-        elif payload.marketing_task_id not in {None, published_work.task_id}:
+        elif payload.marketing_task_id not in {None, work.task_id}:
             raise ApiError(
                 409,
                 "PUBLISHED_WORK_TASK_MISMATCH",
                 "Published work is linked to a different marketing task",
             )
-        payload.marketing_task_id = published_work.task_id
+        payload.marketing_task_id = work.task_id
     elif payload.marketing_task_id is not None:
         task = db.scalar(
             select(MarketingTask).where(

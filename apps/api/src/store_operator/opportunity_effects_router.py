@@ -723,9 +723,125 @@ def effects_overview(
         for item, _ in rows
         if item.integrity_status in {"partial", "anomalous", "unknown"}
     )
+    content_rows = db.execute(
+        select(MetricObservation, MetricDefinition, PublishedWork)
+        .join(
+            MetricDefinition,
+            MetricDefinition.id == MetricObservation.metric_definition_id,
+        )
+        .join(
+            PublishedWork,
+            and_(
+                PublishedWork.store_id == MetricObservation.store_id,
+                PublishedWork.id == MetricObservation.published_work_id,
+            ),
+        )
+        .where(
+            MetricObservation.store_id == store_id,
+            MetricObservation.metric_tier == "content_performance",
+            MetricObservation.published_work_id.is_not(None),
+            MetricObservation.authenticity_status.in_(["official_api", "verified_import"]),
+            MetricObservation.sync_status == "current",
+            MetricObservation.integrity_status == "complete",
+            MetricObservation.value_numeric.is_not(None),
+            PublishedWork.ownership_status.in_(["verified_system_publish", "verified_platform_api"]),
+            PublishedWork.verified_at.is_not(None),
+        )
+        .order_by(MetricObservation.collected_at.desc())
+    ).all()
+    content_groups: dict[str, list[tuple[MetricObservation, MetricDefinition, PublishedWork]]] = {}
+    for observation, definition, work in content_rows:
+        if observation.period_start is None or observation.period_end is None:
+            continue
+        period_key = "|".join(
+            [observation.period_start.isoformat(), observation.period_end.isoformat()]
+        )
+        group_key = "|".join([str(work.id), observation.metric_key, period_key])
+        content_groups.setdefault(group_key, []).append((observation, definition, work))
+
+    content_periods: dict[str, list[dict[str, object]]] = {}
+    for samples in content_groups.values():
+        observation, definition, work = samples[0]
+        values = [sample.value_numeric for sample, _, _ in samples if sample.value_numeric is not None]
+        if not values:
+            continue
+        rule = definition.aggregation_rule
+        if definition.period_semantics == "cumulative_snapshot" or rule == "latest":
+            aggregate = values[0]
+        elif rule == "avg":
+            aggregate = sum(values) / Decimal(len(values))
+        elif rule == "max":
+            aggregate = max(values)
+        elif rule == "min":
+            aggregate = min(values)
+        else:
+            aggregate = sum(values, Decimal("0"))
+        zone = ZoneInfo(observation.period_timezone)
+        period_start = observation.period_start.astimezone(zone)
+        period_end = observation.period_end.astimezone(zone)
+        group_key = f"{work.id}|{observation.metric_key}"
+        content_periods.setdefault(group_key, []).append(
+            {
+                "published_work_id": str(work.id),
+                "marketing_task_id": str(work.task_id) if work.task_id else None,
+                "channel_key": work.channel_key,
+                "external_work_id": work.external_work_id,
+                "metric_key": observation.metric_key,
+                "display_name": definition.display_name,
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "value": str(aggregate),
+                "sample_count": len(values),
+                "timezone": observation.period_timezone,
+            }
+        )
+    content_performance = []
+    for key, points in content_periods.items():
+        points.sort(key=lambda point: str(point["period_end"]))
+        previous = points[-2] if len(points) > 1 else None
+        current = points[-1] if points else None
+        comparison_status = "insufficient_samples"
+        change_percent = None
+        if previous is not None and current is not None:
+            previous_start = datetime.fromisoformat(str(previous["period_start"]))
+            previous_end = datetime.fromisoformat(str(previous["period_end"]))
+            current_start = datetime.fromisoformat(str(current["period_start"]))
+            current_end = datetime.fromisoformat(str(current["period_end"]))
+            same_window = (
+                previous_end - previous_start == current_end - current_start
+                and previous_end == current_start
+            )
+            previous_value = Decimal(str(previous["value"]))
+            current_value = Decimal(str(current["value"]))
+            if same_window and previous_value != 0:
+                comparison_status = "available"
+                change_percent = str(
+                    ((current_value - previous_value) / previous_value * 100).quantize(
+                        Decimal("0.01")
+                    )
+                )
+            elif same_window:
+                comparison_status = "zero_baseline"
+        content_performance.append(
+            {
+                "published_work_id": str(points[-1]["published_work_id"]),
+                "marketing_task_id": points[-1]["marketing_task_id"],
+                "channel_key": points[-1]["channel_key"],
+                "external_work_id": points[-1]["external_work_id"],
+                "metric_key": points[-1]["metric_key"],
+                "display_name": points[-1]["display_name"],
+                "points": points[-30:],
+                "comparison": {
+                    "status": comparison_status,
+                    "change_percent": change_percent,
+                },
+            }
+        )
+
     return {
         "items": cards,
         "trends": trends,
+        "content_performance": content_performance,
         "data_quality": {
             "total_observations": total_observations,
             "verified_observations": verified_count,

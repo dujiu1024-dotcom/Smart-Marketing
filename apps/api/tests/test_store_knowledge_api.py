@@ -1,10 +1,12 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
+from store_operator.models.job_runtime import Job, OutboxEvent
 from store_operator.models.store_knowledge import BrandGuideline, MediaAsset, UploadIntent
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -394,6 +396,28 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
     asset = db_session.get(MediaAsset, UUID(completed.json()["asset"]["id"]))
     assert asset is not None
     assert asset.usage_rights_status == "unknown"
+
+    scan_job = db_session.scalar(
+        select(Job).where(
+            Job.store_id == store.id,
+            Job.job_type == "store.asset.scan",
+        )
+    )
+    assert scan_job is not None
+    assert scan_job.status == "queued"
+    assert scan_job.payload_ref == {
+        "schema_version": 1,
+        "asset_id": str(asset.id),
+        "upload_intent_id": str(intent.id),
+    }
+    dispatch_event = db_session.scalar(
+        select(OutboxEvent).where(
+            OutboxEvent.aggregate_id == scan_job.id,
+            OutboxEvent.event_type == "job.dispatch_requested",
+        )
+    )
+    assert dispatch_event is not None
+    assert dispatch_event.status == "pending"
 
     download = identity_client.get(
         f"/api/v1/store/assets/{asset.id}/download-url",

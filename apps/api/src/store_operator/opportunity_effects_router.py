@@ -125,7 +125,8 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
         payload.period_end.isoformat() if payload.period_end else "",
             payload.source_record_id or "",
         str(payload.value_numeric) if payload.value_numeric is not None else "NULL",
-            payload.currency or ""])
+        payload.currency or "",
+        str(supersedes_observation_id) if supersedes_observation_id else ""])
     dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
     existing = db.scalar(select(MetricObservation).where(
         MetricObservation.store_id == store_id, MetricObservation.deduplication_key == dedupe))
@@ -631,14 +632,22 @@ def correct_manual_observation(
             "CORRECTION_METRIC_MISMATCH",
             "A correction must keep the original metric key",
         )
-    item = _create_observation(
-        db,
-        store_id=store_id,
-        payload=payload,
-        authenticity="merchant_reported",
-        source_system="manual",
-        supersedes_observation_id=original.id,
-    )
+    try:
+        item = _create_observation(
+            db,
+            store_id=store_id,
+            payload=payload,
+            authenticity="merchant_reported",
+            source_system="manual",
+            supersedes_observation_id=original.id,
+        )
+    except IntegrityError as exc:
+        db.rollback()
+        raise ApiError(
+            409,
+            "OBSERVATION_ALREADY_SUPERSEDED",
+            "This observation already has a correction",
+        ) from exc
     definition = db.get(MetricDefinition, item.metric_definition_id)
     if definition is None:
         raise ApiError(500, "METRIC_DEFINITION_MISSING", "Metric definition is unavailable")

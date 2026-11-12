@@ -1,13 +1,18 @@
 from datetime import UTC, datetime
+import socket
+
+import httpcore
 from types import SimpleNamespace
 
 from store_operator_worker.hot_topics import (
+    _PinnedSyncBackend,
     _brand_guideline_text,
     _brand_risk_flags,
     _match_score,
     _region_matches,
     _parse_feed,
     _store_profile_text,
+    _safe_https_url,
     _tokens,
 )
 
@@ -101,3 +106,43 @@ def test_brand_guideline_prohibited_phrases_raise_review_risk():
         "brand_prohibited_phrase"
     ]
     assert _brand_risk_flags("季节限定饮品上新", brand) == []
+
+
+def test_safe_https_url_returns_the_validated_public_address(monkeypatch):
+    monkeypatch.setattr(
+        "store_operator_worker.hot_topics.socket.getaddrinfo",
+        lambda *args, **kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))
+        ],
+    )
+    assert _safe_https_url("https://feeds.example.test/rss", {"feeds.example.test"}) == (
+        "https://feeds.example.test/rss",
+        "93.184.216.34",
+    )
+
+
+def test_safe_https_url_rejects_private_dns_answers(monkeypatch):
+    monkeypatch.setattr(
+        "store_operator_worker.hot_topics.socket.getaddrinfo",
+        lambda *args, **kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443))
+        ],
+    )
+    from store_operator_worker.handlers import JobExecutionError
+
+    try:
+        _safe_https_url("https://feeds.example.test/rss", {"feeds.example.test"})
+    except JobExecutionError as exc:
+        assert exc.code == "SOURCE_HOST_NOT_PUBLIC"
+    else:
+        raise AssertionError("private DNS answer must be rejected")
+
+
+def test_pinned_backend_never_resolves_the_original_hostname_again(monkeypatch):
+    monkeypatch.setattr(
+        httpcore.SyncBackend,
+        "connect_tcp",
+        lambda self, host, port, timeout=None, local_address=None, socket_options=None: host,
+    )
+    backend = _PinnedSyncBackend("feeds.example.test", "93.184.216.34")
+    assert backend.connect_tcp("feeds.example.test", 443) == "93.184.216.34"

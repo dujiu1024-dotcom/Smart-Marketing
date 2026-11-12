@@ -104,6 +104,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [strategyText, setStrategyText] = useState("{}");
   const [strategyDirty, setStrategyDirty] = useState(false);
   const createKey = useRef("");
+  const contentMutationKey = useRef("");
   const isCreate = route === "#create";
   const isDetail = route === "#task";
 
@@ -285,8 +286,11 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           hashtags: copyHashtags.split(/[，,、\s]+/).map(item => item.trim().replace(/^#/, "")).filter(Boolean),
         },
       };
-      if (existing) await createTaskArtifactVersion(storeId, task.id, existing, version);
-      else await createTaskArtifact(storeId, task.id, "copy", version);
+      const mutationKey = contentMutationKey.current || crypto.randomUUID();
+      contentMutationKey.current = mutationKey;
+      if (existing) await createTaskArtifactVersion(storeId, task.id, existing, version, mutationKey);
+      else await createTaskArtifact(storeId, task.id, "copy", version, mutationKey);
+      contentMutationKey.current = "";
       await loadContent(task.id);
       setNotice(existing ? "文案新版本已保存，旧版本保留。" : "文案产物已创建。");
     } catch (reason) { setError(errorText(reason)); }
@@ -298,8 +302,11 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     try {
       const existing = artifacts.find(item => item.artifact_type === "image");
       const version = { source_type: "merchant_upload" as const, media_asset_id: selectedImageAssetId };
-      if (existing) await createTaskArtifactVersion(storeId, task.id, existing, version);
-      else await createTaskArtifact(storeId, task.id, "image", version);
+      const mutationKey = contentMutationKey.current || crypto.randomUUID();
+      contentMutationKey.current = mutationKey;
+      if (existing) await createTaskArtifactVersion(storeId, task.id, existing, version, mutationKey);
+      else await createTaskArtifact(storeId, task.id, "image", version, mutationKey);
+      contentMutationKey.current = "";
       await loadContent(task.id);
       setNotice(existing ? "图片产物新版本已关联，旧版本保留。" : "图片产物已关联到门店已授权素材。");
     } catch (reason) { setError(errorText(reason)); }
@@ -310,12 +317,15 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     if (decision === "revision_requested" && !reviewComment.trim()) { setError("请填写具体的修改意见。"); return; }
     setSaving(true); setError(""); setNotice("");
     try {
+      const mutationKey = contentMutationKey.current || crypto.randomUUID();
+      contentMutationKey.current = mutationKey;
       await createTaskArtifactReview(storeId, task.id, artifact, version, {
         expected_version: version.version_no,
         review_type: artifact.artifact_type,
         decision,
         comment: reviewComment.trim() || null,
-      });
+      }, mutationKey);
+      contentMutationKey.current = "";
       setReviewComment("");
       await loadContent(task.id);
       setNotice(decision === "approved" ? "当前产物版本已审核通过。" : decision === "revision_requested" ? "已记录修改意见，请创建新版本后重新审核。" : "当前产物版本已标记为拒绝。");

@@ -64,6 +64,36 @@ def test_prompt_variables_bind_only_declared_task_context() -> None:
     }
 
 
+
+def test_prompt_variables_use_confirmed_business_fact_values() -> None:
+    task, requirement, version = _generation_context()
+    fact = SimpleNamespace(
+        fact_key="offer",
+        source_type="offer",
+        value_json={"title": "Buy one get one"},
+        source_version=3,
+    )
+
+    variables = _prompt_variables(
+        version,
+        task=task,
+        requirement=requirement,
+        strategy=None,
+        business_facts=[fact],
+    )
+
+    assert variables["business_facts"] == [
+        {
+            "fact_key": "offer",
+            "record_type": "offer",
+            "value": {"title": "Buy one get one"},
+            "source_version": 3,
+        }
+    ]
+    assert variables["business_facts_by_key"] == {
+        "offer": {"title": "Buy one get one"}
+    }
+
 def test_prompt_variables_fail_closed_for_unmapped_schema_properties() -> None:
     task, requirement, version = _generation_context()
     version.variables_schema_json["properties"]["unmapped_business_secret"] = {

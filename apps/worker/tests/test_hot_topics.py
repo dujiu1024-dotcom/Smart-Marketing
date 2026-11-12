@@ -5,6 +5,7 @@ from store_operator_worker.hot_topics import (
     _brand_guideline_text,
     _brand_risk_flags,
     _match_score,
+    _region_matches,
     _parse_feed,
     _store_profile_text,
     _tokens,
@@ -67,6 +68,20 @@ def test_store_profile_matching_uses_industry_and_service_region():
     assert "餐饮" in text
     assert "涩谷区" in text
     assert _match_score("涩谷区季节限定饮品", text) > 0
+
+
+def test_region_matching_uses_province_city_and_district_not_only_region():
+    profile = SimpleNamespace(
+        region="日本",
+        province="东京都",
+        city="涩谷区",
+        district="神南",
+    )
+    assert _region_matches("涩谷区", profile) is True
+    assert _region_matches("大阪府", profile) is False
+    assert _region_matches("关东地区", SimpleNamespace(
+        region=None, province=None, city=None, district=None
+    )) is None
 
 
 def test_brand_guideline_prohibited_phrases_raise_review_risk():

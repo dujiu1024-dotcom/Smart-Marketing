@@ -481,5 +481,5 @@ Web 单元测试覆盖手动文案产物创建和精确版本审核请求；真�
 | ChannelSpec | 平台级 channel_key 唯一目录，current_version_id 复合外键确保指向同一 Spec 的版本 | 不含 store_id；规格更新不可覆盖历史 |
 | ChannelSpecVersion | 不可变版本，保存文本/媒体/标签/链接/排期约束、草稿/发布能力、来源引用和 verification_status | 初始 Douyin v1 明确 pending_verification，能力 false、来源为空，不声称官方规则已核验 |
 | ChannelCapabilitySnapshot | 门店账号级能力历史快照，复合外键约束同店账号和精确 SpecVersion | 当前仅完成数据模型/迁移，探测 Worker/API 尚未接入 |
-| ChannelContent | channel_spec_version_id 增加外键，旧记录迁移时保留原 UUID 并创建 pending legacy spec/version | 未核验规格不得声称官方校验通过 |
+| ChannelContent | channel_spec_version_id 增加外键，旧记录迁移时保留原 UUID 并创建 pending legacy spec/version；创建适配快照时强制校验同渠道且 verification_status=verified | pending/deprecated 规格返回明确阻断，不允许生成渠道适配内容 |
 | API/UI | 门店渠道页面展示当前规格版本、来源与核验状态；新增门店认证后的规格目录/版本只读 API | 只读；规格维护和真实能力探测仍未完成 |

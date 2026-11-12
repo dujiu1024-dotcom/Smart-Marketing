@@ -3560,6 +3560,22 @@
             "minLength": 1,
             "title": "Csv Text",
             "type": "string"
+          },
+          "source_format": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "csv",
+                  "xlsx"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Format",
+            "default": "csv"
           }
         },
         "required": [

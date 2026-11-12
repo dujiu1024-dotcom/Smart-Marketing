@@ -1,6 +1,7 @@
 # ruff: noqa: I001
 from __future__ import annotations
 
+from collections.abc import Sequence
 import hashlib
 import html
 import ipaddress
@@ -16,7 +17,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from store_operator.config import settings
+from store_operator.config import settings  # type: ignore[import-untyped]
 from store_operator.models import (
     AudienceProfile,
     BrandGuideline,
@@ -26,7 +27,7 @@ from store_operator.models import (
     Product,
     StoreOpportunity,
     StoreProfile,
-)
+)  # type: ignore[import-untyped]
 from store_operator_worker.handlers import (
     JobExecutionContext,
     JobExecutionError,
@@ -232,7 +233,7 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
     return inserted
 
 
-def _match_store(db: Session, store_id: UUID, topics: list[HotTopic], context: JobExecutionContext) -> int:
+def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], context: JobExecutionContext) -> int:
     profile = db.scalar(select(StoreProfile).where(StoreProfile.store_id == store_id,
         StoreProfile.fact_status == "confirmed"))
     products = db.scalars(select(Product).where(Product.store_id == store_id,

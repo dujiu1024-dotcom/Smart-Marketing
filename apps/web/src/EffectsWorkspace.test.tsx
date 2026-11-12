@@ -95,4 +95,24 @@ describe("effects workspace", () => {
     expect(screen.getByRole("img", { name: "作品播放量作品表现趋势图" })).toBeInTheDocument();
   });
 
+  it("imports an Excel workbook through the dedicated xlsx endpoint", async () => {
+    api.importMetricXlsx.mockResolvedValue({
+      created: 2, duplicates_skipped: 1, import_batch_id: "batch-xlsx",
+      content_sha256: "abc123", authenticity_status: "merchant_reported", message: "ok",
+    });
+    render(<EffectsWorkspace storeId="store-1" />);
+    const file = new File(["xlsx"], "metrics.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: vi.fn().mockResolvedValue(new Uint8Array([80, 75, 3, 4]).buffer),
+    });
+    fireEvent.change(await screen.findByLabelText("Excel 工作簿（.xlsx，最大 5 MB）"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "导入 Excel" }));
+    expect(await screen.findByText(/Excel 导入完成：新增 2 条，重复跳过 1 条/)).toBeInTheDocument();
+    expect(api.importMetricXlsx).toHaveBeenCalledWith("store-1", "metrics.xlsx", "UEsDBA==");
+  });
+
 });

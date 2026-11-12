@@ -257,7 +257,7 @@ def create_marketing_task(
             step_key,
             includes_copy=payload.task_options.includes_copy,
             includes_image=payload.task_options.includes_image,
-            opportunity_applicable=payload.task_options.opportunity_applicable,
+            opportunity_applicable=bool(task_options.get("opportunity_applicable")),
             selected_channels=bool(payload.task_options.selected_channel_keys),
             requires_external_delivery=payload.task_options.requires_external_delivery,
         )

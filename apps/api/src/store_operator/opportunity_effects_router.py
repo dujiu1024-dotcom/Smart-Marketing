@@ -49,7 +49,6 @@ class MetricObservationInput(BaseModel):
     period_end: datetime | None = None
     period_timezone: str = Field(min_length=1, max_length=80)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
-    currency: str | None = Field(default=None, min_length=3, max_length=3)
     source_record_id: str | None = Field(default=None, max_length=300)
     source_evidence_ref: str | None = Field(default=None, max_length=2048)
 
@@ -59,11 +58,6 @@ class MetricObservationInput(BaseModel):
         if value is not None and value.tzinfo is None:
             raise ValueError("timestamps must include timezone information")
         return value
-
-    @field_validator("currency")
-    @classmethod
-    def normalize_currency(cls, value: str | None) -> str | None:
-        return value.upper() if value else None
 
     @field_validator("currency")
     @classmethod

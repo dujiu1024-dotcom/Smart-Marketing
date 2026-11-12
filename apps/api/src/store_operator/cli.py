@@ -261,6 +261,7 @@ def replay_dead_letter_outbox_event(
     db.flush()
     return event
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="store-operator")
     commands = parser.add_subparsers(dest="command", required=True)

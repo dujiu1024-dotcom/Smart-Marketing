@@ -1080,7 +1080,7 @@ export function getMetricObservations(storeId: string): Promise<{ items: MetricO
   return request<{ items: MetricObservationRecord[] }>("/effects/observations", {}, storeId);
 }
 export function createMetricObservation(storeId: string, payload: {
-  metric_key: string; value_numeric: string | null; period_start: string | null;
+  metric_key: string; value_numeric: string | null; currency: string | null; period_start: string | null;
   period_end: string | null; period_timezone: string; source_record_id: string | null;
   source_evidence_ref: string | null;
 }): Promise<{ item: MetricObservationRecord; message: string }> {

@@ -45,6 +45,7 @@ class MetricObservationInput(BaseModel):
     period_start: datetime | None = None
     period_end: datetime | None = None
     period_timezone: str = Field(min_length=1, max_length=80)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
     source_record_id: str | None = Field(default=None, max_length=300)
     source_evidence_ref: str | None = Field(default=None, max_length=2048)
 
@@ -54,6 +55,11 @@ class MetricObservationInput(BaseModel):
         if value is not None and value.tzinfo is None:
             raise ValueError("timestamps must include timezone information")
         return value
+
+    @field_validator("currency")
+    @classmethod
+    def normalize_currency(cls, value: str | None) -> str | None:
+        return value.upper() if value else None
 
     @field_validator("period_timezone")
     @classmethod
@@ -93,12 +99,12 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
         raise ApiError(422, "UNKNOWN_METRIC", "Metric key is not present in the active metric dictionary")
     if payload.period_start and payload.period_end and payload.period_end <= payload.period_start:
         raise ApiError(422, "INVALID_PERIOD", "period_end must be later than period_start")
-    if payload.metric_key == "revenue" and payload.value_numeric is not None:
-        raise ApiError(422, "CURRENCY_REQUIRED", "Revenue imports require a reviewed currency mapping")
+    if payload.metric_key == "revenue" and payload.value_numeric is not None and payload.currency is None:
+        raise ApiError(422, "CURRENCY_REQUIRED", "Revenue observations require an ISO 4217 currency")
     material = "|".join([str(store_id), source_system, payload.metric_key,
         payload.period_start.isoformat() if payload.period_start else "",
         payload.period_end.isoformat() if payload.period_end else "", payload.source_record_id or "",
-        str(payload.value_numeric) if payload.value_numeric is not None else "NULL"])
+        str(payload.value_numeric) if payload.value_numeric is not None else "NULL", payload.currency or ""])
     dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
     existing = db.scalar(select(MetricObservation).where(
         MetricObservation.store_id == store_id, MetricObservation.deduplication_key == dedupe))
@@ -107,7 +113,7 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
     item = MetricObservation(
         id=uuid4(), store_id=store_id, metric_definition_id=definition.id,
         metric_key=definition.metric_key, metric_tier=definition.metric_tier,
-        value_numeric=payload.value_numeric, unit=definition.unit, currency=None,
+        value_numeric=payload.value_numeric, unit=definition.unit, currency=payload.currency,
         source_system=source_system, source_record_id=payload.source_record_id,
         source_evidence_ref=payload.source_evidence_ref, period_start=payload.period_start,
         period_end=payload.period_end, period_timezone=payload.period_timezone,
@@ -291,12 +297,13 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
                 period_start=datetime.fromisoformat(row["period_start"]) if row.get("period_start") else None,
                 period_end=datetime.fromisoformat(row["period_end"]) if row.get("period_end") else None,
                 period_timezone=(row.get("period_timezone") or "").strip(),
+                currency=(row.get("currency") or "").strip().upper() or None,
                 source_record_id=(row.get("source_record_id") or "").strip() or None,
                 source_evidence_ref=(row.get("source_evidence_ref") or "").strip() or None)
             material = "|".join([str(store_id), "manual", data.metric_key,
                 data.period_start.isoformat() if data.period_start else "",
                 data.period_end.isoformat() if data.period_end else "", data.source_record_id or "",
-                str(data.value_numeric) if data.value_numeric is not None else "NULL"])
+                str(data.value_numeric) if data.value_numeric is not None else "NULL", data.currency or ""])
             dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
             existed = db.scalar(select(MetricObservation.id).where(
                 MetricObservation.store_id == store_id, MetricObservation.deduplication_key == dedupe))

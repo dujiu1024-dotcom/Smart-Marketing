@@ -12,6 +12,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [tier, setTier] = useState<"all" | keyof typeof tierLabels>("all");
   const [metricKey, setMetricKey] = useState("");
   const [value, setValue] = useState("");
+  const [currency, setCurrency] = useState("");
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [timezone, setTimezone] = useState("Asia/Shanghai");
@@ -46,12 +47,12 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
     setSaving(true); setError(""); setNotice("");
     try {
       await createMetricObservation(storeId, {
-        metric_key: metricKey, value_numeric: value.trim() || null,
+        metric_key: metricKey, value_numeric: value.trim() || null, currency: currency.trim().toUpperCase() || null,
         period_start: toIso(periodStart), period_end: toIso(periodEnd), period_timezone: timezone,
         source_record_id: sourceId.trim() || null, source_evidence_ref: evidenceRef.trim() || null,
       });
       setNotice("已保存为商家手工报告。该数据不会自动成为已核验经营结果或 ROI 依据。");
-      setValue(""); setSourceId(""); setEvidenceRef(""); await load();
+      setValue(""); setCurrency(""); setSourceId(""); setEvidenceRef(""); await load();
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
   }
@@ -96,6 +97,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         <article className="form-card"><h2>手工录入指标</h2><form className="profile-form" onSubmit={saveObservation}>
           <label className="field"><span>指标</span><select value={metricKey} onChange={event => setMetricKey(event.target.value)}>{definitions.map(def => <option key={def.id} value={def.metric_key}>{def.display_name}（{tierLabels[def.metric_tier]}）</option>)}</select></label>
           <label className="field"><span>数值（未知可留空）</span><input inputMode="decimal" value={value} onChange={event => setValue(event.target.value)} /></label>
+          <label className="field"><span>币种（销售额必填，ISO 4217）</span><input value={currency} onChange={event => setCurrency(event.target.value)} placeholder="CNY / JPY / USD" maxLength={3} /></label>
           <label className="field"><span>统计开始时间</span><input type="datetime-local" value={periodStart} onChange={event => setPeriodStart(event.target.value)} /></label>
           <label className="field"><span>统计结束时间</span><input type="datetime-local" value={periodEnd} onChange={event => setPeriodEnd(event.target.value)} /></label>
           <label className="field"><span>IANA 时区</span><input value={timezone} onChange={event => setTimezone(event.target.value)} required /></label>
@@ -103,7 +105,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
           <label className="field"><span>证据引用（链接或说明）</span><input value={evidenceRef} onChange={event => setEvidenceRef(event.target.value)} /></label>
           <button className="primary" disabled={saving || !metricKey || !timezone.trim()}>保存为手工报告</button>
         </form></article>
-        <article className="form-card"><h2>CSV / Excel 数据导入</h2><p className="muted">当前接口接受 CSV 文本。Excel 文件可先另存为 CSV。必需列：metric_key、value_numeric、period_timezone；可选列：period_start、period_end、source_record_id、source_evidence_ref。时间必须带时区偏移。</p>
+        <article className="form-card"><h2>CSV / Excel 数据导入</h2><p className="muted">当前接口接受 CSV 文本。Excel 文件可先另存为 CSV。必需列：metric_key、value_numeric、period_timezone；可选列：period_start、period_end、currency、source_record_id、source_evidence_ref。销售额必须提供 ISO 4217 币种；时间必须带时区偏移。</p>
           <form className="profile-form" onSubmit={importCsv}><label className="field"><span>CSV 内容</span><textarea rows={12} value={csvText} onChange={event => setCsvText(event.target.value)} placeholder={"metric_key,value_numeric,period_timezone,period_start,period_end,source_record_id\nviews,1200,Asia/Shanghai,2026-11-01T00:00:00+08:00,2026-11-02T00:00:00+08:00,post-001"} /></label><button className="primary" disabled={saving || !csvText.trim()}>导入 CSV</button></form>
         </article>
       </div>

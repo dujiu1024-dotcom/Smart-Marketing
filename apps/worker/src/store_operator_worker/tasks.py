@@ -13,8 +13,6 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 import httpx
-from celery.exceptions import CeleryError  # type: ignore[import-untyped]
-from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker

@@ -368,3 +368,84 @@ def test_artifact_list_version_and_review_are_store_scoped(
     assert db_session.query(ReviewRecord).filter(
         ReviewRecord.artifact_id == artifact_id
     ).count() == 0
+
+
+
+def test_artifact_version_id_substitution_across_stores_is_rejected(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = create_user(db_session, "content-version-swap@example.com")
+    store_a = create_store(db_session, user)
+    store_b = create_store(db_session, user)
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "content-version-swap@example.com", "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    csrf = login.json()["csrf_token"]
+    headers_a = {**ORIGIN, "X-CSRF-Token": csrf, "X-Store-ID": str(store_a.id)}
+    headers_b = {**ORIGIN, "X-CSRF-Token": csrf, "X-Store-ID": str(store_b.id)}
+
+    task_ids: list[str] = []
+    artifact_ids: list[str] = []
+    version_ids: list[str] = []
+    for store_headers, key in ((headers_a, "store-a"), (headers_b, "store-b")):
+        task = identity_client.post(
+            "/api/v1/marketing-tasks",
+            headers={**store_headers, "Idempotency-Key": f"version-swap-task-{key}"},
+            json=task_payload(),
+        )
+        assert task.status_code == 201, task.text
+        task_id = task.json()["id"]
+        artifact = identity_client.post(
+            f"/api/v1/marketing-tasks/{task_id}/artifacts",
+            headers={**store_headers, "Idempotency-Key": f"version-swap-artifact-{key}"},
+            json={
+                "artifact_type": "copy",
+                "version": {
+                    "source_type": "manual_edit",
+                    "content_json": {"title": key, "body": "Private store copy"},
+                },
+            },
+        )
+        assert artifact.status_code == 201, artifact.text
+        task_ids.append(task_id)
+        artifact_ids.append(artifact.json()["id"])
+        version_ids.append(artifact.json()["current_version_id"])
+
+    version_count = db_session.query(ArtifactVersion).count()
+    review_count = db_session.query(ReviewRecord).count()
+    outbox_count = db_session.query(OutboxEvent).filter(
+        OutboxEvent.event_type == "content.review_recorded"
+    ).count()
+
+    # Keep Store B's task and artifact IDs, but substitute Store A's version ID.
+    swapped_version = identity_client.post(
+        (
+            f"/api/v1/marketing-tasks/{task_ids[1]}/artifacts/"
+            f"{artifact_ids[1]}/versions/{version_ids[0]}/reviews"
+        ),
+        headers={**headers_b, "Idempotency-Key": "version-swap-review"},
+        json={"expected_version": 1, "review_type": "copy", "decision": "approved"},
+    )
+    assert swapped_version.status_code == 404, swapped_version.text
+
+    # Also reject an artifact ID and version ID from Store A under Store B's task.
+    swapped_artifact = identity_client.post(
+        (
+            f"/api/v1/marketing-tasks/{task_ids[1]}/artifacts/"
+            f"{artifact_ids[0]}/versions/{version_ids[0]}/reviews"
+        ),
+        headers={**headers_b, "Idempotency-Key": "artifact-swap-review"},
+        json={"expected_version": 1, "review_type": "copy", "decision": "approved"},
+    )
+    assert swapped_artifact.status_code == 404, swapped_artifact.text
+    assert db_session.query(ArtifactVersion).count() == version_count
+    assert db_session.query(ReviewRecord).count() == review_count
+    assert db_session.query(OutboxEvent).filter(
+        OutboxEvent.event_type == "content.review_recorded"
+    ).count() == outbox_count

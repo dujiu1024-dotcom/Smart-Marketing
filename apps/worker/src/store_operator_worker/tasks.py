@@ -64,12 +64,6 @@ from store_operator.object_storage import (  # type: ignore[import-untyped]
 )
 
 from store_operator_worker.celery_app import celery_app
-from store_operator_worker.media_scanner import (
-    MalwareDetected,
-    image_dimensions,
-    scan_with_clamd,
-    validate_image_dimensions,
-)
 from store_operator_worker.handlers import (
     JobCancelled,
     JobExecutionContext,
@@ -78,6 +72,12 @@ from store_operator_worker.handlers import (
     JobTimedOut,
     register_job_handler,
     resolve_job_handler,
+)
+from store_operator_worker.media_scanner import (
+    MalwareDetected,
+    image_dimensions,
+    scan_with_clamd,
+    validate_image_dimensions,
 )
 
 database_url = os.environ.get("DATABASE_URL")

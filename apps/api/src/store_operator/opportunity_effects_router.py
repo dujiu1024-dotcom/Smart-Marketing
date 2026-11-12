@@ -2166,7 +2166,7 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                             raise ValueError(
                                 f"Row {row_number}: period_timezone must be a valid IANA timezone"
                             ) from exc
-                        if isinstance(value, datetime):
+                        if isinstance(row_value, datetime):
                             row_value = row_value.replace(tzinfo=zone) if row_value.tzinfo is None else row_value
                         else:
                             row_value = datetime.combine(row_value, datetime.min.time(), tzinfo=zone)

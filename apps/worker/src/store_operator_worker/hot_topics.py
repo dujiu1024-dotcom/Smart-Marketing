@@ -17,7 +17,6 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
-from store_operator.config import settings  # type: ignore[import-untyped]
 from store_operator.models import (  # type: ignore[import-untyped]
     AudienceProfile,
     BrandGuideline,

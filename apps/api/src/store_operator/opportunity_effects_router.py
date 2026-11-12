@@ -789,7 +789,11 @@ def effects_overview(
             if sample.value_numeric is not None
         ]
         observation, definition, work = samples[0]
-        values = [sample.value_numeric for sample, _, _ in samples if sample.value_numeric is not None]
+        values = [
+            sample.value_numeric
+            for sample, _, _ in samples
+            if sample.value_numeric is not None
+        ]
         if not values:
             continue
         rule = definition.aggregation_rule

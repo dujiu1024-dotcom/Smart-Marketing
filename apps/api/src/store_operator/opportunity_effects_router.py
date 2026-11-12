@@ -103,6 +103,8 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
         "period_timezone": item.period_timezone, "collected_at": item.collected_at.isoformat(),
         "definition_version": item.definition_version, "integrity_status": item.integrity_status,
         "authenticity_status": item.authenticity_status, "sync_status": item.sync_status,
+        "supersedes_observation_id": str(item.supersedes_observation_id) if item.supersedes_observation_id else None,
+        "import_batch_id": str(item.import_batch_id) if item.import_batch_id else None,
     }
 
 def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservationInput,

@@ -1535,7 +1535,7 @@ def archive_media_asset(
         raise ApiError(409, "VERSION_CONFLICT", "Media asset version has changed")
     if asset.status == "archived":
         raise ApiError(409, "MEDIA_ASSET_ALREADY_ARCHIVED", "Media asset is already archived")
-    if asset.status not in {"ready", "rejected"}:
+    if asset.status not in {"ready", "rejected", "scan_failed"}:
         raise ApiError(
             409,
             "MEDIA_ASSET_NOT_ARCHIVABLE",

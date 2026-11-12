@@ -55,10 +55,10 @@ from store_operator.models import (  # type: ignore[import-untyped]
     PublishPackage,
     PublishPackageItem,
     PublishedWork,
-    WorkOwnershipEvidence,
     QualityReport,
     ReviewRecord,
     UploadIntent,
+    WorkOwnershipEvidence,
 )
 from store_operator.object_storage import (  # type: ignore[import-untyped]
     ObjectStorageNotConfigured,

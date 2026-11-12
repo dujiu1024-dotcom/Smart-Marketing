@@ -933,6 +933,15 @@ def register_published_work_from_readback(
             "A published status and platform readback are required before registering work ownership",  # noqa: E501
         )
     operation, package, package_item, account = row
+    if (
+        package_item.publish_package_id != package.id
+        or package_item.channel_key != account.provider
+    ):
+        raise ApiError(
+            409,
+            "PUBLISH_READBACK_RELATIONSHIP_MISMATCH",
+            "Publish package item and channel account do not match",
+        )
     assert operation.platform_item_id is not None
     assert operation.last_readback_at is not None
     existing = db.scalar(

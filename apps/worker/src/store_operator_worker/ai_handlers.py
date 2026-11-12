@@ -5,12 +5,13 @@ import hashlib
 import json
 import os
 from datetime import UTC, datetime
+from typing import cast
 from uuid import UUID, uuid4
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from store_operator.ai_gateway import (
+from store_operator.ai_gateway import (  # type: ignore[import-untyped]
     AIProviderExecutor,
     HttpProviderEnvironmentConfig,
     ProviderCallContext,
@@ -22,13 +23,13 @@ from store_operator.ai_gateway import (
     validate_prompt_task_contract,
     validate_structured_output,
 )
-from store_operator.ai_gateway.secrets import (
+from store_operator.ai_gateway.secrets import (  # type: ignore[import-untyped]
     EnvironmentSecretResolver,
     ProviderSecretResolver,
     SecretStoreProviderResolver,
 )
-from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
-from store_operator.models import (
+from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError  # type: ignore[import-untyped]
+from store_operator.models import (  # type: ignore[import-untyped]
     Artifact,
     ArtifactVersion,
     Job,
@@ -211,13 +212,19 @@ def _call_text_provider(
     )
     response = asyncio.run(executor.generate_text(request, provider_id=provider_id))
     if response.structured_output is not None:
-        return validate_structured_output(
+        return cast(
+            dict[str, object],
+            validate_structured_output(
             response.structured_output,
-            dict(version.output_schema_json),
+                dict(version.output_schema_json),
+            ),
         )
-    return parse_and_validate_structured_output(
+    return cast(
+        dict[str, object],
+        parse_and_validate_structured_output(
         response.text,
-        dict(version.output_schema_json),
+            dict(version.output_schema_json),
+        ),
     )
 
 

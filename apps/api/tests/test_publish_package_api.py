@@ -8,6 +8,7 @@ from store_operator.models import (
     Artifact,
     ArtifactVersion,
     BusinessFactSnapshot,
+    ChannelAccount,
     ChannelContent,
     ChannelSpec,
     ChannelSpecVersion,
@@ -453,3 +454,117 @@ def test_publish_package_rejects_hard_fail(
     )
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "QUALITY_BLOCKED"
+
+
+
+def test_publish_freeze_rejects_cross_store_associated_ids(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    user = create_user(db_session)
+    store_a = create_store(db_session, user)
+    store_b = create_store(db_session, user)
+    csrf = login(identity_client, monkeypatch)
+    task_a, fact_a, content_a = create_package_inputs(
+        db_session, identity_client, user, store_a, csrf
+    )
+    task_b, fact_b, content_b = create_package_inputs(
+        db_session, identity_client, user, store_b, csrf
+    )
+    report_a = QualityReport(
+        id=uuid4(),
+        store_id=store_a.id,
+        task_id=task_a.id,
+        channel_content_id=content_a.id,
+        rule_version="content-structure-v1",
+        input_fingerprint=report_fingerprint(content_a, "content-structure-v1"),
+        result="pass",
+        issues_json=[],
+    )
+    report_b = QualityReport(
+        id=uuid4(),
+        store_id=store_b.id,
+        task_id=task_b.id,
+        channel_content_id=content_b.id,
+        rule_version="content-structure-v1",
+        input_fingerprint=report_fingerprint(content_b, "content-structure-v1"),
+        result="pass",
+        issues_json=[],
+    )
+    db_session.add_all([report_a, report_b])
+    db_session.flush()
+
+    headers_b = {
+        **ORIGIN,
+        "X-CSRF-Token": csrf,
+        "X-Store-ID": str(store_b.id),
+    }
+    freeze_url = f"/api/v1/marketing-tasks/{task_b.id}/publish-packages/freeze"
+
+    def freeze(key: str, fact_id, content_id, report_id, delivery_mode="manual_handoff",
+               channel_account_id=None):
+        return identity_client.post(
+            freeze_url,
+            headers={**headers_b, "Idempotency-Key": key},
+            json={
+                "expected_task_version": task_b.version,
+                "fact_snapshot_ids": [str(fact_id)],
+                "items": [{
+                    "channel_content_id": str(content_id),
+                    "quality_report_id": str(report_id),
+                    "delivery_mode": delivery_mode,
+                    "channel_account_id": (
+                        str(channel_account_id) if channel_account_id is not None else None
+                    ),
+                }],
+            },
+        )
+
+    # A foreign business-fact ID cannot be attached to Store B's task.
+    foreign_fact = freeze(
+        "freeze-foreign-fact", fact_a.id, content_b.id, report_b.id
+    )
+    assert foreign_fact.status_code == 404, foreign_fact.text
+    assert foreign_fact.json()["error"]["code"] == "BUSINESS_FACT_NOT_FOUND"
+
+    # A foreign channel-content ID cannot be attached to Store B's package.
+    foreign_content = freeze(
+        "freeze-foreign-content", fact_b.id, content_a.id, report_a.id
+    )
+    assert foreign_content.status_code == 404, foreign_content.text
+    assert foreign_content.json()["error"]["code"] == "CHANNEL_CONTENT_NOT_FOUND"
+
+    # A Store A quality report cannot be paired with Store B's content.
+    foreign_report = freeze(
+        "freeze-foreign-report", fact_b.id, content_b.id, report_a.id
+    )
+    assert foreign_report.status_code == 404, foreign_report.text
+    assert foreign_report.json()["error"]["code"] == "QUALITY_REPORT_NOT_FOUND"
+
+    # A Store A channel account cannot be bound to Store B's official delivery item.
+    account_a = ChannelAccount(
+        id=uuid4(),
+        store_id=store_a.id,
+        provider="douyin",
+        external_account_id="store-a-douyin",
+        granted_scopes=["user_info", "video.create", "video.list"],
+        access_token_secret_ref="secret://store-a/access",
+        refresh_token_secret_ref="secret://store-a/refresh",
+        access_token_expires_at=datetime.now(UTC),
+        status="active",
+        connected_by_user_id=user.id,
+    )
+    db_session.add(account_a)
+    db_session.flush()
+    foreign_account = freeze(
+        "freeze-foreign-account",
+        fact_b.id,
+        content_b.id,
+        report_b.id,
+        delivery_mode="official_api",
+        channel_account_id=account_a.id,
+    )
+    assert foreign_account.status_code == 409, foreign_account.text
+    assert foreign_account.json()["error"]["code"] == "CHANNEL_ACCOUNT_UNAVAILABLE"
+
+    assert db_session.query(PublishPackage).count() == 0
+    assert db_session.query(PublishConfirmation).count() == 0

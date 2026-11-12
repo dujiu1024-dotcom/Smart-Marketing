@@ -184,3 +184,16 @@ h1 { margin: 0; color: #1f3029; font-size: clamp(25px, 3vw, 32px); letter-spacin
   .task-overview-stats { text-align: left; }
   .task-home-footer { align-items: flex-start; flex-direction: column; }
 }
+
+.channel-connect-panel { display: grid; gap: 12px; }
+.channel-auth-link { margin: 0; font-size: 14px; }
+.channel-account-list { display: grid; gap: 12px; }
+.channel-account-card { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.4fr) auto; align-items: center; gap: 18px; padding: 16px; border: 1px solid var(--border, #e4e9e5); border-radius: 12px; }
+.channel-account-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.channel-account-main img, .channel-avatar { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%; object-fit: cover; }
+.channel-avatar { display: grid; place-items: center; background: #eef3ef; color: #4b6354; font-weight: 700; }
+.channel-account-main > div, .channel-account-meta { display: grid; gap: 5px; min-width: 0; }
+.channel-account-main small, .channel-account-meta small { color: #718078; font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .channel-account-card { grid-template-columns: 1fr; align-items: start; }
+}

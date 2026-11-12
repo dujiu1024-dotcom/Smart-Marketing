@@ -691,3 +691,29 @@ export async function archiveMarketingTask(storeId: string, task: MarketingTask,
     body: JSON.stringify({ expected_version: task.version, reason }),
   }, storeId);
 }
+
+
+export interface DouyinAccount {
+  id: string;
+  provider: "douyin";
+  external_account_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  granted_scopes: string[];
+  access_token_expires_at: string;
+  refresh_token_expires_at: string | null;
+  status: "active" | "reauth_required" | "revoked" | "error";
+  connected_at: string;
+  last_verified_at: string | null;
+}
+export async function listDouyinAccounts(storeId: string): Promise<DouyinAccount[]> {
+  return request("/channels/douyin/accounts", {}, storeId);
+}
+export async function startDouyinAuthorization(storeId: string): Promise<{ authorization_url: string; expires_in: string }> {
+  return request("/channels/douyin/oauth/authorize", { method: "POST" }, storeId);
+}
+export async function refreshDouyinAccount(storeId: string, accountId: string): Promise<DouyinAccount> {
+  return request(`/channels/douyin/accounts/${encodeURIComponent(accountId)}/refresh`, {
+    method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
+  }, storeId);
+}

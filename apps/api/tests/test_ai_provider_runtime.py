@@ -316,3 +316,95 @@ def test_prompt_runtime_fails_closed_for_unsupported_schema_keywords() -> None:
             {"value": "x"},
             {"type": "object", "patternProperties": {}},
         )
+
+
+def test_provider_environment_config_is_disabled_until_explicitly_configured() -> None:
+    from store_operator.ai_gateway.provider_config import HttpProviderEnvironmentConfig
+
+    assert HttpProviderEnvironmentConfig.from_environment({}) is None
+    with pytest.raises(ValueError, match="incomplete"):
+        HttpProviderEnvironmentConfig.from_environment(
+            {"AI_PROVIDER_ID": "primary"}
+        )
+
+
+def test_provider_environment_config_parses_only_declared_capabilities() -> None:
+    from store_operator.ai_gateway.provider_config import HttpProviderEnvironmentConfig
+    from store_operator.ai_gateway.schemas import ProviderCapability
+
+    config = HttpProviderEnvironmentConfig.from_environment(
+        {
+            "AI_PROVIDER_PROVIDER_ID": "primary",
+            "AI_PROVIDER_DISPLAY_NAME": "Primary AI",
+            "AI_PROVIDER_BASE_URL": "https://ai.example",
+            "AI_PROVIDER_SECRET_REF": "env://AI_PRIMARY_KEY",
+            "AI_PROVIDER_TEXT_MODELS": "text-a, text-b",
+            "AI_PROVIDER_IMAGE_MODELS": "image-a",
+            "AI_PROVIDER_TIMEOUT_SECONDS": "30",
+        }
+    )
+
+    assert config is not None
+    assert config.models[ProviderCapability.TEXT] == ("text-a", "text-b")
+    assert config.models[ProviderCapability.IMAGE] == ("image-a",)
+    assert ProviderCapability.VISION not in config.models
+    assert config.timeout_seconds == 30
+
+
+def test_configured_registry_resolves_capability_specific_adapters_and_models() -> None:
+    from store_operator.ai_gateway.provider_config import (
+        HttpProviderEnvironmentConfig,
+        build_http_provider_registry,
+    )
+    from store_operator.ai_gateway.schemas import ProviderCapability
+
+    config = HttpProviderEnvironmentConfig.from_environment(
+        {
+            "AI_PROVIDER_PROVIDER_ID": "primary",
+            "AI_PROVIDER_DISPLAY_NAME": "Primary AI",
+            "AI_PROVIDER_BASE_URL": "https://ai.example",
+            "AI_PROVIDER_SECRET_REF": "env://AI_PRIMARY_KEY",
+            "AI_PROVIDER_TEXT_MODELS": "text-a",
+            "AI_PROVIDER_IMAGE_MODELS": "image-a",
+        }
+    )
+    assert config is not None
+
+    class FakeResolver:
+        def resolve_api_key(self, secret_ref: str) -> str:
+            assert secret_ref == "env://AI_PRIMARY_KEY"
+            return "secret-value"
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(
+        lambda _: httpx.Response(200, json={"model_id": "text-a", "text": "ok"})
+    ))
+    registry = build_http_provider_registry(
+        config,
+        secret_resolver=FakeResolver(),
+        client=client,
+    )
+
+    assert isinstance(
+        registry.resolve(
+            ProviderCapability.TEXT,
+            provider_id="primary",
+            model_id="text-a",
+        ),
+        HttpTextProvider,
+    )
+    assert isinstance(
+        registry.resolve(
+            ProviderCapability.IMAGE,
+            provider_id="primary",
+            model_id="image-a",
+        ),
+        HttpImageProvider,
+    )
+    with pytest.raises(ProviderError) as caught:
+        registry.resolve(
+            ProviderCapability.TEXT,
+            provider_id="primary",
+            model_id="not-configured",
+        )
+    assert caught.value.code is ProviderErrorCode.CAPABILITY_UNSUPPORTED
+    asyncio.run(client.aclose())

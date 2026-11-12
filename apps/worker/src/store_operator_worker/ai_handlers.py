@@ -40,6 +40,7 @@ from store_operator.models import (
     StrategySnapshot,
     TaskStep,
 )
+
 from store_operator_worker.handlers import (
     JobExecutionContext,
     JobExecutionError,

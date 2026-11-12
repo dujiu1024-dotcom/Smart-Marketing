@@ -78,6 +78,49 @@ def _text(node: ET.Element, tag: str) -> str:
     return " ".join(value.split())[:5000]
 
 
+def _local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1].split(":")[-1].lower()
+
+
+def _metadata_value(node: ET.Element, names: set[str]) -> str:
+    for child in node.iter():
+        if _local_name(child.tag) not in names:
+            continue
+        value = " ".join(part.strip() for part in child.itertext() if part.strip())
+        value = value or child.attrib.get("value", "") or child.attrib.get("term", "")
+        if value.strip():
+            return value.strip()[:500]
+    return ""
+
+
+def _metadata_tags(node: ET.Element) -> list[str]:
+    tags: list[str] = []
+    for child in node.iter():
+        if _local_name(child.tag) not in {"category", "subject", "tag", "keyword"}:
+            continue
+        value = child.attrib.get("term", "") or child.attrib.get("label", "")
+        value = value or " ".join(part.strip() for part in child.itertext() if part.strip())
+        value = value.strip()[:120]
+        if value and value not in tags:
+            tags.append(value)
+    return tags[:50]
+
+
+def _feed_entry_metadata(node: ET.Element) -> dict[str, object]:
+    return {
+        "region": _metadata_value(
+            node, {"region", "area", "geo_region", "location", "province", "city", "district"}
+        ) or None,
+        "heat_value": _metadata_value(
+            node, {"heat", "heat_value", "heat_score", "hotness", "popularity", "search_volume"}
+        ) or None,
+        "heat_unit": _metadata_value(
+            node, {"heat_unit", "heat_metric", "score_unit", "metric_unit"}
+        ) or None,
+        "topic_tags": _metadata_tags(node),
+    }
+
+
 def _parse_published(value: str) -> datetime | None:
     if not value:
         return None
@@ -107,15 +150,26 @@ def _parse_feed(payload: bytes) -> list[dict[str, object]]:
         for entry in rss_items[:MAX_FEED_ITEMS]:
             link = next((item.attrib.get("href", "") for item in entry.findall(f"{atom}link")
                          if item.attrib.get("rel", "alternate") == "alternate"), "")
-            items.append({"id": _text(entry, f"{atom}id") or link, "title": _text(entry, f"{atom}title"),
-                "link": link, "summary": _text(entry, f"{atom}summary"),
-                "published_at": _parse_published(_text(entry, f"{atom}published") or _text(entry, f"{atom}updated"))})
+            items.append({
+                "id": _text(entry, f"{atom}id") or link,
+                "title": _text(entry, f"{atom}title"),
+                "link": link,
+                "summary": _text(entry, f"{atom}summary"),
+                "published_at": _parse_published(
+                    _text(entry, f"{atom}published") or _text(entry, f"{atom}updated")
+                ),
+                **_feed_entry_metadata(entry),
+            })
         return items
     for entry in rss_items[:MAX_FEED_ITEMS]:
-        items.append({"id": _text(entry, "guid") or _text(entry, "link"),
-            "title": _text(entry, "title"), "link": _text(entry, "link"),
+        items.append({
+            "id": _text(entry, "guid") or _text(entry, "link"),
+            "title": _text(entry, "title"),
+            "link": _text(entry, "link"),
             "summary": _text(entry, "description"),
-            "published_at": _parse_published(_text(entry, "pubDate"))})
+            "published_at": _parse_published(_text(entry, "pubDate")),
+            **_feed_entry_metadata(entry),
+        })
     return items
 
 

@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/admin/channel-specs/{channel_key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Channel Spec Version */
+        post: operations["publish_channel_spec_version_api_v1_admin_channel_specs__channel_key__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/outbox-events/{event_id}/requeue": {
         parameters: {
             query?: never;
@@ -1638,6 +1655,43 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ChannelSpecVersionPublishRequest */
+        ChannelSpecVersionPublishRequest: {
+            /**
+             * Draft Supported
+             * @default false
+             */
+            draft_supported: boolean;
+            /** Expected Current Version Id */
+            expected_current_version_id: string | null;
+            /** Hashtag Constraints */
+            hashtag_constraints?: {
+                [key: string]: unknown;
+            };
+            /** Link Constraints */
+            link_constraints?: {
+                [key: string]: unknown;
+            };
+            /** Media Constraints */
+            media_constraints?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Publish Supported
+             * @default false
+             */
+            publish_supported: boolean;
+            /** Schedule Constraints */
+            schedule_constraints?: {
+                [key: string]: unknown;
+            };
+            /** Source Document Ref */
+            source_document_ref: string;
+            /** Text Constraints */
+            text_constraints?: {
+                [key: string]: unknown;
+            };
+        };
         /** FactConfirmationRequest */
         FactConfirmationRequest: {
             /** Confirmation Note */
@@ -2799,6 +2853,43 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    publish_channel_spec_version_api_v1_admin_channel_specs__channel_key__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelSpecVersionPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     requeue_dead_outbox_event_api_v1_admin_outbox_events__event_id__requeue_post: {
         parameters: {
             query?: never;

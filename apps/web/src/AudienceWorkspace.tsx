@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { confirmAudienceFacts, createAudienceProfile, deleteAudienceProfile, getAudienceProfiles, updateAudienceProfile, type AudienceProfile, type AudienceProfileInput } from "./api";
 
 interface FormState {
@@ -9,14 +9,14 @@ interface FormState {
 const empty:FormState={name:"",segment_type:"core",audience_description:"",consumption_scenarios:"",consumption_periods:"",
   purchase_motivations:"",common_objections:"",source_type:"",source_ref:"",sample_size:"",sampled_at:"",confidence_level:""};
 const split=(v:string)=>v.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-const localDate=(value:string)=>{const d=new Date(value);const p=(n:number)=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
+const normalizeTimestamp=(value:string)=>{const v=value.trim();if(!v)return null;if(!/(Z|[+-]\d{2}:\d{2})$/i.test(v))throw new Error("采样时间必须包含明确时区，例如 2026-11-12T09:00:00+08:00。");const d=new Date(v);if(Number.isNaN(d.getTime()))throw new Error("采样时间不是有效的 ISO 8601 时间。");return d.toISOString();};
 const message=(e:unknown)=>e instanceof Error?e.message:"请求失败，请稍后重试。";
 function fromAudience(item:AudienceProfile):FormState {
   return {name:item.name,segment_type:item.segment_type,audience_description:item.audience_description??"",
     consumption_scenarios:(item.consumption_scenarios_json??[]).join("\n"),consumption_periods:(item.consumption_periods_json??[]).join("\n"),
     purchase_motivations:(item.purchase_motivations_json??[]).join("\n"),common_objections:(item.common_objections_json??[]).join("\n"),
     source_type:item.source_type??"",source_ref:item.source_ref??"",sample_size:item.sample_size===null?"":String(item.sample_size),
-    sampled_at:item.sampled_at?localDate(item.sampled_at):"",confidence_level:item.confidence_level??""};
+    sampled_at:item.sampled_at??"",confidence_level:item.confidence_level??""};
 }
 function toInput(form:FormState):AudienceProfileInput {
   const sample=form.sample_size.trim();
@@ -25,40 +25,43 @@ function toInput(form:FormState):AudienceProfileInput {
     consumption_scenarios_json:split(form.consumption_scenarios),consumption_periods_json:split(form.consumption_periods),
     purchase_motivations_json:split(form.purchase_motivations),common_objections_json:split(form.common_objections),
     source_type:form.source_type.trim()||null,source_ref:form.source_ref.trim()||null,sample_size:sample?Number(sample):null,
-    sampled_at:form.sampled_at?new Date(form.sampled_at).toISOString():null,confidence_level:form.confidence_level.trim()||null};
+    sampled_at:normalizeTimestamp(form.sampled_at),confidence_level:form.confidence_level.trim()||null};
 }
-function Field({label,value,onChange,rows=1,placeholder}:{label:string;value:string;onChange:(v:string)=>void;rows?:number;placeholder?:string}) {
-  return <label className={rows>1?"field span-2":"field"}><span>{label}</span>{rows>1?<textarea rows={rows} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>:<input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>}</label>;
+function Field({label,value,onChange,rows=1,placeholder,type="text"}:{label:string;value:string;onChange:(v:string)=>void;rows?:number;placeholder?:string;type?:string}) {
+  return <label className={rows>1?"field span-2":"field"}><span>{label}</span>{rows>1?<textarea rows={rows} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>:<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>}</label>;
 }
 export default function AudienceWorkspace({storeId}:{storeId:string}) {
   const [items,setItems]=useState<AudienceProfile[]>([]);const [total,setTotal]=useState(0);
   const [selected,setSelected]=useState<AudienceProfile|null>(null);const [form,setForm]=useState<FormState>(empty);
   const [route,setRoute]=useState(window.location.hash||"#store:audience");
-  const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);const [dirty,setDirty]=useState(false);
+  const [loading,setLoading]=useState(true);const [listLoaded,setListLoaded]=useState(false);const [saving,setSaving]=useState(false);const [dirty,setDirty]=useState(false);
   const [error,setError]=useState("");const [notice,setNotice]=useState("");
+  const createKey=useRef("");
   const editing=route.startsWith("#store-editor:audience:");
   const reload=useCallback(async()=>{
-    setLoading(true);setError("");
+    setLoading(true);setListLoaded(false);setError("");
     try{const response=await getAudienceProfiles(storeId);setItems(response.items);setTotal(response.total);}
-    catch(reason){setError(message(reason));}finally{setLoading(false);}
+    catch(reason){setError(message(reason));}finally{setLoading(false);setListLoaded(true);}
   },[storeId]);
   useEffect(()=>{const onRoute=()=>setRoute(window.location.hash||"#store:audience");window.addEventListener("hashchange",onRoute);void reload();return()=>window.removeEventListener("hashchange",onRoute);},[reload]);
   useEffect(()=>{
-    if(!editing)return;const id=route.slice("#store-editor:audience:".length);
-    if(id==="new"){setSelected(null);setForm(empty);setDirty(false);return;}
+    if(!editing){setDirty(false);return;}const id=route.slice("#store-editor:audience:".length);
+    if(id==="new"){setSelected(null);setForm(empty);setDirty(false);const key=`store-operator.audience-create.${storeId}`;createKey.current=sessionStorage.getItem(key)??crypto.randomUUID();sessionStorage.setItem(key,createKey.current);return;}
+    setSelected(null);setForm(empty);setDirty(false);
     const found=items.find(item=>item.id===id);if(found){setSelected(found);setForm(fromAudience(found));setDirty(false);}
-  },[editing,items,route]);
+    else if(listLoaded){setError("客群记录不存在，或当前门店无权访问。");}
+  },[editing,items,route,listLoaded]);
   function change<K extends keyof FormState>(key:K,value:FormState[K]){setForm(p=>({...p,[key]:value}));setDirty(true);setNotice("");}
   async function save(e:FormEvent<HTMLFormElement>){
     e.preventDefault();setSaving(true);setError("");setNotice("");
-    try{const input=toInput(form);const saved=selected?await updateAudienceProfile(storeId,selected,input):await createAudienceProfile(storeId,input);
+    try{const input=toInput(form);const saved=selected?await updateAudienceProfile(storeId,selected,input):await createAudienceProfile(storeId,input,createKey.current||crypto.randomUUID());
       setItems(current=>selected?current.map(item=>item.id===saved.id?saved:item):[saved,...current]);setTotal(n=>selected?n:n+1);
-      setSelected(saved);setForm(fromAudience(saved));setDirty(false);setNotice(`客群资料已保存为 V${saved.current_version}，请核对来源后确认。`);window.location.hash="#store:audience";
+      setSelected(saved);setForm(fromAudience(saved));setDirty(false);if(!selected)sessionStorage.removeItem(`store-operator.audience-create.${storeId}`);setNotice(`客群资料已保存为 V${saved.current_version}，请核对来源后确认。`);window.location.hash="#store:audience";
     }catch(reason){setError(message(reason));}finally{setSaving(false);}
   }
   async function confirm(item:AudienceProfile){
     if(dirty)return;setSaving(true);setError("");setNotice("");
-    try{const saved=await confirmAudienceFacts(storeId,item);setItems(current=>current.map(v=>v.id===saved.id?saved:v));setSelected(saved);setNotice(`${saved.name} 的客群事实 V${saved.current_version} 已确认。`);}
+    try{const saved=await confirmAudienceFacts(storeId,item);setItems(current=>current.map(v=>v.id===saved.id?saved:v));setSelected(saved);setForm(fromAudience(saved));setDirty(false);setNotice(`${saved.name} 的客群事实 V${saved.current_version} 已确认。`);}
     catch(reason){setError(message(reason));}finally{setSaving(false);}
   }
   async function remove(item:AudienceProfile){
@@ -67,6 +70,7 @@ export default function AudienceWorkspace({storeId}:{storeId:string}) {
     catch(reason){setError(message(reason));}finally{setSaving(false);}
   }
   const segmentLabel:Record<AudienceProfile["segment_type"],string>={core:"核心客群",secondary:"次要客群",seasonal:"季节客群",scenario:"场景客群"};
+  if(editing && !route.endsWith(":new") && listLoaded && !items.some(item=>item.id===route.slice("#store-editor:audience:".length))) return <section className="empty-card"><h2>无法读取客群</h2><p>{error || "客群记录不存在，或当前门店无权访问。"}</p><button className="secondary" type="button" onClick={()=>{window.location.hash="#store:audience";}}>返回客群列表</button></section>;
   return <>
     <div className="page-heading"><div><p className="eyebrow">AUDIENCE & OPERATIONS</p><h1>客群与经营</h1><p className="muted">记录真实客群、消费场景、购买动机与常见异议，保留样本来源和置信信息。</p></div>
       {!editing&&<button className="primary" type="button" onClick={()=>{window.location.hash="#store-editor:audience:new";}}>新增客群</button>}
@@ -89,7 +93,7 @@ export default function AudienceWorkspace({storeId}:{storeId:string}) {
         <Field label="来源类型" value={form.source_type} onChange={v=>change("source_type",v)} placeholder="merchant_observation / survey / POS…"/>
         <Field label="来源说明 / 引用" value={form.source_ref} onChange={v=>change("source_ref",v)}/>
         <Field label="样本量" value={form.sample_size} onChange={v=>change("sample_size",v)}/>
-        <Field label="采样时间（本地时间）" value={form.sampled_at} onChange={v=>change("sampled_at",v)}/>
+        <Field label="采样时间（含时区）" value={form.sampled_at} onChange={v=>change("sampled_at",v)} placeholder="2026-11-12T09:00:00+08:00"/>
         <label className="field"><span>置信等级</span><select value={form.confidence_level} onChange={e=>change("confidence_level",e.target.value)}><option value="">未评估</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
       </div></section>
       <div className="form-footer"><p>{selected?`当前版本 V${selected.current_version} · ${selected.fact_status==="confirmed"?"已确认":"待确认"}`:"保存后需核对客群来源与描述，再确认事实。"}</p><div className="form-actions">

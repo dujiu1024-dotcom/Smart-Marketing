@@ -16,7 +16,27 @@ describe("audience workspace",()=>{
   fireEvent.change(screen.getByLabelText("消费场景（每行一项）"),{target:{value:"工作日午餐"}});
   fireEvent.change(screen.getByLabelText("样本量"),{target:{value:"12"}});
   fireEvent.click(screen.getByRole("button",{name:"保存客群"}));
-  await waitFor(()=>expect(api.createAudienceProfile).toHaveBeenCalledWith("store-1",expect.objectContaining({name:"附近上班族",consumption_scenarios_json:["工作日午餐"],sample_size:12})));
+  await waitFor(()=>expect(api.createAudienceProfile).toHaveBeenCalledWith("store-1",expect.objectContaining({name:"附近上班族",consumption_scenarios_json:["工作日午餐"],sample_size:12}),expect.any(String)));
+ });
+ it("blocks confirmation while the audience editor has unsaved changes",async()=>{
+  api.getAudienceProfiles.mockResolvedValue({items:[item],total:1});
+  render(<AudienceWorkspace storeId="store-1"/>);
+  fireEvent.click(await screen.findByRole("button",{name:"编辑"}));
+  const name=await screen.findByLabelText("客群名称 *");
+  fireEvent.change(name,{target:{value:"未保存的新客群名称"}});
+  const confirm=screen.getByRole("button",{name:"确认事实"});
+  expect(confirm).toBeDisabled();
+  expect(api.confirmAudienceFacts).not.toHaveBeenCalled();
+  expect(name).toHaveValue("未保存的新客群名称");
+ });
+ it("requires an explicit timezone offset for sampling timestamps",async()=>{
+  render(<AudienceWorkspace storeId="store-1"/>);
+  fireEvent.click(await screen.findByRole("button",{name:"新增客群"}));
+  fireEvent.change(await screen.findByLabelText("客群名称 *"),{target:{value:"午间客群"}});
+  fireEvent.change(screen.getByLabelText("采样时间（含时区）"),{target:{value:"2026-11-12T09:00"}});
+  fireEvent.click(screen.getByRole("button",{name:"保存客群"}));
+  expect(await screen.findByText(/采样时间必须包含明确时区/)).toBeInTheDocument();
+  expect(api.createAudienceProfile).not.toHaveBeenCalled();
  });
  it("confirms existing audience facts as a separate action",async()=>{
   api.getAudienceProfiles.mockResolvedValue({items:[item],total:1});

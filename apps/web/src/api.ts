@@ -1088,7 +1088,7 @@ export interface EffectsOverview {
     authenticity_status: string; integrity_status: string;
   }>;
   trends: Array<{
-    metric_key: string; display_name: string;
+    metric_key: string; display_name: string; source_system: string; channel_key: string | null;
     points: Array<{
       period_start: string; period_end: string; value: string; sample_count: number;
       timezone: string; aggregation_rule: string; display_name: string;
@@ -1097,13 +1097,14 @@ export interface EffectsOverview {
   }>;
   conversion_rates: Array<{
     metric_key: string; display_name: string; numerator_key: string; denominator_key: string;
+    source_system: string; channel_key: string | null;
     period_start: string; period_end: string; timezone: string;
     numerator_value: string; denominator_value: string;
     value_percent: string | null; status: string;
   }>;
   content_performance: Array<{
     published_work_id: string; marketing_task_id: string | null; channel_key: string;
-    external_work_id: string; metric_key: string; display_name: string;
+    external_work_id: string; metric_key: string; source_system: string; display_name: string;
     points: Array<{ period_start: string; period_end: string; value: string; sample_count: number; timezone: string }>;
     comparison: { status: string; change_percent: string | null };
   }>;

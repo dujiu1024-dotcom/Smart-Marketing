@@ -51,8 +51,12 @@ from store_operator.models.marketing_task import (
     TaskStep,
 )
 from store_operator.models.opportunity_effects import (
-    HotTopic, HotTopicSource, MetricDefinition, MetricObservation, OpportunityDecision,
-        StoreOpportunity,
+    HotTopic,
+    HotTopicSource,
+    MetricDefinition,
+    MetricObservation,
+    OpportunityDecision,
+    StoreOpportunity,
 )
 from store_operator.models.prompt_management import PromptActivation, PromptTemplate, PromptVersion
 from store_operator.models.store_knowledge import (

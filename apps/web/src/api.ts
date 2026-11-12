@@ -1108,6 +1108,11 @@ export interface EffectsOverview {
     points: Array<{ period_start: string; period_end: string; value: string; sample_count: number; timezone: string }>;
     comparison: { status: string; change_percent: string | null };
   }>;
+  insights: Array<{
+    metric_key: string; display_name: string; source_system: string; channel_key: string | null;
+    period_end: string; sample_count: number; comparison_status: string;
+    observation: string; next_action: string;
+  }>;
   data_quality: {
     total_observations: number; verified_observations: number; delayed_observations: number;
     incomplete_or_anomalous_observations: number; status: string; reason: string | null;

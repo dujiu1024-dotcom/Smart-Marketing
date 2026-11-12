@@ -1,10 +1,10 @@
 from store_operator.ai_gateway.circuit_breaker import CircuitBreaker
-from store_operator.ai_gateway.execution import AIProviderExecutor
 from store_operator.ai_gateway.errors import (
     ProviderError,
     ProviderErrorCode,
     SideEffectState,
 )
+from store_operator.ai_gateway.execution import AIProviderExecutor
 from store_operator.ai_gateway.http_provider import (
     HttpImageProvider,
     HttpJsonTransport,

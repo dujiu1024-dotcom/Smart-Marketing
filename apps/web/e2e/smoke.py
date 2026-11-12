@@ -162,7 +162,9 @@ async def main() -> None:
         page.on("pageerror", lambda error: page_errors.append(str(error)))
         await page.route("**/api/v1/**", _api_mock)
         response = await page.goto(f"{base_url}#hotspots", wait_until="networkidle")
-        assert response is not None and response.ok, "Authenticated workspace did not return HTTP 2xx"
+        assert response is not None and response.ok, (
+            "Authenticated workspace did not return HTTP 2xx"
+        )
 
         await page.get_by_role("heading", name="发现营销机会").wait_for(state="visible")
         await page.get_by_role("button", name="查看详情").click()
@@ -176,7 +178,9 @@ async def main() -> None:
             + STORE_ID
             + "') || '{}')"
         )
-        assert handoff.get("opportunity_id") == OPPORTUNITY_ID, "Opportunity handoff snapshot was not preserved"
+        assert handoff.get("opportunity_id") == OPPORTUNITY_ID, (
+            "Opportunity handoff snapshot was not preserved"
+        )
 
         await page.get_by_role("link", name="经营效果").click()
         await page.get_by_role("heading", name="经营效果").wait_for(state="visible")

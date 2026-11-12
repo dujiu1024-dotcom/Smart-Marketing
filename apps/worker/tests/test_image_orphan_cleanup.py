@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import os
+import importlib
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 
-os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://ci:ci@localhost:5432/ci")
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-
-from store_operator_worker import tasks
+@pytest.fixture
+def worker_tasks(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://ci:ci@localhost:5432/ci")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    return importlib.import_module("store_operator_worker.tasks")
 
 
 class FakeResult:
@@ -53,6 +54,7 @@ class FakeSessionFactory:
 
 def test_orphan_image_cleanup_deletes_only_unreferenced_store_scoped_objects(
     monkeypatch: pytest.MonkeyPatch,
+    worker_tasks,
 ) -> None:
     store_id = uuid4()
     invocation = SimpleNamespace(
@@ -65,14 +67,14 @@ def test_orphan_image_cleanup_deletes_only_unreferenced_store_scoped_objects(
     )
     database = FakeDatabase([invocation])
     deleted: list[str] = []
-    monkeypatch.setattr(tasks, "SessionLocal", FakeSessionFactory(database))
+    monkeypatch.setattr(worker_tasks, "SessionLocal", FakeSessionFactory(database))
     monkeypatch.setattr(
-        tasks,
+        worker_tasks,
         "delete_object",
         lambda *, object_key: deleted.append(object_key),
     )
 
-    result = tasks.cleanup_orphaned_ai_image_objects.run()
+    result = worker_tasks.cleanup_orphaned_ai_image_objects.run()
 
     assert result == 1
     assert deleted == [invocation.response_ref_json["object_key"]]

@@ -160,8 +160,8 @@ export default function OfferWorkspace({ storeId }: { storeId: string }) {
             <label className="field"><span>活动状态</span><select value={form.status} onChange={(e) => change("status", e.target.value as OfferInput["status"])}>
               <option value="draft">草稿</option><option value="active">生效中</option><option value="paused">已暂停</option><option value="expired">已过期</option><option value="archived">已归档</option>
             </select></label>
-            <div className="field span-2"><span>优惠规则（JSON 对象）</span><textarea rows={4} value={form.terms_json} onChange={(e) => change("terms_json", e.target.value)} placeholder='例如：{"discount_percent": 50, "buy_quantity": 1, "gift_quantity": 1}' /></div>
-            <div className="field span-2"><span>适用条件（JSON 对象）</span><textarea rows={4} value={form.eligibility_rules_json} onChange={(e) => change("eligibility_rules_json", e.target.value)} placeholder='例如：{"product_ids": [], "minimum_spend": 0, "member_only": false}' /></div>
+            <label className="field span-2"><span>优惠规则（JSON 对象）</span><textarea rows={4} value={form.terms_json} onChange={(e) => change("terms_json", e.target.value)} placeholder='例如：{"discount_percent": 50, "buy_quantity": 1, "gift_quantity": 1}' /></label>
+            <label className="field span-2"><span>适用条件（JSON 对象）</span><textarea rows={4} value={form.eligibility_rules_json} onChange={(e) => change("eligibility_rules_json", e.target.value)} placeholder='例如：{"product_ids": [], "minimum_spend": 0, "member_only": false}' /></label>
           </div>
         </section>
         <div className="form-footer"><p>{selected ? `当前版本 V${selected.current_version} · ${selected.fact_status === "confirmed" ? "已确认" : "待确认"}` : "新增后需核对优惠规则、适用条件和有效期。"}</p>

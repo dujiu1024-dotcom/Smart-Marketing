@@ -221,6 +221,23 @@ def _brand_guideline_text(brand: BrandGuideline | None) -> str:
     return " ".join(value for value in values if value)
 
 
+def _region_matches(topic_region: str | None, profile: StoreProfile) -> bool | None:
+    if not topic_region:
+        return None
+    profile_regions = [
+        profile.region,
+        profile.province,
+        profile.city,
+        profile.district,
+    ]
+    profile_tokens = set().union(
+        *(_tokens(value) for value in profile_regions if value and value.strip())
+    )
+    if not profile_tokens:
+        return None
+    return bool(_tokens(topic_region) & profile_tokens)
+
+
 def _brand_risk_flags(topic_text: str, brand: BrandGuideline | None) -> list[str]:
     if brand is None:
         return []
@@ -327,12 +344,9 @@ def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], contex
         industry_score = _match_score(topic_text, profile_text)
         brand_score = _match_score(topic_text, brand_text)
         risk_flags = _brand_risk_flags(topic_text, brand)
-        if (
-            topic.region
-            and profile.region
-            and _match_score(topic.region, profile.region) == 0
-        ):
-                risk_flags.append("region_mismatch")
+        region_match = _region_matches(topic.region, profile)
+        if region_match is False:
+            risk_flags.append("region_mismatch")
         product_scores = []
         for product in products:
             product_text = " ".join([product.name, product.category or "", product.description or "",
@@ -387,7 +401,8 @@ def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], contex
             matched_audience_profile_ids_json=audience_ids, suggested_scenario=(best_offer.title if best_offer else None),
             content_angle=(f"围绕{best_product.name}回应当前话题" if best_product else None),
             reason_summary=(
-                "综合门店行业/区域/品牌规范与商品、活动、客群的规则文本相关性；"
+                "综合门店行业、区域、品牌规范与商品、活动、客群的规则文本相关性；"
+                f"区域匹配：{'匹配' if region_match is True else '不匹配' if region_match is False else '未提供区域证据'}；"
                 "该分值仅代表文本相关性，不代表趋势热度或经营效果。"
             ),
             risk_flags_json=risk_flags, eligibility_status=status, matched_at=datetime.now(UTC),

@@ -436,8 +436,8 @@ export type AudienceProfileInput = Omit<AudienceProfile, "id" | "store_id" | "fa
 export async function getAudienceProfiles(storeId: string): Promise<{ items: AudienceProfile[]; total: number }> {
   return request("/store/audiences?limit=200&offset=0", {}, storeId);
 }
-export async function createAudienceProfile(storeId: string, input: AudienceProfileInput): Promise<AudienceProfile> {
-  return request("/store/audiences", { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify(input) }, storeId);
+export async function createAudienceProfile(storeId: string, input: AudienceProfileInput, idempotencyKey: string = crypto.randomUUID()): Promise<AudienceProfile> {
+  return request("/store/audiences", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(input) }, storeId);
 }
 export async function updateAudienceProfile(storeId: string, current: AudienceProfile, input: AudienceProfileInput): Promise<AudienceProfile> {
   return request(`/store/audiences/${current.id}`, { method: "PATCH", headers: { "If-Match": String(current.current_version) }, body: JSON.stringify(input) }, storeId);

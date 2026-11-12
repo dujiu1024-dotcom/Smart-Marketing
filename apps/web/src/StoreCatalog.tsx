@@ -87,7 +87,16 @@ export default function StoreCatalog({ storeId, initialTab }: { storeId: string;
     } catch (reason) { setError(errorText(reason)); }
     finally { setBusy(false); }
   }
-  async function confirmProduct(item: ProductRecord) {\n    setBusy(true); setError("");\n    try { await confirmStoreRecordFacts(storeId, "products", item); setNotice("商品 / 服务事实已确认。"); await reload(); }\n    catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }\n  }\n  async function confirmOffer(item: OfferRecord) {\n    setBusy(true); setError("");\n    try { await confirmStoreRecordFacts(storeId, "offers", item); setNotice("活动优惠事实已确认。"); await reload(); }\n    catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }\n  }\n  async function removeProduct(item: ProductRecord) {
+  async function confirmProduct(item: ProductRecord) {
+    setBusy(true); setError("");
+    try { await confirmStoreRecordFacts(storeId, "products", item); setNotice("商品 / 服务事实已确认。"); await reload(); }
+    catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
+  }
+  async function confirmOffer(item: OfferRecord) {
+    setBusy(true); setError("");
+    try { await confirmStoreRecordFacts(storeId, "offers", item); setNotice("活动优惠事实已确认。"); await reload(); }
+    catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
+  }\n  async function removeProduct(item: ProductRecord) {
     if (!window.confirm(`确认删除「${item.name}」？`)) return;
     setBusy(true); setError("");
     try { await deleteProduct(storeId, item); setNotice("商品 / 服务已删除。"); await reload(); }

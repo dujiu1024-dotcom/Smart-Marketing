@@ -344,7 +344,7 @@ export interface paths {
         head?: never;
         patch?: never;
         trace?: never;
-    }
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -3417,7 +3417,7 @@ export interface operations {
                 };
             };
         };
-    }
+    };
     get_job_api_v1_jobs__job_id__get: {
         parameters: {
             query?: never;

@@ -579,6 +579,29 @@ def create_review_record(
             "STALE_ARTIFACT_VERSION",
             "Only the current artifact version can be reviewed",
         )
+    if (
+        artifact.artifact_type == "image"
+        and version.source_type == "ai_generated"
+        and payload.decision == "approved"
+    ):
+        image_content = dict(version.content_json or {})
+        vision_inspection = image_content.get("vision_inspection")
+        vision_report = (
+            vision_inspection.get("report")
+            if isinstance(vision_inspection, dict)
+            else None
+        )
+        if (
+            not isinstance(vision_inspection, dict)
+            or vision_inspection.get("passed") is not True
+            or not isinstance(vision_report, dict)
+            or vision_report.get("human_review_required") is not True
+        ):
+            raise ApiError(
+                409,
+                "VISION_INSPECTION_REQUIRED",
+                "AI-generated images require a passing vision inspection and merchant review before approval",
+            )
     latest = db.scalar(
         select(ReviewRecord)
         .where(

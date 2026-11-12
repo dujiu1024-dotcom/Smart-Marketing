@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
+import httpx
+
 from store_operator.ai_gateway.http_provider import (
     HttpImageProvider,
     HttpJsonTransport,
@@ -10,13 +12,16 @@ from store_operator.ai_gateway.http_provider import (
     HttpTextProvider,
     HttpVisionProvider,
 )
-from store_operator.ai_gateway.schemas import ProviderCapability
+from store_operator.ai_gateway.registry import ProviderRegistry
+from store_operator.ai_gateway.schemas import ProviderCapability, ProviderDescriptor
+from store_operator.ai_gateway.secrets import ProviderSecretResolver
 
 
 class HttpProviderBundle:
     """Capability-specific adapters sharing one transport and credential handle."""
 
     def __init__(self, transport: HttpJsonTransport) -> None:
+        self.transport = transport
         self.text = HttpTextProvider(transport)
         self.image = HttpImageProvider(transport)
         self.vision = HttpVisionProvider(transport)
@@ -30,6 +35,9 @@ class HttpProviderBundle:
             ProviderCapability.OCR: self.ocr,
         }
         return adapters[capability]
+
+    async def aclose(self) -> None:
+        await self.transport.aclose()
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,11 +74,11 @@ class HttpProviderEnvironmentConfig:
         if missing:
             raise ValueError("AI provider configuration is incomplete")
         models = {
-            capability: tuple(
+            capability: tuple(dict.fromkeys(
                 model.strip()
                 for model in values[key].split(",")
                 if model.strip()
-            )
+            ))
             for capability, key in (
                 (ProviderCapability.TEXT, "TEXT_MODELS"),
                 (ProviderCapability.IMAGE, "IMAGE_MODELS"),
@@ -88,9 +96,13 @@ class HttpProviderEnvironmentConfig:
             raise ValueError("AI_PROVIDER_TIMEOUT_SECONDS must be numeric") from exc
         if not 0 < timeout_seconds <= 300:
             raise ValueError("AI_PROVIDER_TIMEOUT_SECONDS must be between 0 and 300")
+        provider_id = values["PROVIDER_ID"]
+        display_name = values["DISPLAY_NAME"]
+        if len(provider_id) > 80 or len(display_name) > 120:
+            raise ValueError("AI provider identifier or display name exceeds its limit")
         return cls(
-            provider_id=values["PROVIDER_ID"],
-            display_name=values["DISPLAY_NAME"],
+            provider_id=provider_id,
+            display_name=display_name,
             base_url=values["BASE_URL"],
             secret_ref=values["SECRET_REF"],
             models=configured_models,
@@ -102,28 +114,21 @@ class HttpProviderEnvironmentConfig:
 def build_http_provider_registry(
     config: HttpProviderEnvironmentConfig,
     *,
-    secret_resolver: object,
-    client: object | None = None,
-):
+    secret_resolver: ProviderSecretResolver,
+    client: httpx.AsyncClient | None = None,
+) -> ProviderRegistry:
     """Build a registry from explicit deployment config and an external Secret resolver."""
-    from store_operator.ai_gateway.registry import ProviderRegistry
-    from store_operator.ai_gateway.schemas import ProviderDescriptor
-
-    resolve = getattr(secret_resolver, "resolve_api_key", None)
-    if not callable(resolve):
-        raise TypeError("secret_resolver must implement resolve_api_key")
-    api_key = resolve(config.secret_ref)
+    api_key = secret_resolver.resolve_api_key(config.secret_ref)
     transport = HttpJsonTransport(
         base_url=config.base_url,
         api_key=api_key,
         timeout_seconds=config.timeout_seconds,
-        client=client,  # type: ignore[arg-type]
+        client=client,
     )
-    capabilities = frozenset(config.models)
     descriptor = ProviderDescriptor(
         provider_id=config.provider_id,
         display_name=config.display_name,
-        capabilities=capabilities,
+        capabilities=frozenset(config.models),
         supported_models=dict(config.models),
         enabled=True,
         region=config.region,

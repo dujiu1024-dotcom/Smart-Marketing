@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 import httpx
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError
-from sqlalchemy import create_engine, func, or_, select
+from sqlalchemy import and_, create_engine, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
@@ -844,6 +844,8 @@ def _register_douyin_verified_work(
                 "Verified platform readback does not match the frozen publish operation.",
                 retryable=False,
             )
+        title = readback.get("title")
+        permalink = readback.get("share_url") or readback.get("share_link")
         work = db.scalar(
             select(PublishedWork).where(
                 PublishedWork.store_id == store_id,
@@ -851,8 +853,6 @@ def _register_douyin_verified_work(
             )
         )
         if work is None:
-            title = readback.get("title")
-            permalink = readback.get("share_url") or readback.get("share_link")
             work = PublishedWork(
                 id=uuid4(),
                 store_id=store_id,
@@ -876,6 +876,12 @@ def _register_douyin_verified_work(
             )
             db.add(work)
             db.flush()
+        if work.ownership_status != "verified_system_publish" or work.verified_at is None:
+            raise JobExecutionError(
+                "DOUYIN_WORK_OWNERSHIP_CONFLICT",
+                "An existing published-work record is not eligible for automatic reverification.",
+                retryable=False,
+            )
         evidence = db.scalar(
             select(WorkOwnershipEvidence.id).where(
                 WorkOwnershipEvidence.store_id == store_id,

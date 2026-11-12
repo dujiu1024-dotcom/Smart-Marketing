@@ -8028,6 +8028,58 @@
         ]
       }
     },
+    "/api/v1/effects/publish-readbacks": {
+      "get": {
+        "operationId": "list_unregistered_publish_readbacks_api_v1_effects_publish_readbacks_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Unregistered Publish Readbacks Api V1 Effects Publish Readbacks Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Unregistered Publish Readbacks",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
     "/api/v1/effects/published-works": {
       "get": {
         "operationId": "list_published_works_api_v1_effects_published_works_get",

@@ -23,7 +23,7 @@ from store_operator.models import (
     StoreMembership,
     User,
 )
-from store_operator.models.job_runtime import JobAttempt, OutboxEvent
+from store_operator.models.job_runtime import OutboxEvent
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 

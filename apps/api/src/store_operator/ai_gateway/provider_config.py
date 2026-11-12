@@ -57,7 +57,7 @@ class HttpProviderEnvironmentConfig:
     ) -> HttpProviderEnvironmentConfig | None:
         prefix = "AI_PROVIDER_"
         keys = (
-            "PROVIDER_ID",
+            "ID",
             "DISPLAY_NAME",
             "BASE_URL",
             "SECRET_REF",
@@ -69,7 +69,7 @@ class HttpProviderEnvironmentConfig:
         values = {key: environ.get(prefix + key, "").strip() for key in keys}
         if not any(values.values()):
             return None
-        required = ("PROVIDER_ID", "DISPLAY_NAME", "BASE_URL", "SECRET_REF")
+        required = ("ID", "DISPLAY_NAME", "BASE_URL", "SECRET_REF")
         missing = [key for key in required if not values[key]]
         if missing:
             raise ValueError("AI provider configuration is incomplete")
@@ -96,7 +96,7 @@ class HttpProviderEnvironmentConfig:
             raise ValueError("AI_PROVIDER_TIMEOUT_SECONDS must be numeric") from exc
         if not 0 < timeout_seconds <= 300:
             raise ValueError("AI_PROVIDER_TIMEOUT_SECONDS must be between 0 and 300")
-        provider_id = values["PROVIDER_ID"]
+        provider_id = values["ID"]
         display_name = values["DISPLAY_NAME"]
         if len(provider_id) > 80 or len(display_name) > 120:
             raise ValueError("AI provider identifier or display name exceeds its limit")

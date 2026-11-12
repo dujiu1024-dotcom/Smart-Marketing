@@ -191,6 +191,25 @@ export async function updateStoreProfile(
   );
 }
 
+export async function confirmStoreProfileFacts(
+  storeId: string,
+  profile: StoreProfile,
+): Promise<StoreProfile> {
+  return request(
+    `/store/profile/${profile.id}/confirm-facts`,
+    {
+      method: "POST",
+      headers: { "If-Match": String(profile.current_version) },
+      body: JSON.stringify({
+        source_type: "merchant_ui_confirmation",
+        source_ref: "store-profile-page",
+        confirmation_note: "由当前门店成员核对后确认",
+      }),
+    },
+    storeId,
+  );
+}
+
 export function clearCsrfToken(): void {
   sessionStorage.removeItem(CSRF_KEY);
 }

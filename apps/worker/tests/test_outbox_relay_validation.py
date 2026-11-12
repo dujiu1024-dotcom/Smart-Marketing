@@ -1,3 +1,6 @@
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -44,11 +47,6 @@ def test_outbox_dispatch_payload_requires_object_and_uuid() -> None:
 
 def test_outbox_relay_is_registered_as_celery_task() -> None:
     assert celery_app.tasks["jobs.relay_outbox"] is relay_outbox
-
-
-from contextlib import contextmanager
-from datetime import UTC, datetime
-from types import SimpleNamespace
 
 
 class RelaySession:

@@ -166,11 +166,15 @@ def relay_outbox(batch_size: int = 50) -> int:
             ):
                 continue
             event_type = event.event_type
+            aggregate_type = event.aggregate_type
+            aggregate_id = event.aggregate_id
             raw_payload = event.payload_json
         try:
             if event_type != "job.dispatch_requested":
                 raise ValueError("Unsupported Outbox event type")
             parsed_job_id = _parse_dispatch_job_id(raw_payload)
+            if aggregate_type != "job" or aggregate_id != parsed_job_id:
+                raise ValueError("Outbox aggregate does not match its dispatch Job")
             celery_app.send_task(
                 "jobs.execute",
                 args=[str(parsed_job_id)],

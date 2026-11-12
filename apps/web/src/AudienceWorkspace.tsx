@@ -9,7 +9,7 @@ interface FormState {
 const empty:FormState={name:"",segment_type:"core",audience_description:"",consumption_scenarios:"",consumption_periods:"",
   purchase_motivations:"",common_objections:"",source_type:"",source_ref:"",sample_size:"",sampled_at:"",confidence_level:""};
 const split=(v:string)=>v.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-const normalizeTimestamp=(value:string)=>{const v=value.trim();if(!v)return null;if(!/(Z|[+-]\\d{2}:\\d{2})$/i.test(v))throw new Error("采样时间必须包含明确时区，例如 2026-11-12T09:00:00+08:00。");const d=new Date(v);if(Number.isNaN(d.getTime()))throw new Error("采样时间不是有效的 ISO 8601 时间。");return d.toISOString();};
+const normalizeTimestamp=(value:string)=>{const v=value.trim();if(!v)return null;if(!/(Z|[+-]\d{2}:\d{2})$/i.test(v))throw new Error("采样时间必须包含明确时区，例如 2026-11-12T09:00:00+08:00。");const d=new Date(v);if(Number.isNaN(d.getTime()))throw new Error("采样时间不是有效的 ISO 8601 时间。");return d.toISOString();};
 const message=(e:unknown)=>e instanceof Error?e.message:"请求失败，请稍后重试。";
 function fromAudience(item:AudienceProfile):FormState {
   return {name:item.name,segment_type:item.segment_type,audience_description:item.audience_description??"",

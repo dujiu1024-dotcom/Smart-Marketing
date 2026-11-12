@@ -491,3 +491,12 @@ Job Runtime API 是平台内部/受权限保护的运维能力，不向普通商
 - 系统级 Job 暂不受门店配额限制；Celery worker pool 仍负责进程级总并发。
 
 测试覆盖：容量满时 deferred、Outbox 重新投递、attempt 不增长、容量释放后可正常 claim。该实现解决首期门店级限流，不等同于 Provider/模型级 max_concurrency、队列级公平调度或成本预算；这些仍待实现与故障注入。
+
+
+## 2026-11-12 Worker Lease 恢复可测试化（PR #74）
+
+- 将过期租约恢复规则从 Celery Task 内联逻辑抽取至 API jobs domain service `recover_expired_jobs`，Worker 任务只负责事务调用。
+- 保留批量上限（1–1000）、`FOR UPDATE SKIP LOCKED`、Attempt fencing、Job 转为 `needs_human`、审计事件和租约清理语义。
+- 新增 PostgreSQL 集成测试覆盖 Worker 崩溃后租约过期、Attempt 标记 lease_expired、Job 进入人工对账、审计事件保留原 lease token，以及重复 Sweeper 不重复恢复。
+- 该路径不自动重跑任务：租约过期时外部副作用可能已经发生，必须先对账，再由授权人员执行带幂等键的恢复操作。
+- 测试在 PR CI 中执行；本地未执行（当前通过 GitHub 远程仓库工作流验证）。

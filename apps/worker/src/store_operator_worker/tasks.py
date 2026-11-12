@@ -49,7 +49,6 @@ from store_operator.models import (  # type: ignore[import-untyped]
     ChannelContentArtifactRef,
     MediaAsset,
     OutboxEvent,
-    UploadIntent,
     PublishConfirmation,
     PublishOperation,
     PublishOperationAttempt,
@@ -57,6 +56,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
     PublishPackageItem,
     QualityReport,
     ReviewRecord,
+    UploadIntent,
 )
 from store_operator.object_storage import (  # type: ignore[import-untyped]
     ObjectStorageNotConfigured,
@@ -477,6 +477,8 @@ def scan_quarantined_assets(batch_size: int = 10) -> int:
             )
             asset.status = "scanning"
             rejection_reason: str | None = None
+            width = 0
+            height = 0
             if intent is None or intent.status != "scanning":
                 rejection_reason = "Upload intent is missing or no longer scanning"
             else:
@@ -509,6 +511,7 @@ def scan_quarantined_assets(batch_size: int = 10) -> int:
                     intent.status = "rejected"
                     intent.rejection_reason = rejection_reason[:240]
             else:
+                assert intent is not None
                 asset.width = width
                 asset.height = height
                 asset.status = "ready"

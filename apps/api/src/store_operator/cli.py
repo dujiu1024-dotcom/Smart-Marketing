@@ -231,6 +231,8 @@ def replay_dead_letter_outbox_event(
         job_id = None
     if job_id is None:
         raise SystemExit("Dead Outbox event has an invalid job reference")
+    if event.aggregate_type != "job" or event.aggregate_id != job_id:
+        raise SystemExit("Dead Outbox event aggregate does not match its job reference")
 
     job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
     if job is None or job.status not in {"queued", "retry_wait"}:

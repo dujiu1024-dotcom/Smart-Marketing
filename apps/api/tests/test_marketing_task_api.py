@@ -285,7 +285,7 @@ def test_marketing_task_detail_and_list_are_store_scoped(
     cross_store_archive = identity_client.post(
         f"/api/v1/marketing-tasks/{task_id}/archive",
         headers={**headers_b, "Idempotency-Key": "cross-store-task-archive"},
-        json={"expected_version": 1},
+        json={"expected_version": 1, "reason": "Must not archive another store's task"},
     )
     assert cross_store_archive.status_code == 404
 

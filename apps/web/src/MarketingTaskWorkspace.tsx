@@ -560,6 +560,10 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           const content = current?.content_json || {};
           const body = typeof content.body === "string" ? content.body : "";
           const titleText = typeof content.title === "string" ? content.title : "";
+          const videoScript = content.video_script && typeof content.video_script === "object" && !Array.isArray(content.video_script)
+            ? content.video_script as Record<string, unknown>
+            : null;
+          const storyboard = Array.isArray(videoScript?.storyboard) ? videoScript.storyboard : [];
           const asset = current?.source_refs.find(ref => ref.type === "media_asset");
           const reviews = current?.reviews || [];
           const latestReview = reviews[reviews.length - 1];
@@ -567,6 +571,15 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           return <article className="task-content-artifact" key={artifact.id}>
             <div className="task-step-title"><strong>{artifact.artifact_type === "copy" ? "文案产物" : "图片产物"}</strong><span className="status-chip">{current ? `当前版本 V${current.version_no} · ${latestReview ? reviewLabels[latestReview.decision] : "待审核"}` : "无当前版本"}</span></div>
             {current && artifact.artifact_type === "copy" && <div className="task-readonly-grid"><div><strong>{titleText || "未填写标题"}</strong><span>{body}</span></div></div>}
+            {current && videoScript && <div className="task-readonly-grid video-script-preview">
+              <div><strong>视频脚本（仅文本）</strong>
+                <span>主题：{String(videoScript.theme || "未填写")}</span>
+                <span>口播脚本：{String(videoScript.spoken_script || "未填写")}</span>
+                <span>分镜：</span>
+                {storyboard.map((shot, index) => <span key={index}>{typeof shot === "string" ? shot : JSON.stringify(shot)}</span>)}
+                <span>拍摄指导：{String(videoScript.shooting_guidance || "未填写")}</span>
+              </div>
+            </div>}
             {current && artifact.artifact_type === "image" && <p className="muted">已关联素材引用：{asset && typeof asset.id === "string" ? asset.id : current.content_hash}</p>}
             <p className="muted">版本历史：{artifact.versions.map(version => `V${version.version_no}`).join(" · ")}</p>
             {latestReview && <p className="muted">最近审核：{reviewLabels[latestReview.decision]} · {new Date(latestReview.created_at).toLocaleString()}{latestReview.comment ? ` · ${latestReview.comment}` : ""}</p>}

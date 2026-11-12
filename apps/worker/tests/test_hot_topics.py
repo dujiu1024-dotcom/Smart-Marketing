@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-
 from types import SimpleNamespace
 
 from store_operator_worker.hot_topics import (

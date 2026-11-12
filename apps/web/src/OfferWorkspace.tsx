@@ -62,7 +62,7 @@ function jsonObject(value: string, label: string): Record<string, unknown> {
 function utcTimestamp(value: string, label: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  if (!/(Z|[+-]\\d{2}:\\d{2})$/i.test(trimmed)) {
+  if (!/(Z|[+-]\d{2}:\d{2})$/i.test(trimmed)) {
     throw new Error(`${label}必须包含时区，例如 2026-12-01T09:00:00+08:00。`);
   }
   const parsed = new Date(trimmed);
@@ -72,7 +72,7 @@ function utcTimestamp(value: string, label: string): string | null {
 
 function toOffer(form: OfferForm): OfferInput {
   const usage = form.usage_limit.trim();
-  if (usage && (!/^\\d+$/.test(usage) || Number(usage) < 1)) {
+  if (usage && (!/^\d+$/.test(usage) || Number(usage) < 1)) {
     throw new Error("使用次数上限必须是大于 0 的整数。");
   }
   const startsAt = utcTimestamp(form.starts_at, "开始时间");

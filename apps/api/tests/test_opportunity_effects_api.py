@@ -5,6 +5,8 @@ from io import BytesIO
 from uuid import UUID, uuid4
 from zipfile import ZipFile
 
+from sqlalchemy import select
+
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
 from store_operator.models.marketing_task import MarketingTask
@@ -21,6 +23,42 @@ from store_operator.models.opportunity_effects import (
 )
 
 ORIGIN = {"Origin": "http://localhost:5173"}
+
+
+
+def _ensure_manual_metric_definition(
+    db_session,
+    *,
+    metric_key: str,
+    metric_tier: str,
+    display_name: str,
+    definition: str,
+) -> MetricDefinition:
+    existing = db_session.scalar(
+        select(MetricDefinition).where(
+            MetricDefinition.source_system == "manual",
+            MetricDefinition.metric_key == metric_key,
+            MetricDefinition.definition_version == 1,
+        )
+    )
+    if existing is not None:
+        return existing
+    item = MetricDefinition(
+        id=uuid4(),
+        source_system="manual",
+        metric_key=metric_key,
+        metric_tier=metric_tier,
+        display_name=display_name,
+        value_type="count",
+        definition=definition,
+        aggregation_rule="sum",
+        period_semantics="period_delta",
+        definition_version=1,
+        status="active",
+    )
+    db_session.add(item)
+    db_session.flush()
+    return item
 
 class FakeRedis:
     def __init__(self):
@@ -103,11 +141,13 @@ def test_manual_metric_is_not_verified_or_roi_evidence(identity_client, db_sessi
     import store_operator.auth.router as auth_router
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
     _, store = _identity(db_session, "effects@example.com", "Effects Shop")
-    db_session.add(MetricDefinition(id=uuid4(), source_system="manual", metric_key="views",
-        metric_tier="content_performance", display_name="播放/浏览", value_type="count",
-        definition="Views within a period", aggregation_rule="sum", period_semantics="period_delta",
-        definition_version=1, status="active"))
-    db_session.flush()
+    _ensure_manual_metric_definition(
+        db_session,
+        metric_key="views",
+        metric_tier="content_performance",
+        display_name="播放/浏览",
+        definition="Views within a period",
+    )
     headers = _login(identity_client, "effects@example.com", store.id)
     response = identity_client.post("/api/v1/effects/observations", headers=headers, json={
         "metric_key": "views", "value_numeric": "125",
@@ -128,11 +168,13 @@ def test_csv_import_is_idempotent_and_labeled_as_merchant_reported(identity_clie
     import store_operator.auth.router as auth_router
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
     _, store = _identity(db_session, "import@example.com", "Import Shop")
-    db_session.add(MetricDefinition(id=uuid4(), source_system="manual", metric_key="likes",
-        metric_tier="content_performance", display_name="点赞", value_type="count",
-        definition="Likes", aggregation_rule="sum", period_semantics="period_delta",
-        definition_version=1, status="active"))
-    db_session.flush()
+    _ensure_manual_metric_definition(
+        db_session,
+        metric_key="likes",
+        metric_tier="content_performance",
+        display_name="点赞",
+        definition="Likes",
+    )
     headers = _login(identity_client, "import@example.com", store.id)
     csv_text = (
         "metric_key,value_numeric,period_timezone,period_start,period_end,source_record_id\n"
@@ -271,22 +313,13 @@ def test_manual_observation_correction_appends_without_mutating_original(
 
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
     _, store = _identity(db_session, "correction@example.com", "Correction Shop")
-    db_session.add(
-        MetricDefinition(
-            id=uuid4(),
-            source_system="manual",
-            metric_key="views",
-            metric_tier="content_performance",
-            display_name="播放/浏览",
-            value_type="count",
-            definition="Views within a period",
-            aggregation_rule="sum",
-            period_semantics="period_delta",
-            definition_version=1,
-            status="active",
-        )
+    _ensure_manual_metric_definition(
+        db_session,
+        metric_key="views",
+        metric_tier="content_performance",
+        display_name="播放/浏览",
+        definition="Views within a period",
     )
-    db_session.flush()
     headers = _login(identity_client, "correction@example.com", store.id)
     original_response = identity_client.post(
         "/api/v1/effects/observations",
@@ -498,7 +531,7 @@ def test_attribution_rejects_merchant_claimed_work_and_unverified_outcome(
         "/api/v1/effects/attributions",
         headers=headers,
         json={
-            "marketing_task_id": task_id,
+            "marketing_task_id": str(task_id),
             "published_work_id": str(work.id),
             "outcome_evidence_id": str(outcome.id),
             "attribution_method": "direct_code",
@@ -1017,22 +1050,13 @@ def test_xlsx_metric_import_creates_merchant_reported_observation(
 
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
     _, store = _identity(db_session, "xlsx-import@example.com", "XLSX Import Shop")
-    db_session.add(
-        MetricDefinition(
-            id=uuid4(),
-            source_system="manual",
-            metric_key="views",
-            metric_tier="content_performance",
-            display_name="播放/浏览",
-            value_type="count",
-            definition="Views within a period",
-            aggregation_rule="sum",
-            period_semantics="period_delta",
-            definition_version=1,
-            status="active",
-        )
+    _ensure_manual_metric_definition(
+        db_session,
+        metric_key="views",
+        metric_tier="content_performance",
+        display_name="播放/浏览",
+        definition="Views within a period",
     )
-    db_session.flush()
     headers = _login(identity_client, "xlsx-import@example.com", store.id)
 
     response = identity_client.post(

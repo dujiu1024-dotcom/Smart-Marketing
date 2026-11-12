@@ -146,3 +146,71 @@ def test_vision_inspection_fails_closed_for_high_or_unknown_severity(
     assert result["report"]["revision_suggestions"] == [
         "Revise the promotional visual"
     ]
+
+
+def test_image_artifact_audit_refs_bind_each_provider_invocation() -> None:
+    store_id, job_id, attempt_id = uuid4(), uuid4(), uuid4()
+    text_prompt_id, image_prompt_id, vision_prompt_id = uuid4(), uuid4(), uuid4()
+    invocations = [
+        SimpleNamespace(
+            id=uuid4(),
+            capability="text",
+            prompt_version_id=text_prompt_id,
+        ),
+        SimpleNamespace(
+            id=uuid4(),
+            capability="image",
+            prompt_version_id=image_prompt_id,
+        ),
+        SimpleNamespace(
+            id=uuid4(),
+            capability="vision",
+            prompt_version_id=vision_prompt_id,
+        ),
+    ]
+
+    class FakeScalarResult:
+        def all(self):
+            return invocations
+
+    class FakeSession:
+        def scalars(self, statement):
+            return FakeScalarResult()
+
+    refs = ai_image_handlers._ai_invocation_source_refs(
+        FakeSession(),
+        store_id=store_id,
+        job_id=job_id,
+        attempt_id=attempt_id,
+        prompt_capabilities=(
+            (text_prompt_id, "text"),
+            (image_prompt_id, "image"),
+            (vision_prompt_id, "vision"),
+        ),
+    )
+
+    assert [ref["capability"] for ref in refs] == ["text", "image", "vision"]
+    assert [ref["id"] for ref in refs] == [
+        str(invocation.id) for invocation in invocations
+    ]
+
+
+def test_image_artifact_audit_refs_fail_closed_when_invocation_is_missing() -> None:
+    class FakeScalarResult:
+        def all(self):
+            return []
+
+    class FakeSession:
+        def scalars(self, statement):
+            return FakeScalarResult()
+
+    with pytest.raises(JobExecutionError) as exc_info:
+        ai_image_handlers._ai_invocation_source_refs(
+            FakeSession(),
+            store_id=uuid4(),
+            job_id=uuid4(),
+            attempt_id=uuid4(),
+            prompt_capabilities=((uuid4(), "image"),),
+        )
+
+    assert exc_info.value.code == "AI_IMAGE_INVOCATION_AUDIT_MISSING"

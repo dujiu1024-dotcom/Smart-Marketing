@@ -99,3 +99,12 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - 真实数据源为 `GET/POST/PATCH /api/v1/store/profile`；所有请求携带当前 `X-Store-ID`，写请求携带 CSRF Token；更新使用 `If-Match` 版本。
 - 页面包含登录、当前用户 Session 恢复、门店选择、门店档案创建/编辑、营业时间/服务能力/临时停业字段和显式事实确认。
 - 其他 Demo 路由、七个门店资料分类、营销任务和平台管理页面尚未由生产 Web 实现。导航对未接入模块明确禁用/标记，不将 Demo 的 localStorage 作为生产数据。
+
+
+## 9. 商品与服务生产路由映射（2026-11-12）
+
+- `#store:products` 对应商品与服务生产清单，数据来自门店范围 GET `/api/v1/store/products`。
+- `#store-editor:product:new` 与 `#store-editor:product:<id>` 对应独立商品编辑二级页面；保存通过 POST/PATCH `/api/v1/store/products`，更新使用 If-Match 当前版本。
+- 商品事实确认使用 POST `/api/v1/store/products/<id>/confirm-facts`，绑定精确版本；未保存修改时不允许确认。
+- 商品删除使用 DELETE `/api/v1/store/products/<id>` 与 If-Match，后端保留审计历史。
+- 其余七个门店资料分类仍待接入，不因商品页面完成而改变 Demo 信息架构。

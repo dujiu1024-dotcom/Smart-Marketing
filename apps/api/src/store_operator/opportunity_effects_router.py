@@ -677,7 +677,11 @@ def effects_overview(
                 "metric_key": item.metric_key,
                 "display_name": definition.display_name,
                 "metric_tier": item.metric_tier,
-                "value": _decimal_text(item.value_numeric),
+                "value": (
+                    _decimal_text(item.value_numeric)
+                    if item.value_numeric is not None
+                    else None
+                ),
                 "status": (
                     "accumulating"
                     if (

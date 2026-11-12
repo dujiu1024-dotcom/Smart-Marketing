@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { confirmProductFacts, createProduct, deleteProduct, getProduct, listProducts, updateProduct, type Product, type ProductInput } from "./api";
 
 interface FormState {
@@ -47,6 +47,7 @@ function Input({ label, value, onChange, type = "text", placeholder, step, min }
 
 export default function ProductWorkspace({ storeId }: { storeId: string }) {
   const [route, setRoute] = useState(routeFromHash);
+  const createKey = useRef("");
   const [items, setItems] = useState<Product[]>([]);
   const [product, setProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<FormState>(empty);
@@ -72,7 +73,13 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
 
   useEffect(() => {
     if (!route) { void refresh(); return; }
-    if (route === "new") { setProduct(null); setForm(empty); setDirty(false); setError(""); setNotice(""); return; }
+    if (route === "new") {
+      setProduct(null); setForm(empty); setDirty(false); setError(""); setNotice("");
+      const key = `store-operator.product-create.${storeId}`;
+      createKey.current = sessionStorage.getItem(key) ?? crypto.randomUUID();
+      sessionStorage.setItem(key, createKey.current);
+      return;
+    }
     let active = true;
     setLoading(true); setError(""); setProduct(null); setForm(empty); setDirty(false);
     void getProduct(storeId, route).then((p) => {
@@ -100,8 +107,12 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
     setSaving(true); setError(""); setNotice("");
     try {
       const input = toProductInput(form);
-      const saved = product ? await updateProduct(storeId, product, input) : await createProduct(storeId, input);
+      const saved = product ? await updateProduct(storeId, product, input) : await createProduct(storeId, input, createKey.current || crypto.randomUUID());
       setProduct(saved); setForm(fromProduct(saved)); setDirty(false);
+      if (!product) {
+        sessionStorage.removeItem(`store-operator.product-create.${storeId}`);
+        window.location.hash = `#store-editor:product:${saved.id}`;
+      }
       setNotice(`商品资料已保存为 V${saved.current_version}，经营事实状态为待确认。`);
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
@@ -142,6 +153,7 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
   </>;
 
   if (loading) return <div className="loading-card"><span className="spinner" />正在读取商品资料…</div>;
+  if (route !== "new" && !product) return <section className="empty-card"><h2>无法读取该商品</h2><p>{error || "商品可能已删除，或当前门店无权访问。"}</p><button className="secondary" type="button" onClick={back}>返回商品清单</button></section>;
   return <>
     <div className="page-heading"><div><p className="eyebrow">PRODUCT EDITOR</p><h1>{route === "new" ? "新增商品 / 服务" : "编辑商品 / 服务"}</h1><p className="muted">按真实情况填写。未知价格、库存或规格请留空，不用估算值代替。</p></div>{product && <div className="version-chip">V{product.current_version} · {product.fact_status === "confirmed" ? "已确认" : "待确认"}</div>}</div>
     {error && <div className="alert error" role="alert">{error}</div>}

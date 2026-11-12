@@ -158,8 +158,8 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
       <article className="form-card">
         <div className="section-title"><div><h2>指标趋势与周期对比</h2><p>仅对完整、当前且已核验的数据进行聚合；周期长度不一致或样本不足时不计算环比。</p></div></div>
         {(overview?.trends ?? []).length ? <div className="catalog-list">
-          {overview?.trends.map(trend => <div className="catalog-item" key={trend.metric_key}>
-            <div className="catalog-item-main"><div><h3>{trend.display_name}</h3><p>{trend.metric_key}</p></div>
+          {overview?.trends.map(trend => <div className="catalog-item" key={trend.metric_key + trend.source_system + (trend.channel_key ?? "")}>
+            <div className="catalog-item-main"><div><h3>{trend.display_name}</h3><p>{trend.metric_key} · {trend.source_system}{trend.channel_key ? ` · ${trend.channel_key}` : ""}</p></div>
               <span className="status-chip">{trend.comparison.status === "available" ? `环比 ${trend.comparison.change_percent}%` : "样本不足"}</span></div>
             <div className="catalog-meta">{trend.points.map(point => <span key={point.period_end}>{new Date(point.period_start).toLocaleDateString()} – {new Date(point.period_end).toLocaleDateString()}：{point.value}（n={point.sample_count}）</span>)}</div>
             {trend.points.length > 1 && <svg className="metric-trend-chart" width="100%" height="120" viewBox="0 0 600 120" role="img" aria-label={`${trend.display_name}趋势图`}>
@@ -170,14 +170,14 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         <div className="catalog-list">
           <h3>互动转化率</h3>
           {(overview?.conversion_rates ?? []).length > 0 ? overview?.conversion_rates.map(item => <div className="catalog-item" key={item.metric_key + item.period_end}>
-            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.numerator_value} / {item.denominator_value} · {new Date(item.period_start).toLocaleDateString()}–{new Date(item.period_end).toLocaleDateString()}</p></div>
+            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.numerator_value} / {item.denominator_value} · {item.source_system}{item.channel_key ? ` · ${item.channel_key}` : ""} · {new Date(item.period_start).toLocaleDateString()}–{new Date(item.period_end).toLocaleDateString()}</p></div>
               <span className="status-chip">{item.status === "available" ? `${item.value_percent}%` : "分母为 0，不计算"}</span></div>
           </div>) : <p className="muted">缺少同周期、同口径的已核验分子与分母数据，暂不计算转化率。</p>}
         </div>
         {(overview?.content_performance ?? []).length > 0 && <div className="catalog-list">
           <h3>按作品查看内容表现</h3>
           {overview?.content_performance.map(work => <div className="catalog-item" key={work.published_work_id + work.metric_key}>
-            <div className="catalog-item-main"><div><strong>{work.display_name}</strong><p>{work.channel_key} · {work.external_work_id}</p></div>
+            <div className="catalog-item-main"><div><strong>{work.display_name}</strong><p>{work.channel_key} · {work.external_work_id} · {work.source_system}</p></div>
               <span className="status-chip">{work.comparison.status === "available" ? `环比 ${work.comparison.change_percent}%` : "样本不足"}</span></div>
             <p className="catalog-description">关联任务：{work.marketing_task_id ?? "未关联"} · {work.points.map(point => `${new Date(point.period_start).toLocaleDateString()}–${new Date(point.period_end).toLocaleDateString()}：${point.value}`).join("；")}</p>
             {work.points.length > 1 && <svg className="metric-trend-chart" viewBox="0 0 600 120" role="img" aria-label={`${work.display_name}作品表现趋势图`}>

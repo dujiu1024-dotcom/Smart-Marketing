@@ -425,7 +425,10 @@ def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
     assert response.status_code == 200, response.text
     overview = response.json()
     assert overview["data_status"] == "available"
-    assert next(item for item in overview["items"] if item["metric_key"] == "views")["value"] == "125"
+    views_card = next(
+        item for item in overview["items"] if item["metric_key"] == "views"
+    )
+    assert views_card["value"] == "125"
     assert overview["data_quality"]["verified_observations"] == 4
     trend = next(item for item in overview["trends"] if item["metric_key"] == "views")
     assert len(trend["points"]) == 2

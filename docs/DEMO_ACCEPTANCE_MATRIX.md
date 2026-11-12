@@ -331,6 +331,6 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 商品 / 服务创建 | 接入 POST /products，使用 Idempotency-Key | 售价与币种必须同时填写；未知库存/可售状态不擅自补值 |
 | 商品 / 服务编辑 / 删除 | 接入 PATCH /products/{id} 与 DELETE /products/{id} | If-Match 绑定 current_version；冲突由 API 返回 |
 | 活动 / 优惠列表 | 接入 GET /offers | 规则与适用条件以结构化 JSON 保存 |
-| 活动 / 优惠创建 / 编辑 / 删除 | 接入 POST/PATCH/DELETE /offers | 创建使用 Idempotency-Key，更新/删除使用 If-Match |
+| 活动 / 优惠创建 / 编辑 / 删除 | 接入 POST/PATCH/DELETE /offers | 创建使用 Idempotency-Key，更新/删除使用 If-Match；门店成员可通过版本绑定的 confirm-facts 显式确认 |
 | 浏览器测试 | 新增 StoreCatalog 单元测试 | GitHub CI 待执行；未执行本地测试与完整浏览器 E2E |
 | 其余资料模块 | 品牌规范、客群、知识库、素材库仍未接入 | 不得宣称 #6 完成 |

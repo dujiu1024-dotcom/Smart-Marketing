@@ -54,6 +54,8 @@ from store_operator.models import (  # type: ignore[import-untyped]
     PublishOperationAttempt,
     PublishPackage,
     PublishPackageItem,
+    PublishedWork,
+    WorkOwnershipEvidence,
     QualityReport,
     ReviewRecord,
     UploadIntent,
@@ -784,6 +786,136 @@ def _set_douyin_publish_state(
             operation.next_attempt_at = datetime.now(UTC) + timedelta(seconds=30)
 
 
+
+def _register_douyin_verified_work(
+    operation_id: UUID,
+    store_id: UUID,
+    *,
+    platform_item_id: str,
+    readback: dict[str, Any],
+) -> UUID:
+    now = datetime.now(UTC)
+    with SessionLocal.begin() as db:
+        row = db.execute(
+            select(PublishOperation, PublishPackage, PublishPackageItem, ChannelAccount)
+            .join(
+                PublishPackage,
+                and_(
+                    PublishPackage.store_id == PublishOperation.store_id,
+                    PublishPackage.id == PublishOperation.publish_package_id,
+                ),
+            )
+            .join(
+                PublishPackageItem,
+                and_(
+                    PublishPackageItem.store_id == PublishOperation.store_id,
+                    PublishPackageItem.id == PublishOperation.publish_package_item_id,
+                ),
+            )
+            .join(
+                ChannelAccount,
+                and_(
+                    ChannelAccount.store_id == PublishOperation.store_id,
+                    ChannelAccount.id == PublishOperation.channel_account_id,
+                ),
+            )
+            .where(
+                PublishOperation.id == operation_id,
+                PublishOperation.store_id == store_id,
+            )
+            .with_for_update()
+        ).first()
+        if row is None:
+            raise JobExecutionError(
+                "DOUYIN_PUBLISH_OPERATION_NOT_FOUND",
+                "The verified publish operation could not be found.",
+                retryable=False,
+            )
+        operation, package, package_item, account = row
+        if (
+            operation.platform_item_id != platform_item_id
+            or package_item.publish_package_id != package.id
+            or package_item.channel_key != "douyin"
+            or package_item.channel_account_id != account.id
+            or account.provider != "douyin"
+        ):
+            raise JobExecutionError(
+                "DOUYIN_READBACK_RELATIONSHIP_MISMATCH",
+                "Verified platform readback does not match the frozen publish operation.",
+                retryable=False,
+            )
+        work = db.scalar(
+            select(PublishedWork).where(
+                PublishedWork.store_id == store_id,
+                PublishedWork.publish_operation_id == operation.id,
+            )
+        )
+        if work is None:
+            title = readback.get("title")
+            permalink = readback.get("share_url") or readback.get("share_link")
+            work = PublishedWork(
+                id=uuid4(),
+                store_id=store_id,
+                task_id=package.task_id,
+                publish_operation_id=operation.id,
+                channel_account_id=account.id,
+                channel_key=package_item.channel_key,
+                external_work_id=platform_item_id,
+                title=title[:300] if isinstance(title, str) else None,
+                permalink=permalink[:2048] if isinstance(permalink, str) else None,
+                published_at=operation.published_at or now,
+                ownership_status="verified_system_publish",
+                verified_at=now,
+                source_snapshot_json={
+                    "provider": "douyin",
+                    "publish_operation_id": str(operation.id),
+                    "platform_item_id": platform_item_id,
+                    "readback_verified": True,
+                    "readback_at": now.isoformat(),
+                },
+            )
+            db.add(work)
+            db.flush()
+        evidence = db.scalar(
+            select(WorkOwnershipEvidence.id).where(
+                WorkOwnershipEvidence.store_id == store_id,
+                WorkOwnershipEvidence.published_work_id == work.id,
+                WorkOwnershipEvidence.evidence_type == "system_publish_readback",
+                WorkOwnershipEvidence.evidence_status == "verified",
+            )
+        )
+        if evidence is None:
+            db.add(
+                WorkOwnershipEvidence(
+                    id=uuid4(),
+                    store_id=store_id,
+                    published_work_id=work.id,
+                    evidence_type="system_publish_readback",
+                    evidence_status="verified",
+                    source_system="douyin",
+                    evidence_ref=(
+                        permalink[:2048]
+                        if isinstance(permalink, str)
+                        else f"douyin://publish-operation/{operation.id}/readback"
+                    ),
+                    evidence_payload_json={
+                        "publish_operation_id": str(operation.id),
+                        "platform_item_id": platform_item_id,
+                        "readback_verified": True,
+                        "readback_at": now.isoformat(),
+                    },
+                    verified_at=now,
+                )
+            )
+        operation.status = "published"
+        operation.published_at = operation.published_at or now
+        operation.last_readback_at = now
+        operation.next_attempt_at = None
+        operation.last_error_code = None
+        operation.last_error_summary = None
+        return work.id
+
+
 def _begin_douyin_publish_attempt(
     operation_id: UUID,
     store_id: UUID,
@@ -1499,15 +1631,16 @@ def execute_douyin_image_text_publish(
             retry_delay_seconds=30,
         )
 
-    _set_douyin_publish_state(
+    published_work_id = _register_douyin_verified_work(
         operation_id,
         store_id,
-        status="processing",
-        readback=True,
+        platform_item_id=platform_item_id,
+        readback=readback,
     )
     return {
-        "status": "processing",
+        "status": "published",
         "publish_operation_id": str(operation_id),
+        "published_work_id": str(published_work_id),
         "platform_item_id": platform_item_id,
         "readback_verified": True,
         "platform_review_state": "pending_or_not_public",

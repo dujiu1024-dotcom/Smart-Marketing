@@ -112,18 +112,10 @@ def render_published_prompt(
     return version.system_prompt, rendered
 
 
-def parse_and_validate_structured_output(
-    text: str,
+def validate_structured_output(
+    value: Any,
     schema: dict[str, Any],
 ) -> dict[str, Any]:
-    try:
-        value = json.loads(text)
-    except (TypeError, ValueError) as exc:
-        raise ProviderError(
-            ProviderErrorCode.OUTPUT_INVALID,
-            retryable=False,
-            user_safe_summary="The generated content was not valid JSON.",
-        ) from exc
     try:
         validate_json_schema(value, schema)
     except PromptContractError as exc:
@@ -139,3 +131,18 @@ def parse_and_validate_structured_output(
             user_safe_summary="The generated content must be a JSON object.",
         )
     return value
+
+
+def parse_and_validate_structured_output(
+    text: str,
+    schema: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        value = json.loads(text)
+    except (TypeError, ValueError) as exc:
+        raise ProviderError(
+            ProviderErrorCode.OUTPUT_INVALID,
+            retryable=False,
+            user_safe_summary="The generated content was not valid JSON.",
+        ) from exc
+    return validate_structured_output(value, schema)

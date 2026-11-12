@@ -147,6 +147,15 @@ jobs:
         run: |
           POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml exec -T postgres psql -U store_operator -d store_operator -c "CREATE TABLE IF NOT EXISTS ci_backup_probe (id integer PRIMARY KEY, value text NOT NULL); TRUNCATE ci_backup_probe; INSERT INTO ci_backup_probe (id, value) VALUES (1, 'before-backup');"
           POSTGRES_PASSWORD=ci-only BACKUP_DIR=/tmp/store-operator-ci-backups BACKUP_FILE=/tmp/store-operator-ci-backups/ci.dump bash scripts/backup-postgres.sh
+          test "$(stat -c '%a' /tmp/store-operator-ci-backups)" = "700"
+          test "$(stat -c '%a' /tmp/store-operator-ci-backups/ci.dump)" = "600"
+          if POSTGRES_PASSWORD=ci-only BACKUP_FILE=/tmp/store-operator-ci-backups/ci.dump bash scripts/restore-postgres.sh; then
+            echo "Restore unexpectedly succeeded without destructive confirmation" >&2
+            exit 1
+          else
+            restore_guard_status=$?
+            test "$restore_guard_status" -eq 2
+          fi
           POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml exec -T postgres psql -U store_operator -d store_operator -c "UPDATE ci_backup_probe SET value = 'mutated' WHERE id = 1;"
           POSTGRES_PASSWORD=ci-only BACKUP_FILE=/tmp/store-operator-ci-backups/ci.dump CONFIRM_RESTORE=YES bash scripts/restore-postgres.sh
           POSTGRES_PASSWORD=ci-only docker compose -f infra/compose/docker-compose.yml exec -T postgres psql -U store_operator -d store_operator -tAc "SELECT value FROM ci_backup_probe WHERE id = 1" | grep -Fx before-backup

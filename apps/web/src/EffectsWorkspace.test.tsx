@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import EffectsWorkspace from "./EffectsWorkspace";
 
 afterEach(() => cleanup());
@@ -7,7 +7,7 @@ const api = vi.hoisted(() => ({
   getEffectsOverview: vi.fn(), getMetricDefinitions: vi.fn(), getMetricObservations: vi.fn(),
   createMetricObservation: vi.fn(), importMetricCsv: vi.fn(),
   getPublishedWorks: vi.fn(), getBusinessOutcomes: vi.fn(), getAttributions: vi.fn(),
-  getDataSourceCapabilities: vi.fn(), getPublishReadbacks: vi.fn(), registerPublishedWorkFromReadback: vi.fn(),
+  getDataSourceCapabilities: vi.fn(), checkDataSourceCapabilities: vi.fn(), getPublishReadbacks: vi.fn(), registerPublishedWorkFromReadback: vi.fn(),
 }));
 vi.mock("./api", async () => ({ ...(await vi.importActual<typeof import("./api")>("./api")), ...api }));
 
@@ -32,6 +32,7 @@ describe("effects workspace", () => {
     api.getBusinessOutcomes.mockResolvedValue({ items: [], total: 0 });
     api.getAttributions.mockResolvedValue({ items: [], total: 0 });
     api.getDataSourceCapabilities.mockResolvedValue({ items: [], total: 0 });
+    api.checkDataSourceCapabilities.mockResolvedValue({ items: [], total: 3 });
     api.getPublishReadbacks.mockResolvedValue({ items: [], total: 0 });
   });
   it("keeps business outcomes unavailable until verified evidence exists", async () => {
@@ -40,6 +41,13 @@ describe("effects workspace", () => {
     expect(screen.getAllByText("暂无数据").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/不计算 ROI/).length).toBeGreaterThan(0);
     expect(screen.getByText(/手工录入与导入的数据均标记为商家报告/)).toBeInTheDocument();
+  });
+
+  it("lets merchants refresh channel capability snapshots", async () => {
+    render(<EffectsWorkspace storeId="store-1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "检测渠道能力" }));
+    expect(await screen.findByText(/已刷新渠道能力快照：3 项/)).toBeInTheDocument();
+    expect(api.checkDataSourceCapabilities).toHaveBeenCalledWith("store-1");
   });
 
   it("shows verified per-work performance comparisons and their chart", async () => {

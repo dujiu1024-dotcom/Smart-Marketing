@@ -389,8 +389,8 @@ export default function App() {
       <div className="workspace">
         <aside className="sidebar">
           <div className="side-label">门店工作台</div>
-          <a className="side-link" href="#ai">AI 营销</a>
-          <a className="side-link" href="#tasks">营销任务</a>
+          <div className="side-link disabled" aria-disabled="true">AI 营销 · 待接入</div>
+          <div className="side-link disabled" aria-disabled="true">营销任务 · 待接入</div>
           <div className="side-label spaced">门店资料</div>
           <a className="side-link active" href="#store:profile">门店档案</a>
           <div className="side-link disabled" aria-disabled="true">商品与服务 · 待接入</div>

@@ -47,6 +47,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
     ChannelAccount,
     ChannelContent,
     ChannelContentArtifactRef,
+    Job,
     MediaAsset,
     OutboxEvent,
     PublishConfirmation,
@@ -442,6 +443,47 @@ def recover_expired_leases(batch_size: int = 100) -> int:
 
 
 
+
+def _mark_asset_scan_failed_if_exhausted(
+    *,
+    context: JobExecutionContext,
+    asset_id: UUID,
+    intent_id: UUID,
+    safe_reason: str,
+) -> bool:
+    with SessionLocal.begin() as db:
+        job = db.get(Job, context.job_id)
+        if job is None or job.attempt_count < job.max_attempts:
+            return False
+        asset = db.scalar(
+            select(MediaAsset)
+            .where(
+                MediaAsset.id == asset_id,
+                MediaAsset.store_id == context.store_id,
+            )
+            .with_for_update()
+        )
+        intent = db.scalar(
+            select(UploadIntent)
+            .where(
+                UploadIntent.id == intent_id,
+                UploadIntent.store_id == context.store_id,
+            )
+            .with_for_update()
+        )
+        if asset is None or intent is None:
+            return False
+        if asset.status in {"ready", "rejected", "scan_failed"}:
+            return True
+        if asset.status != "quarantined" or intent.status != "scanning":
+            return False
+        asset.status = "scan_failed"
+        asset.version_no += 1
+        intent.status = "scan_failed"
+        intent.rejection_reason = safe_reason[:240]
+        return True
+
+
 @register_job_handler("store.asset.scan")
 def execute_asset_scan(
     context: JobExecutionContext,
@@ -496,7 +538,7 @@ def execute_asset_scan(
                 "The uploaded asset is not available for security scanning.",
                 retryable=False,
             )
-        if asset.status in {"ready", "rejected"}:
+        if asset.status in {"ready", "rejected", "scan_failed"}:
             return {"asset_id": str(asset.id), "status": asset.status}
         if asset.status != "quarantined" or intent.status != "scanning":
             raise JobExecutionError(
@@ -509,10 +551,16 @@ def execute_asset_scan(
         expected_size = asset.byte_size
 
     if not settings.asset_scanner_host:
+        exhausted = _mark_asset_scan_failed_if_exhausted(
+            context=context,
+            asset_id=asset_id,
+            intent_id=intent_id,
+            safe_reason="Security scanner is not configured; the asset remains blocked",
+        )
         raise JobExecutionError(
             "ASSET_SCANNER_NOT_CONFIGURED",
             "The file security scanner is not configured.",
-            retryable=True,
+            retryable=not exhausted,
             retry_delay_seconds=60,
         )
     try:
@@ -521,10 +569,16 @@ def execute_asset_scan(
             max_bytes=25_000_000,
         )
     except Exception as exc:
+        exhausted = _mark_asset_scan_failed_if_exhausted(
+            context=context,
+            asset_id=asset_id,
+            intent_id=intent_id,
+            safe_reason="Private object storage could not provide the quarantined asset",
+        )
         raise JobExecutionError(
             "ASSET_STORAGE_READ_FAILED",
             "The uploaded asset could not be read for security scanning.",
-            retryable=True,
+            retryable=not exhausted,
             retry_delay_seconds=60,
         ) from exc
     if len(content) != expected_size or hashlib.sha256(content).hexdigest() != expected_sha256:
@@ -539,10 +593,16 @@ def execute_asset_scan(
                 timeout_seconds=settings.asset_scanner_timeout_seconds,
             )
         except AssetScannerUnavailable as exc:
+            exhausted = _mark_asset_scan_failed_if_exhausted(
+                context=context,
+                asset_id=asset_id,
+                intent_id=intent_id,
+                safe_reason="Security scanner could not complete the scan; the asset remains blocked",
+            )
             raise JobExecutionError(
                 "ASSET_SCANNER_UNAVAILABLE",
                 "The file security scanner is temporarily unavailable.",
-                retryable=True,
+                retryable=not exhausted,
                 retry_delay_seconds=60,
             ) from exc
         verdict_clean = result.clean

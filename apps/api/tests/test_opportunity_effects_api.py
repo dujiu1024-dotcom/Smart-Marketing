@@ -469,3 +469,41 @@ def test_attribution_rejects_merchant_claimed_work_and_unverified_outcome(
         },
     )
     assert response.status_code == 409
+
+
+def test_manual_business_outcome_is_retained_as_unverified_evidence(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _identity(db_session, "outcome@example.com", "Outcome Shop")
+    _, store = _identity(db_session, "outcome@example.com", "Outcome Shop")
+    headers = _login(identity_client, "outcome@example.com", store.id)
+
+    response = identity_client.post(
+        "/api/v1/effects/business-outcomes",
+        headers=headers,
+        json={
+            "outcome_type": "orders",
+            "value_numeric": "12",
+            "source_record_id": "manual-order-report",
+            "source_evidence_ref": "Merchant-provided daily report",
+            "occurred_at": "2026-11-10T18:00:00+08:00",
+        },
+    )
+    assert response.status_code == 200, response.text
+    item = response.json()["item"]
+    assert item["authenticity_status"] == "merchant_reported"
+    assert item["integrity_status"] == "unknown"
+
+    history = identity_client.get("/api/v1/effects/business-outcomes", headers=headers)
+    assert history.status_code == 200
+    assert history.json()["items"][0]["id"] == item["id"]
+
+    readbacks = identity_client.get("/api/v1/effects/publish-readbacks", headers=headers)
+    capabilities = identity_client.get("/api/v1/effects/data-source-capabilities", headers=headers)
+    assert readbacks.status_code == 200
+    assert readbacks.json()["items"] == []
+    assert capabilities.status_code == 200
+    assert capabilities.json()["items"] == []

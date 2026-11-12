@@ -988,3 +988,106 @@ export interface ChannelCapabilitySnapshotRecord {
 export async function listDouyinAccountCapabilities(storeId: string, accountId: string): Promise<ChannelCapabilitySnapshotRecord[]> {
   return request(`/channels/douyin/accounts/${encodeURIComponent(accountId)}/capabilities`, {}, storeId);
 }
+
+
+export interface OpportunityItem {
+  id: string;
+  title: string;
+  summary: string | null;
+  source_url: string;
+  published_at: string | null;
+  discovered_at: string;
+  expires_at: string | null;
+  region: string | null;
+  heat_value: string | null;
+  heat_unit: string | null;
+  evidence_status: string;
+  relevance_score: string | null;
+  match_method: string;
+  reason_summary: string | null;
+  suggested_scenario: string | null;
+  content_angle: string | null;
+  risk_flags: string[];
+  eligibility_status: string;
+  decision: string | null;
+}
+export interface OpportunityList {
+  items: OpportunityItem[];
+  total: number;
+  source_status: "available" | "unavailable";
+  empty_reason: string | null;
+}
+export interface MetricDefinitionRecord {
+  id: string;
+  source_system: string;
+  metric_key: string;
+  metric_tier: "content_performance" | "intent" | "business_outcome";
+  display_name: string;
+  unit: string | null;
+  definition: string;
+  definition_version: number;
+}
+export interface MetricObservationRecord {
+  id: string;
+  metric_key: string;
+  metric_tier: "content_performance" | "intent" | "business_outcome";
+  display_name: string;
+  value_numeric: string | null;
+  unit: string | null;
+  currency: string | null;
+  source_system: string;
+  source_record_id: string | null;
+  source_evidence_ref: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  period_timezone: string;
+  collected_at: string;
+  definition_version: number;
+  integrity_status: string;
+  authenticity_status: string;
+  sync_status: string;
+}
+export interface EffectsOverview {
+  items: Array<{
+    metric_key: string; display_name: string; metric_tier: string; value: string | null;
+    status: "available" | "unavailable"; reason: string | null; source_system: string;
+    period_end: string | null; period_timezone: string; collected_at: string;
+    authenticity_status: string; integrity_status: string;
+  }>;
+  data_status: "available" | "unavailable";
+  business_outcomes: { roi: number | null; sales_growth: number | null; store_visit_growth: number | null; reason: string };
+}
+export function getOpportunities(storeId: string): Promise<OpportunityList> {
+  return request<OpportunityList>("/opportunities", {}, storeId);
+}
+export function getOpportunity(storeId: string, opportunityId: string): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>(`/opportunities/${encodeURIComponent(opportunityId)}`, {}, storeId);
+}
+export function decideOpportunity(storeId: string, opportunityId: string, decision: "adopt" | "ignore" | "snooze", reason: string, idempotencyKey: string): Promise<{ id: string; decision: string; replayed: boolean }> {
+  return request("/opportunities/" + encodeURIComponent(opportunityId) + "/decisions", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ decision, reason: reason || null }),
+  }, storeId);
+}
+export function getEffectsOverview(storeId: string): Promise<EffectsOverview> {
+  return request<EffectsOverview>("/effects/overview", {}, storeId);
+}
+export function getMetricDefinitions(): Promise<{ items: MetricDefinitionRecord[] }> {
+  return request<{ items: MetricDefinitionRecord[] }>("/effects/definitions");
+}
+export function getMetricObservations(storeId: string): Promise<{ items: MetricObservationRecord[] }> {
+  return request<{ items: MetricObservationRecord[] }>("/effects/observations", {}, storeId);
+}
+export function createMetricObservation(storeId: string, payload: {
+  metric_key: string; value_numeric: string | null; period_start: string | null;
+  period_end: string | null; period_timezone: string; source_record_id: string | null;
+  source_evidence_ref: string | null;
+}): Promise<{ item: MetricObservationRecord; message: string }> {
+  return request("/effects/observations", { method: "POST", body: JSON.stringify(payload) }, storeId);
+}
+export function importMetricCsv(storeId: string, csvText: string): Promise<{
+  created: number; duplicates_skipped: number; authenticity_status: string; message: string;
+}> {
+  return request("/effects/import", { method: "POST", body: JSON.stringify({ csv_text: csvText }) }, storeId);
+}

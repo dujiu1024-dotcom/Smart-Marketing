@@ -466,6 +466,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/effects/attributions/{attribution_id}/reversal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reverse Attribution */
+        post: operations["reverse_attribution_api_v1_effects_attributions__attribution_id__reversal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/effects/business-outcomes": {
         parameters: {
             query?: never;
@@ -495,6 +512,23 @@ export interface paths {
         get: operations["list_data_source_capabilities_api_v1_effects_data_source_capabilities_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/effects/data-source-capabilities/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Data Source Capabilities */
+        post: operations["check_data_source_capabilities_api_v1_effects_data_source_capabilities_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1768,6 +1802,11 @@ export interface components {
              */
             published_work_id: string;
         };
+        /** AttributionReversalInput */
+        AttributionReversalInput: {
+            /** Reason */
+            reason: string;
+        };
         /** AudienceProfileCreate */
         AudienceProfileCreate: {
             /** Audience Description */
@@ -2620,15 +2659,11 @@ export interface components {
         MetricImportInput: {
             /** Csv Text */
             csv_text: string;
-            /** Source Format */
-            source_format?: "csv" | "xlsx";
-        };
-        /** MetricXlsxImportInput */
-        MetricXlsxImportInput: {
-            /** File Base64 */
-            file_base64: string;
-            /** File Name */
-            file_name: string;
+            /**
+             * Source Format
+             * @default csv
+             */
+            source_format: string;
         };
         /** MetricObservationInput */
         MetricObservationInput: {
@@ -2654,6 +2689,13 @@ export interface components {
             supersedes_observation_id?: string | null;
             /** Value Numeric */
             value_numeric?: number | string | null;
+        };
+        /** MetricXlsxImportInput */
+        MetricXlsxImportInput: {
+            /** File Base64 */
+            file_base64: string;
+            /** File Name */
+            file_name: string;
         };
         /** OfferCreate */
         OfferCreate: {
@@ -4267,6 +4309,45 @@ export interface operations {
             };
         };
     };
+    reverse_attribution_api_v1_effects_attributions__attribution_id__reversal_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                attribution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttributionReversalInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_business_outcomes_api_v1_effects_business_outcomes_get: {
         parameters: {
             query?: never;
@@ -4370,6 +4451,39 @@ export interface operations {
             };
         };
     };
+    check_data_source_capabilities_api_v1_effects_data_source_capabilities_check_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_metric_definitions_api_v1_effects_definitions_get: {
         parameters: {
             query?: never;
@@ -4404,6 +4518,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MetricImportInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_manual_observations_xlsx_api_v1_effects_import_xlsx_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetricXlsxImportInput"];
             };
         };
         responses: {

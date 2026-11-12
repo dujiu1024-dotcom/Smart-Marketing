@@ -474,7 +474,9 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
                     # noqa: E501
             "heat_unit": topic.heat_unit, "evidence_status": topic.evidence_status,
             "relevance_score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,  # noqa: E501
-            "match_method": opportunity.match_method, "reason_summary": opportunity.reason_summary,
+            "match_method": opportunity.match_method,
+            "matching_algorithm_version": opportunity.matching_algorithm_version,
+            "reason_summary": opportunity.reason_summary,
             "suggested_scenario": opportunity.suggested_scenario,
                 "content_angle": opportunity.content_angle,
             "risk_flags": opportunity.risk_flags_json,
@@ -504,7 +506,9 @@ def get_opportunity(opportunity_id: UUID, context: Annotated[AuthContext,
             "discovered_at": topic.discovered_at.isoformat(),
                 "evidence_status": topic.evidence_status},
         "match": {"score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,  # noqa: E501
-            "method": opportunity.match_method, "reason": opportunity.reason_summary,
+            "method": opportunity.match_method,
+            "algorithm_version": opportunity.matching_algorithm_version,
+            "reason": opportunity.reason_summary,
             "products": opportunity.matched_product_ids_json,
                 "offers": opportunity.matched_offer_ids_json,
             "audiences": opportunity.matched_audience_profile_ids_json,

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import KnowledgeWorkspace from "./KnowledgeWorkspace";
-import { ApiError } from "./api";
 
 afterEach(() => cleanup());
 const api = vi.hoisted(() => ({

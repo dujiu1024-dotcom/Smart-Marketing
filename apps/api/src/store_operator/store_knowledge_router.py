@@ -21,6 +21,8 @@ from store_operator.auth.dependencies import (
 from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
+from store_operator.config import settings
+from store_operator.jobs.service import create_job
 from store_operator.models.store_knowledge import (
     AudienceProfile,
     BrandGuideline,
@@ -1328,10 +1330,29 @@ def complete_asset_upload(
     db.add(asset)
     intent.status = "scanning"
     intent.completed_at = now
+    create_job(
+        db,
+        job_type="store.asset.scan",
+        payload_ref={
+            "schema_version": 1,
+            "asset_id": str(asset.id),
+            "upload_intent_id": str(intent.id),
+        },
+        idempotency_key=f"store.asset.scan:{asset.id}",
+        store_id=store_id,
+        actor_type="user",
+        actor_user_id=auth.user.id,
+        max_attempts=5,
+        timeout_seconds=settings.asset_scanner_timeout_seconds + 30,
+    )
     _audit(
-        db, request, action="store.asset.upload_quarantined",
-        record_type="media_asset", record_id=asset.id,
-        actor_id=auth.user.id, store_id=store_id,
+        db,
+        request,
+        action="store.asset.upload_quarantined",
+        record_type="media_asset",
+        record_id=asset.id,
+        actor_id=auth.user.id,
+        store_id=store_id,
         metadata={"sha256": actual_sha256, "byte_size": actual_size},
     )
     db.commit()

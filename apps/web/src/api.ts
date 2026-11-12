@@ -801,3 +801,33 @@ export async function createTaskArtifactReview(
     storeId,
   );
 }
+
+
+export interface ChannelSpecVersionRecord {
+  id: string;
+  channel_spec_id: string;
+  spec_version: number;
+  text_constraints: Record<string, unknown>;
+  media_constraints: Record<string, unknown>;
+  hashtag_constraints: Record<string, unknown>;
+  link_constraints: Record<string, unknown>;
+  schedule_constraints: Record<string, unknown>;
+  draft_supported: boolean;
+  publish_supported: boolean;
+  verification_status: "pending_verification" | "verified" | "deprecated";
+  source_document_ref: string | null;
+  published_at: string | null;
+  created_at: string;
+}
+export interface ChannelSpecRecord {
+  id: string;
+  channel_key: string;
+  status: "active" | "archived";
+  current_version: ChannelSpecVersionRecord | null;
+}
+export async function listChannelSpecs(storeId: string): Promise<ChannelSpecRecord[]> {
+  return request("/channels/specs", {}, storeId);
+}
+export async function listChannelSpecVersions(storeId: string, channelKey: string): Promise<ChannelSpecVersionRecord[]> {
+  return request(`/channels/specs/${encodeURIComponent(channelKey)}/versions`, {}, storeId);
+}

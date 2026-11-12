@@ -33,6 +33,7 @@ def test_parse_atom_feed_uses_alternate_link_and_updated_date():
     assert items[0]["id"] == "urn:story:2"
     assert items[0]["link"] == "https://news.example.test/story/2"
     assert items[0]["summary"] == "Market event and seasonal offers"
+    assert items[0]["published_at"] == datetime(2026, 11, 11, 10, 0, tzinfo=UTC)
 
 
 def test_chinese_bigram_matching_is_deterministic_and_bounded():

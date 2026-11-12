@@ -26,12 +26,12 @@ from store_operator.channels.oauth_state import consume_oauth_state, new_oauth_s
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
 from store_operator.config import settings
 from store_operator.db import get_db
-from store_operator.models.channel_spec import ChannelCapabilitySnapshot
 from store_operator.models.channel_delivery import (
     ChannelAccount,
     DouyinWebhookReceipt,
     OAuthAuthorizationAttempt,
 )
+from store_operator.models.channel_spec import ChannelCapabilitySnapshot
 from store_operator.models.identity import Store, StoreMembership
 
 router = APIRouter(prefix="/channels/douyin", tags=["channel-accounts"])

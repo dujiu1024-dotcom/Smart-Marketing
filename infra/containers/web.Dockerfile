@@ -8,4 +8,5 @@ COPY apps/web apps/web
 RUN pnpm --filter @store-operator/web build
 FROM nginx:alpine
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+COPY infra/containers/nginx-web.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80

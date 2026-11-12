@@ -487,3 +487,58 @@ def test_provider_circuit_breaker_reopens_after_failed_recovery_probe() -> None:
     assert breaker.state == "open"
     with pytest.raises(ProviderError):
         breaker.before_call()
+
+
+def test_prompt_task_contracts_separate_script_text_from_media_generation() -> None:
+    from store_operator.ai_gateway.prompt_contracts import validate_prompt_task_contract
+
+    validate_prompt_task_contract(
+        "video_script",
+        "text",
+        {
+            "type": "object",
+            "properties": {
+                "theme": {"type": "string"},
+                "spoken_script": {"type": "string"},
+                "storyboard": {"type": "array", "items": {"type": "string"}},
+                "shooting_guidance": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": [
+                "theme",
+                "spoken_script",
+                "storyboard",
+                "shooting_guidance",
+            ],
+        },
+    )
+    with pytest.raises(ValueError, match="does not match"):
+        validate_prompt_task_contract(
+            "video_script",
+            "video",
+            {"type": "object", "properties": {}, "required": []},
+        )
+
+
+def test_visual_quality_prompt_contract_cannot_publish_auto_approval_schema() -> None:
+    from store_operator.ai_gateway.prompt_contracts import validate_prompt_task_contract
+
+    with pytest.raises(ValueError, match="human_review_required=true"):
+        validate_prompt_task_contract(
+            "visual_quality_check",
+            "vision",
+            {
+                "type": "object",
+                "properties": {
+                    "findings": {"type": "array"},
+                    "overall_severity": {"type": "string"},
+                    "revision_suggestions": {"type": "array"},
+                    "human_review_required": {"type": "boolean"},
+                },
+                "required": [
+                    "findings",
+                    "overall_severity",
+                    "revision_suggestions",
+                    "human_review_required",
+                ],
+            },
+        )

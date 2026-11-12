@@ -392,3 +392,19 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 - 客群创建使用 sessionStorage 保持本次编辑草稿的 Idempotency-Key，网络结果不确定时重试复用相同 key。
 - `sampled_at` 必须显式提供 ISO 8601 时区偏移并归一化 UTC，不假设浏览器时区等于门店时区。
 - 客群事实确认在编辑器存在未保存修改时禁用；不存在或不属于当前门店的记录不会退化为创建表单。
+
+
+## 2026-11-12 #6 素材资产库生产 Web 接入
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 素材列表 | GET /api/v1/store/assets | 当前门店隔离，按服务端记录读取 |
+| 上传 | SHA-256 本地计算 → upload-intent → 私有对象存储预签名 PUT → complete | 仅 JPEG/PNG/WebP，单张不超过 25 MB；稳定幂等键和 intent ID 保存在 sessionStorage 以恢复中断上传 |
+| 服务端校验 | HEAD 元数据 + 完整对象 SHA-256 对照 | 不等同恶意文件扫描；上传后仍为 quarantined/scanning |
+| 使用权确认 | POST /api/v1/store/assets/{id}/confirm-usage-rights | 必须扫描 ready，绑定 version + SHA-256 + 商家来源说明；允许/限制均明确记录 |
+| 原图下载 | GET /api/v1/store/assets/{id}/download-url | 仅 ready + confirmed_allowed，使用短期签名 URL；页面不持久化 URL |
+| 归档 | POST /api/v1/store/assets/{id}/archive | If-Match + Idempotency-Key；不物理删除，品牌 Logo 当前引用会阻止归档 |
+| 存储端点 | 内部 S3 endpoint 与浏览器可访问 presign endpoint 分离 | Compose API 使用 seaweedfs:8333；浏览器签名 URL 使用 localhost:8333；SeaweedFS 仅允许本地 Web origin CORS |
+| 未完成 | ClamAV/恶意文件扫描、缩略图/尺寸元数据、Worker 状态回写、过期 UploadIntent sweeper、素材与商品/任务/Logo 关联选择器、真实对象存储浏览器联调 | 不得把哈希/MIME 校验称为安全扫描；不据此关闭 Issue #6 |
+
+CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作环境未执行本地命令，最终以 PR CI 为准。真实对象存储浏览器 PUT、CORS 和预签名 URL 仍需环境级验收。

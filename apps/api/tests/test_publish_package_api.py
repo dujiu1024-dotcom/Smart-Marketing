@@ -14,7 +14,9 @@ from store_operator.models import (
     ChannelSpecVersion,
     MarketingTask,
     PublishConfirmation,
+    PublishOperation,
     PublishPackage,
+    PublishPackageItem,
     QualityReport,
     QualityResolution,
     RequirementSnapshot,
@@ -376,6 +378,61 @@ def test_publish_package_requires_accepted_quality_and_confirmed_facts(
     )
     assert confirmation_replay.status_code == 201, confirmation_replay.text
     assert confirmation_replay.json()["id"] == confirmed.json()["id"]
+
+    # Seed a persisted operation tied to the confirmed frozen package, then
+    # verify its read endpoint remains scoped to the request's selected store.
+    account = ChannelAccount(
+        id=uuid4(),
+        store_id=store.id,
+        provider="douyin",
+        external_account_id="publish-operation-readback",
+        granted_scopes=["user_info", "video.create", "video.list"],
+        access_token_secret_ref="secret://publish-operation/access",
+        refresh_token_secret_ref="secret://publish-operation/refresh",
+        access_token_expires_at=datetime.now(UTC),
+        status="active",
+        connected_by_user_id=user.id,
+    )
+    db_session.add(account)
+    db_session.flush()
+    package_row = db_session.query(PublishPackage).filter(
+        PublishPackage.id == package["id"]
+    ).one()
+    package_item = db_session.query(PublishPackageItem).filter(
+        PublishPackageItem.publish_package_id == package_row.id
+    ).one()
+    package_item.delivery_mode = "official_api"
+    package_item.channel_account_id = account.id
+    db_session.flush()
+    operation = PublishOperation(
+        id=uuid4(),
+        store_id=store.id,
+        publish_package_id=package_row.id,
+        publish_package_item_id=package_item.id,
+        publish_confirmation_id=UUID(confirmed.json()["id"]),
+        channel_account_id=account.id,
+        idempotency_key="publish-operation-readback",
+        request_fingerprint="7" * 64,
+        status="queued",
+        attempt_count=0,
+        confirmed_by_user_id=user.id,
+        confirmed_package_fingerprint=package_row.package_fingerprint,
+        next_attempt_at=datetime.now(UTC),
+    )
+    db_session.add(operation)
+    db_session.flush()
+
+    hidden_operation = identity_client.get(
+        f"/api/v1/marketing-tasks/publish-operations/{operation.id}",
+        headers={"X-Store-ID": str(store_b.id)},
+    )
+    assert hidden_operation.status_code == 404, hidden_operation.text
+    visible_operation = identity_client.get(
+        f"/api/v1/marketing-tasks/publish-operations/{operation.id}",
+        headers={"X-Store-ID": str(store.id)},
+    )
+    assert visible_operation.status_code == 200, visible_operation.text
+    assert visible_operation.json()["id"] == str(operation.id)
 
     packages = identity_client.get(
         f"/api/v1/marketing-tasks/{task.id}/publish-packages",

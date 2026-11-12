@@ -380,3 +380,8 @@ Redis 可用于缓存、限流、短期锁和队列 Broker。队列选型应以�
 ## 17. 异步运行时契约入口（2026-11-11）
 
 Issue #9 的详细实现契约以 [ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md](ASYNC_JOB_RUNTIME_AND_AI_GATEWAY_CONTRACT.md) 为准；身份、营销领域与 Job Runtime 的跨域边界以 [ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md](ASYNC_RUNTIME_DOMAIN_INTEGRATION_CONTRACT.md) 为准。本文保留目标架构摘要，不重复定义 Job 状态机、Outbox Relay 和 Worker fencing 细节。Job Runtime 是模块化单体中的领域模块，Worker 作为独立进程运行，不构成首期微服务拆分。
+
+
+## 产品范围约束：视频能力不进入系统架构（2026-11-12）
+
+系统的媒体生产链路只覆盖图片生成/编辑；视频相关产物仅允许以普通文本形式保存为视频脚本，不建立 VideoArtifact、视频媒体处理 Worker、视频转码/渲染服务或视频上传/发布 Adapter。渠道发布首期只实现图片图文。平台账号已有视频作品如被外部数据源读取，仅作为平台内容数据，不触发本系统视频生产或发布能力。

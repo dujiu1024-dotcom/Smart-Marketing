@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from store_operator.auth.context import AuthContext
@@ -22,12 +26,124 @@ from store_operator.channels.oauth_state import consume_oauth_state, new_oauth_s
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError
 from store_operator.config import settings
 from store_operator.db import get_db
-from store_operator.models.channel_delivery import ChannelAccount, OAuthAuthorizationAttempt
+from store_operator.models.channel_delivery import (
+    ChannelAccount,
+    DouyinWebhookReceipt,
+    OAuthAuthorizationAttempt,
+)
 from store_operator.models.identity import Store, StoreMembership
 
 router = APIRouter(prefix="/channels/douyin", tags=["channel-accounts"])
 
 DOUYIN_REQUIRED_SCOPES = frozenset({"user_info", "video.create", "video.list"})
+
+
+
+def _verify_douyin_webhook_signature(*, raw_body: bytes, signature: str, client_secret: str) -> bool:
+    if not signature or not client_secret:
+        return False
+    expected = hashlib.sha1(client_secret.encode("utf-8") + raw_body).hexdigest()
+    return hmac.compare_digest(signature.strip().lower(), expected)
+
+
+def _parse_douyin_unauthorize_event(payload: object) -> tuple[str, list[str]]:
+    if not isinstance(payload, dict):
+        raise ApiError(400, "WEBHOOK_PAYLOAD_INVALID", "Webhook payload is invalid")
+    open_id = payload.get("from_user_id")
+    content = payload.get("content")
+    if not isinstance(open_id, str) or not open_id.strip() or len(open_id) > 160:
+        raise ApiError(400, "WEBHOOK_ACCOUNT_INVALID", "Webhook account reference is invalid")
+    if not isinstance(content, dict):
+        raise ApiError(400, "WEBHOOK_CONTENT_INVALID", "Webhook content is invalid")
+    scopes = content.get("scopes", [])
+    if not isinstance(scopes, list) or any(not isinstance(scope, str) for scope in scopes):
+        raise ApiError(400, "WEBHOOK_SCOPES_INVALID", "Webhook scopes are invalid")
+    return open_id, sorted(set(scope for scope in scopes if scope))
+
+
+@router.post("/webhook")
+async def receive_douyin_webhook(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> JSONResponse:
+    raw_body = await request.body()
+    try:
+        payload = json.loads(raw_body)
+    except (TypeError, ValueError) as exc:
+        raise ApiError(400, "WEBHOOK_JSON_INVALID", "Webhook payload must be JSON") from exc
+    if not isinstance(payload, dict):
+        raise ApiError(400, "WEBHOOK_PAYLOAD_INVALID", "Webhook payload is invalid")
+
+    event_type = payload.get("event")
+    content = payload.get("content")
+    if event_type == "verify_webhook":
+        if not isinstance(content, dict) or not isinstance(content.get("challenge"), (str, int)):
+            raise ApiError(400, "WEBHOOK_CHALLENGE_INVALID", "Webhook challenge is invalid")
+        return JSONResponse({"challenge": content["challenge"]})
+
+    if not settings.douyin_client_key or not settings.douyin_client_secret:
+        raise ApiError(503, "CHANNEL_NOT_CONFIGURED", "Douyin channel is not configured")
+    if payload.get("client_key") != settings.douyin_client_key:
+        raise ApiError(403, "WEBHOOK_CLIENT_MISMATCH", "Webhook client does not match configuration")
+    signature = request.headers.get("X-Douyin-Signature", "")
+    if not _verify_douyin_webhook_signature(
+        raw_body=raw_body,
+        signature=signature,
+        client_secret=settings.douyin_client_secret,
+    ):
+        raise ApiError(401, "WEBHOOK_SIGNATURE_INVALID", "Webhook signature is invalid")
+
+    if event_type != "unauthorize":
+        return JSONResponse({"code": 0})
+
+    message_id = request.headers.get("Msg-Id", "").strip()
+    if not message_id or len(message_id) > 160:
+        raise ApiError(400, "WEBHOOK_MESSAGE_ID_INVALID", "Webhook message ID is required")
+    open_id, revoked_scopes = _parse_douyin_unauthorize_event(payload)
+
+    existing = db.scalar(
+        select(DouyinWebhookReceipt.id).where(
+            DouyinWebhookReceipt.provider == "douyin",
+            DouyinWebhookReceipt.message_id == message_id,
+        )
+    )
+    if existing is not None:
+        return JSONResponse({"code": 0})
+
+    now = datetime.now(UTC)
+    receipt = DouyinWebhookReceipt(
+        provider="douyin",
+        message_id=message_id,
+        event_type="unauthorize",
+        external_user_id_hash=hashlib.sha256(open_id.encode("utf-8")).hexdigest(),
+        scopes_json=revoked_scopes,
+        received_at=now,
+        processed_at=now,
+    )
+    db.add(receipt)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        return JSONResponse({"code": 0})
+
+    accounts = db.scalars(
+        select(ChannelAccount)
+        .where(
+            ChannelAccount.provider == "douyin",
+            ChannelAccount.external_account_id == open_id,
+            ChannelAccount.status.in_(("active", "reauth_required")),
+        )
+        .with_for_update()
+    ).all()
+    for account in accounts:
+        account.status = "revoked"
+        account.granted_scopes = []
+        account.revoked_at = now
+        account.updated_at = now
+    receipt.affected_account_count = len(accounts)
+    db.commit()
+    return JSONResponse({"code": 0})
 
 
 def _require_oauth_configuration() -> tuple[DouyinAppCredentials, str]:

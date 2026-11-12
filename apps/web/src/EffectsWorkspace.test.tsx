@@ -13,7 +13,10 @@ describe("effects workspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.getEffectsOverview.mockResolvedValue({
-      items: [], data_status: "unavailable",
+      items: [], trends: [],
+      data_quality: { total_observations: 0, verified_observations: 0, delayed_observations: 0,
+        incomplete_or_anomalous_observations: 0, status: "unavailable", reason: "暂无可核验数据" },
+      data_status: "unavailable",
       business_outcomes: { roi: null, sales_growth: null, store_visit_growth: null,
         reason: "没有已核验的真实经营结果与成本证据时，不计算 ROI、销售增长或到店增长。" },
     });

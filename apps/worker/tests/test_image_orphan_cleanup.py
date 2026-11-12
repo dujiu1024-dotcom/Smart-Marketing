@@ -112,17 +112,30 @@ def test_orphan_image_cleanup_protects_registered_or_referenced_objects(
     assert invocation.response_ref_json["orphan_cleanup_result"] == "protected_referenced"
 
 
-def test_orphan_image_cleanup_never_deletes_cross_store_or_traversal_keys(
+@pytest.mark.parametrize(
+    "key_kind",
+    ["cross_store", "traversal", "dot_segment", "empty_segment"],
+)
+def test_orphan_image_cleanup_never_deletes_invalid_object_keys(
     monkeypatch: pytest.MonkeyPatch,
     worker_tasks,
+    key_kind: str,
 ) -> None:
     store_id = uuid4()
+    if key_kind == "cross_store":
+        object_key = f"stores/{uuid4()}/generated/image.png"
+    elif key_kind == "traversal":
+        object_key = f"stores/{store_id}/../other-store/image.png"
+    elif key_kind == "dot_segment":
+        object_key = f"stores/{store_id}/./generated/image.png"
+    else:
+        object_key = f"stores/{store_id}//generated/image.png"
     invocation = SimpleNamespace(
         id=uuid4(),
         store_id=store_id,
         response_ref_json={
             "schema_version": 1,
-            "object_key": f"stores/{uuid4()}/../other-store/image.png",
+            "object_key": object_key,
         },
     )
     database = FakeDatabase([invocation])

@@ -226,3 +226,41 @@ class MetricObservation(Base):
         ForeignKey("metric_observations.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         server_default=func.now(), nullable=False)
+
+
+
+class MetricImportBatch(Base):
+    __tablename__ = "metric_import_batches"
+    __table_args__ = (
+        UniqueConstraint(
+            "store_id",
+            "content_sha256",
+            name="uq_metric_import_batches_store_hash",
+        ),
+        CheckConstraint("row_count >= 0", name="row_count_nonnegative"),
+        CheckConstraint("created_count >= 0", name="created_count_nonnegative"),
+        CheckConstraint("skipped_count >= 0", name="skipped_count_nonnegative"),
+        Index("ix_metric_import_batches_store_created", "store_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("stores.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_format: Mapped[str] = mapped_column(String(16), nullable=False)
+    imported_by_user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )

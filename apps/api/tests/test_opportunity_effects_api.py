@@ -5,6 +5,8 @@ from uuid import uuid4
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
 from store_operator.models.opportunity_effects import (
+    AttributionEvidence,
+    BusinessOutcomeEvidence,
     HotTopic,
     HotTopicSource,
     MetricDefinition,
@@ -402,3 +404,71 @@ def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
     assert len(trend["points"]) == 2
     assert trend["comparison"]["status"] == "available"
     assert trend["comparison"]["change_percent"] == "25.00"
+
+
+def test_attribution_rejects_merchant_claimed_work_and_unverified_outcome(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store = _identity(db_session, "attribution@example.com", "Attribution Shop")
+    headers = _login(identity_client, "attribution@example.com", store.id)
+    task_response = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers={**headers, "Idempotency-Key": "attribution-task"},
+        json={
+            "task_type": "full_marketing",
+            "title": "Attribution evidence task",
+            "requirement_draft": {"goal": "Test attribution evidence"},
+            "task_options": {
+                "includes_copy": True,
+                "includes_image": True,
+                "selected_channel_keys": [],
+                "requires_external_delivery": False,
+            },
+        },
+    )
+    assert task_response.status_code == 201, task_response.text
+    task_id = uuid4()
+    task_id = uuid4() if not task_response.json().get("id") else uuid4()
+    task_id = task_response.json()["id"]
+
+    work = PublishedWork(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task_id,
+        channel_key="douyin",
+        external_work_id="merchant-claimed-work",
+        ownership_status="merchant_claim",
+    )
+    outcome = BusinessOutcomeEvidence(
+        id=uuid4(),
+        store_id=store.id,
+        outcome_type="orders",
+        value_numeric=Decimal("8"),
+        source_system="manual",
+        source_record_id="merchant-order-report",
+        source_evidence_ref="merchant supplied report",
+        occurred_at=datetime.now(UTC),
+        authenticity_status="merchant_reported",
+        integrity_status="unknown",
+        deduplication_key="e" * 64,
+    )
+    db_session.add_all([work, outcome])
+    db_session.flush()
+
+    response = identity_client.post(
+        "/api/v1/effects/attributions",
+        headers=headers,
+        json={
+            "marketing_task_id": task_id,
+            "published_work_id": str(work.id),
+            "outcome_evidence_id": str(outcome.id),
+            "attribution_method": "direct_code",
+            "evidence_strength": "strong",
+            "allocation_percent": "100",
+        },
+    )
+    assert response.status_code == 409
+    assert response.json()["code"] == "PUBLISHED_WORK_NOT_VERIFIED"

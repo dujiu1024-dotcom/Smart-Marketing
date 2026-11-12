@@ -6,6 +6,19 @@ import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getM
 const tierLabels = { content_performance: "内容表现", intent: "互动意向", business_outcome: "经营结果" } as const;
 const errorText = (error: unknown) => error instanceof Error ? error.message : "请求失败，请稍后重试。";
 
+function chartPoints(points: Array<{ value: string }>): string {
+  const values = points.map(point => Number(point.value));
+  if (values.length < 2 || values.some(value => !Number.isFinite(value))) return "";
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const range = maximum - minimum || 1;
+  return values.map((value, index) => {
+    const x = 20 + (index * 560) / (values.length - 1);
+    const y = 100 - ((value - minimum) / range) * 80;
+    return `${x},${y}`;
+  }).join(" ");
+}
+
 export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [overview, setOverview] = useState<EffectsOverview | null>(null);
   const [definitions, setDefinitions] = useState<MetricDefinitionRecord[]>([]);
@@ -139,6 +152,9 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
             <div className="catalog-item-main"><div><h3>{trend.display_name}</h3><p>{trend.metric_key}</p></div>
               <span className="status-chip">{trend.comparison.status === "available" ? `环比 ${trend.comparison.change_percent}%` : "样本不足"}</span></div>
             <div className="catalog-meta">{trend.points.map(point => <span key={point.period_end}>{new Date(point.period_start).toLocaleDateString()} – {new Date(point.period_end).toLocaleDateString()}：{point.value}（n={point.sample_count}）</span>)}</div>
+            {trend.points.length > 1 && <svg className="metric-trend-chart" viewBox="0 0 600 120" role="img" aria-label={`${trend.display_name}趋势图`}>
+              <polyline fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={chartPoints(trend.points)} />
+            </svg>}
           </div>)}
         </div> : <p className="muted">{overview?.data_quality?.reason ?? "暂无可用于趋势分析的已核验周期数据。"}</p>}
         {(overview?.content_performance ?? []).length > 0 && <div className="catalog-list">
@@ -147,6 +163,9 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
             <div className="catalog-item-main"><div><strong>{work.display_name}</strong><p>{work.channel_key} · {work.external_work_id}</p></div>
               <span className="status-chip">{work.comparison.status === "available" ? `环比 ${work.comparison.change_percent}%` : "样本不足"}</span></div>
             <p className="catalog-description">关联任务：{work.marketing_task_id ?? "未关联"} · {work.points.map(point => `${new Date(point.period_start).toLocaleDateString()}–${new Date(point.period_end).toLocaleDateString()}：${point.value}`).join("；")}</p>
+            {work.points.length > 1 && <svg className="metric-trend-chart" viewBox="0 0 600 120" role="img" aria-label={`${work.display_name}作品表现趋势图`}>
+              <polyline fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={chartPoints(work.points)} />
+            </svg>}
           </div>)}
         </div>}
         <p className="footnote">数据质量：观测 {overview?.data_quality.total_observations ?? 0} 条 · 已核验 {overview?.data_quality.verified_observations ?? 0} 条 · 延迟 {overview?.data_quality.delayed_observations ?? 0} 条 · 不完整/异常 {overview?.data_quality.incomplete_or_anomalous_observations ?? 0} 条</p>

@@ -211,6 +211,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
           {capabilities.map(item => <div className="catalog-item" key={item.id}>
             <div className="catalog-item-main"><div><h3>{item.channel_key} · {item.capability_key}</h3><p>能力快照 v{item.snapshot_version}</p></div><span className="status-chip">{item.status}</span></div>
             <p className="catalog-description">检查时间：{new Date(item.checked_at).toLocaleString()} · 已授权范围：{item.granted_scopes.join(", ") || "无"}</p>
+            {item.reason && <p className="catalog-description">{item.reason}</p>}
           </div>)}
           {!capabilities.length && <p className="muted">暂无渠道数据读取能力快照；发布授权不代表已获得数据读取权限。</p>}
         </div>

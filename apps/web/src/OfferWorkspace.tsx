@@ -166,7 +166,7 @@ export default function OfferWorkspace({ storeId }: { storeId: string }) {
       return;
     }
     if (route === "new") {
-      setOffer(null); setForm(emptyForm); setDirty(false); setError(""); setNotice("");
+      setLoading(false); setOffer(null); setForm(emptyForm); setDirty(false); setError(""); setNotice("");
       const key = `store-operator.offer-create.${storeId}`;
       createKey.current = sessionStorage.getItem(key) ?? crypto.randomUUID();
       sessionStorage.setItem(key, createKey.current);

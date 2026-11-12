@@ -234,7 +234,11 @@ class ChannelContent(Base):
     channel_key: Mapped[str] = mapped_column(String(80), nullable=False)
     copy_version_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     payload_json: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
-    channel_spec_version_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    channel_spec_version_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("channel_spec_versions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     input_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="ready")
     created_at: Mapped[datetime] = mapped_column(

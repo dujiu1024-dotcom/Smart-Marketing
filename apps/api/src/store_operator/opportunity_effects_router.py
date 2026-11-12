@@ -1,8 +1,8 @@
 import base64
 import csv
-import math
 import hashlib
 import io
+import math
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, cast
@@ -2052,7 +2052,9 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             for index, key in enumerate(normalized_headers):
                 value = row_values[index] if index < len(row_values) else None
                 if isinstance(value, datetime) and key in {"period_start", "period_end"}:
-                    timezone_name = str(row_values[normalized_headers.index("period_timezone")] or "").strip()
+                    timezone_index = normalized_headers.index("period_timezone")
+                    timezone_value = row_values[timezone_index] if timezone_index < len(row_values) else None
+                    timezone_name = str(timezone_value or "").strip()
                     try:
                         zone = ZoneInfo(timezone_name)
                     except (ZoneInfoNotFoundError, ValueError) as exc:

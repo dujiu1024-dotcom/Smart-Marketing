@@ -17,6 +17,7 @@ import {
   type StoreProfile,
   type User,
 } from "./api";
+import ProductWorkspace from "./ProductWorkspace";
 
 interface ProfileForm {
   display_name: string;

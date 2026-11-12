@@ -117,3 +117,10 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - 活动读写与事实确认调用 Store Knowledge API；创建带 Idempotency-Key，更新/确认带 If-Match。
 - 优惠规则和适用条件以 JSON 对象保存；客户端要求开始/结束时间包含明确时区偏移，并规范化为 UTC。
 - 当前不从门店 membership 读取 Store.timezone，因此列表明确显示 UTC；本地时区呈现需要先扩展只读门店上下文契约，不在前端猜测时区。
+
+
+### Offer 规则补充
+
+- `buy_x_get_y` 与 `gift` 的适用商品通过真实门店 Product 列表选择，并将对应 Product ID 写入 `terms_json.eligible_product_ids`。
+- `discount_percent`、`discount_amount`、`fixed_price`、`threshold_discount` 按各自字段校验金额、币种和折扣范围；不接受仅有自然语言标题而缺少规则数值的优惠。
+- 归档通过 Offer 的 `status=archived` 与 If-Match 版本更新完成，不物理删除业务记录。

@@ -434,7 +434,7 @@ def execute_job(job_id: str) -> dict[str, str]:
 def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     with SessionLocal.begin() as db:
-        return recover_expired_jobs(db, batch_size=batch_size)
+        return int(recover_expired_jobs(db, batch_size=batch_size))
 
 
 @register_job_handler("content.quality_check")

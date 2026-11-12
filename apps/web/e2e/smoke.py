@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+from urllib.parse import urlsplit
 
 from playwright.async_api import async_playwright
 
@@ -13,7 +14,7 @@ OPPORTUNITY_ID = "22222222-2222-4222-8222-222222222222"
 
 async def _api_mock(route) -> None:
     request = route.request
-    path = request.url.split("?", 1)[0].removeprefix("http://127.0.0.1:5173")
+    path = urlsplit(request.url).path
     method = request.method
     status = 200
     payload: object = {}

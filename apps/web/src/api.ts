@@ -707,6 +707,14 @@ export interface ArtifactVersionRecord {
   prompt_version_id: string | null;
   input_fingerprint: string;
   created_at: string;
+  reviews: Array<{
+    id: string;
+    review_type: "copy" | "image";
+    decision: "approved" | "revision_requested" | "rejected";
+    comment: string | null;
+    target: Record<string, unknown> | null;
+    created_at: string;
+  }>;
 }
 export interface ContentArtifact {
   id: string;

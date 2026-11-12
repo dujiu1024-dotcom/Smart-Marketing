@@ -34,7 +34,9 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("finished_at", sa.DateTime(timezone=True)),
         sa.UniqueConstraint(
-            "store_id", "publish_operation_id", "attempt_no",
+            "store_id",
+            "publish_operation_id",
+            "attempt_no",
             name="uq_publish_operation_attempts_operation_no",
         ),
         sa.ForeignKeyConstraint(
@@ -52,8 +54,10 @@ def upgrade() -> None:
             name="ck_publish_operation_attempts_action",
         ),
         sa.CheckConstraint(
-            "normalized_status IN ('started', 'accepted', 'verified', "
-            "'not_found', 'failed', 'unknown')",
+            (
+                "normalized_status IN ('started', 'accepted', 'verified', "
+                "'not_found', 'failed', 'unknown')"
+            ),
             name="ck_publish_operation_attempts_normalized_status",
         ),
     )

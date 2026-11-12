@@ -3,7 +3,7 @@ import hashlib
 import io
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Annotated
+from typing import Annotated, cast
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -826,8 +826,9 @@ def effects_overview(
 
     insights: list[dict[str, object]] = []
     for trend in trends:
-        comparison = trend["comparison"]
-        current_point = trend["points"][-1]
+        comparison = cast(dict[str, object], trend["comparison"])
+        trend_points = cast(list[dict[str, object]], trend["points"])
+        current_point = trend_points[-1]
         status = str(comparison["status"])
         change_percent = comparison["change_percent"]
         metric_tier = str(trend["metric_tier"])

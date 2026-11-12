@@ -42,6 +42,8 @@ celery_app.conf.update(
 
 configure_worker_logging()
 
+from store_operator_worker import ai_handlers as _ai_handlers  # noqa: F401
+from store_operator_worker import ai_image_handlers as _ai_image_handlers  # noqa: F401
 from store_operator_worker import tasks as _tasks  # noqa: F401
 
 

@@ -100,7 +100,10 @@ def render_published_prompt(
     schema = version.variables_schema_json
     validate_json_schema(variables, schema)
     placeholders = set(_PLACEHOLDER.findall(version.user_prompt_template))
-    if placeholders != set(schema.get("properties", {})):
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        raise PromptContractError("Published PromptVersion has an invalid variable schema")
+    if placeholders != set(properties):
         raise PromptContractError("Prompt placeholders do not match the published variable schema")
     rendered = _PLACEHOLDER.sub(
         lambda match: str(variables[match.group(1)]),

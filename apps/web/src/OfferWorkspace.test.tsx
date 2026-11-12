@@ -53,6 +53,7 @@ describe("production offer workspace", () => {
     api.listOffers.mockResolvedValue({ items: [], total: 0 });
     render(<OfferWorkspace storeId="store-1" />);
     fireEvent.click(await screen.findByRole("button", { name: "新增活动" }));
+    await screen.findByRole("heading", { name: "新增活动与优惠" });
     fireEvent.change(screen.getByLabelText("活动名称 *"), { target: { value: "新客八折" } });
     fireEvent.change(screen.getByLabelText("折扣比例（百分比）"), { target: { value: "80" } });
     fireEvent.click(screen.getByRole("button", { name: "创建活动" }));

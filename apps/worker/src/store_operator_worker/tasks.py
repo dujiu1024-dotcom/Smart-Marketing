@@ -635,7 +635,7 @@ def execute_asset_scan(
                 "The uploaded asset changed during security scanning.",
                 retryable=False,
             )
-        if asset.status in {"ready", "rejected"}:
+        if asset.status in {"ready", "rejected", "scan_failed"}:
             return {"asset_id": str(asset.id), "status": asset.status}
         if asset.status != "quarantined" or intent.status != "scanning":
             raise JobExecutionError(

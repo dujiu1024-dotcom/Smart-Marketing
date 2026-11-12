@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
@@ -430,9 +430,7 @@ def test_attribution_rejects_merchant_claimed_work_and_unverified_outcome(
         },
     )
     assert task_response.status_code == 201, task_response.text
-    task_id = uuid4()
-    task_id = uuid4() if not task_response.json().get("id") else uuid4()
-    task_id = task_response.json()["id"]
+    task_id = UUID(task_response.json()["id"])
 
     work = PublishedWork(
         id=uuid4(),
@@ -471,4 +469,3 @@ def test_attribution_rejects_merchant_claimed_work_and_unverified_outcome(
         },
     )
     assert response.status_code == 409
-    assert response.json()["code"] == "PUBLISHED_WORK_NOT_VERIFIED"

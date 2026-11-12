@@ -863,9 +863,9 @@ def effects_overview(
         if observation.period_start is None or observation.period_end is None:
             continue
         period_key = "|".join(
-            [observation.period_start.isoformat(), observation.period_end.isoformat()]
+            [observation.period_start.isoformat(), observation.period_end.isoformat(), observation.period_timezone]
         )
-        group_key = "|".join([str(work.id), observation.metric_key, period_key])
+        group_key = "|".join([str(work.id), observation.metric_key, observation.source_system, period_key])
         content_groups.setdefault(group_key, []).append((observation, definition, work))
 
     content_periods: dict[str, list[dict[str, object]]] = {}
@@ -896,7 +896,7 @@ def effects_overview(
         zone = ZoneInfo(observation.period_timezone)
         period_start = observation.period_start.astimezone(zone)
         period_end = observation.period_end.astimezone(zone)
-        group_key = f"{work.id}|{observation.metric_key}"
+        group_key = f"{work.id}|{observation.metric_key}|{observation.source_system}"
         content_periods.setdefault(group_key, []).append(
             {
                 "published_work_id": str(work.id),
@@ -904,6 +904,7 @@ def effects_overview(
                 "channel_key": work.channel_key,
                 "external_work_id": work.external_work_id,
                 "metric_key": observation.metric_key,
+                "source_system": observation.source_system,
                 "display_name": definition.display_name,
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
@@ -946,6 +947,7 @@ def effects_overview(
                 "channel_key": points[-1]["channel_key"],
                 "external_work_id": points[-1]["external_work_id"],
                 "metric_key": points[-1]["metric_key"],
+                "source_system": points[-1]["source_system"],
                 "display_name": points[-1]["display_name"],
                 "points": points[-30:],
                 "comparison": {

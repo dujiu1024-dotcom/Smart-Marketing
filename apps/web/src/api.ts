@@ -1151,6 +1151,12 @@ export function getPublishedWorks(storeId: string): Promise<{ items: PublishedWo
 export function getBusinessOutcomes(storeId: string): Promise<{ items: BusinessOutcomeEvidenceRecord[]; total: number }> {
   return request("/effects/business-outcomes", {}, storeId);
 }
+export function createBusinessOutcome(storeId: string, payload: {
+  outcome_type: string; value_numeric: string; currency?: string | null;
+  source_record_id?: string | null; source_evidence_ref: string; occurred_at: string;
+}): Promise<{ item: BusinessOutcomeEvidenceRecord; replayed: boolean; message?: string }> {
+  return request("/effects/business-outcomes", { method: "POST", body: JSON.stringify(payload) }, storeId);
+}
 export function getAttributions(storeId: string): Promise<{ items: AttributionEvidenceRecord[]; total: number }> {
   return request("/effects/attributions", {}, storeId);
 }

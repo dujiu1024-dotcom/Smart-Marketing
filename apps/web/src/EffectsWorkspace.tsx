@@ -179,7 +179,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         <div className="catalog-list">
           <h3>互动转化率</h3>
           {(overview?.conversion_rates ?? []).length > 0 ? overview?.conversion_rates.map(item => <div className="catalog-item" key={item.metric_key + item.source_system + (item.channel_key ?? "") + item.definition_version + item.period_end}>
-            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.numerator_value} / {item.denominator_value} · {item.source_system}{item.channel_key ? ` · ${item.channel_key}` : ""} · 口径 v{item.definition_version} · {new Date(item.period_start).toLocaleDateString()}–{new Date(item.period_end).toLocaleDateString()}</p></div>
+            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.numerator_value} / {item.denominator_value} · {item.source_system}{item.channel_key ? ` · ${item.channel_key}` : ""} · 口径 v{item.numerator_definition_version}/{item.denominator_definition_version} · {new Date(item.period_start).toLocaleDateString()}–{new Date(item.period_end).toLocaleDateString()}</p></div>
               <span className="status-chip">{item.status === "available" ? `${item.value_percent}%` : "分母为 0，不计算"}</span></div>
           </div>) : <p className="muted">缺少同周期、同口径的已核验分子与分母数据，暂不计算转化率。</p>}
         </div>

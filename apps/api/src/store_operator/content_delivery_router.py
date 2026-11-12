@@ -76,7 +76,10 @@ class ReviewCreate(BaseModel):
         return self
 
 
-def _version_payload(version: ArtifactVersion) -> dict[str, object]:
+def _version_payload(
+    version: ArtifactVersion,
+    reviews: list[ReviewRecord] | None = None,
+) -> dict[str, object]:
     return {
         "id": str(version.id),
         "artifact_id": str(version.artifact_id),
@@ -93,12 +96,25 @@ def _version_payload(version: ArtifactVersion) -> dict[str, object]:
         ),
         "input_fingerprint": version.input_fingerprint,
         "created_at": version.created_at.isoformat(),
+        "reviews": [
+            {
+                "id": str(review.id),
+                "review_type": review.review_type,
+                "decision": review.decision,
+                "comment": review.comment,
+                "target": review.target_json,
+                "created_at": review.created_at.isoformat(),
+            }
+            for review in reviews or []
+            if review.artifact_version_id == version.id
+        ],
     }
 
 
 def _artifact_payload(
     artifact: Artifact,
     versions: list[ArtifactVersion] | None = None,
+    reviews: list[ReviewRecord] | None = None,
 ) -> dict[str, object]:
     return {
         "id": str(artifact.id),
@@ -109,7 +125,7 @@ def _artifact_payload(
         ),
         "created_at": artifact.created_at.isoformat(),
         "updated_at": artifact.updated_at.isoformat(),
-        "versions": [_version_payload(item) for item in versions or []],
+        "versions": [_version_payload(item, reviews) for item in versions or []],
     }
 
 
@@ -366,7 +382,22 @@ def list_task_artifacts(
             )
             .order_by(ArtifactVersion.version_no)
         ).all()
-        result.append(_artifact_payload(artifact, list(versions)))
+        version_ids = [item.id for item in versions]
+        reviews = (
+            list(
+                db.scalars(
+                    select(ReviewRecord)
+                    .where(
+                        ReviewRecord.store_id == store_id,
+                        ReviewRecord.artifact_version_id.in_(version_ids),
+                    )
+                    .order_by(ReviewRecord.created_at, ReviewRecord.id)
+                ).all()
+            )
+            if version_ids
+            else []
+        )
+        result.append(_artifact_payload(artifact, list(versions), reviews))
     return result
 
 

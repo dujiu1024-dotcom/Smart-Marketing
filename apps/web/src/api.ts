@@ -717,3 +717,87 @@ export async function refreshDouyinAccount(storeId: string, accountId: string): 
     method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
   }, storeId);
 }
+
+
+export interface ArtifactVersionRecord {
+  id: string;
+  artifact_id: string;
+  version_no: number;
+  source_type: "ai_generated" | "merchant_upload" | "manual_edit";
+  source_refs: Array<Record<string, unknown>>;
+  instruction: string | null;
+  content_json: Record<string, unknown> | null;
+  content_hash: string;
+  provider_id: string | null;
+  model_id: string | null;
+  prompt_version_id: string | null;
+  input_fingerprint: string;
+  created_at: string;
+  reviews: Array<{
+    id: string;
+    review_type: "copy" | "image";
+    decision: "approved" | "revision_requested" | "rejected";
+    comment: string | null;
+    target: Record<string, unknown> | null;
+    created_at: string;
+  }>;
+}
+export interface ContentArtifact {
+  id: string;
+  task_id: string;
+  artifact_type: "copy" | "image";
+  current_version_id: string | null;
+  created_at: string;
+  updated_at: string;
+  versions: ArtifactVersionRecord[];
+}
+export interface ContentArtifactVersionInput {
+  source_type: "ai_generated" | "merchant_upload" | "manual_edit";
+  source_refs?: Array<Record<string, unknown>>;
+  instruction?: string | null;
+  content_json?: Record<string, unknown> | null;
+  media_asset_id?: string | null;
+  provider_id?: string | null;
+  model_id?: string | null;
+  prompt_version_id?: string | null;
+}
+export interface ContentReviewInput {
+  expected_version: number;
+  review_type: "copy" | "image";
+  decision: "approved" | "revision_requested" | "rejected";
+  comment?: string | null;
+  target?: Record<string, unknown> | null;
+}
+export async function listTaskArtifacts(storeId: string, taskId: string): Promise<ContentArtifact[]> {
+  return request(`/marketing-tasks/${encodeURIComponent(taskId)}/artifacts`, {}, storeId);
+}
+export async function createTaskArtifact(
+  storeId: string, taskId: string, artifactType: "copy" | "image",
+  version: ContentArtifactVersionInput, idempotencyKey: string = crypto.randomUUID(),
+): Promise<ContentArtifact> {
+  return request(`/marketing-tasks/${encodeURIComponent(taskId)}/artifacts`, {
+    method: "POST", headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ artifact_type: artifactType, version }),
+  }, storeId);
+}
+export async function createTaskArtifactVersion(
+  storeId: string, taskId: string, artifact: ContentArtifact,
+  version: ContentArtifactVersionInput, idempotencyKey: string = crypto.randomUUID(),
+): Promise<ArtifactVersionRecord> {
+  const currentVersion = artifact.versions.find(item => item.id === artifact.current_version_id);
+  if (!currentVersion) throw new ApiError("当前产物版本不存在，请刷新后重试。", 409, "ARTIFACT_VERSION_MISSING");
+  return request(`/marketing-tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifact.id)}/versions`, {
+    method: "POST", headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ ...version, expected_version: currentVersion.version_no }),
+  }, storeId);
+}
+export async function createTaskArtifactReview(
+  storeId: string, taskId: string, artifact: ContentArtifact, version: ArtifactVersionRecord,
+  input: ContentReviewInput, idempotencyKey: string = crypto.randomUUID(),
+): Promise<Record<string, unknown>> {
+  return request(
+    `/marketing-tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifact.id)}/versions/${encodeURIComponent(version.id)}/reviews`,
+    { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(input) },
+    storeId,
+  );
+}

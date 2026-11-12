@@ -213,6 +213,12 @@ def test_artifact_versions_and_reviews_are_version_bound(
     assert artifacts.status_code == 200, artifacts.text
     assert artifacts.json()[0]["current_version_id"] == second_version_id
     assert [version["version_no"] for version in artifacts.json()[0]["versions"]] == [1, 2]
+    reviewed_version = next(
+        version for version in artifacts.json()[0]["versions"]
+        if version["id"] == second_version_id
+    )
+    assert reviewed_version["reviews"][0]["decision"] == "approved"
+    assert reviewed_version["reviews"][0]["comment"] is None
 
     media = MediaAsset(
         id=uuid4(),

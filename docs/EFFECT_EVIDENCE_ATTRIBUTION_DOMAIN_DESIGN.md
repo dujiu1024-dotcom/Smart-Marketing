@@ -374,7 +374,7 @@ Job 命令需包含 source/channel account ID、时间窗口、cursor、schema v
 
 ## 13. Issue #137 implementation status (2026-11-12)
 
-An initial metrics slice is now implemented:
+The first complete code slice for opportunity handoff, published-work ownership and effects evidence is implemented; external data-source verification and full acceptance remain:
 
 - Metric definition dictionary and append-oriented metric observation storage are introduced by migration `0018_opportunity_effects`.
 - Store-scoped APIs expose observations, a metric overview, period aggregation, period-over-period comparison and data-quality counts. Trend aggregation requires complete, current, verified observations with explicit period boundaries and uses the metric dictionary aggregation rule.
@@ -383,6 +383,7 @@ An initial metrics slice is now implemented:
 - Attribution reversals are append-preserving status transitions: the original attribution snapshot is immutable, while reversal reason, actor and timestamp are recorded and audited. Only one active attribution per store/outcome/task is allowed; a reversed record may be replaced without deleting history.
 - CSV imports create store-scoped import batches with the importing user, row counts and SHA-256 content hash. Replaying identical file content returns the original batch and does not create duplicate observations; new observations retain their batch ID.
 - The overview only surfaces values marked `official_api` or `verified_import` with complete/current integrity as available. Merchant-reported and demo-sample values do not become verified results. ROI, sales growth and store-visit growth remain unavailable unless the required real evidence and cost basis exist.
+- The opportunity workspace exposes an explicit merchant-triggered handoff to marketing-task creation. The server validates the adopted opportunity and store scope, snapshots the opportunity evidence into the task, and preserves idempotent task creation.
 - The Douyin publish worker now changes an operation to `published` only after successful platform readback, then idempotently creates `PublishedWork` and verified `WorkOwnershipEvidence` in the same transaction. The effects workspace registration endpoint remains a reconciliation path for older or externally completed operations; merchant claims remain unverified.
 - The effects workspace can snapshot Douyin capability boundaries: `video.list` may support published-work ownership readback, but content-metric reads and business-outcome reads remain explicitly `unsupported` until a verified adapter and scope exist. Capability snapshots are versioned and include granted scopes and assessment reasons.
 - `BusinessOutcomeEvidence`, `AttributionEvidence` and `DataSourceCapabilitySnapshot` now have store-scoped models and APIs. Manual business outcomes are always `merchant_reported`; formal attribution requires a verified work, verified ownership evidence, a complete official/verified outcome, a matching task, strong/medium evidence and allocation not exceeding 100%.

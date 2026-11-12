@@ -29,6 +29,12 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="RESTRICT"),
         ),
     )
+    op.create_check_constraint(
+        "ck_attribution_evidence_rejected_requires_reversal_metadata",
+        "attribution_evidence",
+        "status != 'rejected' OR (reversal_reason IS NOT NULL AND "
+        "reversed_at IS NOT NULL AND reversed_by_user_id IS NOT NULL)",
+    )
     op.drop_constraint(
         "uq_attribution_evidence_store_outcome_task",
         "attribution_evidence",

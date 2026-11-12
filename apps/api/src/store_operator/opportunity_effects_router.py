@@ -2115,7 +2115,7 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                     cell_value: str | datetime | None = (
                         value_node.text if value_node is not None else None
                     )
-                    if cell_type == "s" and cell_value is not None:
+                    if cell_type == "s" and isinstance(cell_value, str):
                         cell_value = shared_strings[int(cell_value)]
                     elif cell_type == "inlineStr":
                         inline = cell.find("main:is", ns)

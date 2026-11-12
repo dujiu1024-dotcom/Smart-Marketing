@@ -1533,7 +1533,7 @@ def recover_marketing_task(
             copy_artifact.current_version_id if copy_artifact is not None else None
         )
         step.input_fingerprint = strategy_snapshot.content_fingerprint
-        job_payload: dict[str, object] = {
+        copy_job_payload: dict[str, object] = {
             "schema_version": 1,
             "marketing_task_id": str(task.id),
             "requirement_snapshot_id": str(requirement_snapshot.id),
@@ -1543,14 +1543,14 @@ def recover_marketing_task(
             "revision_instruction": payload.reason,
         }
         if previous_artifact_version_id is not None:
-            job_payload["previous_artifact_version_id"] = str(
+            copy_job_payload["previous_artifact_version_id"] = str(
                 previous_artifact_version_id
             )
         try:
             copy_job = create_job(
                 db,
                 job_type="marketing_task.generate_copy",
-                payload_ref=job_payload,
+                payload_ref=copy_job_payload,
                 idempotency_key=(
                     f"marketing-task:{task.id}:copy-recovery:{step.version}"
                 ),

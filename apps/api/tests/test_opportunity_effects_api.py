@@ -161,7 +161,7 @@ def test_manual_metric_is_not_verified_or_roi_evidence(identity_client, db_sessi
     assert overview.status_code == 200, overview.text
     assert overview.json()["data_status"] == "unavailable"
     assert overview.json()["business_outcomes"]["roi"] is None
-    assert overview.json()["items"][0]["value"] is None
+    assert not any(item["metric_key"] == "views" for item in overview.json()["items"])
 
 def test_csv_import_is_idempotent_and_labeled_as_merchant_reported(identity_client, db_session,
     monkeypatch):

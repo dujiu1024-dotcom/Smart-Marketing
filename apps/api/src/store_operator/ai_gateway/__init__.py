@@ -16,6 +16,7 @@ from store_operator.ai_gateway.prompt_runtime import (
     parse_and_validate_structured_output,
     render_published_prompt,
     validate_json_schema,
+    validate_structured_output,
 )
 from store_operator.ai_gateway.protocols import (
     ImageProvider,
@@ -78,4 +79,5 @@ __all__ = [
     "parse_and_validate_structured_output",
     "render_published_prompt",
     "validate_json_schema",
+    "validate_structured_output",
 ]

@@ -3050,6 +3050,11 @@
             "maxItems": 20,
             "title": "Selected Channel Keys",
             "type": "array"
+          },
+          "includes_video_script": {
+            "default": false,
+            "title": "Includes Video Script",
+            "type": "boolean"
           }
         },
         "title": "MarketingTaskOptions",

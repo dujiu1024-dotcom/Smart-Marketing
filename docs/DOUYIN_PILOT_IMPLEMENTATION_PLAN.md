@@ -136,3 +136,12 @@ CI Run [42998696426](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions
 - E2E/Infrastructure 仅验证仓库应用与 Demo 路由/状态 smoke，不是抖音真实平台验收
 
 仍未完成：OAuth state 持久化与回调 Session/store 校验、Secret Manager/SecretRef、ChannelAccount 账号授权管理、PublishOperation 幂等/重试/未知结果恢复、冻结包与账号能力关联、真实抖音应用审核与账号授权、真实上传/发布/作品读回。Issue #12 保持 Open。
+
+
+## 8. 发布 API 调用审计（2026-11-12）
+
+PR #93 已合并（merge commit：`b6ed0433c96148e6f6538cc04d2859cec649eb67`），新增 `PublishOperationAttempt` 持久化记录图片上传、图文发布提交和作品读回的调用尝试，保存请求指纹、适配器版本、抖音 `extra.logid`、归一化状态及错误码。发布提交遇到传输异常时按未知副作用处理，禁止自动重复发布。
+
+合并后审查发现作品读回路径的 `httpx.HTTPError` 未结束 Attempt 记录，PR #96 补齐传输异常审计；读回仅验证已提交作品，不创建新作品，因此可重试。
+
+以上仍是 API 尝试审计能力，不代表真实账号、OAuth 或作品发布验收完成。

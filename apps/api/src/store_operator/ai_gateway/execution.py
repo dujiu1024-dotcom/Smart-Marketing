@@ -20,7 +20,12 @@ from store_operator.ai_gateway.invocations import (
     fail_ai_invocation,
     start_ai_invocation,
 )
-from store_operator.ai_gateway.protocols import ImageProvider, OCRProvider, TextProvider, VisionProvider
+from store_operator.ai_gateway.protocols import (
+    ImageProvider,
+    OCRProvider,
+    TextProvider,
+    VisionProvider,
+)
 from store_operator.ai_gateway.registry import ProviderRegistry
 from store_operator.ai_gateway.schemas import (
     ImageEditRequest,

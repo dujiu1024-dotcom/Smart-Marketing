@@ -113,6 +113,7 @@ __all__ = [
     "HotTopic",
     "HotTopicSource",
     "MetricDefinition",
+    "MetricImportBatch",
     "MetricObservation",
     "OpportunityDecision",
     "StoreOpportunity",

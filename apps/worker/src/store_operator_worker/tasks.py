@@ -49,8 +49,8 @@ from store_operator.models import (  # type: ignore[import-untyped]
     ChannelAccount,
     ChannelContent,
     ChannelContentArtifactRef,
-    MediaAsset,
     Job,
+    MediaAsset,
     OutboxEvent,
     PublishConfirmation,
     PublishOperation,
@@ -477,6 +477,8 @@ def cleanup_orphaned_ai_image_objects(
                 continue
             object_key = response_ref.get("object_key")
             if not isinstance(object_key, str) or not object_key:
+                continue
+            if invocation.job_id is None:
                 continue
             job = db.get(Job, invocation.job_id)
             if (

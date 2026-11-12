@@ -32,6 +32,7 @@ from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretS
 from store_operator.models import (  # type: ignore[import-untyped]
     Artifact,
     ArtifactVersion,
+    BusinessFactSnapshot,
     Job,
     MarketingTask,
     PromptTemplate,
@@ -73,7 +74,10 @@ def _provider_secret_resolver(secret_ref: str) -> ProviderSecretResolver:
     return SecretStoreProviderResolver(AwsSecretsManagerStore(region_name=region))
 
 
-def _load_executor() -> tuple[AIProviderExecutor, httpx.AsyncClient, str, str]:
+def _load_executor(
+    capability: ProviderCapability = ProviderCapability.TEXT,
+    model_env_var: str = "AI_TEXT_MODEL_ID",
+) -> tuple[AIProviderExecutor, httpx.AsyncClient, str, str]:
     config = HttpProviderEnvironmentConfig.from_environment(os.environ)
     if config is None:
         raise _safe_error(
@@ -94,15 +98,15 @@ def _load_executor() -> tuple[AIProviderExecutor, httpx.AsyncClient, str, str]:
             "AI_PROVIDER_CONFIGURATION_INVALID",
             "AI provider configuration or Secret reference could not be resolved.",
         )
-    model_id = os.environ.get("AI_TEXT_MODEL_ID", "").strip()
-    text_models = config.models.get(ProviderCapability.TEXT, ())
-    if not model_id and len(text_models) == 1:
-        model_id = text_models[0]
-    if not model_id or model_id not in text_models:
+    model_id = os.environ.get(model_env_var, "").strip()
+    supported_models = config.models.get(capability, ())
+    if not model_id and len(supported_models) == 1:
+        model_id = supported_models[0]
+    if not model_id or model_id not in supported_models:
         asyncio.run(client.aclose())
         raise _safe_error(
-            "AI_TEXT_MODEL_NOT_CONFIGURED",
-            "A supported AI_TEXT_MODEL_ID must be configured for text generation.",
+            "AI_PROVIDER_MODEL_NOT_CONFIGURED",
+            f"A supported {model_env_var} must be configured for {capability.value}.",
         )
     executor = AIProviderExecutor(
         registry=registry,
@@ -115,6 +119,7 @@ def _published_prompt(
     db: Session,
     *,
     task_type: str,
+    capability: str = "text",
 ) -> PromptVersion:
     template_key = os.environ.get(
         f"AI_PROMPT_TEMPLATE_KEY_{task_type.upper()}",
@@ -122,7 +127,7 @@ def _published_prompt(
     ).strip()
     query = select(PromptTemplate).where(
         PromptTemplate.task_type == task_type,
-        PromptTemplate.capability == "text",
+        PromptTemplate.capability == capability,
         PromptTemplate.status == "active",
         PromptTemplate.current_published_version_id.is_not(None),
     )
@@ -135,17 +140,73 @@ def _published_prompt(
             "Exactly one active published prompt template must match this generation task.",
         )
     version = db.get(PromptVersion, templates[0].current_published_version_id)
-    if version is None or version.prompt_template_id != templates[0].id:
+    if (
+        version is None
+        or version.prompt_template_id != templates[0].id
+        or version.status != "published"
+    ):
         raise _safe_error(
             "AI_PROMPT_VERSION_UNAVAILABLE",
             "The active published prompt version is unavailable.",
         )
     validate_prompt_task_contract(
         task_type,
-        capability=templates[0].capability,
+        capability=capability,
         output_schema=dict(version.output_schema_json),
     )
     return version
+
+
+def _business_fact_snapshots(
+    db: Session,
+    *,
+    task: MarketingTask,
+    requirement: RequirementSnapshot,
+) -> list[BusinessFactSnapshot]:
+    refs = dict(requirement.payload_json).get("business_facts", [])
+    if not isinstance(refs, list):
+        raise _safe_error(
+            "AI_BUSINESS_FACTS_INVALID",
+            "The confirmed requirement snapshot has invalid business fact references.",
+        )
+    fact_ids: list[UUID] = []
+    for ref in refs:
+        if not isinstance(ref, dict):
+            raise _safe_error(
+                "AI_BUSINESS_FACTS_INVALID",
+                "The confirmed requirement snapshot has invalid business fact references.",
+            )
+        value = ref.get("business_fact_snapshot_id")
+        if not isinstance(value, str):
+            raise _safe_error(
+                "AI_BUSINESS_FACTS_INVALID",
+                "A confirmed business fact snapshot reference is missing.",
+            )
+        try:
+            fact_ids.append(UUID(value))
+        except ValueError as exc:
+            raise _safe_error(
+                "AI_BUSINESS_FACTS_INVALID",
+                "A confirmed business fact snapshot reference is invalid.",
+            ) from exc
+    if not fact_ids:
+        return []
+    facts = db.scalars(
+        select(BusinessFactSnapshot)
+        .where(
+            BusinessFactSnapshot.id.in_(fact_ids),
+            BusinessFactSnapshot.store_id == task.store_id,
+            BusinessFactSnapshot.task_id == task.id,
+            BusinessFactSnapshot.confirmation_status == "confirmed",
+        )
+        .order_by(BusinessFactSnapshot.fact_key)
+    ).all()
+    if len(facts) != len(set(fact_ids)):
+        raise _safe_error(
+            "AI_BUSINESS_FACTS_STALE",
+            "One or more confirmed business fact snapshots are no longer available.",
+        )
+    return list(facts)
 
 
 def _prompt_variables(
@@ -154,14 +215,30 @@ def _prompt_variables(
     task: MarketingTask,
     requirement: RequirementSnapshot,
     strategy: StrategySnapshot | None,
+    business_facts: list[BusinessFactSnapshot] | None = None,
+    extra_variables: dict[str, object] | None = None,
 ) -> dict[str, object]:
     requirement_payload = dict(requirement.payload_json)
+    fact_values = [
+        {
+            "fact_key": fact.fact_key,
+            "record_type": fact.source_type,
+            "value": dict(fact.value_json),
+            "source_version": fact.source_version,
+        }
+        for fact in business_facts or []
+    ]
+    fact_values_by_key = {
+        fact.fact_key: dict(fact.value_json) for fact in business_facts or []
+    }
     values: dict[str, object] = {
         "task_title": task.title,
         "task_type": task.task_type,
         "requirement": requirement_payload.get("requirement", {}),
         "requirements": requirement_payload.get("requirement", {}),
-        "business_facts": requirement_payload.get("business_facts", []),
+        "business_facts": fact_values,
+        "business_fact_refs": requirement_payload.get("business_facts", []),
+        "business_facts_by_key": fact_values_by_key,
         "task_options": dict(task.task_options_json),
         "strategy": (
             dict(strategy.payload_json).get("strategy", {})
@@ -172,6 +249,39 @@ def _prompt_variables(
             "selected_channel_keys", []
         ),
     }
+    for fact in business_facts or []:
+        fact_value = dict(fact.value_json)
+        values.setdefault(fact.fact_key, fact_value)
+        if fact.source_type == "product":
+            values.setdefault("product", fact_value)
+            if isinstance(fact_value.get("name"), str):
+                values.setdefault("product_name", fact_value["name"])
+            if isinstance(fact_value.get("description"), str):
+                values.setdefault("product_description", fact_value["description"])
+            values.setdefault(
+                "product_selling_points",
+                fact_value.get("key_selling_points_json", []),
+            )
+        elif fact.source_type == "offer":
+            values.setdefault("offer", fact_value)
+            if isinstance(fact_value.get("title"), str):
+                values.setdefault("offer_title", fact_value["title"])
+        elif fact.source_type == "brand_guideline":
+            values.setdefault("brand_guideline", fact_value)
+            for key in ("brand_story", "positioning", "visual_style", "tone_of_voice"):
+                if isinstance(fact_value.get(key), str):
+                    values.setdefault(key, fact_value[key])
+        elif fact.source_type == "store_profile":
+            values.setdefault("store_profile", fact_value)
+            if isinstance(fact_value.get("name"), str):
+                values.setdefault("store_name", fact_value["name"])
+        elif fact.source_type == "audience_profile":
+            values.setdefault("audience_profile", fact_value)
+            if isinstance(fact_value.get("name"), str):
+                values.setdefault("audience_name", fact_value["name"])
+    if extra_variables:
+        values.update(extra_variables)
+
     schema = version.variables_schema_json
     properties = schema.get("properties")
     required = schema.get("required", [])
@@ -199,6 +309,7 @@ def _call_text_provider(
     provider_id: str,
     model_id: str,
     executor: AIProviderExecutor,
+    idempotency_key: str | None = None,
 ) -> dict[str, object]:
     system_instruction, user_input = render_published_prompt(version, variables)
     request = TextGenerateRequest(
@@ -207,7 +318,7 @@ def _call_text_provider(
             store_id=task.store_id,
             job_id=job.id,
             attempt_id=context.attempt_id,
-            idempotency_key=job.idempotency_key,
+            idempotency_key=idempotency_key or job.idempotency_key,
             marketing_task_id=task.id,
             prompt_version_id=version.id,
         ),
@@ -275,8 +386,12 @@ def _complete_strategy(
                 "The confirmed requirement snapshot changed before strategy generation.",
             )
         version = _published_prompt(db, task_type="marketing_strategy")
+        business_facts = _business_fact_snapshots(
+            db, task=task, requirement=requirement
+        )
         variables = _prompt_variables(
-            version, task=task, requirement=requirement, strategy=None
+            version, task=task, requirement=requirement, strategy=None,
+            business_facts=business_facts,
         )
         task_id = task.id
         store_id = task.store_id
@@ -386,8 +501,12 @@ def _complete_copy(
                 "The confirmed strategy or requirement snapshot changed before copy generation.",
             )
         version = _published_prompt(db, task_type="copy_generation")
+        business_facts = _business_fact_snapshots(
+            db, task=task, requirement=requirement
+        )
         variables = _prompt_variables(
-            version, task=task, requirement=requirement, strategy=strategy
+            version, task=task, requirement=requirement, strategy=strategy,
+            business_facts=business_facts,
         )
         store_id = task.store_id
 

@@ -34,21 +34,23 @@ export default function AudienceWorkspace({storeId}:{storeId:string}) {
   const [items,setItems]=useState<AudienceProfile[]>([]);const [total,setTotal]=useState(0);
   const [selected,setSelected]=useState<AudienceProfile|null>(null);const [form,setForm]=useState<FormState>(empty);
   const [route,setRoute]=useState(window.location.hash||"#store:audience");
-  const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);const [dirty,setDirty]=useState(false);
+  const [loading,setLoading]=useState(true);const [listLoaded,setListLoaded]=useState(false);const [saving,setSaving]=useState(false);const [dirty,setDirty]=useState(false);
   const [error,setError]=useState("");const [notice,setNotice]=useState("");
   const createKey=useRef("");
   const editing=route.startsWith("#store-editor:audience:");
   const reload=useCallback(async()=>{
-    setLoading(true);setError("");
+    setLoading(true);setListLoaded(false);setError("");
     try{const response=await getAudienceProfiles(storeId);setItems(response.items);setTotal(response.total);}
-    catch(reason){setError(message(reason));}finally{setLoading(false);}
+    catch(reason){setError(message(reason));}finally{setLoading(false);setListLoaded(true);}
   },[storeId]);
   useEffect(()=>{const onRoute=()=>setRoute(window.location.hash||"#store:audience");window.addEventListener("hashchange",onRoute);void reload();return()=>window.removeEventListener("hashchange",onRoute);},[reload]);
   useEffect(()=>{
     if(!editing){setDirty(false);return;}const id=route.slice("#store-editor:audience:".length);
     if(id==="new"){setSelected(null);setForm(empty);setDirty(false);const key=`store-operator.audience-create.${storeId}`;createKey.current=sessionStorage.getItem(key)??crypto.randomUUID();sessionStorage.setItem(key,createKey.current);return;}
+    setSelected(null);setForm(empty);setDirty(false);
     const found=items.find(item=>item.id===id);if(found){setSelected(found);setForm(fromAudience(found));setDirty(false);}
-  },[editing,items,route]);
+    else if(listLoaded){setError("客群记录不存在，或当前门店无权访问。");}
+  },[editing,items,route,listLoaded]);
   function change<K extends keyof FormState>(key:K,value:FormState[K]){setForm(p=>({...p,[key]:value}));setDirty(true);setNotice("");}
   async function save(e:FormEvent<HTMLFormElement>){
     e.preventDefault();setSaving(true);setError("");setNotice("");
@@ -68,6 +70,7 @@ export default function AudienceWorkspace({storeId}:{storeId:string}) {
     catch(reason){setError(message(reason));}finally{setSaving(false);}
   }
   const segmentLabel:Record<AudienceProfile["segment_type"],string>={core:"核心客群",secondary:"次要客群",seasonal:"季节客群",scenario:"场景客群"};
+  if(editing && !route.endsWith(":new") && listLoaded && !items.some(item=>item.id===route.slice("#store-editor:audience:".length))) return <section className="empty-card"><h2>无法读取客群</h2><p>{error || "客群记录不存在，或当前门店无权访问。"}</p><button className="secondary" type="button" onClick={()=>{window.location.hash="#store:audience";}}>返回客群列表</button></section>;
   return <>
     <div className="page-heading"><div><p className="eyebrow">AUDIENCE & OPERATIONS</p><h1>客群与经营</h1><p className="muted">记录真实客群、消费场景、购买动机与常见异议，保留样本来源和置信信息。</p></div>
       {!editing&&<button className="primary" type="button" onClick={()=>{window.location.hash="#store-editor:audience:new";}}>新增客群</button>}

@@ -44,3 +44,99 @@ def test_outbox_dispatch_payload_requires_object_and_uuid() -> None:
 
 def test_outbox_relay_is_registered_as_celery_task() -> None:
     assert celery_app.tasks["jobs.relay_outbox"] is relay_outbox
+
+
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from types import SimpleNamespace
+
+
+class RelaySession:
+    def __init__(self, event):
+        self.event = event
+
+    def scalars(self, _statement):
+        return SimpleNamespace(all=lambda: [self.event])
+
+    def get(self, _model, event_id):
+        return self.event if self.event.id == event_id else None
+
+    def scalar(self, _statement):
+        return self.event
+
+
+class RelaySessionFactory:
+    def __init__(self, event):
+        self.event = event
+
+    @contextmanager
+    def begin(self):
+        yield RelaySession(self.event)
+
+    @contextmanager
+    def __call__(self):
+        yield RelaySession(self.event)
+
+
+def make_outbox_event(*, attempts: int = 0):
+    return SimpleNamespace(
+        id=uuid4(),
+        status="pending",
+        event_type="job.dispatch_requested",
+        payload_json={"job_id": str(uuid4())},
+        publish_attempts=attempts,
+        available_at=datetime.now(UTC),
+        locked_by=None,
+        locked_until=None,
+        published_at=None,
+        last_error=None,
+    )
+
+
+def test_outbox_relay_publishes_and_clears_lease(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    from store_operator_worker import tasks
+
+    event = make_outbox_event()
+    monkeypatch.setattr(tasks, "SessionLocal", RelaySessionFactory(event))
+    sent = []
+    monkeypatch.setattr(
+        tasks.celery_app,
+        "send_task",
+        lambda *args, **kwargs: sent.append((args, kwargs)),
+    )
+
+    assert tasks.relay_outbox() == 1
+    assert len(sent) == 1
+    assert sent[0][0][0] == "jobs.execute"
+    assert sent[0][1]["task_id"] == str(event.id)
+    assert event.status == "published"
+    assert event.published_at is not None
+    assert event.locked_by is None
+    assert event.locked_until is None
+    assert event.last_error is None
+
+
+def test_outbox_relay_releases_lease_and_schedules_retry_on_broker_error(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    from store_operator_worker import tasks
+
+    event = make_outbox_event()
+    monkeypatch.setattr(tasks, "SessionLocal", RelaySessionFactory(event))
+
+    def fail_send(*_args, **_kwargs):
+        raise RuntimeError("broker credentials must not leak")
+
+    monkeypatch.setattr(tasks.celery_app, "send_task", fail_send)
+
+    assert tasks.relay_outbox() == 0
+    assert event.status == "pending"
+    assert event.publish_attempts == 1
+    assert event.available_at > datetime.now(UTC)
+    assert event.locked_by is None
+    assert event.locked_until is None
+    assert "broker credentials" not in (event.last_error or "")

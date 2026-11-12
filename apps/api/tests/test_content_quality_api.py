@@ -118,7 +118,13 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
     content_payload = {
         "channel_key": "douyin",
         "copy_version_id": version_id,
-        "channel_spec_version_id": str(uuid4()),
+        "channel_spec_version_id": str(
+            db_session.query(ChannelSpecVersion)
+            .join(ChannelSpec, ChannelSpec.id == ChannelSpecVersion.channel_spec_id)
+            .filter(ChannelSpec.channel_key == "douyin")
+            .one()
+            .id
+        ),
         "payload": {"title": "Lunch offer", "body": "Visit us for lunch this week."},
         "image_version_ids": [],
     }

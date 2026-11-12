@@ -347,3 +347,11 @@ CI Run [42997147535](https://github.com/dujiu1024-dotcom/Smart-Marketing/actions
 - Infrastructure：完整 Compose 启动、API/Web readiness、PostgreSQL volume restart persistence 通过
 
 Issue #6 仍 Open。恶意文件扫描、缩略图/尺寸元数据、Worker 扫描状态回写、UploadIntent 过期清理和素材库前端仍未实现。
+
+
+## 2026-11-12 素材资产生产 Web 接入补充
+
+- `#store:assets` 已接入真实素材列表与上传/归档/使用权交互；前端上传使用服务端 upload-intent 与预签名 PUT，完成接口在服务端重新校验对象大小、MIME 和 SHA-256。
+- 私有对象存储配置拆分为内部 API/Worker endpoint 与浏览器 presigned URL endpoint，避免容器内 `localhost` 错误指向 API 容器，也避免向浏览器暴露不可解析的 Docker 服务主机名。
+- 本地 SeaweedFS CORS 仅允许两个本地开发 origin；生产对象存储必须配置精确的 Web Origin、PUT/GET 方法和必要请求头。
+- 文件上传完成仍停留在隔离/扫描状态；ClamAV/恶意文件扫描、Worker ready/rejected 回写、缩略图和 UploadIntent 过期清理未完成。哈希与 MIME 校验不等于恶意文件扫描。

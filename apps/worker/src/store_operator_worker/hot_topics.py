@@ -78,7 +78,7 @@ def _assert_public_host(host: str, allowed: set[str]) -> str:
             retryable=False,
         )
     try:
-        addresses = {item[4][0] for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)}
+        addresses = {str(item[4][0]) for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)}
     except OSError as exc:
         raise JobExecutionError(
             "SOURCE_DNS_FAILED", "Feed host could not be resolved.", retryable=True

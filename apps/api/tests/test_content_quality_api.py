@@ -368,3 +368,87 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
         image_created.json()["id"],
         created.json()["id"],
     }
+
+
+def test_publish_package_freeze_requires_confirmed_requirement_and_strategy(
+    identity_client, db_session, monkeypatch
+) -> None:
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = User(
+        id=uuid4(),
+        email_normalized="package-freeze-gate@example.com",
+        password_hash=hash_password("test-password-123"),
+        status="active",
+    )
+    db_session.add(user)
+    db_session.flush()
+    store = Store(
+        id=uuid4(),
+        name="Package Freeze Gate",
+        timezone="Asia/Tokyo",
+        status="active",
+    )
+    db_session.add(store)
+    db_session.flush()
+    db_session.add(
+        StoreMembership(
+            id=uuid4(),
+            store_id=store.id,
+            user_id=user.id,
+            role="owner",
+            status="active",
+            joined_at=datetime.now(UTC),
+        )
+    )
+    db_session.commit()
+
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "package-freeze-gate@example.com",
+            "password": "test-password-123",
+        },
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": login.json()["csrf_token"],
+        "X-Store-ID": str(store.id),
+        "Idempotency-Key": "package-freeze-task-create",
+    }
+    task = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers=headers,
+        json={
+            "task_type": "copy_only",
+            "title": "Package freeze gate test",
+            "requirement_draft": {"goal": "Test package gate"},
+            "task_options": {
+                "includes_copy": True,
+                "includes_image": False,
+                "opportunity_applicable": False,
+                "selected_channel_keys": ["douyin"],
+                "requires_external_delivery": False,
+            },
+        },
+    )
+    assert task.status_code == 201, task.text
+
+    response = identity_client.post(
+        f"/api/v1/marketing-tasks/{task.json()['id']}/publish-packages",
+        headers={**headers, "Idempotency-Key": "package-freeze-before-confirmation"},
+        json={
+            "items": [
+                {
+                    "channel_content_id": str(uuid4()),
+                    "quality_report_id": str(uuid4()),
+                    "delivery_mode": "manual_handoff",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "TASK_SNAPSHOTS_REQUIRED"

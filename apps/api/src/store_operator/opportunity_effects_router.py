@@ -926,6 +926,7 @@ def register_published_work_from_readback(
         channel_account_id=account.id,
         channel_key=package_item.channel_key,
         external_work_id=operation.platform_item_id,
+        published_at=operation.published_at,
         ownership_status="verified_system_publish",
         verified_at=operation.last_readback_at,
         source_snapshot_json=snapshot,

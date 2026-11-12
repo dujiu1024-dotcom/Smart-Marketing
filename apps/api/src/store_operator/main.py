@@ -33,6 +33,7 @@ from store_operator.db import engine, redis_client
 from store_operator.jobs.router import router as jobs_router
 from store_operator.marketing_tasks.router import router as marketing_tasks_router
 from store_operator.observability import configure_logging
+from store_operator.opportunity_effects_router import router as opportunity_effects_router
 from store_operator.prompt_management_router import router as prompt_management_router
 from store_operator.store_knowledge_router import router as store_knowledge_router
 from store_operator.store_router import router as store_router
@@ -204,6 +205,7 @@ app.include_router(content_publishing_router, prefix="/api/v1")
 app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(prompt_management_router, prefix="/api/v1")
+app.include_router(opportunity_effects_router, prefix="/api/v1")
 
 
 @app.get("/health/live", tags=["health"])

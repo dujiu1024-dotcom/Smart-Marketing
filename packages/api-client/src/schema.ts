@@ -2362,6 +2362,8 @@ export interface components {
         };
         /** MetricObservationInput */
         MetricObservationInput: {
+            /** Currency */
+            currency?: string | null;
             /** Metric Key */
             metric_key: string;
             /** Period End */

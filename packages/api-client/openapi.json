@@ -3373,6 +3373,19 @@
       "MetricObservationInput": {
         "additionalProperties": false,
         "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "maxLength": 3,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
           "metric_key": {
             "maxLength": 120,
             "minLength": 1,

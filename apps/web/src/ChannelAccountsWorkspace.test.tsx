@@ -5,6 +5,7 @@ import ChannelAccountsWorkspace from "./ChannelAccountsWorkspace";
 afterEach(() => cleanup());
 const api = vi.hoisted(() => ({
   listChannelSpecs: vi.fn(),
+  listDouyinAccountCapabilities: vi.fn(),
   listDouyinAccounts: vi.fn(),
   startDouyinAuthorization: vi.fn(),
   refreshDouyinAccount: vi.fn(),
@@ -15,6 +16,7 @@ describe("channel accounts workspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.listDouyinAccounts.mockResolvedValue([]);
+    api.listDouyinAccountCapabilities.mockResolvedValue([]);
     api.listChannelSpecs.mockResolvedValue([{
       id: "spec-1", channel_key: "douyin", status: "active",
       current_version: {

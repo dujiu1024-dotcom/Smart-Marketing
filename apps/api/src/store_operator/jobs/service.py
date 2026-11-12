@@ -11,7 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from store_operator.ai_gateway.errors import SideEffectState
-from store_operator.models.identity import Store
+from store_operator.models.identity import Store, StoreMembership
 from store_operator.models.job_runtime import Job, JobAttempt, JobEvent, OutboxEvent
 
 SYSTEM_SCOPE_ID = UUID("00000000-0000-0000-0000-000000000001")
@@ -342,6 +342,24 @@ def recover_expired_jobs(
     return recovered
 
 
+def _cancel_before_claim(
+    db: Session,
+    job: Job,
+    *,
+    now: datetime,
+    reason: str,
+    error_code: str,
+) -> None:
+    """Prevent queued work from executing after its store/actor authorization is revoked."""
+    job.status = "cancelled"
+    job.error_code = error_code
+    job.error_summary = "Execution authorization is no longer active."
+    job.finished_at = now
+    _clear_lease(job)
+    _append_event(db, job, "job.cancelled", data={"reason": reason})
+    db.flush()
+
+
 def claim_job(
     db: Session,
     *,
@@ -381,11 +399,37 @@ def claim_job(
         return None
 
     if job.store_id is not None:
-        store_id = db.scalar(
-            select(Store.id).where(Store.id == job.store_id).with_for_update()
+        store = db.scalar(
+            select(Store).where(Store.id == job.store_id).with_for_update()
         )
-        if store_id is None:
+        if store is None:
             raise LookupError("Job store no longer exists")
+        if store.status != "active":
+            _cancel_before_claim(
+                db,
+                job,
+                now=current_time,
+                reason="store_not_active",
+                error_code="STORE_NOT_ACTIVE",
+            )
+            return None
+        if job.actor_user_id is not None:
+            active_membership_id = db.scalar(
+                select(StoreMembership.id).where(
+                    StoreMembership.store_id == job.store_id,
+                    StoreMembership.user_id == job.actor_user_id,
+                    StoreMembership.status == "active",
+                )
+            )
+            if active_membership_id is None:
+                _cancel_before_claim(
+                    db,
+                    job,
+                    now=current_time,
+                    reason="actor_membership_revoked",
+                    error_code="ACTOR_MEMBERSHIP_REVOKED",
+                )
+                return None
         running_count = db.scalar(
             select(func.count(Job.id)).where(
                 Job.store_id == job.store_id,

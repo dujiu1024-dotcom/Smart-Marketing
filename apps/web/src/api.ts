@@ -580,6 +580,7 @@ export type TaskStepKey =
 export interface MarketingTaskOptions {
   includes_copy: boolean | null;
   includes_image: boolean | null;
+  includes_video_script: boolean;
   opportunity_applicable: boolean | null;
   selected_channel_keys: string[];
   requires_external_delivery: boolean;

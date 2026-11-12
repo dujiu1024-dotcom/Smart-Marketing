@@ -2804,6 +2804,11 @@
             ],
             "title": "Includes Image"
           },
+          "includes_video_script": {
+            "default": false,
+            "title": "Includes Video Script",
+            "type": "boolean"
+          },
           "opportunity_applicable": {
             "anyOf": [
               {

@@ -438,6 +438,7 @@ def execute_job(job_id: str) -> dict[str, str]:
         heartbeat_thread.join(timeout=HEARTBEAT_INTERVAL_SECONDS + 1)
 
 
+
 @celery_app.task(
     name="jobs.recover_expired_leases", ignore_result=True
 )  # type: ignore[untyped-decorator]

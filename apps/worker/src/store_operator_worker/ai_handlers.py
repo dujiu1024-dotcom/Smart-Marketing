@@ -60,6 +60,12 @@ def _safe_error(code: str, summary: str) -> JobExecutionError:
     return JobExecutionError(code, summary, retryable=False)
 
 
+def _operation_idempotency_key(job: Job, operation: str) -> str:
+    return hashlib.sha256(
+        f"{job.idempotency_key}:{operation}".encode()
+    ).hexdigest()
+
+
 def _provider_secret_resolver(secret_ref: str) -> ProviderSecretResolver:
     if secret_ref.startswith("env://"):
         return EnvironmentSecretResolver()
@@ -249,6 +255,18 @@ def _prompt_variables(
             "selected_channel_keys", []
         ),
     }
+    task_options = dict(task.task_options_json)
+    requirement_fields = requirement_payload.get("requirement", {})
+    strategy_fields = values["strategy"]
+    if isinstance(requirement_fields, dict):
+        for key, value in requirement_fields.items():
+            values.setdefault(key, value)
+    if isinstance(strategy_fields, dict):
+        for key, value in strategy_fields.items():
+            values.setdefault(key, value)
+    for key, value in task_options.items():
+        values.setdefault(key, value)
+
     for fact in business_facts or []:
         fact_value = dict(fact.value_json)
         values.setdefault(fact.fact_key, fact_value)
@@ -449,6 +467,23 @@ def _complete_strategy(
     }
 
 
+def _merge_copy_revision(
+    previous_copy: dict[str, object],
+    revision_output: dict[str, object],
+    generation_output_schema: dict[str, object],
+) -> dict[str, object]:
+    copy_fields: dict[str, object] = {
+        "title": revision_output["title"],
+        "body": revision_output["body"],
+        "hashtags": previous_copy.get("hashtags", []),
+        "call_to_action": previous_copy.get("call_to_action", ""),
+    }
+    validate_structured_output(copy_fields, generation_output_schema)
+    merged = {**previous_copy, **copy_fields}
+    merged["change_summary"] = revision_output["change_summary"]
+    return merged
+
+
 def _complete_copy(
     context: JobExecutionContext,
     payload_ref: dict[str, object],
@@ -467,6 +502,23 @@ def _complete_copy(
         strategy_id = UUID(str(strategy_id_value))
     except ValueError as exc:
         raise _safe_error("AI_COPY_PAYLOAD_INVALID", "Copy generation payload is invalid.") from exc
+
+    revision_instruction = payload_ref.get("revision_instruction", "")
+    if not isinstance(revision_instruction, str) or len(revision_instruction) > 4000:
+        raise _safe_error("AI_COPY_REVISION_INVALID", "Copy revision instruction is invalid.")
+    revision_instruction = revision_instruction.strip()
+    previous_version_value = payload_ref.get("previous_artifact_version_id")
+    previous_version_id: UUID | None = None
+    if previous_version_value is not None:
+        if not isinstance(previous_version_value, str):
+            raise _safe_error("AI_COPY_REVISION_INVALID", "Previous copy version reference is invalid.")
+        try:
+            previous_version_id = UUID(previous_version_value)
+        except ValueError as exc:
+            raise _safe_error(
+                "AI_COPY_REVISION_INVALID",
+                "Previous copy version reference is invalid.",
+            ) from exc
 
     with _session_factory()() as db:
         job = db.get(Job, context.job_id)
@@ -500,23 +552,144 @@ def _complete_copy(
                 "AI_COPY_INPUT_STALE",
                 "The confirmed strategy or requirement snapshot changed before copy generation.",
             )
-        version = _published_prompt(db, task_type="copy_generation")
+        artifact = db.scalar(
+            select(Artifact).where(
+                Artifact.store_id == task.store_id,
+                Artifact.task_id == task_id,
+                Artifact.artifact_type == "copy",
+            ).with_for_update()
+        )
+        if previous_version_id is not None:
+            if artifact is None or artifact.current_version_id != previous_version_id:
+                raise _safe_error(
+                    "AI_COPY_REVISION_STALE",
+                    "The copy version selected for revision is no longer current.",
+                )
+            previous_version = db.scalar(
+                select(ArtifactVersion).where(
+                    ArtifactVersion.id == previous_version_id,
+                    ArtifactVersion.store_id == task.store_id,
+                    ArtifactVersion.artifact_id == artifact.id,
+                )
+            )
+            if previous_version is None:
+                raise _safe_error(
+                    "AI_COPY_REVISION_STALE",
+                    "The copy version selected for revision is no longer available.",
+                )
+        elif revision_instruction and artifact is not None and artifact.current_version_id is not None:
+            previous_version = db.scalar(
+                select(ArtifactVersion).where(
+                    ArtifactVersion.id == artifact.current_version_id,
+                    ArtifactVersion.store_id == task.store_id,
+                    ArtifactVersion.artifact_id == artifact.id,
+                )
+            )
+            if previous_version is not None:
+                previous_version_id = previous_version.id
+        else:
+            previous_version = None
+        previous_copy = (
+            dict(previous_version.content_json or {})
+            if previous_version is not None
+            else None
+        )
+        is_revision = bool(revision_instruction and previous_copy is not None)
+        version = _published_prompt(
+            db,
+            task_type="copy_revision" if is_revision else "copy_generation",
+        )
+        generation_contract_version = (
+            _published_prompt(db, task_type="copy_generation")
+            if is_revision
+            else version
+        )
         business_facts = _business_fact_snapshots(
             db, task=task, requirement=requirement
         )
+        extra_variables: dict[str, object] = {}
+        if revision_instruction:
+            extra_variables["revision_instruction"] = revision_instruction
+        if previous_copy is not None:
+            extra_variables["previous_copy"] = previous_copy
+            extra_variables["current_copy"] = previous_copy
+            extra_variables["copy"] = previous_copy
         variables = _prompt_variables(
-            version, task=task, requirement=requirement, strategy=strategy,
+            version,
+            task=task,
+            requirement=requirement,
+            strategy=strategy,
             business_facts=business_facts,
+            extra_variables=extra_variables,
+        )
+        include_video_script = bool(
+            dict(task.task_options_json).get("includes_video_script", False)
+        )
+        video_script_version = (
+            _published_prompt(db, task_type="video_script")
+            if include_video_script
+            else None
         )
         store_id = task.store_id
 
     executor, client, provider_id, model_id = _load_executor()
     try:
-        output = _call_text_provider(
-            context=context, job=job, task=task, version=version,
-            variables=variables, provider_id=provider_id, model_id=model_id,
+        revision_output = _call_text_provider(
+            context=context,
+            job=job,
+            task=task,
+            version=version,
+            variables=variables,
+            provider_id=provider_id,
+            model_id=model_id,
             executor=executor,
+            idempotency_key=_operation_idempotency_key(
+                job, "copy-revision" if is_revision else "copy-generation"
+            ),
         )
+        if is_revision and previous_copy is not None:
+            output = _merge_copy_revision(
+                previous_copy,
+                revision_output,
+                dict(generation_contract_version.output_schema_json),
+            )
+        else:
+            output = dict(revision_output)
+
+        if video_script_version is not None:
+            video_variables = _prompt_variables(
+                video_script_version,
+                task=task,
+                requirement=requirement,
+                strategy=strategy,
+                business_facts=business_facts,
+                extra_variables={
+                    "copy": {
+                        key: value for key, value in output.items()
+                        if key != "video_script"
+                    },
+                    "marketing_copy": {
+                        key: value for key, value in output.items()
+                        if key != "video_script"
+                    },
+                    "copy_title": output.get("title", ""),
+                    "copy_body": output.get("body", ""),
+                    "revision_instruction": revision_instruction,
+                    "previous_copy": previous_copy or {},
+                },
+            )
+            video_script = _call_text_provider(
+                context=context,
+                job=job,
+                task=task,
+                version=video_script_version,
+                variables=video_variables,
+                provider_id=provider_id,
+                model_id=model_id,
+                executor=executor,
+                idempotency_key=_operation_idempotency_key(job, "video-script"),
+            )
+            output["video_script"] = video_script
     finally:
         asyncio.run(client.aclose())
 
@@ -532,6 +705,16 @@ def _complete_copy(
                 "requirement_fingerprint": requirement.content_fingerprint,
                 "strategy_fingerprint": strategy.content_fingerprint,
                 "prompt_version_id": str(version.id),
+                "generation_contract_prompt_version_id": str(generation_contract_version.id),
+                "video_script_prompt_version_id": (
+                    str(video_script_version.id)
+                    if video_script_version is not None
+                    else None
+                ),
+                "previous_artifact_version_id": (
+                    str(previous_version_id) if previous_version_id else None
+                ),
+                "revision_instruction": revision_instruction,
                 "job_idempotency_key": job.idempotency_key,
             },
             sort_keys=True,
@@ -589,17 +772,36 @@ def _complete_copy(
                     ArtifactVersion.artifact_id == artifact.id,
                 ).order_by(ArtifactVersion.version_no.desc()).limit(1)
             ) or 0
+            source_refs = [
+                {"type": "requirement_snapshot", "id": str(requirement_id)},
+                {"type": "strategy_snapshot", "id": str(strategy_id)},
+            ]
+            if generation_contract_version.id != version.id:
+                source_refs.append({
+                    "type": "copy_generation_contract_prompt_version",
+                    "id": str(generation_contract_version.id),
+                })
+            if previous_version is not None:
+                source_refs.append({
+                    "type": "previous_artifact_version",
+                    "id": str(previous_version.id),
+                })
+            if video_script_version is not None:
+                source_refs.append({
+                    "type": "video_script_prompt_version",
+                    "id": str(video_script_version.id),
+                })
             artifact_version = ArtifactVersion(
                 id=uuid4(),
                 store_id=store_id,
                 artifact_id=artifact.id,
                 version_no=latest_version + 1,
                 source_type="ai_generated",
-                source_refs_json=[
-                    {"type": "requirement_snapshot", "id": str(requirement_id)},
-                    {"type": "strategy_snapshot", "id": str(strategy_id)},
-                ],
-                instruction="Generate marketing copy from confirmed task strategy.",
+                source_refs_json=source_refs,
+                instruction=(
+                    revision_instruction
+                    or "Generate marketing copy from confirmed task strategy."
+                ),
                 content_json=output,
                 content_hash=content_hash,
                 provider_id=provider_id,
@@ -619,6 +821,11 @@ def _complete_copy(
             "artifact_id": str(artifact.id),
             "artifact_version_id": str(artifact_version.id),
         }]
+        if video_script_version is not None:
+            step.output_refs_json.append({
+                "type": "video_script",
+                "prompt_version_id": str(video_script_version.id),
+            })
         step.blocked_by_json = []
         step.block_code = None
         step.block_detail_json = None
@@ -628,6 +835,7 @@ def _complete_copy(
         "artifact_id": str(artifact.id),
         "artifact_version_id": str(artifact_version.id),
         "prompt_version_id": str(version.id),
+        "video_script_included": video_script_version is not None,
         "output_type": "copy",
     }
 

@@ -2030,6 +2030,11 @@ export interface components {
             includes_copy?: boolean | null;
             /** Includes Image */
             includes_image?: boolean | null;
+            /**
+             * Includes Video Script
+             * @default false
+             */
+            includes_video_script: boolean;
             /** Opportunity Applicable */
             opportunity_applicable?: boolean | null;
             /**

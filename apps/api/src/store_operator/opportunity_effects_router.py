@@ -811,6 +811,9 @@ def effects_overview(
     delayed_count = sum(
         1 for item, _ in rows if item.sync_status == "delayed"
     )
+    completed_verified_count = max(
+        0, verified_count - accumulating_count - window_unknown_count
+    )
     incomplete_count = sum(
         1
         for item, _ in rows
@@ -1107,14 +1110,14 @@ def effects_overview(
             "window_unknown_observations": window_unknown_count,
             "delayed_observations": delayed_count,
             "incomplete_or_anomalous_observations": incomplete_count,
-            "status": "available" if verified_count else "unavailable",
+            "status": "available" if completed_verified_count else "unavailable",
             "reason": (
                 None
-                if verified_count
-                else "缺少完整、当前且已核验的指标观测；手工报告不进入正式趋势和经营结论。"
+                if completed_verified_count
+                else "暂无已完成统计窗口的完整、当前且已核验指标观测。"
             ),
         },
-        "data_status": "available" if cards else "unavailable",
+        "data_status": "available" if completed_verified_count else "unavailable",
         "business_outcomes": {
             "roi": None,
             "sales_growth": None,

@@ -5,10 +5,12 @@ from sqlalchemy.orm import Session
 
 from store_operator.auth.security import hash_password
 from store_operator.models import (
+    AuditEvent,
     ChannelAccount,
     ChannelCapabilitySnapshot,
     ChannelSpec,
     ChannelSpecVersion,
+    PlatformAdminGrant,
     Store,
     StoreMembership,
     User,
@@ -144,3 +146,76 @@ def test_channel_specs_are_store_authenticated_and_unverified_by_default(
     assert capabilities.status_code == 200, capabilities.text
     assert capabilities.json()[0]["capability_key"] == "publish_image_text"
     assert capabilities.json()[0]["support_status"] == "pending_verification"
+
+
+def test_platform_admin_publishes_a_new_verified_channel_spec_version(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = User(
+        id=uuid4(),
+        email_normalized="channel-spec-admin@example.com",
+        password_hash=hash_password("test-password-123"),
+        status="active",
+    )
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(
+        PlatformAdminGrant(
+            id=uuid4(),
+            user_id=user.id,
+            status="active",
+            reason_code="test_fixture",
+        )
+    )
+    db_session.flush()
+    spec = db_session.query(ChannelSpec).filter_by(channel_key="douyin").one()
+    previous_version_id = spec.current_version_id
+
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "channel-spec-admin@example.com", "password": "test-password-123"},
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert login.status_code == 200, login.text
+    headers = {
+        "Origin": "http://localhost:5173",
+        "X-CSRF-Token": login.json()["csrf_token"],
+    }
+    response = identity_client.post(
+        "/api/v1/admin/channel-specs/douyin/versions",
+        headers={**headers, "Idempotency-Key": "publish-douyin-spec-v2"},
+        json={
+            "expected_current_version_id": str(previous_version_id),
+            "source_document_ref": "https://open.douyin.com/platform/resource/docs",
+            "text_constraints": {"max_length": 2000},
+            "media_constraints": {"max_images": 9},
+            "hashtag_constraints": {"max_count": 10},
+            "link_constraints": {},
+            "schedule_constraints": {},
+            "draft_supported": True,
+            "publish_supported": False,
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["spec_version"] == 2
+    assert response.json()["verification_status"] == "verified"
+    assert response.json()["draft_supported"] is True
+    assert response.json()["publish_supported"] is False
+    db_session.refresh(spec)
+    assert spec.current_version_id == response.json()["id"]
+    audit = db_session.query(AuditEvent).filter_by(action="channel.spec_version.published").one()
+    assert audit.target_id == response.json()["id"]
+
+    stale = identity_client.post(
+        "/api/v1/admin/channel-specs/douyin/versions",
+        headers={**headers, "Idempotency-Key": "publish-douyin-spec-stale"},
+        json={
+            "expected_current_version_id": str(previous_version_id),
+            "source_document_ref": "https://open.douyin.com/platform/resource/docs",
+        },
+    )
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "STALE_CHANNEL_SPEC_VERSION"

@@ -631,3 +631,30 @@ def test_media_asset_archive_checks_references_and_is_audited(
     assert archived.status_code == 200, archived.text
     assert archived.json()["status"] == "archived"
     assert db_session.get(MediaAsset, asset.id).status == "archived"
+
+    failed_asset = MediaAsset(
+        id=uuid4(),
+        store_id=store.id,
+        object_key=f"stores/{store.id}/quarantine/archive/scan-failed.png",
+        sha256="c" * 64,
+        mime_type="image/png",
+        byte_size=1024,
+        asset_type="image",
+        source_type="merchant_upload",
+        usage_rights_status="unknown",
+        status="scan_failed",
+        version_no=2,
+        created_by_user_id=user.id,
+    )
+    db_session.add(failed_asset)
+    db_session.flush()
+    failed_archive = identity_client.post(
+        f"/api/v1/store/assets/{failed_asset.id}/archive",
+        headers={
+            **headers,
+            "If-Match": '"2"',
+            "Idempotency-Key": "asset-archive-scan-failed",
+        },
+    )
+    assert failed_archive.status_code == 200, failed_archive.text
+    assert failed_archive.json()["status"] == "archived"

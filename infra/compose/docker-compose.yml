@@ -30,6 +30,18 @@ services:
     ports: ["8333:8333", "9333:9333", "8888:8888"]
     volumes: ["seaweed_data:/data"]
 
+  clamav:
+    image: clamav/clamav:1.4
+    ports: ["3310:3310"]
+    volumes: ["clamav_data:/var/lib/clamav"]
+    mem_limit: 4g
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping=1 --no-summary"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+
   api:
     build:
       context: ../..
@@ -59,9 +71,13 @@ services:
       DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
       REDIS_URL: redis://redis:6379/0
       OBJECT_STORAGE_ENDPOINT_URL: http://seaweedfs:8333
+      ASSET_SCANNER_HOST: clamav
+      ASSET_SCANNER_PORT: 3310
+      ASSET_SCANNER_TIMEOUT_SECONDS: 120
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      clamav: { condition: service_healthy }
     healthcheck:
       test:
         - CMD-SHELL
@@ -89,9 +105,13 @@ services:
       DATABASE_URL: postgresql+psycopg://store_operator:${POSTGRES_PASSWORD}@postgres:5432/store_operator
       REDIS_URL: redis://redis:6379/0
       OBJECT_STORAGE_ENDPOINT_URL: http://seaweedfs:8333
+      ASSET_SCANNER_HOST: clamav
+      ASSET_SCANNER_PORT: 3310
+      ASSET_SCANNER_TIMEOUT_SECONDS: 120
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      clamav: { condition: service_healthy }
 
   web:
     build:
@@ -111,3 +131,4 @@ volumes:
   postgres_data:
   redis_data:
   seaweed_data:
+  clamav_data:

@@ -12,9 +12,10 @@ from threading import Event, Thread
 from typing import Any, cast
 from uuid import UUID, uuid4
 
+import httpx
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError
-from sqlalchemy import create_engine, or_, select
+from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
@@ -52,6 +53,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
     OutboxEvent,
     PublishConfirmation,
     PublishOperation,
+    PublishOperationAttempt,
     PublishPackage,
     PublishPackageItem,
     QualityReport,
@@ -719,6 +721,69 @@ def _set_douyin_publish_state(
             operation.next_attempt_at = datetime.now(UTC) + timedelta(seconds=30)
 
 
+def _begin_douyin_publish_attempt(
+    operation_id: UUID,
+    store_id: UUID,
+    *,
+    action: str,
+) -> UUID:
+    with SessionLocal.begin() as db:
+        operation = db.scalar(
+            select(PublishOperation)
+            .where(
+                PublishOperation.id == operation_id,
+                PublishOperation.store_id == store_id,
+            )
+            .with_for_update()
+        )
+        if operation is None:
+            raise JobExecutionError(
+                "DOUYIN_PUBLISH_OPERATION_NOT_FOUND",
+                "The publish operation no longer exists.",
+                retryable=False,
+            )
+        latest_no = db.scalar(
+            select(func.max(PublishOperationAttempt.attempt_no)).where(
+                PublishOperationAttempt.store_id == store_id,
+                PublishOperationAttempt.publish_operation_id == operation_id,
+            )
+        )
+        attempt = PublishOperationAttempt(
+            id=uuid4(),
+            store_id=store_id,
+            publish_operation_id=operation_id,
+            attempt_no=(latest_no or 0) + 1,
+            action=action,
+            adapter_version="douyin-openapi-v1",
+            request_fingerprint=operation.request_fingerprint,
+            normalized_status="started",
+            retryable=False,
+            started_at=datetime.now(UTC),
+        )
+        db.add(attempt)
+        db.flush()
+        return attempt.id
+
+
+def _finish_douyin_publish_attempt(
+    attempt_id: UUID,
+    *,
+    normalized_status: str,
+    retryable: bool,
+    error_code: str | None = None,
+    external_request_id: str | None = None,
+) -> None:
+    with SessionLocal.begin() as db:
+        attempt = db.get(PublishOperationAttempt, attempt_id)
+        if attempt is None:
+            return
+        attempt.normalized_status = normalized_status
+        attempt.retryable = retryable
+        attempt.error_code = error_code
+        attempt.external_request_id = external_request_id
+        attempt.finished_at = datetime.now(UTC)
+
+
 def _mark_douyin_account_reauth_required(account_id: UUID, store_id: UUID) -> None:
     with SessionLocal.begin() as db:
         account = db.scalar(
@@ -1195,11 +1260,25 @@ def execute_douyin_image_text_publish(
                 uploaded_ids: list[str] = []
                 for index, (filename, mime_type, content) in enumerate(image_bytes):
                     context.check_control()
-                    uploaded = await client.upload_image(
-                        access_token=access_token,
-                        filename=filename,
-                        content=content,
-                        content_type=mime_type,
+                    attempt_id = _begin_douyin_publish_attempt(
+                        operation_id, store_id, action="upload_image"
+                    )
+                    try:
+                        uploaded = await client.upload_image(
+                            access_token=access_token,
+                            filename=filename,
+                            content=content,
+                            content_type=mime_type,
+                        )
+                    except (DouyinApiError, httpx.HTTPError) as exc:
+                        _finish_douyin_publish_attempt(
+                            attempt_id, normalized_status="failed", retryable=True,
+                            error_code=exc.code if isinstance(exc, DouyinApiError) else "HTTP_TRANSPORT_ERROR",
+                        )
+                        raise
+                    _finish_douyin_publish_attempt(
+                        attempt_id, normalized_status="accepted", retryable=False,
+                        external_request_id=uploaded.get("external_request_id"),
                     )
                     uploaded_ids.append(uploaded["image_id"])
                     context.update_progress(current=index + 1, total=len(image_bytes))
@@ -1209,7 +1288,7 @@ def execute_douyin_image_text_publish(
 
         try:
             uploaded_ids = asyncio.run(upload_all_images())
-        except DouyinApiError as exc:
+        except (DouyinApiError, httpx.HTTPError) as exc:
             raise JobExecutionError(
                 "DOUYIN_IMAGE_UPLOAD_FAILED",
                 "Douyin image upload failed; the publish operation can be retried safely.",
@@ -1227,19 +1306,34 @@ def execute_douyin_image_text_publish(
         async def create_image_text_post() -> DouyinPublishReceipt:
             client = DouyinOAuthClient(credentials)
             try:
-                return await client.publish_images(
-                    access_token=access_token,
-                    open_id=account_open_id,
-                    image_ids=uploaded_ids,
-                    text=post_text,
-                    merchant_confirmed=True,
+                attempt_id = _begin_douyin_publish_attempt(
+                    operation_id, store_id, action="publish_image_text"
                 )
+                try:
+                    receipt = await client.publish_images(
+                        access_token=access_token,
+                        open_id=account_open_id,
+                        image_ids=uploaded_ids,
+                        text=post_text,
+                        merchant_confirmed=True,
+                    )
+                except (DouyinApiError, httpx.HTTPError) as exc:
+                    _finish_douyin_publish_attempt(
+                        attempt_id, normalized_status="unknown", retryable=False,
+                        error_code=exc.code if isinstance(exc, DouyinApiError) else "HTTP_TRANSPORT_ERROR",
+                    )
+                    raise
+                _finish_douyin_publish_attempt(
+                    attempt_id, normalized_status="accepted", retryable=False,
+                    external_request_id=receipt.external_request_id,
+                )
+                return receipt
             finally:
                 await client.aclose()
 
         try:
             receipt = asyncio.run(create_image_text_post())
-        except DouyinApiError as exc:
+        except (DouyinApiError, httpx.HTTPError) as exc:
             _set_douyin_publish_state(
                 operation_id,
                 store_id,
@@ -1276,20 +1370,31 @@ def execute_douyin_image_text_publish(
     async def read_back_post() -> dict[str, Any] | None:
         client = DouyinOAuthClient(credentials)
         try:
-            return cast(
-                dict[str, Any] | None,
-                await client.verify_published_item(
+            attempt_id = _begin_douyin_publish_attempt(
+                operation_id, store_id, action="readback"
+            )
+            try:
+                result = await client.verify_published_item(
                     access_token=access_token,
                     open_id=account_open_id,
                     item_id=platform_item_id,
-                ),
+                )
+            except DouyinApiError as exc:
+                _finish_douyin_publish_attempt(
+                    attempt_id, normalized_status="failed", retryable=True, error_code=exc.code
+                )
+                raise
+            _finish_douyin_publish_attempt(
+                attempt_id, normalized_status="verified" if result is not None else "not_found",
+                retryable=result is None,
             )
+            return cast(dict[str, Any] | None, result)
         finally:
             await client.aclose()
 
     try:
         readback = asyncio.run(read_back_post())
-    except DouyinApiError as exc:
+    except (DouyinApiError, httpx.HTTPError) as exc:
         raise JobExecutionError(
             "DOUYIN_READBACK_FAILED",
             "Douyin accepted the post, but readback is temporarily unavailable.",

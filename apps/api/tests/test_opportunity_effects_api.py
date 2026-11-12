@@ -357,7 +357,20 @@ def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
         definition_version=1,
         status="active",
     )
-    db_session.add(definition)
+    click_definition = MetricDefinition(
+        id=uuid4(),
+        source_system="official_api",
+        metric_key="clicks",
+        metric_tier="intent",
+        display_name="点击",
+        value_type="count",
+        definition="Verified clicks in a period",
+        aggregation_rule="sum",
+        period_semantics="period_delta",
+        definition_version=1,
+        status="active",
+    )
+    db_session.add_all([definition, click_definition])
     db_session.flush()
     periods = [
         (
@@ -372,28 +385,38 @@ def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
         ),
     ]
     for index, (period_start, period_end, value) in enumerate(periods):
-        db_session.add(
-            MetricObservation(
-                id=uuid4(),
-                store_id=store.id,
-                metric_definition_id=definition.id,
-                metric_key="views",
-                metric_tier="content_performance",
-                value_numeric=value,
-                unit="count",
-                source_system="official_api",
-                source_record_id=f"post-{index}",
-                period_start=period_start,
-                period_end=period_end,
-                period_timezone="Asia/Tokyo",
-                collected_at=datetime(2026, 11, 4 + index, tzinfo=UTC),
-                definition_version=1,
-                integrity_status="complete",
-                authenticity_status="official_api",
-                sync_status="current",
-                deduplication_key=f"{index}" * 64,
+        for metric_definition, metric_key, metric_tier, metric_value, source_id in (
+            (definition, "views", "content_performance", value, f"post-{index}"),
+            (
+                click_definition,
+                "clicks",
+                "intent",
+                Decimal("10") if index == 0 else Decimal("20"),
+                f"click-{index}",
+            ),
+        ):
+            db_session.add(
+                MetricObservation(
+                    id=uuid4(),
+                    store_id=store.id,
+                    metric_definition_id=metric_definition.id,
+                    metric_key=metric_key,
+                    metric_tier=metric_tier,
+                    value_numeric=metric_value,
+                    unit="count",
+                    source_system="official_api",
+                    source_record_id=source_id,
+                    period_start=period_start,
+                    period_end=period_end,
+                    period_timezone="Asia/Tokyo",
+                    collected_at=datetime(2026, 11, 4 + index, tzinfo=UTC),
+                    definition_version=1,
+                    integrity_status="complete",
+                    authenticity_status="official_api",
+                    sync_status="current",
+                    deduplication_key=source_id.ljust(64, "0"),
+                )
             )
-        )
     db_session.flush()
     headers = _login(identity_client, "trend@example.com", store.id)
 
@@ -402,12 +425,15 @@ def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
     assert response.status_code == 200, response.text
     overview = response.json()
     assert overview["data_status"] == "available"
-    assert overview["items"][0]["value"] == "125"
-    assert overview["data_quality"]["verified_observations"] == 2
-    trend = overview["trends"][0]
+    assert next(item for item in overview["items"] if item["metric_key"] == "views")["value"] == "125"
+    assert overview["data_quality"]["verified_observations"] == 4
+    trend = next(item for item in overview["trends"] if item["metric_key"] == "views")
     assert len(trend["points"]) == 2
     assert trend["comparison"]["status"] == "available"
     assert trend["comparison"]["change_percent"] == "25.00"
+    conversion = overview["conversion_rates"]
+    assert len(conversion) == 2
+    assert [item["value_percent"] for item in conversion] == ["10.00", "16.00"]
 
 
 def test_attribution_rejects_merchant_claimed_work_and_unverified_outcome(

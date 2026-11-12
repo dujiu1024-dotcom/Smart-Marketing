@@ -108,3 +108,12 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - 列表、创建、更新、事实确认分别调用 Store Knowledge API；请求按当前门店上下文授权，创建带 Idempotency-Key，更新/确认带 If-Match。
 - 商品价格/币种同时为空代表未知价格；不以 0 伪造未知金额。
 - 商品/服务与活动优惠、品牌规范、客群经营、知识库、素材资产、渠道账号及营销任务仍未接入生产 Web。
+
+
+## 10. 第三个生产 Web 页面映射（2026-11-12）
+
+- Demo `#store:offers` 已接入真实 React 活动列表。
+- Demo `#store-editor:offer:new` 和 `#store-editor:offer:<id>` 映射为独立新增/编辑页面。
+- 活动读写与事实确认调用 Store Knowledge API；创建带 Idempotency-Key，更新/确认带 If-Match。
+- 优惠规则和适用条件以 JSON 对象保存；客户端要求开始/结束时间包含明确时区偏移，并规范化为 UTC。
+- 当前不从门店 membership 读取 Store.timezone，因此列表明确显示 UTC；本地时区呈现需要先扩展只读门店上下文契约，不在前端猜测时区。

@@ -337,3 +337,20 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 未完成 | 删除/归档的完整 UX、商品与活动关联、完整浏览器视觉/移动端验收 | 不据此关闭 Issue #6 |
 
 本页通过真实 API 读写商品资料；事实状态和版本由服务端返回。CI 验收覆盖 Web、API、Worker、Contracts、E2E、Infrastructure；实际运行结果以该 PR 对应最新 CI 为准。
+
+
+## 2026-11-12 #6 第三个生产 Web 页面：活动与优惠
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 活动列表 | 接入门店隔离的 `GET /api/v1/store/offers` | 只显示当前门店真实记录 |
+| 活动新增 | 接入 `POST /api/v1/store/offers` | Idempotency-Key；规则/适用条件为结构化 JSON 对象 |
+| 活动编辑 | 接入 `PATCH /api/v1/store/offers/{id}` | If-Match 乐观锁；新版本重置事实状态 |
+| 事实确认 | 接入 `POST /api/v1/store/offers/{id}/confirm-facts` | 商家独立确认，确认动作写入版本与审计 |
+| 优惠规则 | offer_type、terms_json、eligibility_rules_json、stacking_policy、usage_limit | 规则结构化保存，不把自然语言描述当作规则引擎执行结果 |
+| 有效期 | ISO 8601 且必须显式带时区偏移；客户端归一化为 UTC | 列表明确显示 UTC；当前 UI 尚未读取 Store.timezone 并转换为门店本地时间 |
+| 活动状态 | draft/active/paused/expired/archived | 可通过编辑归档；不提供物理删除入口 |
+| 页面路由 | `#store:offers`；`#store-editor:offer:new`；`#store-editor:offer:<id>` | 对照 Demo 活动列表与独立二级编辑页 |
+| 未完成 | 门店时区本地化展示、商品关联选择器、完整浏览器视觉/移动端验收 | 不据此关闭 Issue #6 |
+
+该页已接入真实 Offer API；CI 验收覆盖六组工作流。门店本地时区展示仍是明确缺口，不将 UTC 展示伪称为本地时间。

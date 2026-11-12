@@ -8,7 +8,6 @@ from typing import Any
 import pytest
 
 from store_operator.auth.errors import ApiError
-from store_operator.channels import douyin
 from store_operator.channel_douyin_router import (
     _parse_douyin_unauthorize_event,
     _verify_douyin_webhook_signature,
@@ -85,7 +84,10 @@ def test_webhook_signature_uses_client_secret_prefix_and_raw_body() -> None:
 
 def test_parse_unauthorize_event_validates_account_and_scopes() -> None:
     open_id, scopes = _parse_douyin_unauthorize_event(
-        {"from_user_id": "open-123", "content": {"scopes": ["video.create", "user_info", "video.create"]}}
+        {
+            "from_user_id": "open-123",
+            "content": {"scopes": ["video.create", "user_info", "video.create"]},
+        }
     )
 
     assert open_id == "open-123"

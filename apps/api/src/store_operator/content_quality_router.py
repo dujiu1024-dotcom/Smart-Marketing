@@ -22,24 +22,24 @@ from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.idempotency import begin_idempotency, complete_idempotency
 from store_operator.jobs.service import JobIdempotencyConflict, create_job
+from store_operator.models.channel_delivery import ChannelAccount
 from store_operator.models.channel_spec import (
     ChannelCapabilitySnapshot,
     ChannelSpec,
     ChannelSpecVersion,
 )
-from store_operator.models.channel_delivery import ChannelAccount
 from store_operator.models.content_delivery import (
     Artifact,
     ArtifactVersion,
     ChannelContent,
     ChannelContentArtifactRef,
-    QualityReport,
-    QualityResolution,
-    ReviewRecord,
     PublishConfirmation,
     PublishPackage,
     PublishPackageFactRef,
     PublishPackageItem,
+    QualityReport,
+    QualityResolution,
+    ReviewRecord,
 )
 from store_operator.models.marketing_task import (
     BusinessFactSnapshot,
@@ -244,7 +244,9 @@ def freeze_publish_package(
 
     channel_keys = [item.channel_content_id for item in payload.items]
     if len(channel_keys) != len(set(channel_keys)):
-        raise ApiError(422, "DUPLICATE_PACKAGE_CONTENT", "Package content references must be unique")
+        raise ApiError(
+            422, "DUPLICATE_PACKAGE_CONTENT", "Package content references must be unique"
+        )
     channels: set[str] = set()
     frozen_items: list[PublishPackageItem] = []
     item_fingerprints: list[dict[str, object]] = []
@@ -261,7 +263,9 @@ def freeze_publish_package(
         if content is None:
             raise ApiError(404, "CHANNEL_CONTENT_NOT_FOUND", "Channel content not found")
         if content.status != "ready":
-            raise ApiError(409, "CHANNEL_CONTENT_NOT_READY", "Stale or blocked content cannot be frozen")
+            raise ApiError(
+                409, "CHANNEL_CONTENT_NOT_READY", "Stale or blocked content cannot be frozen"
+            )
         if content.channel_key in channels:
             raise ApiError(422, "DUPLICATE_PACKAGE_CHANNEL", "Only one item per channel is allowed")
         channels.add(content.channel_key)
@@ -327,9 +331,15 @@ def freeze_publish_package(
                 )
             )
             if resolution is None:
-                raise ApiError(409, "QUALITY_HUMAN_REVIEW_REQUIRED", "Quality report requires an accepted human resolution")
+                raise ApiError(
+                    409,
+                    "QUALITY_HUMAN_REVIEW_REQUIRED",
+                    "Quality report requires an accepted human resolution",
+                )
         elif report.result != "pass":
-            raise ApiError(409, "QUALITY_CHECK_FAILED", "Failed quality reports cannot be published")
+            raise ApiError(
+                409, "QUALITY_CHECK_FAILED", "Failed quality reports cannot be published"
+            )
 
         spec_version = db.scalar(
             select(ChannelSpecVersion)
@@ -342,11 +352,17 @@ def freeze_publish_package(
             )
         )
         if spec_version is None:
-            raise ApiError(409, "CHANNEL_SPEC_STALE", "Content must use the current verified channel specification")
+            raise ApiError(
+                409,
+                "CHANNEL_SPEC_STALE",
+                "Content must use the current verified channel specification",
+            )
 
         if item.delivery_mode == "official_api":
             if item.channel_account_id is None:
-                raise ApiError(422, "CHANNEL_ACCOUNT_REQUIRED", "Official API delivery requires a connected account")
+                raise ApiError(
+                    422, "CHANNEL_ACCOUNT_REQUIRED", "Official API delivery requires a connected account"
+                )
             account = db.scalar(
                 select(ChannelAccount).where(
                     ChannelAccount.id == item.channel_account_id,
@@ -356,9 +372,15 @@ def freeze_publish_package(
                 )
             )
             if account is None:
-                raise ApiError(409, "CHANNEL_ACCOUNT_NOT_ACTIVE", "An active account for this channel is required")
+                raise ApiError(
+                    409, "CHANNEL_ACCOUNT_NOT_ACTIVE", "An active account for this channel is required"
+                )
             if not spec_version.publish_supported:
-                raise ApiError(409, "CHANNEL_PUBLISH_UNSUPPORTED", "Official publishing is not verified for this channel")
+                raise ApiError(
+                    409,
+                    "CHANNEL_PUBLISH_UNSUPPORTED",
+                    "Official publishing is not verified for this channel",
+                )
             capability = db.scalar(
                 select(ChannelCapabilitySnapshot)
                 .where(
@@ -373,9 +395,17 @@ def freeze_publish_package(
                 .order_by(ChannelCapabilitySnapshot.checked_at.desc())
             )
             if capability is None:
-                raise ApiError(409, "CHANNEL_PUBLISH_CAPABILITY_UNVERIFIED", "Publishing capability has not been verified for this account")
+                raise ApiError(
+                    409,
+                    "CHANNEL_PUBLISH_CAPABILITY_UNVERIFIED",
+                    "Publishing capability has not been verified for this account",
+                )
         elif item.channel_account_id is not None:
-            raise ApiError(422, "MANUAL_HANDOFF_ACCOUNT_FORBIDDEN", "Manual handoff must not bind a platform account")
+            raise ApiError(
+                422,
+                "MANUAL_HANDOFF_ACCOUNT_FORBIDDEN",
+                "Manual handoff must not bind a platform account",
+            )
 
         item_fingerprint = _fingerprint(
             {
@@ -384,9 +414,13 @@ def freeze_publish_package(
                 "quality_report_id": str(report.id),
                 "quality_report_fingerprint": report.input_fingerprint,
                 "channel_spec_version_id": str(spec_version.id),
-                "channel_account_id": str(item.channel_account_id) if item.channel_account_id else None,
+                "channel_account_id": (
+                    str(item.channel_account_id) if item.channel_account_id else None
+                ),
                 "delivery_mode": item.delivery_mode,
-                "planned_publish_at": item.planned_publish_at.isoformat() if item.planned_publish_at else None,
+                "planned_publish_at": (
+                    item.planned_publish_at.isoformat() if item.planned_publish_at else None
+                ),
             }
         )
         frozen_items.append(
@@ -403,7 +437,9 @@ def freeze_publish_package(
                 item_fingerprint=item_fingerprint,
             )
         )
-        item_fingerprints.append({"channel_key": content.channel_key, "fingerprint": item_fingerprint})
+        item_fingerprints.append(
+            {"channel_key": content.channel_key, "fingerprint": item_fingerprint}
+        )
 
     facts = list(
         db.scalars(
@@ -417,7 +453,9 @@ def freeze_publish_package(
         ).all()
     )
     if not facts:
-        raise ApiError(409, "CONFIRMED_FACTS_REQUIRED", "At least one confirmed business fact is required")
+        raise ApiError(
+            409, "CONFIRMED_FACTS_REQUIRED", "At least one confirmed business fact is required"
+        )
     package_version = db.scalar(
         select(func.max(PublishPackage.package_version)).where(
             PublishPackage.store_id == store_id,
@@ -425,7 +463,11 @@ def freeze_publish_package(
         )
     ) or 0
     fact_fingerprints = [
-        {"fact_key": fact.fact_key, "version": fact.version_no, "fingerprint": fact.content_fingerprint}
+        {
+            "fact_key": fact.fact_key,
+            "version": fact.version_no,
+            "fingerprint": fact.content_fingerprint,
+        },
         for fact in facts
     ]
     package_fingerprint = _fingerprint(
@@ -531,7 +573,11 @@ def confirm_publish_package(
         )
     )
     if existing is not None:
-        raise ApiError(409, "PUBLISH_PACKAGE_ALREADY_CONFIRMED", "This exact package was already confirmed")
+        raise ApiError(
+            409,
+            "PUBLISH_PACKAGE_ALREADY_CONFIRMED",
+            "This exact package was already confirmed",
+        )
     confirmation = PublishConfirmation(
         id=uuid4(),
         store_id=store_id,

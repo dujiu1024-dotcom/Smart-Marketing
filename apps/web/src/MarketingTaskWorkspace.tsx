@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   archiveMarketingTask, cancelMarketingTask, confirmMarketingTaskRequirement,
+  createChannelContent, runChannelContentQuality, createQualityResolution,
+  freezePublishPackage, confirmPublishPackage, listChannelContents, listPublishPackages,
+  listChannelSpecs, listTaskBusinessFacts,
   confirmMarketingTaskStrategy, createMarketingTask, getAudienceProfiles, getMediaAssets,
   getBrandGuideline, getKnowledgeItems, getMarketingTask, listOffers, listTaskArtifacts,
   createTaskArtifact, createTaskArtifactVersion, createTaskArtifactReview,
@@ -9,6 +12,8 @@ import {
   type BusinessFactReference, type ContentArtifact, type ArtifactVersionRecord,
   type MediaAsset, type MarketingTask, type MarketingTaskCreateInput,
   type MarketingTaskSummary, type MarketingTaskType, type TaskStep, type TaskStepKey,
+  type ChannelContentRecord, type ChannelSpecRecord, type PublishPackageRecord,
+  type TaskBusinessFactSnapshot,
 } from "./api";
 
 const taskTypeLabels: Record<MarketingTaskType, string> = {
@@ -78,6 +83,14 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [selectedFacts, setSelectedFacts] = useState<string[]>([]);
   const [artifacts, setArtifacts] = useState<ContentArtifact[]>([]);
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
+  const [channelSpecs, setChannelSpecs] = useState<ChannelSpecRecord[]>([]);
+  const [channelContents, setChannelContents] = useState<ChannelContentRecord[]>([]);
+  const [publishPackages, setPublishPackages] = useState<PublishPackageRecord[]>([]);
+  const [taskFactSnapshots, setTaskFactSnapshots] = useState<TaskBusinessFactSnapshot[]>([]);
+  const [selectedPackageFacts, setSelectedPackageFacts] = useState<string[]>([]);
+  const [selectedChannelContent, setSelectedChannelContent] = useState("");
+  const [qualityResolutionReason, setQualityResolutionReason] = useState("");
+  const [confirmationNote, setConfirmationNote] = useState("");
   const [copyTitle, setCopyTitle] = useState("");
   const [copyBody, setCopyBody] = useState("");
   const [copyHashtags, setCopyHashtags] = useState("");
@@ -134,12 +147,21 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
 
   const loadContent = useCallback(async (taskId: string) => {
     try {
-      const [contentItems, assetItems] = await Promise.all([
+      const [contentItems, assetItems, channelItems, packageItems, specs, factItems] = await Promise.all([
         listTaskArtifacts(storeId, taskId),
         getMediaAssets(storeId),
+        listChannelContents(storeId, taskId),
+        listPublishPackages(storeId, taskId),
+        listChannelSpecs(storeId),
+        listTaskBusinessFacts(storeId, taskId),
       ]);
       setArtifacts(contentItems);
       setMediaAssets(assetItems.items);
+      setChannelContents(channelItems);
+      setPublishPackages(packageItems);
+      setChannelSpecs(specs);
+      setTaskFactSnapshots(factItems);
+      setSelectedPackageFacts(current => current.length ? current : factItems.filter(fact => fact.confirmation_status === "confirmed").map(fact => fact.id));
       setSelectedImageAssetId(current => current || assetItems.items.find(item =>
         item.status === "ready" && item.usage_rights_status === "confirmed_allowed" && item.mime_type.startsWith("image/")
       )?.id || "");

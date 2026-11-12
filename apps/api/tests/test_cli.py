@@ -107,3 +107,19 @@ def test_dead_letter_replay_rejects_non_object_payload(db_session):
         )
 
     assert event.status == "dead"
+
+
+def test_dead_letter_replay_rejects_mismatched_aggregate_reference(db_session):
+    _, event = create_dead_letter(db_session)
+    event.aggregate_id = uuid4()
+    db_session.flush()
+
+    with pytest.raises(SystemExit, match="aggregate does not match"):
+        replay_dead_letter_outbox_event(
+            db_session,
+            event_id=event.id,
+            reason="Reject mismatched aggregate identity",
+            confirmation=str(event.id),
+        )
+
+    assert event.status == "dead"

@@ -355,7 +355,10 @@ def test_collection_handler_marks_source_failed_and_preserves_retryability(monke
             raise httpx.ReadTimeout("upstream timed out")
 
     monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _TimeoutClient)
-    monkeypatch.setattr("store_operator_worker.hot_topics._allowed_hosts", lambda: {"feeds.example.test"})
+    monkeypatch.setattr(
+        "store_operator_worker.hot_topics._allowed_hosts",
+        lambda: {"feeds.example.test"},
+    )
 
     source = _fake_source()
     source.id = uuid4()

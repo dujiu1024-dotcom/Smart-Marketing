@@ -1083,7 +1083,7 @@ export interface AttributionEvidenceRecord {
 export interface EffectsOverview {
   items: Array<{
     metric_key: string; display_name: string; metric_tier: string; value: string | null;
-    status: "available" | "unavailable"; reason: string | null; source_system: string;
+    status: "available" | "unavailable" | "accumulating" | "window_unknown"; reason: string | null; source_system: string;
     period_end: string | null; period_timezone: string; collected_at: string;
     authenticity_status: string; integrity_status: string;
   }>;
@@ -1114,7 +1114,8 @@ export interface EffectsOverview {
     observation: string; next_action: string;
   }>;
   data_quality: {
-    total_observations: number; verified_observations: number; delayed_observations: number;
+    total_observations: number; verified_observations: number; accumulating_observations: number;
+    window_unknown_observations: number; delayed_observations: number;
     incomplete_or_anomalous_observations: number; status: string; reason: string | null;
   };
   data_status: "available" | "unavailable";

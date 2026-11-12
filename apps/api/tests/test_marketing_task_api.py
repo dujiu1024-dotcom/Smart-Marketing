@@ -809,6 +809,34 @@ def test_failed_step_recovery_cancel_and_archive_transitions(
     )
     assert task is not None
     assert step is not None
+    requirement_snapshot = RequirementSnapshot(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task_id,
+        snapshot_no=1,
+        payload_json={"requirement": {}, "business_facts": []},
+        content_fingerprint="a" * 64,
+        created_by_user_id=user.id,
+        confirmed_by_user_id=user.id,
+        confirmed_at=datetime.now(UTC),
+    )
+    db_session.add(requirement_snapshot)
+    db_session.flush()
+    strategy_snapshot = StrategySnapshot(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task_id,
+        requirement_snapshot_id=requirement_snapshot.id,
+        snapshot_no=1,
+        payload_json={"strategy": {}},
+        content_fingerprint="b" * 64,
+        created_by_user_id=user.id,
+        confirmed_by_user_id=user.id,
+        confirmed_at=datetime.now(UTC),
+    )
+    db_session.add(strategy_snapshot)
+    task.current_requirement_snapshot_id = requirement_snapshot.id
+    task.current_strategy_snapshot_id = strategy_snapshot.id
     task.lifecycle_status = "failed"
     task.version = 2
     step.status = "failed"
@@ -907,3 +935,28 @@ def test_failed_step_recovery_cancel_and_archive_transitions(
     assert archived.status_code == 200, archived.text
     assert archived.json()["lifecycle_status"] == "archived"
     assert archived.json()["version"] == 5
+
+
+def test_copy_task_can_opt_in_to_text_only_video_script(
+    identity_client, db_session, monkeypatch
+):
+    user = create_user(db_session, "video-script-task@example.com")
+    store = create_store(db_session, user, "Video Script Store")
+    csrf = login(identity_client, monkeypatch, "video-script-task@example.com")
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": csrf,
+        "X-Store-ID": str(store.id),
+        "Idempotency-Key": "video-script-task-create-1",
+    }
+    payload = task_payload("Product video script")
+    payload["task_options"]["includes_video_script"] = True
+
+    response = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers=headers,
+        json=payload,
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["task_options"]["includes_video_script"] is True

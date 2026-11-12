@@ -166,6 +166,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -221,12 +222,14 @@ export default function App() {
         if (!active) return;
         setProfile(value);
         setForm(formFromProfile(value));
+        setDirty(false);
       })
       .catch((reason: unknown) => {
         if (!active) return;
         if (reason instanceof ApiError && reason.status === 404) {
           setProfile(null);
           setForm(emptyForm);
+          setDirty(false);
         } else {
           setError(errorMessage(reason));
         }
@@ -241,6 +244,7 @@ export default function App() {
 
   function change<K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setDirty(true);
     setNotice("");
   }
 
@@ -283,6 +287,7 @@ export default function App() {
         : await createStoreProfile(storeId, payload);
       setProfile(saved);
       setForm(formFromProfile(saved));
+      setDirty(false);
       setNotice(`门店档案已保存为 V${saved.current_version}。关键经营事实变更后需要重新确认。`);
     } catch (reason) {
       setError(errorMessage(reason));
@@ -292,7 +297,7 @@ export default function App() {
   }
 
   async function confirmFacts() {
-    if (!storeId || !profile) return;
+    if (!storeId || !profile || dirty) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -300,6 +305,7 @@ export default function App() {
       const confirmed = await confirmStoreProfileFacts(storeId, profile);
       setProfile(confirmed);
       setForm(formFromProfile(confirmed));
+      setDirty(false);
       setNotice(`门店档案 V${confirmed.current_version} 已确认。`);
     } catch (reason) {
       setError(errorMessage(reason));
@@ -316,6 +322,7 @@ export default function App() {
       const latest = await getStoreProfile(storeId);
       setProfile(latest);
       setForm(formFromProfile(latest));
+      setDirty(false);
       setNotice("已加载服务器最新版本。");
     } catch (reason) {
       setError(errorMessage(reason));
@@ -476,7 +483,7 @@ export default function App() {
                 <div className="form-actions">
                   {profile && <button className="secondary" type="button" onClick={() => void reloadProfile()}>放弃修改</button>}
                   {profile && profile.fact_status !== "confirmed" && (
-                    <button className="secondary" type="button" onClick={() => void confirmFacts()} disabled={saving}>
+                    <button className="secondary" type="button" onClick={() => void confirmFacts()} disabled={saving || dirty} title={dirty ? "请先保存修改，再确认资料" : undefined}>
                       确认资料
                     </button>
                   )}

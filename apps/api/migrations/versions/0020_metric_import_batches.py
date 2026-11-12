@@ -10,7 +10,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0020_metric_import_batches"
-down_revision: str | None = "0019_metric_observation_corrections"
+down_revision: str | None = "0019_metric_obs_corrections"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 

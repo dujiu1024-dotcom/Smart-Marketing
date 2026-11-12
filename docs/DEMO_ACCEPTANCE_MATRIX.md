@@ -337,3 +337,15 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 未完成 | 删除/归档的完整 UX、商品与活动关联、完整浏览器视觉/移动端验收 | 不据此关闭 Issue #6 |
 
 本页通过真实 API 读写商品资料；事实状态和版本由服务端返回。CI 验收覆盖 Web、API、Worker、Contracts、E2E、Infrastructure；实际运行结果以该 PR 对应最新 CI 为准。
+
+## 2026-11-12 #6 第三个生产 Web 页面：活动与优惠（PR 待验收）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 活动列表 | 接入 GET /api/v1/store/offers，按当前门店上下文读取 | 不使用 Demo seed |
+| 活动新增 | 接入 POST /api/v1/store/offers | Idempotency-Key；规则与适用条件必须为 JSON 对象 |
+| 活动编辑 / 删除 | 接入 PATCH/DELETE /api/v1/store/offers/{id} | If-Match 绑定 current_version |
+| 事实确认 | 接入 POST /api/v1/store/offers/{id}/confirm-facts | 独立显式确认，确认版本可追溯 |
+| 字段 | 活动名称、类型、优惠规则、适用条件、开始/结束时间、叠加策略、使用次数上限、状态 | 有效期顺序和使用次数前端校验；后端再次校验 |
+| 页面路由 | #store:offers；#store-editor:offer:new；#store-editor:offer:<id> | 对照 Demo 活动列表和独立二级编辑页 |
+| 未完成 | 与商品的关联选择、完整浏览器流程、响应式/可访问性人工验收 | 不据此关闭 Issue #6 |

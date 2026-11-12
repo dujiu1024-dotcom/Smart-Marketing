@@ -288,52 +288,6 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
         )
         if task is None:
             raise ApiError(404, "MARKETING_TASK_NOT_FOUND", "Marketing task not found")
-    if payload.published_work_id is not None:
-        work = db.scalar(
-            select(PublishedWork).where(
-                PublishedWork.id == payload.published_work_id,
-                PublishedWork.store_id == store_id,
-            )
-        )
-        if work is None:
-            raise ApiError(404, "PUBLISHED_WORK_NOT_FOUND", "Published work not found")
-        if (
-            work.ownership_status not in {"verified_system_publish", "verified_platform_api"}
-            or work.verified_at is None
-        ):
-            verified_evidence_id = db.scalar(
-                select(WorkOwnershipEvidence.id).where(
-                    WorkOwnershipEvidence.store_id == store_id,
-                    WorkOwnershipEvidence.published_work_id == work.id,
-                    WorkOwnershipEvidence.evidence_status == "verified",
-                )
-            )
-            if verified_evidence_id is None:
-                raise ApiError(
-                    409,
-                    "PUBLISHED_WORK_EVIDENCE_MISSING",
-                    "A verified ownership evidence record is required",
-                )
-            raise ApiError(
-                409,
-                "PUBLISHED_WORK_NOT_VERIFIED",
-                "Unverified works cannot be linked to metric observations",
-            )
-        if work.task_id is None:
-            if payload.marketing_task_id is not None:
-                raise ApiError(409, "PUBLISHED_WORK_TASK_MISMATCH", "Work has no verified task")
-        elif payload.marketing_task_id not in {None, work.task_id}:
-            raise ApiError(409, "PUBLISHED_WORK_TASK_MISMATCH", "Work belongs to another task")
-        payload.marketing_task_id = work.task_id
-    elif payload.marketing_task_id is not None:
-        task = db.scalar(
-            select(MarketingTask).where(
-                MarketingTask.id == payload.marketing_task_id,
-                MarketingTask.store_id == store_id,
-            )
-        )
-        if task is None:
-            raise ApiError(404, "MARKETING_TASK_NOT_FOUND", "Marketing task not found")
     if payload.period_start and payload.period_end and payload.period_end <= payload.period_start:
         raise ApiError(422, "INVALID_PERIOD", "period_end must be later than period_start")
     if payload.metric_key == "revenue" and payload.value_numeric is not None and payload.currency is None:  # noqa: E501
@@ -1190,23 +1144,23 @@ def create_attribution(
         work.ownership_status not in {"verified_system_publish", "verified_platform_api"}
         or work.verified_at is None
     ):
-        verified_evidence_id = db.scalar(
-            select(WorkOwnershipEvidence.id).where(
-                WorkOwnershipEvidence.store_id == store_id,
-                WorkOwnershipEvidence.published_work_id == work.id,
-                WorkOwnershipEvidence.evidence_status == "verified",
-            )
-        )
-        if verified_evidence_id is None:
-            raise ApiError(
-                409,
-                "PUBLISHED_WORK_EVIDENCE_MISSING",
-                "A verified ownership evidence record is required",
-            )
         raise ApiError(
             409,
             "PUBLISHED_WORK_NOT_VERIFIED",
             "Only verified platform works can be attributed",
+        )
+    verified_evidence_id = db.scalar(
+        select(WorkOwnershipEvidence.id).where(
+            WorkOwnershipEvidence.store_id == store_id,
+            WorkOwnershipEvidence.published_work_id == work.id,
+            WorkOwnershipEvidence.evidence_status == "verified",
+        )
+    )
+    if verified_evidence_id is None:
+        raise ApiError(
+            409,
+            "PUBLISHED_WORK_EVIDENCE_MISSING",
+            "A verified ownership evidence record is required",
         )
     if work.task_id != task.id:
         raise ApiError(

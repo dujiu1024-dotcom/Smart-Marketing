@@ -334,6 +334,104 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
   }
+
+  async function createChannelDraft() {
+    if (!task || saving) return;
+    const spec = channelSpecs.find(item => item.channel_key === "douyin")?.current_version;
+    if (!spec || spec.verification_status !== "verified") {
+      setError("当前渠道规格尚未完成官方核验，不能创建渠道适配内容。");
+      return;
+    }
+    const copyArtifact = artifacts.find(item => item.artifact_type === "copy");
+    const copyVersion = copyArtifact?.versions.find(version => version.id === copyArtifact.current_version_id);
+    const copyReview = copyVersion?.reviews?.[copyVersion.reviews.length - 1];
+    if (!copyArtifact || !copyVersion || copyReview?.decision !== "approved") {
+      setError("请先完成文案当前版本审核，再进行渠道适配。");
+      return;
+    }
+    const imageVersions = artifacts
+      .filter(item => item.artifact_type === "image")
+      .flatMap(item => item.versions.filter(version => version.id === item.current_version_id && version.reviews?.[version.reviews.length - 1]?.decision === "approved"));
+    const content = copyVersion.content_json || {};
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await createChannelContent(storeId, task.id, {
+        channel_key: "douyin",
+        copy_version_id: copyVersion.id,
+        channel_spec_version_id: spec.id,
+        payload: {
+          title: typeof content.title === "string" ? content.title : "",
+          body: typeof content.body === "string" ? content.body : "",
+          hashtags: typeof content.hashtags === "string" ? content.hashtags.split(/[、,，\s]+/).filter(Boolean) : [],
+        },
+        image_version_ids: imageVersions.map(version => version.id),
+      });
+      await loadContent(task.id);
+      setNotice("渠道内容适配快照已创建。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
+  async function runQuality(content: ChannelContentRecord) {
+    if (!task || saving) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const job = await runChannelContentQuality(storeId, task.id, content);
+      setNotice("质检任务已提交（" + job.job_id + "）。完成后点击刷新产物查看报告。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
+  async function acceptQuality(content: ChannelContentRecord, report: ChannelContentRecord["quality_reports"][number]) {
+    if (!task || saving || !qualityResolutionReason.trim()) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await createQualityResolution(storeId, report.id, report.input_fingerprint, qualityResolutionReason.trim());
+      setQualityResolutionReason("");
+      await loadContent(task.id);
+      setNotice("已记录当前质检报告的人工接受决议。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
+  async function freezePackage(content: ChannelContentRecord, report: ChannelContentRecord["quality_reports"][number]) {
+    if (!task || saving) return;
+    const confirmedFacts = taskFactSnapshots.filter(fact =>
+      fact.confirmation_status === "confirmed" && selectedPackageFacts.includes(fact.id)
+    );
+    if (!confirmedFacts.length) {
+      setError("发布包至少需要选择一项已确认的经营事实快照。");
+      return;
+    }
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await freezePublishPackage(storeId, task.id, {
+        expected_task_version: task.version,
+        fact_snapshot_ids: confirmedFacts.map(fact => fact.id),
+        items: [{
+          channel_content_id: content.id,
+          quality_report_id: report.id,
+          delivery_mode: "manual_handoff",
+        }],
+      });
+      await loadContent(task.id);
+      setNotice("发布包已冻结。冻结后内容不会被静默修改。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
+  async function confirmPackage(pkg: PublishPackageRecord) {
+    if (!task || saving || pkg.confirmation) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await confirmPublishPackage(storeId, pkg.id, pkg.package_fingerprint, confirmationNote.trim());
+      setConfirmationNote("");
+      await loadContent(task.id);
+      setNotice("已确认该不可变发布包。实际发布状态仍需外部平台凭证确认。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
   async function reviewArtifact(artifact: ContentArtifact, version: ArtifactVersionRecord, decision: "approved" | "revision_requested" | "rejected") {
     if (!task || saving) return;
     if (decision === "revision_requested" && !reviewComment.trim()) { setError("请填写具体的修改意见。"); return; }

@@ -214,7 +214,11 @@ class DouyinOAuthClient:
             "image_id": str(image["image_id"]),
             "width": image.get("width"),
             "height": image.get("height"),
-            "external_request_id": str(extra.get("logid")) if isinstance(extra, dict) and extra.get("logid") else None,
+            "external_request_id": (
+                str(extra.get("logid"))
+                if isinstance(extra, dict) and extra.get("logid")
+                else None
+            ),
         }
 
     async def publish_images(
@@ -245,7 +249,11 @@ class DouyinOAuthClient:
             raise DouyinApiError("MISSING_ITEM_ID", "Douyin image-text response is incomplete")
         return DouyinPublishReceipt(
             item_id=str(data["item_id"]),
-            external_request_id=str(extra.get("logid")) if isinstance(extra, dict) and extra.get("logid") else None,
+            external_request_id=(
+                str(extra.get("logid"))
+                if isinstance(extra, dict) and extra.get("logid")
+                else None
+            ),
         )
 
     async def publish_video(

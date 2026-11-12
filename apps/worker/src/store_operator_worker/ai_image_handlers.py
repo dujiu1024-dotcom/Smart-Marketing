@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import json
 import os
 from datetime import UTC, datetime
@@ -10,7 +11,6 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-
 from store_operator.ai_gateway import (
     ImageEditRequest,
     ImageGenerateRequest,
@@ -40,8 +40,10 @@ from store_operator.object_storage import (
     delete_object,
     download_object_bytes,
 )
+
 from store_operator_worker.ai_handlers import (
     _business_fact_snapshots,
+    _call_text_provider,
     _load_executor,
     _prompt_variables,
     _published_prompt,
@@ -62,6 +64,7 @@ from store_operator_worker.media_scanner import (
 )
 
 
+logger = logging.getLogger(__name__)
 _MAX_IMAGE_BYTES = 25 * 1024 * 1024
 
 
@@ -255,7 +258,7 @@ def _verify_and_scan_image(result: ImageGenerateResponse) -> tuple[bytes, int, i
 
 def _operation_idempotency_key(job: Job, operation: str) -> str:
     return hashlib.sha256(
-        f"{job.idempotency_key}:{operation}".encode("utf-8")
+        f"{job.idempotency_key}:{operation}".encode()
     ).hexdigest()
 
 
@@ -836,12 +839,15 @@ def _complete_image(
                     dedupe_key=f"content.artifact_version_created:{artifact_version.id}",
                 )
             )
-    except Exception:
+    except Exception as persistence_error:
         try:
             delete_object(object_key=image_result.asset_object_key)
-        except Exception:
-            pass
-        raise
+        except (ObjectStorageNotConfigured, OSError) as cleanup_error:
+            logger.warning(
+                "Could not clean up generated image after persistence failure (%s)",
+                type(cleanup_error).__name__,
+            )
+        raise persistence_error
 
     return {
         "schema_version": 1,

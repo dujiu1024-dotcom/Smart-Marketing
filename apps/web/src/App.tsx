@@ -402,7 +402,7 @@ export default function App() {
           <div className="side-link disabled" aria-disabled="true">门店知识库 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">素材资产库 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">渠道账号 · 待接入</div>
-          <div className="sidebar-foot">当前仅接入真实门店档案。未接入模块明确标记，不使用演示数据冒充生产数据。</div>
+          <div className="sidebar-foot">当前已接入门店档案、商品与服务、活动与优惠。其他未接入模块明确标记，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
           {section !== "profile" ? <StoreCatalog storeId={storeId} initialTab={section} /> : <>

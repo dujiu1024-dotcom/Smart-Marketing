@@ -1474,6 +1474,19 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
                 source_evidence_ref=(row.get("source_evidence_ref") or "").strip() or None,
                 published_work_id=UUID(row["published_work_id"]) if row.get("published_work_id") else None,
                 marketing_task_id=UUID(row["marketing_task_id"]) if row.get("marketing_task_id") else None)
+            if data.published_work_id is not None:
+                linked_work = db.scalar(
+                    select(PublishedWork).where(
+                        PublishedWork.id == data.published_work_id,
+                        PublishedWork.store_id == store_id,
+                    )
+                )
+                if linked_work is None or linked_work.ownership_status not in {
+                    "verified_system_publish",
+                    "verified_platform_api",
+                } or linked_work.verified_at is None:
+                    raise ValueError("CSV published work reference is not verified")
+                data.marketing_task_id = linked_work.task_id
             material = "|".join([str(store_id), "manual", data.metric_key,
                 data.period_start.isoformat() if data.period_start else "",
                 data.period_end.isoformat() if data.period_end else "", data.source_record_id or "",

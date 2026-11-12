@@ -38,7 +38,7 @@ describe("effects workspace", () => {
     render(<EffectsWorkspace storeId="store-1" />);
     expect(await screen.findByRole("heading", { name: "经营效果" })).toBeInTheDocument();
     expect(screen.getAllByText("暂无数据").length).toBeGreaterThan(0);
-    expect(screen.getByText(/不计算 ROI/)).toBeInTheDocument();
+    expect(screen.getAllByText(/不计算 ROI/).length).toBeGreaterThan(0);
     expect(screen.getByText(/手工录入与导入的数据均标记为商家报告/)).toBeInTheDocument();
   });
 });

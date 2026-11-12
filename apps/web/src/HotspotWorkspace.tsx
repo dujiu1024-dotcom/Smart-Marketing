@@ -96,7 +96,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
         <article className="form-card">
           <h2>为什么匹配这家门店</h2>
           <p>{String(match.reason ?? "暂无可解释的匹配理由")}</p>
-          <div className="catalog-meta"><span>匹配方式：{String(match.method ?? "未知")}</span><span>相关性评分：{match.score == null ? "尚未计算" : String(match.score)}</span></div>
+          <div className="catalog-meta"><span>匹配方式：{String(match.method ?? "未知")}</span><span>算法版本：{String(match.algorithm_version ?? "未知")}</span><span>相关性评分：{match.score == null ? "尚未计算" : String(match.score)}</span></div>
           <p>建议场景：{String(match.scenario ?? "暂无")}</p><p>内容角度：{String(match.content_angle ?? "暂无")}</p>
           <p>关联商品：{Array.isArray(match.products) && match.products.length ? match.products.join("、") : "暂无"}</p>
           <p>风险提示：{Array.isArray(match.risk_flags) && match.risk_flags.length ? match.risk_flags.join("、") : "暂无已登记风险"}</p>
@@ -130,7 +130,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
     {loading ? <div className="loading-card"><span className="spinner" />正在读取机会…</div> : filtered.length ? <div className="catalog-list">
       {filtered.map(item => <article className="catalog-item" key={item.id}>
         <div className="catalog-item-main"><div><h2>{item.title}</h2><p>{item.summary ?? "暂无摘要"}</p></div><span className="status-chip">{labels[item.eligibility_status] ?? item.eligibility_status}</span></div>
-        <div className="catalog-meta"><span>来源：{item.evidence_status === "collected" ? "已采集" : "证据不完整"}</span><span>匹配：{item.relevance_score ?? "未计算"}</span><span>地区：{item.region ?? "未标注"}</span><span>更新时间：{new Date(item.discovered_at).toLocaleString()}</span></div>
+        <div className="catalog-meta"><span>来源：{item.evidence_status === "collected" ? "已采集" : "证据不完整"}</span><span>匹配：{item.relevance_score ?? "未计算"}</span><span>算法 v{item.matching_algorithm_version}</span><span>地区：{item.region ?? "未标注"}</span><span>更新时间：{new Date(item.discovered_at).toLocaleString()}</span></div>
         {item.reason_summary && <p className="catalog-description">{item.reason_summary}</p>}
         <div className="catalog-actions"><button className="secondary" onClick={() => { const nextRoute = `#hotspot-detail:${item.id}`; window.location.hash = nextRoute; setRoute(nextRoute); }}>查看详情</button></div>
       </article>)}

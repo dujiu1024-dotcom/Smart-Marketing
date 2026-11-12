@@ -19,6 +19,7 @@ import {
 } from "./api";
 import ProductWorkspace from "./ProductWorkspace";
 import OfferWorkspace from "./OfferWorkspace";
+import BrandGuidelineWorkspace from "./BrandGuidelineWorkspace";
 
 interface ProfileForm {
   display_name: string;
@@ -174,6 +175,7 @@ export default function App() {
   const [route, setRoute] = useState(window.location.hash || "#store:profile");
   const productRoute = route === "#store:products" || route.startsWith("#store-editor:product:");
   const offerRoute = route === "#store:offers" || route.startsWith("#store-editor:offer:");
+  const brandRoute = route === "#store:brand";
 
   const loadStoreContext = useCallback(async () => {
     const response = await getStores();
@@ -413,7 +415,7 @@ export default function App() {
           <a className={productRoute || offerRoute ? "side-link" : "side-link active"} href="#store:profile">门店档案</a>
           <a className={productRoute ? "side-link active" : "side-link"} href="#store:products">商品与服务</a>
           <a className={offerRoute ? "side-link active" : "side-link"} href="#store:offers">活动与优惠</a>
-          <div className="side-link disabled" aria-disabled="true">品牌规范 · 待接入</div>
+          <a className={brandRoute ? "side-link active" : "side-link"} href="#store:brand">品牌规范</a>
           <div className="side-link disabled" aria-disabled="true">客群与经营 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">门店知识库 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">素材资产库 · 待接入</div>
@@ -421,7 +423,7 @@ export default function App() {
           <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠。其他模块明确标记待接入，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
-          {!stores.length ? <section className="empty-card"><h2>当前账号尚未加入门店</h2><p>请联系门店所有者邀请你加入后，再维护经营资料。</p></section> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : <>
+          {!stores.length ? <section className="empty-card"><h2>当前账号尚未加入门店</h2><p>请联系门店所有者邀请你加入后，再维护经营资料。</p></section> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : <>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STORE PROFILE</p>

@@ -498,7 +498,7 @@ class AttributionEvidence(Base):
         CheckConstraint(
             "status != 'rejected' OR (reversal_reason IS NOT NULL AND "
             "reversed_at IS NOT NULL AND reversed_by_user_id IS NOT NULL)",
-            name="rejected_attribution_requires_reversal_metadata",
+            name="rejected_requires_reversal_metadata",
         ),
         CheckConstraint(
             "allocation_percent > 0 AND allocation_percent <= 100",

@@ -604,7 +604,7 @@ def test_expired_lease_recovery_fences_worker_and_requires_reconciliation(
     assert event is not None
     assert event.actor_type == "system"
     assert event.attempt_id == claim.attempt.id
-    assert event.lease_token == claim.attempt.lease_token or event.lease_token is not None
+    assert event.lease_token is not None
     assert event.data_json == {"recovery": "needs_human"}
 
     # A second sweeper pass must not create another recovery event.

@@ -162,8 +162,9 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 
 - Demo `#store:assets` 对应生产 `MediaAssetsWorkspace`，从当前门店上下文读取 `/store/assets`。
 - 图片上传按 SHA-256 建立稳定 session 草稿：创建 `/store/assets/upload-intents`、浏览器直传预签名 PUT、调用 `/complete`；中断后先尝试完成既有 intent，避免重复 PUT 造成覆盖/冲突。
-- 浏览器直传 URL 使用 `OBJECT_STORAGE_PUBLIC_ENDPOINT_URL` 签名；API 内部 HEAD/GET 使用 `OBJECT_STORAGE_ENDPOINT_URL`。Docker Compose API 内部地址为 `http://seaweedfs:8333`，`.env` 的公开地址为浏览器可访问的 `http://localhost:8333`。
-- SeaweedFS 本地 CORS 限制为 `http://localhost:5173` 与 `http://127.0.0.1:5173`；生产 S3 必须按实际 Web Origin 配置 CORS，且仅开放 PUT/GET 和必要请求头。
-- 上传完成后状态为 quarantined/scanning；只有 Worker 安全扫描推进至 ready 且商家确认使用权为 confirmed_allowed，才会开放下载 URL。
-- 页面支持扫描状态查看、来源/授权说明、限制使用、短期原图下载和归档；归档不删除对象，当前品牌 Logo 引用会被服务端阻断。
-- 当前没有声称恶意文件扫描或真实 S3 浏览器联调已完成；扫描 Worker、缩略图、尺寸元数据、过期 intent 清理和素材关联选择器仍待完成。
+- 浏览器直传 URL 使用 `OBJECT_STORAGE_PUBLIC_ENDPOINT_URL` 签名；API/Worker 内部对象读取使用 `OBJECT_STORAGE_ENDPOINT_URL`。Docker Compose 内部地址为 `http://seaweedfs:8333`，公开地址由 `.env` 提供。
+- 上传完成在同一数据库事务创建 `store.asset.scan` Job 与 Outbox 事件；Worker 重新验证对象大小与 SHA-256 后，通过 ClamAV TCP INSTREAM 协议扫描。
+- 扫描通过 → `ready`；发现恶意内容或对象哈希不一致 → `rejected`；扫描服务/对象存储连续失败并耗尽 Job 重试 → `scan_failed`。后三种状态均不会开放下载。
+- 使用权确认只允许 `ready` 资产；下载只允许 `ready + confirmed_allowed`；归档允许 `ready/rejected/scan_failed`，不删除原始对象，当前品牌 Logo 引用会被服务端阻断。
+- ClamAV 1.4 容器持久化签名数据库，Worker/Scheduler 依赖健康检查；生产必须显式配置扫描服务地址和对象存储公开 HTTPS endpoint。
+- 真实生产对象存储浏览器 PUT/CORS、缩略图/尺寸元数据、过期 UploadIntent 清理和素材关联选择器仍待完成。

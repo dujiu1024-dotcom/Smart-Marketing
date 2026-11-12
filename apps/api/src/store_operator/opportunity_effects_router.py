@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -746,6 +746,14 @@ def effects_overview(
             MetricObservation.value_numeric.is_not(None),
             PublishedWork.ownership_status.in_(["verified_system_publish", "verified_platform_api"]),
             PublishedWork.verified_at.is_not(None),
+            MetricObservation.marketing_task_id == PublishedWork.task_id,
+            exists(
+                select(WorkOwnershipEvidence.id).where(
+                    WorkOwnershipEvidence.store_id == PublishedWork.store_id,
+                    WorkOwnershipEvidence.published_work_id == PublishedWork.id,
+                    WorkOwnershipEvidence.evidence_status == "verified",
+                )
+            ),
         )
         .order_by(MetricObservation.collected_at.desc())
     ).all()

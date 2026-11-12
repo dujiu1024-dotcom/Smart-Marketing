@@ -180,7 +180,7 @@ def _published_work_read(item: PublishedWork) -> dict[str, object]:
     return {
         "id": str(item.id),
         "task_id": str(item.task_id) if item.task_id else None,
-        "publish_operation_id": str(item.publish_operation_id) if item.publish_operation_id else None,
+        "publish_operation_id": str(item.publish_operation_id) if item.publish_operation_id else None,  # noqa: E501
         "channel_account_id": str(item.channel_account_id) if item.channel_account_id else None,
         "channel_key": item.channel_key,
         "external_work_id": item.external_work_id,
@@ -489,7 +489,9 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
                 "published_at": topic.published_at.isoformat() if topic.published_at else None,
             "discovered_at": topic.discovered_at.isoformat(),
                 "expires_at": opportunity.expires_at.isoformat() if opportunity.expires_at else None,  # noqa: E501
-            "region": topic.region, "heat_value": str(topic.heat_value) if topic.heat_value is not None else None,  # noqa: E501
+            "region": topic.region,
+                "heat_value": str(topic.heat_value) if topic.heat_value is not None else None,
+                    # noqa: E501
             "heat_unit": topic.heat_unit, "evidence_status": topic.evidence_status,
             "relevance_score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,  # noqa: E501
             "match_method": opportunity.match_method, "reason_summary": opportunity.reason_summary,
@@ -961,7 +963,7 @@ def register_published_work_from_readback(
         raise ApiError(
             409,
             "PUBLISH_READBACK_NOT_VERIFIED",
-            "A published status and platform readback are required before registering work ownership",
+            "A published status and platform readback are required before registering work ownership",  # noqa: E501
         )
     operation, package, package_item, account = row
     assert operation.platform_item_id is not None
@@ -1040,7 +1042,8 @@ def register_published_work_from_readback(
         )
         if existing is not None:
             return {"item": _published_work_read(existing), "replayed": True}
-        raise ApiError(409, "PUBLISHED_WORK_CONFLICT", "Published work registration conflicted") from exc
+        raise ApiError(409, "PUBLISHED_WORK_CONFLICT",
+            "Published work registration conflicted") from exc
     return {"item": _published_work_read(item), "replayed": False}
 
 
@@ -1113,7 +1116,8 @@ def create_manual_business_outcome(
         target_id=item.id,
         actor_user_id=auth.user.id,
         store_id=store_id,
-        metadata={"outcome_type": item.outcome_type, "authenticity_status": item.authenticity_status},
+        metadata={"outcome_type": item.outcome_type,
+            "authenticity_status": item.authenticity_status},
     )
     db.commit()
     return {
@@ -1216,7 +1220,8 @@ def create_attribution(
         )
     )
     if existing is not None:
-        raise ApiError(409, "ATTRIBUTION_ALREADY_EXISTS", "This outcome is already attributed to this task")
+        raise ApiError(409, "ATTRIBUTION_ALREADY_EXISTS",
+            "This outcome is already attributed to this task")
     allocated = db.scalar(
         select(func.coalesce(func.sum(AttributionEvidence.allocation_percent), 0)).where(
             AttributionEvidence.store_id == store_id,
@@ -1472,8 +1477,8 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
                 currency=(row.get("currency") or "").strip().upper() or None,
                 source_record_id=(row.get("source_record_id") or "").strip() or None,
                 source_evidence_ref=(row.get("source_evidence_ref") or "").strip() or None,
-                published_work_id=UUID(row["published_work_id"]) if row.get("published_work_id") else None,
-                marketing_task_id=UUID(row["marketing_task_id"]) if row.get("marketing_task_id") else None)
+                published_work_id=UUID(row["published_work_id"]) if row.get("published_work_id") else None,  # noqa: E501
+                marketing_task_id=UUID(row["marketing_task_id"]) if row.get("marketing_task_id") else None)  # noqa: E501
             if data.published_work_id is not None:
                 linked_work = db.scalar(
                     select(PublishedWork).where(

@@ -207,7 +207,11 @@ def _resolve_source_asset(
     return None
 
 
-def _verify_and_scan_image(result: ImageGenerateResponse) -> tuple[bytes, int, int]:
+def _verify_and_scan_image(
+    result: ImageGenerateResponse,
+    *,
+    store_id: UUID,
+) -> tuple[bytes, int, int]:
     key = result.asset_object_key
     path = PurePosixPath(key)
     if (
@@ -219,6 +223,11 @@ def _verify_and_scan_image(result: ImageGenerateResponse) -> tuple[bytes, int, i
         raise _safe_error(
             "AI_IMAGE_OBJECT_KEY_INVALID",
             "The AI provider returned an invalid image storage reference.",
+        )
+    if len(path.parts) < 3 or path.parts[0] != "stores" or path.parts[1] != str(store_id):
+        raise _safe_error(
+            "AI_IMAGE_OBJECT_STORE_MISMATCH",
+            "The generated image storage reference does not belong to the active store.",
         )
     try:
         content = download_object_bytes(object_key=key, max_bytes=_MAX_IMAGE_BYTES)
@@ -644,7 +653,9 @@ def _complete_image(
         },
         dict(image_version.output_schema_json),
     )
-    content, actual_width, actual_height = _verify_and_scan_image(image_result)
+    content, actual_width, actual_height = _verify_and_scan_image(
+        image_result, store_id=store_id
+    )
     context.check_control()
 
     vision_variables = _image_prompt_variables(

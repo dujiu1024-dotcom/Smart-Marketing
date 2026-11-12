@@ -302,7 +302,7 @@ def test_dynamic_applicability_follows_selected_outputs_and_delivery_scope() -> 
             TaskStepKey.OPPORTUNITY_DECISION,
             opportunity_applicable=False,
         )
-        is StepApplicability.NOT_APPLICABLE
+        is StepApplicability.OPTIONAL
     )
     assert (
         resolve_step_applicability(

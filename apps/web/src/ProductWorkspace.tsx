@@ -72,7 +72,11 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
   }, []);
 
   useEffect(() => {
-    if (!route) { void refresh(); return; }
+    if (!route) {
+      sessionStorage.removeItem(`store-operator.product-create.${storeId}`);
+      void refresh();
+      return;
+    }
     if (route === "new") {
       setProduct(null); setForm(empty); setDirty(false); setError(""); setNotice("");
       const key = `store-operator.product-create.${storeId}`;

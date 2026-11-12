@@ -17,6 +17,7 @@ class MarketingTaskOptions(BaseModel):
     includes_copy: bool | None = None
     includes_image: bool | None = None
     opportunity_applicable: bool | None = None
+    opportunity_snapshot: dict[str, object] | None = None
     selected_channel_keys: list[str] = Field(default_factory=list, max_length=20)
     requires_external_delivery: bool = False
 
@@ -24,6 +25,7 @@ class MarketingTaskOptions(BaseModel):
 class MarketingTaskCreate(BaseModel):
     task_type: MarketingTaskType
     title: str = Field(min_length=1, max_length=200)
+    opportunity_id: UUID | None = None
     requirement_draft: dict[str, object] = Field(default_factory=dict)
     task_options: MarketingTaskOptions = Field(default_factory=MarketingTaskOptions)
 

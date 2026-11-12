@@ -161,6 +161,17 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     )
     assert hidden_from_other_store.status_code == 404
     assert hidden_from_other_store.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
+    hidden_product_update = identity_client.patch(
+        f"/api/v1/store/products/{product['id']}",
+        headers={**headers_a, "X-Store-ID": str(store_b.id), "If-Match": '"1"'},
+        json={"description": "Cross-store write must fail"},
+    )
+    assert hidden_product_update.status_code == 404
+    hidden_product_delete = identity_client.delete(
+        f"/api/v1/store/products/{product['id']}",
+        headers={**headers_a, "X-Store-ID": str(store_b.id)},
+    )
+    assert hidden_product_delete.status_code == 404
 
     updated_product = identity_client.patch(
         f"/api/v1/store/products/{product['id']}",

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import {
-  ApiError, archiveMediaAsset, completeAssetUpload, confirmMediaAssetUsageRights,
+  archiveMediaAsset, completeAssetUpload, confirmMediaAssetUsageRights,
   createAssetUploadIntent, getMediaAssetDownloadUrl, getMediaAssets, putAssetFile,
   type MediaAsset,
 } from "./api";

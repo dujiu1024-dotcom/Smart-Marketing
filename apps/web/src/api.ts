@@ -1050,6 +1050,8 @@ export interface MetricObservationRecord {
   sync_status: string;
   supersedes_observation_id: string | null;
   import_batch_id: string | null;
+  published_work_id: string | null;
+  marketing_task_id: string | null;
 }
 export interface EffectsOverview {
   items: Array<{

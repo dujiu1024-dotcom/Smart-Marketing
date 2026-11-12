@@ -5,7 +5,6 @@ from uuid import UUID, uuid4
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
 from store_operator.models.opportunity_effects import (
-    AttributionEvidence,
     BusinessOutcomeEvidence,
     HotTopic,
     HotTopicSource,

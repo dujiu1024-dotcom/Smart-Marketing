@@ -215,3 +215,9 @@ h1 { margin: 0; color: #1f3029; font-size: clamp(25px, 3vw, 32px); letter-spacin
 @media (max-width: 760px) {
   .task-content-artifact .task-step-actions { flex-wrap: wrap; }
 }
+
+.channel-spec-panel { display: grid; gap: 12px; }
+.channel-spec-panel .task-readonly-grid { margin-top: 0; }
+
+.channel-capability-list { display: grid; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #edf0ed; }
+.channel-capability-list strong { font-size: 12px; color: #4b6354; }

@@ -31,6 +31,7 @@ from store_operator.models.channel_delivery import (
     DouyinWebhookReceipt,
     OAuthAuthorizationAttempt,
 )
+from store_operator.models.channel_spec import ChannelCapabilitySnapshot
 from store_operator.models.identity import Store, StoreMembership
 
 router = APIRouter(prefix="/channels/douyin", tags=["channel-accounts"])
@@ -385,6 +386,55 @@ def list_douyin_accounts(
             ),
         }
         for account in accounts
+    ]
+
+
+@router.get("/accounts/{account_id}/capabilities")
+def list_douyin_account_capabilities(
+    account_id: UUID,
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[dict[str, object]]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+    account = db.scalar(
+        select(ChannelAccount).where(
+            ChannelAccount.id == account_id,
+            ChannelAccount.store_id == store_id,
+            ChannelAccount.provider == "douyin",
+        )
+    )
+    if account is None:
+        raise ApiError(404, "CHANNEL_ACCOUNT_NOT_FOUND", "Channel account not found")
+    snapshots = db.scalars(
+        select(ChannelCapabilitySnapshot)
+        .where(
+            ChannelCapabilitySnapshot.store_id == store_id,
+            ChannelCapabilitySnapshot.channel_account_id == account_id,
+        )
+        .order_by(
+            ChannelCapabilitySnapshot.capability_key,
+            ChannelCapabilitySnapshot.checked_at.desc(),
+            ChannelCapabilitySnapshot.created_at.desc(),
+        )
+    ).all()
+    latest: dict[str, ChannelCapabilitySnapshot] = {}
+    for snapshot in snapshots:
+        latest.setdefault(snapshot.capability_key, snapshot)
+    return [
+        {
+            "id": str(item.id),
+            "channel_account_id": str(item.channel_account_id),
+            "channel_spec_version_id": str(item.channel_spec_version_id),
+            "capability_key": item.capability_key,
+            "support_status": item.support_status,
+            "evidence_ref": item.evidence_ref,
+            "reason": item.reason,
+            "checked_at": item.checked_at.isoformat(),
+            "expires_at": item.expires_at.isoformat() if item.expires_at else None,
+        }
+        for item in latest.values()
     ]
 
 

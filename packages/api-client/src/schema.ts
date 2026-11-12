@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/admin/channel-specs/{channel_key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish Channel Spec Version */
+        post: operations["publish_channel_spec_version_api_v1_admin_channel_specs__channel_key__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/outbox-events/{event_id}/requeue": {
         parameters: {
             query?: never;
@@ -277,6 +294,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/channels/douyin/accounts/{account_id}/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Douyin Account Capabilities */
+        get: operations["list_douyin_account_capabilities_api_v1_channels_douyin_accounts__account_id__capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/channels/douyin/accounts/{account_id}/refresh": {
         parameters: {
             query?: never;
@@ -339,6 +373,40 @@ export interface paths {
         put?: never;
         /** Receive Douyin Webhook */
         post: operations["receive_douyin_webhook_api_v1_channels_douyin_webhook_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/specs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Channel Specs */
+        get: operations["list_channel_specs_api_v1_channels_specs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/channels/specs/{channel_key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Channel Spec Versions */
+        get: operations["list_channel_spec_versions_api_v1_channels_specs__channel_key__versions_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1587,6 +1655,43 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** ChannelSpecVersionPublishRequest */
+        ChannelSpecVersionPublishRequest: {
+            /**
+             * Draft Supported
+             * @default false
+             */
+            draft_supported: boolean;
+            /** Expected Current Version Id */
+            expected_current_version_id: string | null;
+            /** Hashtag Constraints */
+            hashtag_constraints?: {
+                [key: string]: unknown;
+            };
+            /** Link Constraints */
+            link_constraints?: {
+                [key: string]: unknown;
+            };
+            /** Media Constraints */
+            media_constraints?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Publish Supported
+             * @default false
+             */
+            publish_supported: boolean;
+            /** Schedule Constraints */
+            schedule_constraints?: {
+                [key: string]: unknown;
+            };
+            /** Source Document Ref */
+            source_document_ref: string;
+            /** Text Constraints */
+            text_constraints?: {
+                [key: string]: unknown;
+            };
+        };
         /** FactConfirmationRequest */
         FactConfirmationRequest: {
             /** Confirmation Note */
@@ -2748,6 +2853,43 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    publish_channel_spec_version_api_v1_admin_channel_specs__channel_key__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelSpecVersionPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     requeue_dead_outbox_event_api_v1_admin_outbox_events__event_id__requeue_post: {
         parameters: {
             query?: never;
@@ -3296,6 +3438,41 @@ export interface operations {
             };
         };
     };
+    list_douyin_account_capabilities_api_v1_channels_douyin_accounts__account_id__capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     refresh_douyin_account_token_api_v1_channels_douyin_accounts__account_id__refresh_post: {
         parameters: {
             query?: never;
@@ -3414,6 +3591,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_channel_specs_api_v1_channels_specs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_channel_spec_versions_api_v1_channels_specs__channel_key__versions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                channel_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

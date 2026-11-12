@@ -450,7 +450,7 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 未完成 | 过期 UploadIntent 清理、完整解码/缩略图、真实对象存储与 ClamAV 浏览器端到端联调 | Issue #6 继续 Open |
 
 
-## 2026-11-12 #12 抖音门店账号 Web 接入（PR 待 CI）
+## 2026-11-12 #12 抖音门店账号 Web 接入（PR #129 已合并；真实 OAuth 待验收）
 
 | 能力 | 当前实现 | 验收边界 |
 |---|---|---|
@@ -461,7 +461,7 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 未完成 | 断开/撤销 UI、能力快照、ChannelSpecVersion 管理/发现、内容适配、真实授权/发布 E2E | Issue #12 继续 Open |
 
 
-## 2026-11-12 #8 文案/图片产物与版本审核 Web 接入（PR 待 CI）
+## 2026-11-12 #8 文案/图片产物与版本审核 Web 接入（PR #130 已合并；完整内容闭环待验收）
 
 | 能力 | 当前实现 | 验收边界 |
 |---|---|---|
@@ -472,3 +472,14 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 未完成 | AI Provider 生成/图片编辑、渠道规格选择与 ChannelContent 适配、质检报告/人工复核、发布包冻结/最终确认/人工交付 UI | 由 #10/#12 及后续 #8 PR 完成；Issue #8 不关闭 |
 
 Web 单元测试覆盖手动文案产物创建和精确版本审核请求；真实 AI 生成与完整发布浏览器链路未在本 PR 中实现。
+
+
+## 2026-11-12 #12 ChannelSpec/ChannelSpecVersion/CapabilitySnapshot 数据层（PR 待 CI）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| ChannelSpec | 平台级 channel_key 唯一目录，current_version_id 复合外键确保指向同一 Spec 的版本 | 不含 store_id；规格更新不可覆盖历史 |
+| ChannelSpecVersion | 不可变版本，保存文本/媒体/标签/链接/排期约束、草稿/发布能力、来源引用和 verification_status | 初始 Douyin v1 明确 pending_verification，能力 false、来源为空，不声称官方规则已核验 |
+| ChannelCapabilitySnapshot | 门店账号级能力历史快照，复合外键约束同店账号和精确 SpecVersion | 当前仅完成数据模型/迁移，探测 Worker/API 尚未接入 |
+| ChannelContent | channel_spec_version_id 增加外键，旧记录迁移时保留原 UUID 并创建 pending legacy spec/version；创建适配快照时强制校验同渠道且 verification_status=verified | pending/deprecated 规格返回明确阻断，不允许生成渠道适配内容 |
+| API/UI | 门店渠道页面展示当前规格版本、来源与核验状态；新增门店认证后的规格目录/版本只读 API | 只读；规格维护和真实能力探测仍未完成 |

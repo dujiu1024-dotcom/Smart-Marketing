@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  listDouyinAccounts, refreshDouyinAccount, startDouyinAuthorization,
-  type DouyinAccount,
+  listChannelSpecs, listDouyinAccountCapabilities, listDouyinAccounts, refreshDouyinAccount, startDouyinAuthorization,
+  type ChannelCapabilitySnapshotRecord, type ChannelSpecRecord, type DouyinAccount,
 } from "./api";
 
 const statusLabels: Record<DouyinAccount["status"], string> = {
@@ -14,6 +14,9 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : "
 
 export default function ChannelAccountsWorkspace({ storeId }: { storeId: string }) {
   const [accounts, setAccounts] = useState<DouyinAccount[]>([]);
+  const [capabilities, setCapabilities] = useState<Record<string, ChannelCapabilitySnapshotRecord[]>>({});
+  const [douyinSpec, setDouyinSpec] = useState<ChannelSpecRecord | null>(null);
+  const [specError, setSpecError] = useState("");
   const [authorizationUrl, setAuthorizationUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -23,8 +26,20 @@ export default function ChannelAccountsWorkspace({ storeId }: { storeId: string 
   const loadAccounts = useCallback(async () => {
     setLoading(true);
     setError("");
-    try { setAccounts(await listDouyinAccounts(storeId)); }
-    catch (reason) { setError(errorText(reason)); }
+    try {
+      const accountItems = await listDouyinAccounts(storeId);
+      setAccounts(accountItems);
+      const capabilityEntries = await Promise.all(accountItems.map(async account => {
+        try { return [account.id, await listDouyinAccountCapabilities(storeId, account.id)] as const; }
+        catch { return [account.id, []] as const; }
+      }));
+      setCapabilities(Object.fromEntries(capabilityEntries));
+      try {
+        const specs = await listChannelSpecs(storeId);
+        setDouyinSpec(specs.find(item => item.channel_key === "douyin") || null);
+        setSpecError("");
+      } catch (reason) { setSpecError(errorText(reason)); }
+    } catch (reason) { setError(errorText(reason)); }
     finally { setLoading(false); }
   }, [storeId]);
 
@@ -57,6 +72,10 @@ export default function ChannelAccountsWorkspace({ storeId }: { storeId: string 
     </div>
     {error && <div className="alert error" role="alert">{error}</div>}
     {notice && <div className="alert success" role="status">{notice}</div>}
+    <section className="task-panel channel-spec-panel">
+      <div className="section-title"><div><h2>抖音渠道规格</h2><p>内容规则必须引用不可变版本；未经官方来源核验的规则不得用于宣称通过平台校验。</p></div><span className={douyinSpec?.current_version?.verification_status === "verified" ? "status-chip" : "status-chip danger"}>{douyinSpec?.current_version?.verification_status === "verified" ? "已核验" : "待核验"}</span></div>
+      {specError ? <p className="muted">{specError}</p> : douyinSpec?.current_version ? <div className="task-readonly-grid"><div><strong>规格版本</strong><span>V{douyinSpec.current_version.spec_version}</span></div><div><strong>官方规则来源</strong><span>{douyinSpec.current_version.source_document_ref || "尚未登记官方来源"}</span></div><div><strong>草稿能力</strong><span>{douyinSpec.current_version.draft_supported ? "已核验支持" : "未核验/不支持"}</span></div><div><strong>发布能力</strong><span>{douyinSpec.current_version.publish_supported ? "已核验支持" : "未核验/不支持"}</span></div></div> : <p className="muted">当前没有可用的渠道规格版本。</p>}
+    </section>
     <section className="task-panel channel-connect-panel">
       <div className="section-title"><div><h2>连接抖音账号</h2><p>通过官方授权页申请 user_info、video.create、video.list 权限；不会采集或保存账号密码。</p></div><span className="status-chip">首期渠道</span></div>
       <button className="primary" type="button" disabled={saving} onClick={() => void connectDouyin()}>{saving ? "处理中…" : "生成官方授权链接"}</button>
@@ -72,7 +91,9 @@ export default function ChannelAccountsWorkspace({ storeId }: { storeId: string 
           {account.avatar_url ? <img src={account.avatar_url} alt="" referrerPolicy="no-referrer" /> : <span className="channel-avatar">抖</span>}
           <div><strong>{account.display_name || "抖音账号"}</strong><small>账号 ID：{account.external_account_id}</small><small>授权于 {new Date(account.connected_at).toLocaleString()}</small></div>
         </div>
-        <div className="channel-account-meta"><span className={account.status === "active" ? "status-chip" : "status-chip danger"}>{statusLabels[account.status]}</span><small>授权范围：{account.granted_scopes.join("、") || "未返回"}</small><small>Access Token 到期：{new Date(account.access_token_expires_at).toLocaleString()}</small><small>最近验证：{account.last_verified_at ? new Date(account.last_verified_at).toLocaleString() : "尚未验证"}</small></div>
+        <div className="channel-account-meta"><span className={account.status === "active" ? "status-chip" : "status-chip danger"}>{statusLabels[account.status]}</span><small>授权范围：{account.granted_scopes.join("、") || "未返回"}</small><small>Access Token 到期：{new Date(account.access_token_expires_at).toLocaleString()}</small><small>最近验证：{account.last_verified_at ? new Date(account.last_verified_at).toLocaleString() : "尚未验证"}</small>
+          <div className="channel-capability-list"><strong>账号能力核验</strong>{(capabilities[account.id] || []).length === 0 ? <small>暂无能力探测记录；当前不将任何未核验能力视为可用。</small> : (capabilities[account.id] || []).map(capability => <small key={capability.id}>{capability.capability_key}：{capability.support_status === "supported" ? "已核验支持" : capability.support_status === "unsupported" ? "不支持" : "待核验"} · {new Date(capability.checked_at).toLocaleString()}</small>)}</div>
+        </div>
         <button className="text-button" type="button" disabled={saving || account.status !== "active"} onClick={() => void refreshAccount(account)}>重新验证授权</button>
       </article>)}</div>}
     </section>

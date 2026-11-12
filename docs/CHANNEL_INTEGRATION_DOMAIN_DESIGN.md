@@ -1,6 +1,6 @@
 # 渠道账号与官方发布集成领域设计（Issue #12）
 
-> 状态：抖音首期实施中；OAuth/发布 API 与异步图文发布已合并，真实账号验收和 UI 接入待完成  
+> 状态：抖音首期实施中；OAuth/发布 API、账号 Web 入口已合并；ChannelSpec 数据层实施中，真实账号验收待完成  
 > 日期：2026-11-11  
 > 产品基线：PRODUCT_DESIGN.md v1.8 / UX_AUDIT_AND_REDESIGN.md v1.8  
 > Demo 基线：门店资料 channels、营销任务 task 的 channel / publish 步骤
@@ -291,3 +291,10 @@ ChannelSpecVersion：**id, channel_spec_id, spec_version, text_constraints_json,
 - #12 设计可先行；特定平台实现必须等产品负责人确认首个平台和官方权限。
 - 本文是通用设计提案；不实现真实 OAuth、Token 存储、平台 SDK 或 PublishOperation 生产代码。
 - 所有 Mock/演示连接必须标注模拟，不得作为真实渠道接通证据。
+
+
+## 2026-11-12 生产数据层实现进度
+
+PR 待验收：新增 ChannelSpec、ChannelSpecVersion、ChannelCapabilitySnapshot ORM 与 migration 0016；ChannelContent.channel_spec_version_id 现在由外键约束引用 ChannelSpecVersion。迁移会为历史 ChannelContent 保留原 spec version UUID，回填 pending_verification 的 legacy spec/version；并为首期抖音创建 pending_verification v1，不填充未经核验的平台限制，也不声明草稿/发布能力。
+
+新增门店认证的只读规格目录/版本 API，并在门店渠道账号页展示当前规格版本和核验状态。CapabilitySnapshot 当前只有数据模型，账号能力探测、快照刷新/过期 Worker、规格管理/发布 API 仍未实现。真实官方来源、scope 与平台能力必须在官方应用/账号验证后录入。

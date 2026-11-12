@@ -2,7 +2,15 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from store_operator.auth.security import hash_password
-from store_operator.models import MediaAsset, QualityReport, Store, StoreMembership, User
+from store_operator.models import (
+    ChannelSpec,
+    ChannelSpecVersion,
+    MediaAsset,
+    QualityReport,
+    Store,
+    StoreMembership,
+    User,
+)
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -115,10 +123,25 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
     artifact_id = artifact.json()["id"]
     version_id = artifact.json()["current_version_id"]
     content_url = f"/api/v1/marketing-tasks/{task_id}/channel-contents"
+    spec_version = (
+        db_session.query(ChannelSpecVersion)
+        .join(ChannelSpec, ChannelSpec.id == ChannelSpecVersion.channel_spec_id)
+        .filter(ChannelSpec.channel_key == "douyin")
+        .one()
+    )
+    spec_version.verification_status = "verified"
+    spec_version.source_document_ref = "test-fixture://verified-channel-spec"
+    db_session.flush()
     content_payload = {
         "channel_key": "douyin",
         "copy_version_id": version_id,
-        "channel_spec_version_id": str(uuid4()),
+        "channel_spec_version_id": str(
+            db_session.query(ChannelSpecVersion)
+            .join(ChannelSpec, ChannelSpec.id == ChannelSpecVersion.channel_spec_id)
+            .filter(ChannelSpec.channel_key == "douyin")
+            .one()
+            .id
+        ),
         "payload": {"title": "Lunch offer", "body": "Visit us for lunch this week."},
         "image_version_ids": [],
     }

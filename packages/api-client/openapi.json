@@ -1662,6 +1662,69 @@
         "title": "ChannelContentCreate",
         "type": "object"
       },
+      "ChannelSpecVersionPublishRequest": {
+        "properties": {
+          "draft_supported": {
+            "default": false,
+            "title": "Draft Supported",
+            "type": "boolean"
+          },
+          "expected_current_version_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Current Version Id"
+          },
+          "hashtag_constraints": {
+            "additionalProperties": true,
+            "title": "Hashtag Constraints",
+            "type": "object"
+          },
+          "link_constraints": {
+            "additionalProperties": true,
+            "title": "Link Constraints",
+            "type": "object"
+          },
+          "media_constraints": {
+            "additionalProperties": true,
+            "title": "Media Constraints",
+            "type": "object"
+          },
+          "publish_supported": {
+            "default": false,
+            "title": "Publish Supported",
+            "type": "boolean"
+          },
+          "schedule_constraints": {
+            "additionalProperties": true,
+            "title": "Schedule Constraints",
+            "type": "object"
+          },
+          "source_document_ref": {
+            "maxLength": 2048,
+            "minLength": 12,
+            "title": "Source Document Ref",
+            "type": "string"
+          },
+          "text_constraints": {
+            "additionalProperties": true,
+            "title": "Text Constraints",
+            "type": "object"
+          }
+        },
+        "required": [
+          "expected_current_version_id",
+          "source_document_ref"
+        ],
+        "title": "ChannelSpecVersionPublishRequest",
+        "type": "object"
+      },
       "FactConfirmationRequest": {
         "properties": {
           "confirmation_note": {
@@ -5573,6 +5636,60 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/channel-specs/{channel_key}/versions": {
+      "post": {
+        "operationId": "publish_channel_spec_version_api_v1_admin_channel_specs__channel_key__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_key",
+            "required": true,
+            "schema": {
+              "title": "Channel Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChannelSpecVersionPublishRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Publish Channel Spec Version Api V1 Admin Channel Specs  Channel Key  Versions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Channel Spec Version",
+        "tags": [
+          "platform-admin"
+        ]
+      }
+    },
     "/api/v1/admin/outbox-events/{event_id}/requeue": {
       "post": {
         "operationId": "requeue_dead_outbox_event_api_v1_admin_outbox_events__event_id__requeue_post",
@@ -6426,6 +6543,70 @@
         ]
       }
     },
+    "/api/v1/channels/douyin/accounts/{account_id}/capabilities": {
+      "get": {
+        "operationId": "list_douyin_account_capabilities_api_v1_channels_douyin_accounts__account_id__capabilities_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Account Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Douyin Account Capabilities Api V1 Channels Douyin Accounts  Account Id  Capabilities Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Douyin Account Capabilities",
+        "tags": [
+          "channel-accounts"
+        ]
+      }
+    },
     "/api/v1/channels/douyin/accounts/{account_id}/refresh": {
       "post": {
         "operationId": "refresh_douyin_account_token_api_v1_channels_douyin_accounts__account_id__refresh_post",
@@ -6615,6 +6796,123 @@
         "summary": "Receive Douyin Webhook",
         "tags": [
           "channel-accounts"
+        ]
+      }
+    },
+    "/api/v1/channels/specs": {
+      "get": {
+        "operationId": "list_channel_specs_api_v1_channels_specs_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Channel Specs Api V1 Channels Specs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Channel Specs",
+        "tags": [
+          "channel-specs"
+        ]
+      }
+    },
+    "/api/v1/channels/specs/{channel_key}/versions": {
+      "get": {
+        "operationId": "list_channel_spec_versions_api_v1_channels_specs__channel_key__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "channel_key",
+            "required": true,
+            "schema": {
+              "title": "Channel Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Channel Spec Versions Api V1 Channels Specs  Channel Key  Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Channel Spec Versions",
+        "tags": [
+          "channel-specs"
         ]
       }
     },

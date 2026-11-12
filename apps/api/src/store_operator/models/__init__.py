@@ -6,6 +6,11 @@ from store_operator.models.channel_delivery import (
     PublishOperation,
     PublishOperationAttempt,
 )
+from store_operator.models.channel_spec import (
+    ChannelCapabilitySnapshot,
+    ChannelSpec,
+    ChannelSpecVersion,
+)
 from store_operator.models.content_delivery import (
     Artifact,
     ArtifactVersion,
@@ -61,6 +66,9 @@ from store_operator.models.store_knowledge import (
 
 __all__ = [
     "Artifact",
+    "ChannelSpec",
+    "ChannelSpecVersion",
+    "ChannelCapabilitySnapshot",
     "ChannelAccount",
     "DouyinWebhookReceipt",
     "OAuthAuthorizationAttempt",

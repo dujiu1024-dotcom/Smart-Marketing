@@ -4,6 +4,8 @@ import ChannelAccountsWorkspace from "./ChannelAccountsWorkspace";
 
 afterEach(() => cleanup());
 const api = vi.hoisted(() => ({
+  listChannelSpecs: vi.fn(),
+  listDouyinAccountCapabilities: vi.fn(),
   listDouyinAccounts: vi.fn(),
   startDouyinAuthorization: vi.fn(),
   refreshDouyinAccount: vi.fn(),
@@ -14,6 +16,16 @@ describe("channel accounts workspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.listDouyinAccounts.mockResolvedValue([]);
+    api.listDouyinAccountCapabilities.mockResolvedValue([]);
+    api.listChannelSpecs.mockResolvedValue([{
+      id: "spec-1", channel_key: "douyin", status: "active",
+      current_version: {
+        id: "spec-v1", channel_spec_id: "spec-1", spec_version: 1,
+        text_constraints: {}, media_constraints: {}, hashtag_constraints: {}, link_constraints: {}, schedule_constraints: {},
+        draft_supported: false, publish_supported: false, verification_status: "pending_verification",
+        source_document_ref: null, published_at: null, created_at: "2026-11-12T00:00:00Z",
+      },
+    }]);
     api.startDouyinAuthorization.mockResolvedValue({
       authorization_url: "https://open.douyin.com/platform/oauth/connect?state=test",
       expires_in: "600",

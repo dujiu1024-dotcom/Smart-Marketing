@@ -558,7 +558,7 @@ def update_requirement_draft(
         task.task_options_json
     )
     immutable_opportunity_snapshot = task.task_options_json.get("opportunity_snapshot")
-    if immutable_opportunity_snapshot is not None:
+    if isinstance(immutable_opportunity_snapshot, dict):
         options.opportunity_snapshot = immutable_opportunity_snapshot
         options.opportunity_applicable = True
     validated = MarketingTaskCreate(

@@ -340,8 +340,19 @@ def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], contex
             [topic.title, topic.summary or "", *topic.topic_tags_json, *topic.industry_tags_json]
         )
         profile_text = _store_profile_text(profile)
+        region_text = " ".join(
+            value
+            for value in (
+                profile.region,
+                profile.province,
+                profile.city,
+                profile.district,
+            )
+            if value
+        )
         brand_text = _brand_guideline_text(brand)
-        industry_score = _match_score(topic_text, profile_text)
+        profile_score = _match_score(topic_text, profile_text)
+        region_score = _match_score(topic.region or "", region_text)
         brand_score = _match_score(topic_text, brand_text)
         risk_flags = _brand_risk_flags(topic_text, brand)
         region_match = _region_matches(topic.region, profile)
@@ -374,7 +385,7 @@ def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], contex
             [value for value, _ in product_scores]
             + [value for value, _ in offer_scores]
             + [value for value, _ in audience_scores]
-            + [industry_score * 0.8, brand_score * 0.5]
+            + [profile_score * 0.8, region_score * 0.6, brand_score * 0.5]
         )
         latest = db.scalar(select(StoreOpportunity).where(
             StoreOpportunity.store_id == store_id, StoreOpportunity.hot_topic_id == topic.id)
@@ -401,8 +412,8 @@ def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], contex
             matched_audience_profile_ids_json=audience_ids, suggested_scenario=(best_offer.title if best_offer else None),
             content_angle=(f"围绕{best_product.name}回应当前话题" if best_product else None),
             reason_summary=(
-                "综合门店行业、区域、品牌规范与商品、活动、客群的规则文本相关性；"
-                f"区域匹配：{'匹配' if region_match is True else '不匹配' if region_match is False else '未提供区域证据'}；"
+                f"门店资料文本相关度 {profile_score:.2f}，区域文本相关度 {region_score:.2f}，"
+                f"品牌规范文本相关度 {brand_score:.2f}；区域匹配：{'匹配' if region_match is True else '不匹配' if region_match is False else '未提供区域证据'}；"
                 "该分值仅代表文本相关性，不代表趋势热度或经营效果。"
             ),
             risk_flags_json=risk_flags, eligibility_status=status, matched_at=datetime.now(UTC),

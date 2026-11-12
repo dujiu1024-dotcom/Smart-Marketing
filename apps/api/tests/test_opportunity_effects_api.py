@@ -710,3 +710,49 @@ def test_attribution_reversal_preserves_snapshot_and_allows_replacement(
     )
     assert replacement.status_code == 200, replacement.text
     assert replacement.json()["item"]["status"] == "active"
+
+
+def test_metric_observation_cannot_reference_another_stores_published_work(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store_a = _identity(db_session, "work-scope-a@example.com", "Work Scope A")
+    _, store_b = _identity(db_session, "work-scope-b@example.com", "Work Scope B")
+    definition = MetricDefinition(
+        id=uuid4(),
+        source_system="manual",
+        metric_key="views",
+        metric_tier="content_performance",
+        display_name="播放量",
+        value_type="count",
+        definition="Manual views report",
+        aggregation_rule="sum",
+        period_semantics="period_delta",
+        definition_version=1,
+        status="active",
+    )
+    work = PublishedWork(
+        id=uuid4(),
+        store_id=store_b.id,
+        channel_key="douyin",
+        external_work_id="private-to-store-b",
+        ownership_status="merchant_claim",
+    )
+    db_session.add_all([definition, work])
+    db_session.flush()
+    headers = _login(identity_client, "work-scope-a@example.com", store_a.id)
+
+    response = identity_client.post(
+        "/api/v1/effects/observations",
+        headers=headers,
+        json={
+            "metric_key": "views",
+            "value_numeric": "10",
+            "period_timezone": "Asia/Tokyo",
+            "published_work_id": str(work.id),
+        },
+    )
+
+    assert response.status_code == 404

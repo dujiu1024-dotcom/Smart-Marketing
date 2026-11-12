@@ -50,6 +50,7 @@ def upgrade() -> None:
                 name="fk_published_works_account_same_store", ondelete="RESTRICT"),
         sa.CheckConstraint("ownership_status IN ('pending_verification', 'verified_system_publish', 'verified_platform_api', 'merchant_claim', 'rejected', 'revoked')", name="ck_published_works_ownership_status"),  # noqa: E501
         sa.CheckConstraint("ownership_status NOT IN ('verified_system_publish', 'verified_platform_api') OR verified_at IS NOT NULL", name="ck_published_works_verified_ownership_requires_timestamp"),  # noqa: E501
+        sa.CheckConstraint("ownership_status != 'verified_system_publish' OR publish_operation_id IS NOT NULL", name="ck_published_works_system_publish_requires_operation"),  # noqa: E501
     )
     op.create_index("ix_published_works_store_channel_published", "published_works",
         ["store_id", "channel_key", "published_at"])
@@ -76,6 +77,8 @@ def upgrade() -> None:
         sa.CheckConstraint("evidence_type IN ('system_publish_readback', 'platform_api', 'merchant_attestation', 'external_import')", name="ck_work_ownership_evidence_evidence_type"),  # noqa: E501
         sa.CheckConstraint("evidence_status IN ('pending', 'verified', 'rejected', 'revoked')",
             name="ck_work_ownership_evidence_evidence_status"),
+        sa.CheckConstraint("evidence_status != 'verified' OR verified_at IS NOT NULL",
+            name="ck_work_ownership_evidence_verified_evidence_requires_timestamp"),
     )
     op.create_index("ix_work_ownership_evidence_work_status", "work_ownership_evidence",
         ["store_id", "published_work_id", "evidence_status"])

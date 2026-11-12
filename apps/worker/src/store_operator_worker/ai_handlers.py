@@ -312,6 +312,7 @@ def _call_text_provider(
     provider_id: str,
     model_id: str,
     executor: AIProviderExecutor,
+    idempotency_key: str | None = None,
 ) -> dict[str, object]:
     system_instruction, user_input = render_published_prompt(version, variables)
     request = TextGenerateRequest(
@@ -320,7 +321,7 @@ def _call_text_provider(
             store_id=task.store_id,
             job_id=job.id,
             attempt_id=context.attempt_id,
-            idempotency_key=job.idempotency_key,
+            idempotency_key=idempotency_key or job.idempotency_key,
             marketing_task_id=task.id,
             prompt_version_id=version.id,
         ),

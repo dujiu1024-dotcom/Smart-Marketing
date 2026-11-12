@@ -70,7 +70,7 @@ describe("marketing task workspace", () => {
     render(<MarketingTaskWorkspace storeId={storeId} />);
     expect(await screen.findByText("渠道适配与质检")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "创建抖音适配快照" })).toBeDisabled();
-    expect(screen.getByText("最终发布确认")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "最终发布确认" })).toBeInTheDocument();
   });
   it("lists current-store tasks and opens the selected task", async () => {
     render(<MarketingTaskWorkspace storeId={storeId} />);

@@ -11,7 +11,7 @@ class ObjectStorageNotConfigured(RuntimeError):
     """The private object-storage backend is not configured."""
 
 
-def _client() -> Any:
+def _build_client(endpoint_url: str | None) -> Any:
     if (
         not settings.object_storage_bucket
         or not settings.object_storage_access_key_id
@@ -20,7 +20,7 @@ def _client() -> Any:
         raise ObjectStorageNotConfigured("Private object storage is not configured")
     return boto3.client(
         "s3",
-        endpoint_url=settings.object_storage_endpoint_url,
+        endpoint_url=endpoint_url,
         region_name=settings.object_storage_region,
         aws_access_key_id=settings.object_storage_access_key_id,
         aws_secret_access_key=settings.object_storage_secret_access_key,
@@ -68,7 +68,7 @@ def head_object(*, object_key: str) -> dict[str, Any]:
 def create_download_url(*, object_key: str, expires_in: int | None = None) -> str:
     return cast(
         str,
-        _client().generate_presigned_url(
+        _presign_client().generate_presigned_url(
             "get_object",
             Params={"Bucket": settings.object_storage_bucket, "Key": object_key},
             ExpiresIn=expires_in or settings.object_storage_download_ttl_seconds,

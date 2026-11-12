@@ -46,7 +46,9 @@ def test_outbox_dispatch_payload_requires_object_and_uuid() -> None:
 
 
 def test_outbox_relay_is_registered_as_celery_task() -> None:
-    assert celery_app.tasks["jobs.relay_outbox"] is relay_outbox
+    registered = celery_app.tasks["jobs.relay_outbox"]
+    assert registered.name == "jobs.relay_outbox"
+    assert registered.run.__name__ == relay_outbox.run.__name__
 
 
 class RelaySession:

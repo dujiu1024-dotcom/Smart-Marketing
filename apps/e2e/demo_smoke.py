@@ -167,6 +167,12 @@ async def main() -> None:
         await package_label.wait_for(state="visible")
         package_text = await package_label.inner_text()
         assert "pkg-" in package_text, f"Unexpected frozen package label: {package_text!r}"
+        package_id = "pkg-" + package_text.split("pkg-", 1)[1].split()[0]
+
+        # A repeated submission of the same approved content version must reuse the frozen package.
+        await page.locator('[data-action="save-publish"]').click()
+        await page.get_by_text("当前内容版本已冻结，无需重复提交").wait_for(state="visible")
+        assert package_id in await package_label.inner_text()
 
         # Refresh must restore the frozen package without pretending an external publish occurred.
         await page.reload(wait_until="networkidle")
@@ -174,7 +180,7 @@ async def main() -> None:
         await page.locator('[data-task-tab="publish"]').click()
         restored_package = page.get_by_text("内容包编号：", exact=False)
         await restored_package.wait_for(state="visible")
-        assert "pkg-" in await restored_package.inner_text()
+        assert package_id in await restored_package.inner_text()
         await page.get_by_text("只保存冻结版本的内容包。渠道未连接时，不会向外部平台发布。").wait_for(
             state="visible"
         )

@@ -350,7 +350,10 @@ Issue #6 仍 Open。恶意文件扫描、缩略图/尺寸元数据、Worker 扫�
 
 ## 2026-11-12 素材资产生产 Web 接入补充
 
-- `#store:assets` 已接入真实素材列表与上传/归档/使用权交互；前端上传使用服务端 upload-intent 与预签名 PUT，完成接口在服务端重新校验对象大小、MIME 和 SHA-256。
-- 私有对象存储配置拆分为内部 API/Worker endpoint 与浏览器 presigned URL endpoint，避免容器内 `localhost` 错误指向 API 容器，也避免向浏览器暴露不可解析的 Docker 服务主机名。
-- 本地 SeaweedFS CORS 仅允许两个本地开发 origin；生产对象存储必须配置精确的 Web Origin、PUT/GET 方法和必要请求头。
-- 文件上传完成仍停留在隔离/扫描状态；ClamAV/恶意文件扫描、Worker ready/rejected 回写、缩略图和 UploadIntent 过期清理未完成。哈希与 MIME 校验不等于恶意文件扫描。
+- `#store:assets` 已接入真实素材列表、上传、使用权确认、短期原图下载和归档。
+- 私有对象存储拆分内部 API/Worker endpoint 与浏览器 presign endpoint；生产必须配置 HTTPS 公共 endpoint。
+- 上传完成的同一事务创建 `store.asset.scan` Job + Outbox，确保资产不会因 API/进程崩溃而漏掉扫描任务。
+- Worker 通过 ClamAV TCP INSTREAM 扫描对象，并在扫描前再次校验对象大小与 SHA-256。扫描服务不可用按 Job 策略重试；耗尽后写入 `scan_failed`，保持不可下载。
+- `ready` 只代表 ClamAV 返回 clean，不代表素材版权已确认；商家仍需独立提交来源/使用权说明。只有 `ready + confirmed_allowed` 才可生成短期下载 URL。
+- Compose 使用官方 ClamAV 1.4 镜像和持久化签名数据库卷；生产部署需为 ClamAV 分配充足内存并监控病毒库更新。
+- 尚未完成缩略图/尺寸元数据、过期 UploadIntent sweeper、素材与商品/任务/Logo 选择器及真实对象存储浏览器联调。哈希与 MIME 校验仍不能单独称为恶意文件扫描。

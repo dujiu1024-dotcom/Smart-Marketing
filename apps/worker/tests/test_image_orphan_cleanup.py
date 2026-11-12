@@ -105,7 +105,7 @@ def test_orphan_image_cleanup_protects_registered_or_referenced_objects(
         lambda *, object_key: deleted.append(object_key),
     )
 
-    result = tasks.cleanup_orphaned_ai_image_objects.run()
+    result = worker_tasks.cleanup_orphaned_ai_image_objects.run()
 
     assert result == 0
     assert deleted == []
@@ -127,14 +127,14 @@ def test_orphan_image_cleanup_never_deletes_cross_store_or_traversal_keys(
     )
     database = FakeDatabase([invocation])
     deleted: list[str] = []
-    monkeypatch.setattr(tasks, "SessionLocal", FakeSessionFactory(database))
+    monkeypatch.setattr(worker_tasks, "SessionLocal", FakeSessionFactory(database))
     monkeypatch.setattr(
-        tasks,
+        worker_tasks,
         "delete_object",
         lambda *, object_key: deleted.append(object_key),
     )
 
-    result = tasks.cleanup_orphaned_ai_image_objects.run()
+    result = worker_tasks.cleanup_orphaned_ai_image_objects.run()
 
     assert result == 0
     assert deleted == []

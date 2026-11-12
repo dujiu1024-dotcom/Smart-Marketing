@@ -16,7 +16,11 @@ def _generation_context() -> tuple[SimpleNamespace, SimpleNamespace, SimpleNames
     requirement = SimpleNamespace(
         payload_json={
             "requirement": {"objective": "Increase store visits"},
-            "business_facts": [{"fact_key": "offer", "value": "Buy one get one"}],
+            "business_facts": [],
+        "business_fact_refs": [
+            {"fact_key": "offer", "value": "Buy one get one"}
+        ],
+        "business_facts_by_key": {},
         }
     )
     version = SimpleNamespace(

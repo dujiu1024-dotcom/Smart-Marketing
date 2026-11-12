@@ -757,7 +757,9 @@ def effects_overview(
             MetricObservation.sync_status == "current",
             MetricObservation.integrity_status == "complete",
             MetricObservation.value_numeric.is_not(None),
-            PublishedWork.ownership_status.in_(["verified_system_publish", "verified_platform_api"]),
+            PublishedWork.ownership_status.in_(
+                ["verified_system_publish", "verified_platform_api"]
+            ),
             PublishedWork.verified_at.is_not(None),
             MetricObservation.marketing_task_id == PublishedWork.task_id,
             exists(
@@ -781,7 +783,11 @@ def effects_overview(
         content_groups.setdefault(group_key, []).append((observation, definition, work))
 
     content_periods: dict[str, list[dict[str, object]]] = {}
-    for samples in content_groups.values():
+        values = [
+            sample.value_numeric
+            for sample, _, _ in samples
+            if sample.value_numeric is not None
+        ]
         observation, definition, work = samples[0]
         values = [sample.value_numeric for sample, _, _ in samples if sample.value_numeric is not None]
         if not values:

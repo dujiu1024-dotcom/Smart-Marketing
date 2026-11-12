@@ -61,7 +61,6 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
   }
 
   async function decide(decision: "adopt" | "ignore" | "snooze") {
-    const id = typeof detail?.id === "string" ? detail.id : "";
     if (!id) return;
     setSaving(true); setError(""); setNotice("");
     try {

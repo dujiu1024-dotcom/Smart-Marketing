@@ -230,3 +230,93 @@ def test_platform_admin_publishes_a_new_verified_channel_spec_version(
     )
     assert untrusted_source.status_code == 422
     assert untrusted_source.json()["error"]["code"] == "CHANNEL_SPEC_SOURCE_REQUIRED"
+
+
+
+def test_channel_account_capabilities_are_store_scoped(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = User(
+        id=uuid4(),
+        email_normalized="channel-idor@example.com",
+        password_hash=hash_password("test-password-123"),
+        status="active",
+    )
+    store_a = Store(id=uuid4(), name="Channel A", timezone="Asia/Tokyo", status="active")
+    store_b = Store(id=uuid4(), name="Channel B", timezone="Asia/Tokyo", status="active")
+    db_session.add_all([user, store_a, store_b])
+    db_session.flush()
+    db_session.add_all(
+        [
+            StoreMembership(
+                id=uuid4(), store_id=store_a.id, user_id=user.id,
+                role="owner", status="active", joined_at=datetime.now(UTC),
+            ),
+            StoreMembership(
+                id=uuid4(), store_id=store_b.id, user_id=user.id,
+                role="owner", status="active", joined_at=datetime.now(UTC),
+            ),
+        ]
+    )
+    db_session.flush()
+
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": "channel-idor@example.com", "password": "test-password-123"},
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert login.status_code == 200, login.text
+    headers_a = {
+        "Origin": "http://localhost:5173",
+        "X-CSRF-Token": login.json()["csrf_token"],
+        "X-Store-ID": str(store_a.id),
+    }
+    headers_b = {**headers_a, "X-Store-ID": str(store_b.id)}
+
+    spec_version = (
+        db_session.query(ChannelSpecVersion)
+        .join(ChannelSpec, ChannelSpec.id == ChannelSpecVersion.channel_spec_id)
+        .filter(ChannelSpec.channel_key == "douyin")
+        .one()
+    )
+    account = ChannelAccount(
+        id=uuid4(),
+        store_id=store_a.id,
+        provider="douyin",
+        external_account_id="store-a-open-id",
+        access_token_secret_ref="secret://store-a/access",
+        refresh_token_secret_ref="secret://store-a/refresh",
+        access_token_expires_at=datetime.now(UTC) + timedelta(days=1),
+        connected_by_user_id=user.id,
+        status="active",
+    )
+    db_session.add(account)
+    db_session.flush()
+    db_session.add(
+        ChannelCapabilitySnapshot(
+            id=uuid4(),
+            store_id=store_a.id,
+            channel_account_id=account.id,
+            channel_spec_version_id=spec_version.id,
+            capability_key="publish_image_text",
+            support_status="pending_verification",
+            checked_at=datetime.now(UTC),
+        )
+    )
+    db_session.flush()
+
+    own = identity_client.get(
+        f"/api/v1/channels/douyin/accounts/{account.id}/capabilities",
+        headers=headers_a,
+    )
+    assert own.status_code == 200, own.text
+
+    hidden = identity_client.get(
+        f"/api/v1/channels/douyin/accounts/{account.id}/capabilities",
+        headers=headers_b,
+    )
+    assert hidden.status_code == 404
+    assert "store-a-open-id" not in hidden.text

@@ -72,6 +72,7 @@ describe("effects workspace", () => {
         external_work_id: "douyin-post-001",
         metric_key: "views",
         source_system: "official_api",
+        definition_version: 1,
         display_name: "作品播放量",
         points: [
           { period_start: "2026-11-01T00:00:00+00:00", period_end: "2026-11-02T00:00:00+00:00", value: "100", sample_count: 1, timezone: "UTC" },

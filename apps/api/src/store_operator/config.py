@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     auth_login_window_seconds: int = 900
     object_storage_endpoint_url: str | None = None
     object_storage_public_endpoint_url: str | None = None
+    asset_scanner_host: str | None = None
+    asset_scanner_port: int = 3310
+    asset_scanner_timeout_seconds: int = 120
     object_storage_region: str = "us-east-1"
     object_storage_bucket: str | None = None
     object_storage_access_key_id: str | None = None
@@ -72,6 +75,12 @@ class Settings(BaseSettings):
                 )
             if not self.object_storage_public_endpoint_url.startswith("https://"):
                 raise ValueError("OBJECT_STORAGE_PUBLIC_ENDPOINT_URL must use HTTPS in production")
+            if not self.asset_scanner_host:
+                raise ValueError("ASSET_SCANNER_HOST must be explicitly configured in production")
+            if not 1 <= self.asset_scanner_port <= 65535:
+                raise ValueError("ASSET_SCANNER_PORT must be between 1 and 65535")
+            if self.asset_scanner_timeout_seconds <= 0:
+                raise ValueError("ASSET_SCANNER_TIMEOUT_SECONDS must be positive")
             if not self.object_storage_bucket:
                 raise ValueError(
                     "OBJECT_STORAGE_BUCKET must be explicitly configured in production"

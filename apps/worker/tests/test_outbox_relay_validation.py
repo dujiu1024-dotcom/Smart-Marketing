@@ -5,6 +5,8 @@ import pytest
 from store_operator_worker.tasks import (
     _normalize_outbox_batch_size,
     _parse_dispatch_job_id,
+    celery_app,
+    relay_outbox,
 )
 
 
@@ -32,3 +34,7 @@ def test_outbox_dispatch_payload_requires_object_and_uuid() -> None:
 
     with pytest.raises(ValueError, match="UUID"):
         _parse_dispatch_job_id({"job_id": "not-a-uuid"})
+
+
+def test_outbox_relay_is_registered_as_celery_task() -> None:
+    assert celery_app.tasks["jobs.relay_outbox"] is relay_outbox

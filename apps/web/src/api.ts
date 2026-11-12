@@ -567,3 +567,127 @@ export async function getMediaAssetDownloadUrl(storeId: string, assetId: string)
   const response = await request<{ url: string }>("/store/assets/" + assetId + "/download-url", {}, storeId);
   return response.url;
 }
+
+
+export type MarketingTaskType = "full_marketing" | "copy_only" | "image_only" | "image_optimization" | "merchant_content";
+export type MarketingTaskStatus = "draft" | "active" | "waiting_for_user" | "blocked" | "failed" | "completed" | "cancelled" | "archived";
+export type TaskStepStatus = "pending" | "running" | "waiting_for_user" | "succeeded" | "failed" | "skipped" | "stale";
+export type StepApplicability = "required" | "optional" | "not_applicable";
+export type TaskStepKey =
+  | "requirement_understanding" | "context_snapshot" | "opportunity_decision"
+  | "strategy_confirmation" | "copy_production_review" | "image_production_review"
+  | "channel_adaptation" | "quality_check" | "final_confirmation" | "delivery";
+export interface MarketingTaskOptions {
+  includes_copy: boolean | null;
+  includes_image: boolean | null;
+  opportunity_applicable: boolean | null;
+  selected_channel_keys: string[];
+  requires_external_delivery: boolean;
+}
+export interface TaskStep {
+  id: string;
+  step_key: TaskStepKey;
+  status: TaskStepStatus;
+  applicability: StepApplicability;
+  version: number;
+  skip_reason: string | null;
+  input_fingerprint: string | null;
+  output_refs: Array<Record<string, unknown>>;
+  blocked_by: Array<Record<string, unknown>>;
+  block_code: string | null;
+  block_detail: Record<string, unknown> | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+export interface MarketingTaskSummary {
+  id: string;
+  store_id: string;
+  task_type: MarketingTaskType;
+  lifecycle_status: MarketingTaskStatus;
+  title: string;
+  version: number;
+  current_requirement_snapshot_id: string | null;
+  current_strategy_snapshot_id: string | null;
+  created_at: string;
+  updated_at: string;
+  pending_steps_count: number;
+  blocked_steps_count: number;
+}
+export interface MarketingTask extends MarketingTaskSummary {
+  requirement_draft: Record<string, unknown>;
+  strategy_draft: Record<string, unknown>;
+  task_options: MarketingTaskOptions;
+  steps: TaskStep[];
+}
+export interface MarketingTaskCreateInput {
+  task_type: MarketingTaskType;
+  title: string;
+  requirement_draft: Record<string, unknown>;
+  task_options: MarketingTaskOptions;
+}
+export interface BusinessFactReference {
+  fact_key: string;
+  record_type: "store_profile" | "product" | "offer" | "audience_profile" | "brand_guideline" | "knowledge_item";
+  record_id: string;
+  expected_version_no: number;
+}
+export async function listMarketingTasks(storeId: string, filters: { lifecycle_status?: MarketingTaskStatus; task_type?: MarketingTaskType } = {}): Promise<{ items: MarketingTaskSummary[]; total: number }> {
+  const params = new URLSearchParams({ limit: "100", offset: "0" });
+  if (filters.lifecycle_status) params.set("lifecycle_status", filters.lifecycle_status);
+  if (filters.task_type) params.set("task_type", filters.task_type);
+  return request(`/marketing-tasks?${params.toString()}`, {}, storeId);
+}
+export async function getMarketingTask(storeId: string, taskId: string): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(taskId)}`, {}, storeId);
+}
+export async function createMarketingTask(storeId: string, input: MarketingTaskCreateInput, idempotencyKey: string = crypto.randomUUID()): Promise<MarketingTask> {
+  return request("/marketing-tasks", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(input) }, storeId);
+}
+export async function updateMarketingTaskRequirement(storeId: string, task: MarketingTask, requirementDraft: Record<string, unknown>): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(task.id)}/requirement`, {
+    method: "PATCH", headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ expected_version: task.version, requirement_draft: requirementDraft }),
+  }, storeId);
+}
+export async function confirmMarketingTaskRequirement(storeId: string, task: MarketingTask, businessFacts: BusinessFactReference[]): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(task.id)}/requirement/confirm`, {
+    method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ expected_version: task.version, business_facts: businessFacts }),
+  }, storeId);
+}
+export async function updateMarketingTaskStrategy(storeId: string, task: MarketingTask, strategy: Record<string, unknown>): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(task.id)}/strategy`, {
+    method: "PATCH", headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ expected_version: task.version, strategy }),
+  }, storeId);
+}
+export async function confirmMarketingTaskStrategy(storeId: string, task: MarketingTask): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(task.id)}/strategy/confirm`, {
+    method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ expected_version: task.version }),
+  }, storeId);
+}
+export async function skipMarketingTaskStep(storeId: string, task: MarketingTask, stepKey: TaskStepKey, reason: string): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(task.id)}/steps/${encodeURIComponent(stepKey)}/skip`, {
+    method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ expected_version: task.version, reason }),
+  }, storeId);
+}
+export async function recoverMarketingTaskStep(storeId: string, task: MarketingTask, stepKey: TaskStepKey, reason: string): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(task.id)}/recover`, {
+    method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ expected_version: task.version, step_key: stepKey, reason }),
+  }, storeId);
+}
+export async function cancelMarketingTask(storeId: string, task: MarketingTask, reason: string): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(task.id)}/cancel`, {
+    method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ expected_version: task.version, reason }),
+  }, storeId);
+}
+export async function archiveMarketingTask(storeId: string, task: MarketingTask, reason: string): Promise<MarketingTask> {
+  return request(`/marketing-tasks/${encodeURIComponent(task.id)}/archive`, {
+    method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify({ expected_version: task.version, reason }),
+  }, storeId);
+}

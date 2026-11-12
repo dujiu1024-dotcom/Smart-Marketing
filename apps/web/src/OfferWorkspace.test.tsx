@@ -16,8 +16,8 @@ describe("store offer workspace", () => {
     render(<OfferWorkspace storeId="store-1" />);
     expect(await screen.findByText("第二杯半价")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"新增活动"}));
-    fireEvent.change(screen.getByLabelText("活动名称 *"),{target:{value:"买一赠一"}});
-    fireEvent.change(screen.getByLabelText("优惠规则（JSON 对象）"),{target:{value:'{"buy_quantity":1,"gift_quantity":1}'}});
+    fireEvent.change(await screen.findByLabelText("活动名称 *"),{target:{value:"买一赠一"}});
+    fireEvent.change(await screen.findByLabelText("优惠规则（JSON 对象）"),{target:{value:'{"buy_quantity":1,"gift_quantity":1}'}});
     fireEvent.click(screen.getByRole("button",{name:"保存活动"}));
     await waitFor(() => expect(api.createOffer).toHaveBeenCalledWith("store-1",expect.objectContaining({title:"买一赠一",terms_json:{buy_quantity:1,gift_quantity:1},status:"draft"})));
   });

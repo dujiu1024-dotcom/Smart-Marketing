@@ -353,7 +353,7 @@ class FactConfirmationRequest(BaseModel):
 
 class AssetUploadIntentCreate(BaseModel):
     expected_mime_type: str = Field(pattern=r"^image/(jpeg|png|webp)$")
-    expected_byte_size: int = Field(gt=0, le=25 * 1024 * 1024)
+    expected_byte_size: int = Field(gt=0, le=25_000_000)
     expected_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
     original_filename: str = Field(min_length=1, max_length=255)
 

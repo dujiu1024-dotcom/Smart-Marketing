@@ -14,6 +14,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 import httpx
+from botocore.exceptions import BotoCoreError
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine, func, or_, select
@@ -618,6 +619,7 @@ def cleanup_orphaned_ai_image_objects(
                 )
                 referenced_version = db.scalar(
                     select(ArtifactVersion.id).where(
+                        ArtifactVersion.store_id == store_id,
                         or_(
                             ArtifactVersion.content_ref == object_key,
                             ArtifactVersion.source_refs_json.contains(
@@ -637,7 +639,7 @@ def cleanup_orphaned_ai_image_objects(
 
                 try:
                     delete_object(object_key=object_key)
-                except (ObjectStorageNotConfigured, RuntimeError, OSError) as exc:
+                except (BotoCoreError, ObjectStorageNotConfigured, RuntimeError, OSError) as exc:
                     logger.warning(
                         "Orphan AI image cleanup deferred (%s)",
                         type(exc).__name__,

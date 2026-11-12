@@ -3,16 +3,15 @@ import csv
 import hashlib
 import io
 import math
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, cast
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from openpyxl import load_workbook
-
 from fastapi import APIRouter, Depends, Header, Query, Request
+from openpyxl import load_workbook
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import and_, exists, func, select
 from sqlalchemy.exc import IntegrityError
@@ -2051,7 +2050,7 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             row_values = list(values)
             for index, key in enumerate(normalized_headers):
                 value = row_values[index] if index < len(row_values) else None
-                if isinstance(value, datetime) and key in {"period_start", "period_end"}:
+                if isinstance(value, date) and key in {"period_start", "period_end"}:
                     timezone_index = normalized_headers.index("period_timezone")
                     timezone_value = row_values[timezone_index] if timezone_index < len(row_values) else None
                     timezone_name = str(timezone_value or "").strip()
@@ -2059,7 +2058,11 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                         zone = ZoneInfo(timezone_name)
                     except (ZoneInfoNotFoundError, ValueError) as exc:
                         raise ValueError(f"Row {row_number}: period_timezone must be a valid IANA timezone") from exc
-                    value = (value.replace(tzinfo=zone) if value.tzinfo is None else value).isoformat()
+                    if isinstance(value, datetime):
+                        value = value.replace(tzinfo=zone) if value.tzinfo is None else value
+                    else:
+                        value = datetime.combine(value, datetime.min.time(), tzinfo=zone)
+                    value = value.isoformat()
                 elif value is None:
                     value = ""
                 elif isinstance(value, bool):

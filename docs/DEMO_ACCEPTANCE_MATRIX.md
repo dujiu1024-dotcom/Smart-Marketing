@@ -362,3 +362,15 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 - 买赠与赠品规则通过当前门店真实商品清单选择 Product ID；不要求商家手工输入 UUID。
 - 创建幂等键在同一编辑草稿的重试期间保持稳定；未保存修改时禁止确认旧版本事实。
 - 活动使用 `archived` 状态归档，不提供物理删除入口。
+
+
+## 2026-11-12 #6 品牌规范生产 Web 接入
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 品牌规范读取/创建 | GET/POST /api/v1/store/brand-guideline | 当前门店范围；首次 404 进入真实创建态 |
+| 品牌规范编辑 | PATCH /api/v1/store/brand-guideline | If-Match 乐观锁，保存生成新版本 |
+| 品牌事实确认 | POST /api/v1/store/brand-guideline/{id}/confirm-facts | 独立商家确认；未保存修改时禁止确认 |
+| 品牌字段 | 故事、定位、差异化、价值观、语气、常用/禁用表达、CTA、视觉风格、字体、色彩、Logo 资产引用 | 色彩为 JSON 对象数组；Logo 仅保存 asset ID，不伪造上传/选择能力 |
+| 创建重试 | sessionStorage 保存本次创建 Idempotency-Key | 请求不确定时重试复用同一 key |
+| 未完成 | Logo 资产选择器、门店本地时区、客群/知识/素材/渠道模块、完整浏览器与移动端验收 | 不据此关闭 Issue #6 |

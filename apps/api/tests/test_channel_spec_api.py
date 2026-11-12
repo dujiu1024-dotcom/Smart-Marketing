@@ -219,3 +219,14 @@ def test_platform_admin_publishes_a_new_verified_channel_spec_version(
     )
     assert stale.status_code == 409
     assert stale.json()["error"]["code"] == "STALE_CHANNEL_SPEC_VERSION"
+
+    untrusted_source = identity_client.post(
+        "/api/v1/admin/channel-specs/douyin/versions",
+        headers={**headers, "Idempotency-Key": "publish-douyin-spec-untrusted-source"},
+        json={
+            "expected_current_version_id": response.json()["id"],
+            "source_document_ref": "https://open.douyin.com.attacker.example/docs",
+        },
+    )
+    assert untrusted_source.status_code == 422
+    assert untrusted_source.json()["error"]["code"] == "CHANNEL_SPEC_SOURCE_REQUIRED"

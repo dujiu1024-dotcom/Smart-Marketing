@@ -79,11 +79,14 @@ class RelaySessionFactory:
 
 
 def make_outbox_event(*, attempts: int = 0):
+    job_id = uuid4()
     return SimpleNamespace(
         id=uuid4(),
         status="pending",
         event_type="job.dispatch_requested",
-        payload_json={"job_id": str(uuid4())},
+        aggregate_type="job",
+        aggregate_id=job_id,
+        payload_json={"job_id": str(job_id)},
         publish_attempts=attempts,
         available_at=datetime.now(UTC),
         locked_by=None,
@@ -196,3 +199,24 @@ def test_outbox_relay_dead_letters_after_retry_budget_and_alerts(monkeypatch) ->
     assert len(alerts) == 1
     assert alerts[0]["event"] == "outbox.dead_letter"
     assert alerts[0]["correlation_id"] == str(event.id)
+
+
+def test_outbox_relay_rejects_payload_job_mismatch(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    from store_operator_worker import tasks
+
+    event = make_outbox_event()
+    event.payload_json = {"job_id": str(uuid4())}
+    monkeypatch.setattr(tasks, "SessionLocal", RelaySessionFactory(event))
+    sent = []
+    monkeypatch.setattr(
+        tasks.celery_app,
+        "send_task",
+        lambda *args, **kwargs: sent.append((args, kwargs)),
+    )
+
+    assert tasks.relay_outbox() == 0
+    assert sent == []
+    assert event.status == "pending"
+    assert event.locked_by is None

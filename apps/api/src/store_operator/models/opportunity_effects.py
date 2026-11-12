@@ -324,6 +324,10 @@ class PublishedWork(Base):
             "OR verified_at IS NOT NULL",
             name="verified_ownership_requires_timestamp",
         ),
+        CheckConstraint(
+            "ownership_status != 'verified_system_publish' OR publish_operation_id IS NOT NULL",
+            name="system_publish_requires_operation",
+        ),
         Index("ix_published_works_store_channel_published", "store_id", "channel_key",
             "published_at"),
     )
@@ -369,6 +373,10 @@ class WorkOwnershipEvidence(Base):
         CheckConstraint(
             "evidence_status IN ('pending', 'verified', 'rejected', 'revoked')",
             name="evidence_status",
+        ),
+        CheckConstraint(
+            "evidence_status != 'verified' OR verified_at IS NOT NULL",
+            name="verified_evidence_requires_timestamp",
         ),
         Index("ix_work_ownership_evidence_work_status", "store_id", "published_work_id",
             "evidence_status"),

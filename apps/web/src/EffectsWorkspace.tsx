@@ -129,6 +129,14 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
             <div className="catalog-meta">{trend.points.map(point => <span key={point.period_end}>{new Date(point.period_start).toLocaleDateString()} – {new Date(point.period_end).toLocaleDateString()}：{point.value}（n={point.sample_count}）</span>)}</div>
           </div>)}
         </div> : <p className="muted">{overview?.data_quality?.reason ?? "暂无可用于趋势分析的已核验周期数据。"}</p>}
+        {(overview?.content_performance ?? []).length > 0 && <div className="catalog-list">
+          <h3>按作品查看内容表现</h3>
+          {overview?.content_performance.map(work => <div className="catalog-item" key={work.published_work_id + work.metric_key}>
+            <div className="catalog-item-main"><div><strong>{work.display_name}</strong><p>{work.channel_key} · {work.external_work_id}</p></div>
+              <span className="status-chip">{work.comparison.status === "available" ? `环比 ${work.comparison.change_percent}%` : "样本不足"}</span></div>
+            <p className="catalog-description">关联任务：{work.marketing_task_id ?? "未关联"} · {work.points.map(point => `${new Date(point.period_start).toLocaleDateString()}–${new Date(point.period_end).toLocaleDateString()}：${point.value}`).join("；")}</p>
+          </div>)}
+        </div>}
         <p className="footnote">数据质量：观测 {overview?.data_quality.total_observations ?? 0} 条 · 已核验 {overview?.data_quality.verified_observations ?? 0} 条 · 延迟 {overview?.data_quality.delayed_observations ?? 0} 条 · 不完整/异常 {overview?.data_quality.incomplete_or_anomalous_observations ?? 0} 条</p>
       </article>
       <article className="form-card">

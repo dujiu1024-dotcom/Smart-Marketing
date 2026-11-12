@@ -308,7 +308,7 @@ Endpoint paths can be replaced by constructing `ProviderEndpoints`. Responses mu
 
 ### Configuration and security
 
-Set `AI_PROVIDER_PROVIDER_ID`, `AI_PROVIDER_DISPLAY_NAME`, `AI_PROVIDER_BASE_URL`, `AI_PROVIDER_SECRET_REF`, and one or more capability model lists. The API key itself must be injected separately (for example as a runtime environment secret referenced by `env://AI_PROVIDER_API_KEY`) or resolved through the existing AWS Secrets Manager SecretStore. Remote endpoints require HTTPS. No real provider is selected by default; deployment owners must verify that their gateway implements this wire contract and declare only its actual model capabilities.
+Set `AI_PROVIDER_ID`, `AI_PROVIDER_DISPLAY_NAME`, `AI_PROVIDER_BASE_URL`, `AI_PROVIDER_SECRET_REF`, and one or more capability model lists. The API key itself must be injected separately (for example as a runtime environment secret referenced by `env://AI_PROVIDER_API_KEY`) or resolved through the existing AWS Secrets Manager SecretStore. Remote endpoints require HTTPS. No real provider is selected by default; deployment owners must verify that their gateway implements this wire contract and declare only its actual model capabilities.
 
 ### Acceptance boundary
 

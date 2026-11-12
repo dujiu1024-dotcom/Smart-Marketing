@@ -118,3 +118,116 @@ def test_csv_import_is_idempotent_and_labeled_as_merchant_reported(identity_clie
     assert second.status_code == 200, second.text
     assert second.json()["created"] == 0
     assert second.json()["duplicates_skipped"] == 1
+
+
+def test_adopted_opportunity_handoff_creates_store_scoped_immutable_snapshot(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store = _identity(db_session, "handoff@example.com", "Handoff Shop")
+    source = HotTopicSource(
+        id=uuid4(),
+        source_key="handoff-rss",
+        display_name="Handoff RSS",
+        source_type="rss",
+        source_url="https://news.example.test/rss",
+        enabled=True,
+        health_status="healthy",
+    )
+    db_session.add(source)
+    db_session.flush()
+    topic = HotTopic(
+        id=uuid4(),
+        source_id=source.id,
+        source_item_id="handoff-item",
+        canonical_url="https://news.example.test/story/handoff",
+        title="Seasonal local menu trend",
+        summary="Local demand for seasonal drinks",
+        discovered_at=datetime.now(UTC),
+        last_seen_at=datetime.now(UTC),
+        evidence_status="collected",
+        content_fingerprint="c" * 64,
+    )
+    db_session.add(topic)
+    db_session.flush()
+    opportunity = StoreOpportunity(
+        id=uuid4(),
+        store_id=store.id,
+        hot_topic_id=topic.id,
+        store_context_fingerprint="d" * 64,
+        matching_version=2,
+        relevance_score=Decimal("78.5"),
+        match_method="rules",
+        eligibility_status="eligible",
+        matched_at=datetime.now(UTC),
+        reason_summary="A confirmed product is relevant to this trend.",
+        suggested_scenario="Promote the seasonal drink",
+        content_angle="Explain the seasonal ingredients",
+        matched_product_ids_json=["product-1"],
+    )
+    db_session.add(opportunity)
+    db_session.flush()
+    headers = _login(identity_client, "handoff@example.com", store.id)
+
+    create_payload = {
+        "task_type": "full_marketing",
+        "title": "Seasonal opportunity content",
+        "opportunity_id": str(opportunity.id),
+        "requirement_draft": {"goal": "Promote the seasonal drink"},
+        "task_options": {
+            "includes_copy": True,
+            "includes_image": True,
+            "opportunity_applicable": True,
+            "selected_channel_keys": [],
+            "requires_external_delivery": False,
+        },
+    }
+    not_adopted = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers={**headers, "Idempotency-Key": "handoff-before-adopt"},
+        json=create_payload,
+    )
+    assert not_adopted.status_code == 409
+    assert not_adopted.json()["error"]["code"] == "OPPORTUNITY_NOT_ADOPTED"
+
+    adopted = identity_client.post(
+        f"/api/v1/opportunities/{opportunity.id}/decisions",
+        headers={**headers, "Idempotency-Key": "handoff-adopt"},
+        json={"decision": "adopt"},
+    )
+    assert adopted.status_code == 200, adopted.text
+
+    created = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers={**headers, "Idempotency-Key": "handoff-create"},
+        json=create_payload,
+    )
+    assert created.status_code == 201, created.text
+    task = created.json()
+    snapshot = task["task_options"]["opportunity_snapshot"]
+    assert snapshot["opportunity_id"] == str(opportunity.id)
+    assert snapshot["matching_version"] == 2
+    assert snapshot["source"]["url"] == topic.canonical_url
+    assert snapshot["source"]["title"] == topic.title
+
+    updated = identity_client.patch(
+        f"/api/v1/marketing-tasks/{task['id']}/requirement",
+        headers={**headers, "Idempotency-Key": "handoff-update"},
+        json={
+            "expected_version": 1,
+            "requirement_draft": {"goal": "Refined seasonal promotion"},
+            "task_options": {
+                "includes_copy": True,
+                "includes_image": True,
+                "opportunity_applicable": False,
+                "opportunity_snapshot": {"forged": True},
+                "selected_channel_keys": [],
+                "requires_external_delivery": False,
+            },
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["task_options"]["opportunity_snapshot"] == snapshot
+    assert updated.json()["task_options"]["opportunity_applicable"] is True

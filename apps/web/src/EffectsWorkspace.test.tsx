@@ -41,4 +41,36 @@ describe("effects workspace", () => {
     expect(screen.getAllByText(/不计算 ROI/).length).toBeGreaterThan(0);
     expect(screen.getByText(/手工录入与导入的数据均标记为商家报告/)).toBeInTheDocument();
   });
+
+  it("shows verified per-work performance comparisons and their chart", async () => {
+    api.getEffectsOverview.mockResolvedValue({
+      items: [],
+      trends: [],
+      content_performance: [{
+        published_work_id: "work-verified-1",
+        marketing_task_id: "task-1",
+        channel_key: "douyin",
+        external_work_id: "douyin-post-001",
+        metric_key: "views",
+        display_name: "作品播放量",
+        points: [
+          { period_start: "2026-11-01T00:00:00+00:00", period_end: "2026-11-02T00:00:00+00:00", value: "100", sample_count: 1, timezone: "UTC" },
+          { period_start: "2026-11-02T00:00:00+00:00", period_end: "2026-11-03T00:00:00+00:00", value: "150", sample_count: 1, timezone: "UTC" },
+        ],
+        comparison: { status: "available", change_percent: "50.00" },
+      }],
+      data_quality: { total_observations: 2, verified_observations: 2, delayed_observations: 0,
+        incomplete_or_anomalous_observations: 0, status: "available", reason: null },
+      data_status: "available",
+      business_outcomes: { roi: null, sales_growth: null, store_visit_growth: null,
+        reason: "没有已核验的真实经营结果与成本证据时，不计算 ROI、销售增长或到店增长。" },
+    });
+    render(<EffectsWorkspace storeId="store-1" />);
+    expect(await screen.findByText("按作品查看内容表现")).toBeInTheDocument();
+    expect(screen.getByText(/douyin · douyin-post-001/)).toBeInTheDocument();
+    expect(screen.getByText(/环比 50.00%/)).toBeInTheDocument();
+    expect(screen.getByText(/关联任务：task-1/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "作品播放量作品表现趋势图" })).toBeInTheDocument();
+  });
+
 });

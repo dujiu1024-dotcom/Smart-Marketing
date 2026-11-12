@@ -127,6 +127,40 @@ export interface OfferInput {
   status: Offer["status"];
 }
 
+export interface BrandGuideline {
+  id: string;
+  store_id: string;
+  brand_story: string | null;
+  positioning: string | null;
+  differentiators: string | null;
+  core_values_json: string[] | null;
+  tone_of_voice: string | null;
+  common_phrases_json: string[] | null;
+  prohibited_phrases_json: string[] | null;
+  cta_preferences_json: string[] | null;
+  logo_asset_id: string | null;
+  color_palette_json: Array<Record<string, unknown>> | null;
+  font_preferences_json: string[] | null;
+  visual_style: string | null;
+  fact_status: string;
+  current_version: number;
+}
+
+export interface BrandGuidelineInput {
+  brand_story: string | null;
+  positioning: string | null;
+  differentiators: string | null;
+  core_values_json: string[];
+  tone_of_voice: string | null;
+  common_phrases_json: string[];
+  prohibited_phrases_json: string[];
+  cta_preferences_json: string[];
+  logo_asset_id: string | null;
+  color_palette_json: Array<Record<string, unknown>>;
+  font_preferences_json: string[];
+  visual_style: string | null;
+}
+
 interface ApiErrorBody {
   error?: { code?: string; message?: string };
   detail?: string;
@@ -355,6 +389,37 @@ export async function confirmProductFacts(storeId: string, product: Product): Pr
       source_type: "merchant_ui_confirmation",
       source_ref: "store-products-page",
       confirmation_note: "由当前门店成员核对商品事实后确认",
+    }),
+  }, storeId);
+}
+export async function getBrandGuideline(storeId: string): Promise<BrandGuideline> {
+  return request("/store/brand-guideline", {}, storeId);
+}
+
+export async function createBrandGuideline(storeId: string, input: BrandGuidelineInput, idempotencyKey: string = crypto.randomUUID()): Promise<BrandGuideline> {
+  return request("/store/brand-guideline", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  }, storeId);
+}
+
+export async function updateBrandGuideline(storeId: string, guideline: BrandGuideline, input: BrandGuidelineInput): Promise<BrandGuideline> {
+  return request("/store/brand-guideline", {
+    method: "PATCH",
+    headers: { "If-Match": String(guideline.current_version) },
+    body: JSON.stringify(input),
+  }, storeId);
+}
+
+export async function confirmBrandGuidelineFacts(storeId: string, guideline: BrandGuideline): Promise<BrandGuideline> {
+  return request(`/store/brand-guideline/${guideline.id}/confirm-facts`, {
+    method: "POST",
+    headers: { "If-Match": String(guideline.current_version) },
+    body: JSON.stringify({
+      source_type: "merchant_ui_confirmation",
+      source_ref: "store-brand-guideline-page",
+      confirmation_note: "由当前门店成员核对品牌定位、表达和视觉规范后确认",
     }),
   }, storeId);
 }

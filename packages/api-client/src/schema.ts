@@ -2454,6 +2454,8 @@ export interface components {
         MetricObservationInput: {
             /** Currency */
             currency?: string | null;
+            /** Marketing Task Id */
+            marketing_task_id?: string | null;
             /** Metric Key */
             metric_key: string;
             /** Period End */
@@ -2462,6 +2464,8 @@ export interface components {
             period_start?: string | null;
             /** Period Timezone */
             period_timezone: string;
+            /** Published Work Id */
+            published_work_id?: string | null;
             /** Source Evidence Ref */
             source_evidence_ref?: string | null;
             /** Source Record Id */

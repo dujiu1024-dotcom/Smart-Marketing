@@ -3466,6 +3466,18 @@
             ],
             "title": "Currency"
           },
+          "marketing_task_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketing Task Id"
+          },
           "metric_key": {
             "maxLength": 120,
             "minLength": 1,
@@ -3501,6 +3513,18 @@
             "minLength": 1,
             "title": "Period Timezone",
             "type": "string"
+          },
+          "published_work_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published Work Id"
           },
           "source_evidence_ref": {
             "anyOf": [

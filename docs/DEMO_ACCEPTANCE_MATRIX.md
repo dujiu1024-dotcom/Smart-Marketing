@@ -413,12 +413,14 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 能力 | 当前实现 | 验收边界 |
 |---|---|---|
 | 素材列表 | GET /api/v1/store/assets | 当前门店隔离，按服务端记录读取 |
-| 上传 | SHA-256 本地计算 → upload-intent → 私有对象存储预签名 PUT → complete | 仅 JPEG/PNG/WebP，单张不超过 25 MB；稳定幂等键和 intent ID 保存在 sessionStorage 以恢复中断上传 |
-| 服务端校验 | HEAD 元数据 + 完整对象 SHA-256 对照 | 不等同恶意文件扫描；上传后仍为 quarantined/scanning |
-| 使用权确认 | POST /api/v1/store/assets/{id}/confirm-usage-rights | 必须扫描 ready，绑定 version + SHA-256 + 商家来源说明；允许/限制均明确记录 |
+| 上传 | SHA-256 本地计算 → upload-intent → 私有对象存储预签名 PUT → complete | 仅 JPEG/PNG/WebP，单张不超过 25,000,000 bytes；稳定幂等键和 intent ID 保存在 sessionStorage 以恢复中断上传 |
+| 服务端校验 | HEAD 元数据 + 完整对象 SHA-256 对照 | 仅验证上传一致性，不代替恶意文件扫描 |
+| 异步安全扫描 | complete 同一事务创建 store.asset.scan Job + Outbox；Worker 重新读取对象、复核大小与 SHA-256，再通过 ClamAV INSTREAM 扫描 | clean → ready；恶意内容/对象完整性失败 → rejected；扫描服务多次失败 → scan_failed；只有 ready 才可继续使用 |
+| 扫描基础设施 | Compose ClamAV 1.4 服务、签名数据库持久卷、Worker/Scheduler 健康依赖 | 生产显式配置 ASSET_SCANNER_HOST；ClamAV 需要按官方建议配置约 4 GB 内存 |
+| 使用权确认 | POST /api/v1/store/assets/{id}/confirm-usage-rights | 必须 ready，绑定 version + SHA-256 + 商家来源说明；允许/限制均明确记录 |
 | 原图下载 | GET /api/v1/store/assets/{id}/download-url | 仅 ready + confirmed_allowed，使用短期签名 URL；页面不持久化 URL |
-| 归档 | POST /api/v1/store/assets/{id}/archive | If-Match + Idempotency-Key；不物理删除，品牌 Logo 当前引用会阻止归档 |
-| 存储端点 | 内部 S3 endpoint 与浏览器可访问 presign endpoint 分离 | Compose API 使用 seaweedfs:8333；浏览器签名 URL 使用 localhost:8333；SeaweedFS 仅允许本地 Web origin CORS |
-| 未完成 | ClamAV/恶意文件扫描、缩略图/尺寸元数据、Worker 状态回写、过期 UploadIntent sweeper、素材与商品/任务/Logo 关联选择器、真实对象存储浏览器联调 | 不得把哈希/MIME 校验称为安全扫描；不据此关闭 Issue #6 |
+| 归档 | POST /api/v1/store/assets/{id}/archive | If-Match + Idempotency-Key；ready/rejected/scan_failed 可归档，不物理删除；品牌 Logo 当前引用会阻止归档 |
+| 存储端点 | 内部 S3 endpoint 与浏览器可访问 presign endpoint 分离 | Compose API/Worker 使用 seaweedfs:8333；浏览器签名 URL 使用 localhost:8333；SeaweedFS 仅允许本地 Web origin CORS |
+| 未完成 | 缩略图/尺寸元数据、过期 UploadIntent sweeper、素材与商品/任务/Logo 关联选择器、真实对象存储浏览器联调、完整浏览器/移动端/可访问性验收 | 不据此关闭 Issue #6 |
 
 CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作环境未执行本地命令，最终以 PR CI 为准。真实对象存储浏览器 PUT、CORS 和预签名 URL 仍需环境级验收。

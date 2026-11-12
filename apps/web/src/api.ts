@@ -833,6 +833,121 @@ export async function listChannelSpecVersions(storeId: string, channelKey: strin
 }
 
 
+
+export interface ChannelContentQualityReport {
+  id: string;
+  rule_version: string;
+  input_fingerprint: string;
+  result: "pass" | "fail" | "needs_human";
+  issues: Array<Record<string, unknown>>;
+  resolutions: Array<{ id: string; decision: "accepted" | "rejected"; reason: string; created_at: string }>;
+  created_at: string;
+}
+export interface ChannelContentRecord {
+  id: string;
+  task_id: string;
+  channel_key: string;
+  copy_version_id: string;
+  channel_spec_version_id: string;
+  payload: Record<string, unknown>;
+  input_fingerprint: string;
+  status: "ready" | "stale" | "blocked";
+  image_version_ids: string[];
+  quality_reports: ChannelContentQualityReport[];
+  created_at: string;
+  updated_at: string;
+}
+export interface PublishPackageRecord {
+  id: string;
+  task_id: string;
+  package_version: number;
+  package_fingerprint: string;
+  frozen_at: string;
+  frozen_by_user_id: string | null;
+  items: Array<{
+    id: string;
+    channel_key: string;
+    channel_content_id: string;
+    quality_report_id: string;
+    delivery_mode: "official_api" | "manual_handoff";
+    channel_account_id: string | null;
+    planned_publish_at: string | null;
+    item_fingerprint: string;
+  }>;
+  fact_snapshot_ids: string[];
+  confirmation: {
+    id: string;
+    package_fingerprint: string;
+    confirmed_by_user_id: string;
+    confirmed_at: string;
+    confirmation_note: string | null;
+  } | null;
+}
+export interface PublishPackageFreezeInput {
+  expected_task_version: number;
+  fact_snapshot_ids: string[];
+  items: Array<{
+    channel_content_id: string;
+    quality_report_id: string;
+    delivery_mode: "official_api" | "manual_handoff";
+    channel_account_id?: string | null;
+    planned_publish_at?: string | null;
+  }>;
+}
+export async function createChannelContent(
+  storeId: string, taskId: string, input: {
+    channel_key: string;
+    copy_version_id: string;
+    channel_spec_version_id: string;
+    payload: Record<string, unknown>;
+    image_version_ids: string[];
+  }, idempotencyKey: string = crypto.randomUUID(),
+): Promise<ChannelContentRecord> {
+  return request("/marketing-tasks/" + encodeURIComponent(taskId) + "/channel-contents", {
+    method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(input),
+  }, storeId);
+}
+export async function listChannelContents(storeId: string, taskId: string): Promise<ChannelContentRecord[]> {
+  return request("/marketing-tasks/" + encodeURIComponent(taskId) + "/channel-contents", {}, storeId);
+}
+export async function runChannelContentQuality(
+  storeId: string, taskId: string, content: ChannelContentRecord,
+  idempotencyKey: string = crypto.randomUUID(),
+): Promise<{ job_id: string; job_status: string; channel_content_id: string; expected_fingerprint: string; rule_version: string }> {
+  return request(
+    "/marketing-tasks/" + encodeURIComponent(taskId) + "/channel-contents/" + encodeURIComponent(content.id) + "/quality-reports/run",
+    {
+      method: "POST", headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ rule_version: "content-structure-v1", expected_fingerprint: content.input_fingerprint }),
+    }, storeId,
+  );
+}
+export async function freezePublishPackage(
+  storeId: string, taskId: string, input: PublishPackageFreezeInput,
+  idempotencyKey: string = crypto.randomUUID(),
+): Promise<PublishPackageRecord> {
+  return request(
+    "/marketing-tasks/" + encodeURIComponent(taskId) + "/publish-packages/freeze",
+    { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(input) },
+    storeId,
+  );
+}
+export async function confirmPublishPackage(
+  storeId: string, packageId: string, packageFingerprint: string, confirmationNote: string,
+  idempotencyKey: string = crypto.randomUUID(),
+): Promise<PublishPackageRecord["confirmation"]> {
+  return request(
+    "/marketing-tasks/publish-packages/" + encodeURIComponent(packageId) + "/confirm",
+    {
+      method: "POST", headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ package_fingerprint: packageFingerprint, confirmation_note: confirmationNote || null }),
+    }, storeId,
+  );
+}
+export async function listPublishPackages(storeId: string, taskId: string): Promise<PublishPackageRecord[]> {
+  return request("/marketing-tasks/" + encodeURIComponent(taskId) + "/publish-packages", {}, storeId);
+}
+
 export interface ChannelCapabilitySnapshotRecord {
   id: string;
   channel_account_id: string;

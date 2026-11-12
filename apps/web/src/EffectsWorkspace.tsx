@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, checkDataSourceCapabilities, getPublishReadbacks, registerPublishedWorkFromReadback, createBusinessOutcome, reverseAttribution, importMetricCsv,
+import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, checkDataSourceCapabilities, getPublishReadbacks, registerPublishedWorkFromReadback, createBusinessOutcome, reverseAttribution, importMetricCsv, importMetricXlsx,
   type EffectsOverview, type MetricDefinitionRecord, type MetricObservationRecord, type PublishedWorkRecord,
   type BusinessOutcomeEvidenceRecord, type AttributionEvidenceRecord, type DataSourceCapabilitySnapshotRecord, type PublishReadbackCandidate } from "./api";
 
@@ -39,6 +39,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [sourceId, setSourceId] = useState("");
   const [evidenceRef, setEvidenceRef] = useState("");
   const [csvText, setCsvText] = useState("");
+  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const [outcomeType, setOutcomeType] = useState("orders");
   const [outcomeValue, setOutcomeValue] = useState("");
   const [outcomeCurrency, setOutcomeCurrency] = useState("CNY");
@@ -137,6 +138,24 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
       const result = await importMetricCsv(storeId, csvText);
       setNotice(`导入完成：新增 ${result.created} 条，重复跳过 ${result.duplicates_skipped} 条。批次 ${result.import_batch_id}；SHA-256 ${result.content_sha256}。全部标记为商家报告。`);
       setCsvText(""); await load();
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+  async function importXlsx(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!xlsxFile) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      if (!xlsxFile.name.toLowerCase().endsWith(".xlsx")) throw new Error("仅支持 .xlsx 文件");
+      if (xlsxFile.size > 5_000_000) throw new Error("Excel 文件不能超过 5 MB");
+      const bytes = new Uint8Array(await xlsxFile.arrayBuffer());
+      let binary = "";
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+      }
+      const result = await importMetricXlsx(storeId, xlsxFile.name, btoa(binary));
+      setNotice(`Excel 导入完成：新增 ${result.created} 条，重复跳过 ${result.duplicates_skipped} 条。批次 ${result.import_batch_id}；SHA-256 ${result.content_sha256}。全部标记为商家报告。`);
+      setXlsxFile(null); await load();
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
   }
@@ -294,8 +313,9 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
           <label className="field"><span>证据引用（链接或说明）</span><input value={evidenceRef} onChange={event => setEvidenceRef(event.target.value)} /></label>
           <button className="primary" disabled={saving || !metricKey || !timezone.trim()}>保存为手工报告</button>
         </form></article>
-        <article className="form-card"><h2>CSV / Excel 数据导入</h2><p className="muted">当前接口接受 CSV 文本。Excel 文件可先另存为 CSV。必需列：metric_key、value_numeric、period_timezone；可选列：period_start、period_end、currency、source_record_id、source_evidence_ref、published_work_id、marketing_task_id。作品关联仅接受已核验的系统发布读回作品。销售额必须提供 ISO 4217 币种；时间必须带时区偏移。</p>
-          <form className="profile-form" onSubmit={importCsv}><label className="field"><span>CSV 内容</span><textarea rows={12} value={csvText} onChange={event => setCsvText(event.target.value)} placeholder={"metric_key,value_numeric,period_timezone,period_start,period_end,source_record_id\nviews,1200,Asia/Shanghai,2026-11-01T00:00:00+08:00,2026-11-02T00:00:00+08:00,post-001"} /></label><button className="primary" disabled={saving || !csvText.trim()}>导入 CSV</button></form>
+        <article className="form-card"><h2>CSV / Excel 数据导入</h2><p className="muted">支持 CSV 和 .xlsx（首个工作表）。必需列：metric_key、value_numeric、period_timezone；可选列：period_start、period_end、currency、source_record_id、source_evidence_ref、published_work_id、marketing_task_id。Excel 日期单元格按该行 period_timezone 解释。作品关联仅接受已核验的系统发布读回作品。销售额必须提供 ISO 4217 币种；CSV 时间必须带时区偏移。</p>
+          <form className="profile-form" onSubmit={importCsv}><label className="field"><span>CSV 内容</span><textarea rows={8} value={csvText} onChange={event => setCsvText(event.target.value)} placeholder={"metric_key,value_numeric,period_timezone,period_start,period_end,source_record_id\nviews,1200,Asia/Shanghai,2026-11-01T00:00:00+08:00,2026-11-02T00:00:00+08:00,post-001"} /></label><button className="primary" disabled={saving || !csvText.trim()}>导入 CSV</button></form>
+          <form className="profile-form" onSubmit={importXlsx}><label className="field"><span>Excel 工作簿（.xlsx，最大 5 MB）</span><input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={event => setXlsxFile(event.target.files?.[0] ?? null)} /></label><button className="primary" disabled={saving || !xlsxFile}>导入 Excel</button></form>
         </article>
       </div>
     </>}

@@ -1148,6 +1148,9 @@ export function importMetricCsv(storeId: string, csvText: string): Promise<{
 export function getDataSourceCapabilities(storeId: string): Promise<{ items: DataSourceCapabilitySnapshotRecord[]; total: number }> {
   return request("/effects/data-source-capabilities", {}, storeId);
 }
+export function checkDataSourceCapabilities(storeId: string): Promise<{ items: DataSourceCapabilitySnapshotRecord[]; total: number }> {
+  return request("/effects/data-source-capabilities/check", { method: "POST" }, storeId);
+}
 export function getPublishReadbacks(storeId: string): Promise<{ items: PublishReadbackCandidate[]; total: number }> {
   return request("/effects/publish-readbacks", {}, storeId);
 }

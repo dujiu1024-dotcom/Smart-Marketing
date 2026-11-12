@@ -6,6 +6,8 @@ afterEach(() => cleanup());
 const api = vi.hoisted(() => ({
   getEffectsOverview: vi.fn(), getMetricDefinitions: vi.fn(), getMetricObservations: vi.fn(),
   createMetricObservation: vi.fn(), importMetricCsv: vi.fn(),
+  getPublishedWorks: vi.fn(), getBusinessOutcomes: vi.fn(), getAttributions: vi.fn(),
+  getDataSourceCapabilities: vi.fn(), getPublishReadbacks: vi.fn(), registerPublishedWorkFromReadback: vi.fn(),
 }));
 vi.mock("./api", async () => ({ ...(await vi.importActual<typeof import("./api")>("./api")), ...api }));
 
@@ -26,6 +28,11 @@ describe("effects workspace", () => {
       definition: "Views", definition_version: 1,
     }] });
     api.getMetricObservations.mockResolvedValue({ items: [] });
+    api.getPublishedWorks.mockResolvedValue({ items: [], total: 0, verified_count: 0 });
+    api.getBusinessOutcomes.mockResolvedValue({ items: [], total: 0 });
+    api.getAttributions.mockResolvedValue({ items: [], total: 0 });
+    api.getDataSourceCapabilities.mockResolvedValue({ items: [], total: 0 });
+    api.getPublishReadbacks.mockResolvedValue({ items: [], total: 0 });
   });
   it("keeps business outcomes unavailable until verified evidence exists", async () => {
     render(<EffectsWorkspace storeId="store-1" />);

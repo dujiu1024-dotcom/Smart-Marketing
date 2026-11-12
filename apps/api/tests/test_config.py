@@ -14,8 +14,7 @@ def test_production_rejects_local_development_session_pepper() -> None:
             session_idle_timeout_seconds=3600,
             session_absolute_timeout_seconds=86400,
             object_storage_public_endpoint_url="https://assets.example.com",
-            object_storage_public_endpoint_url="https://assets.example.com",
-        object_storage_bucket="store-operator-private",
+            object_storage_bucket="store-operator-private",
             object_storage_access_key_id="test-access-key",
             object_storage_secret_access_key="test-secret-key",
         )
@@ -29,11 +28,13 @@ def test_production_accepts_explicit_non_placeholder_session_pepper() -> None:
         session_token_pepper="production-random-secret-value-32-bytes-minimum",
         session_idle_timeout_seconds=3600,
         session_absolute_timeout_seconds=86400,
+        object_storage_public_endpoint_url="https://assets.example.com",
         object_storage_bucket="store-operator-private",
         object_storage_access_key_id="test-access-key",
         object_storage_secret_access_key="test-secret-key",
     )
     assert settings.session_token_pepper == "production-random-secret-value-32-bytes-minimum"
+
 
 def test_production_requires_https_public_object_storage_endpoint() -> None:
     with pytest.raises(ValidationError, match="must use HTTPS"):

@@ -84,7 +84,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
     const match = (detail?.match ?? {}) as Record<string, unknown>;
     const id = typeof detail?.id === "string" ? detail.id : "";
     return <section className="opportunity-workspace">
-      <div className="page-heading"><div><p className="eyebrow">MARKETING OPPORTUNITY</p><h1>机会详情</h1><p className="muted">核对来源证据、门店匹配理由和风险后再做决定。</p></div><button className="secondary" onClick={() => { window.location.hash = "#hotspots"; }}>返回机会列表</button></div>
+      <div className="page-heading"><div><p className="eyebrow">MARKETING OPPORTUNITY</p><h1>机会详情</h1><p className="muted">核对来源证据、门店匹配理由和风险后再做决定。</p></div><button className="secondary" onClick={() => { window.location.hash = "#hotspots"; setRoute("#hotspots"); }}>返回机会列表</button></div>
       {error && <div className="alert error" role="alert">{error}</div>}
       {notice && <div className="alert success" role="status">{notice}</div>}
       {loading ? <div className="loading-card"><span className="spinner" />正在读取机会…</div> : detail ? <>
@@ -132,7 +132,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
         <div className="catalog-item-main"><div><h2>{item.title}</h2><p>{item.summary ?? "暂无摘要"}</p></div><span className="status-chip">{labels[item.eligibility_status] ?? item.eligibility_status}</span></div>
         <div className="catalog-meta"><span>来源：{item.evidence_status === "collected" ? "已采集" : "证据不完整"}</span><span>匹配：{item.relevance_score ?? "未计算"}</span><span>地区：{item.region ?? "未标注"}</span><span>更新时间：{new Date(item.discovered_at).toLocaleString()}</span></div>
         {item.reason_summary && <p className="catalog-description">{item.reason_summary}</p>}
-        <div className="catalog-actions"><button className="secondary" onClick={() => { window.location.hash = `#hotspot-detail:${item.id}`; }}>查看详情</button></div>
+        <div className="catalog-actions"><button className="secondary" onClick={() => { const nextRoute = `#hotspot-detail:${item.id}`; window.location.hash = nextRoute; setRoute(nextRoute); }}>查看详情</button></div>
       </article>)}
     </div> : <div className="empty-card"><h2>暂无可用营销机会</h2><p>当前没有已核验来源生成的有效机会。不会用演示数据冒充实时热点，也不会随机生成匹配分数。</p><div className="form-actions"><a className="primary opportunity-link" href="#create">直接按需制作</a></div></div>}
   </section>;

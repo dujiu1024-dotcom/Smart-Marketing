@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from store_operator.ai_gateway.errors import ProviderCapability  # type: ignore[attr-defined]
-
 
 class PromptTaskType(StrEnum):
     MARKETING_STRATEGY = "marketing_strategy"

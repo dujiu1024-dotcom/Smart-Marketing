@@ -7,6 +7,9 @@ const api = vi.hoisted(() => ({
   archiveMarketingTask: vi.fn(), cancelMarketingTask: vi.fn(),
   confirmMarketingTaskRequirement: vi.fn(), confirmMarketingTaskStrategy: vi.fn(),
   createMarketingTask: vi.fn(), createTaskArtifact: vi.fn(), createTaskArtifactVersion: vi.fn(), createTaskArtifactReview: vi.fn(),
+  createChannelContent: vi.fn(), runChannelContentQuality: vi.fn(), createQualityResolution: vi.fn(),
+  freezePublishPackage: vi.fn(), confirmPublishPackage: vi.fn(), listChannelContents: vi.fn(),
+  listPublishPackages: vi.fn(), listChannelSpecs: vi.fn(), listTaskBusinessFacts: vi.fn(),
   getMediaAssets: vi.fn(), listTaskArtifacts: vi.fn(), getAudienceProfiles: vi.fn(), getBrandGuideline: vi.fn(),
   getKnowledgeItems: vi.fn(), getMarketingTask: vi.fn(), listOffers: vi.fn(),
   getProducts: vi.fn(), getStoreProfile: vi.fn(), listMarketingTasks: vi.fn(),
@@ -51,10 +54,23 @@ describe("marketing task workspace", () => {
     api.createMarketingTask.mockResolvedValue(task);
     api.listTaskArtifacts.mockResolvedValue([]);
     api.getMediaAssets.mockResolvedValue({ items: [], total: 0 });
+    api.listChannelContents.mockResolvedValue([]);
+    api.listPublishPackages.mockResolvedValue([]);
+    api.listChannelSpecs.mockResolvedValue([]);
+    api.listTaskBusinessFacts.mockResolvedValue([]);
     api.createTaskArtifact.mockResolvedValue({ id: "artifact-copy", task_id: task.id, artifact_type: "copy", current_version_id: "version-1", created_at: "2026-11-12T01:00:00Z", updated_at: "2026-11-12T01:00:00Z", versions: [] });
     api.createTaskArtifactReview.mockResolvedValue({ id: "review-1" });
     api.confirmMarketingTaskRequirement.mockResolvedValue({ ...task, lifecycle_status: "active", version: 2 });
     mockFactSources();
+  });
+
+  it("shows the channel verification gate and publish confirmation workspace", async () => {
+    sessionStorage.setItem(`store-operator.current-task-id.${storeId}`, task.id);
+    window.location.hash = "#task";
+    render(<MarketingTaskWorkspace storeId={storeId} />);
+    expect(await screen.findByText("渠道适配与质检")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "创建抖音适配快照" })).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "最终发布确认" })).toBeInTheDocument();
   });
   it("lists current-store tasks and opens the selected task", async () => {
     render(<MarketingTaskWorkspace storeId={storeId} />);

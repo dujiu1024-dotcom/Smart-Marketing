@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   archiveMarketingTask, cancelMarketingTask, confirmMarketingTaskRequirement,
+  createChannelContent, runChannelContentQuality, createQualityResolution,
+  freezePublishPackage, confirmPublishPackage, listChannelContents, listPublishPackages,
+  listChannelSpecs, listTaskBusinessFacts,
   confirmMarketingTaskStrategy, createMarketingTask, getAudienceProfiles, getMediaAssets,
   getBrandGuideline, getKnowledgeItems, getMarketingTask, listOffers, listTaskArtifacts,
   createTaskArtifact, createTaskArtifactVersion, createTaskArtifactReview,
@@ -9,6 +12,8 @@ import {
   type BusinessFactReference, type ContentArtifact, type ArtifactVersionRecord,
   type MediaAsset, type MarketingTask, type MarketingTaskCreateInput,
   type MarketingTaskSummary, type MarketingTaskType, type TaskStep, type TaskStepKey,
+  type ChannelContentRecord, type ChannelSpecRecord, type PublishPackageRecord,
+  type TaskBusinessFactSnapshot,
 } from "./api";
 
 const taskTypeLabels: Record<MarketingTaskType, string> = {
@@ -78,6 +83,13 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [selectedFacts, setSelectedFacts] = useState<string[]>([]);
   const [artifacts, setArtifacts] = useState<ContentArtifact[]>([]);
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
+  const [channelSpecs, setChannelSpecs] = useState<ChannelSpecRecord[]>([]);
+  const [channelContents, setChannelContents] = useState<ChannelContentRecord[]>([]);
+  const [publishPackages, setPublishPackages] = useState<PublishPackageRecord[]>([]);
+  const [taskFactSnapshots, setTaskFactSnapshots] = useState<TaskBusinessFactSnapshot[]>([]);
+  const [selectedPackageFacts, setSelectedPackageFacts] = useState<string[]>([]);
+  const [qualityResolutionReason, setQualityResolutionReason] = useState("");
+  const [confirmationNote, setConfirmationNote] = useState("");
   const [copyTitle, setCopyTitle] = useState("");
   const [copyBody, setCopyBody] = useState("");
   const [copyHashtags, setCopyHashtags] = useState("");
@@ -134,12 +146,21 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
 
   const loadContent = useCallback(async (taskId: string) => {
     try {
-      const [contentItems, assetItems] = await Promise.all([
+      const [contentItems, assetItems, channelItems, packageItems, specs, factItems] = await Promise.all([
         listTaskArtifacts(storeId, taskId),
         getMediaAssets(storeId),
+        listChannelContents(storeId, taskId),
+        listPublishPackages(storeId, taskId),
+        listChannelSpecs(storeId),
+        listTaskBusinessFacts(storeId, taskId),
       ]);
       setArtifacts(contentItems);
       setMediaAssets(assetItems.items);
+      setChannelContents(channelItems);
+      setPublishPackages(packageItems);
+      setChannelSpecs(specs);
+      setTaskFactSnapshots(factItems);
+      setSelectedPackageFacts(current => current.length ? current : factItems.filter(fact => fact.confirmation_status === "confirmed").map(fact => fact.id));
       setSelectedImageAssetId(current => current || assetItems.items.find(item =>
         item.status === "ready" && item.usage_rights_status === "confirmed_allowed" && item.mime_type.startsWith("image/")
       )?.id || "");
@@ -312,6 +333,104 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
   }
+
+  async function createChannelDraft() {
+    if (!task || saving) return;
+    const spec = channelSpecs.find(item => item.channel_key === "douyin")?.current_version;
+    if (!spec || spec.verification_status !== "verified") {
+      setError("当前渠道规格尚未完成官方核验，不能创建渠道适配内容。");
+      return;
+    }
+    const copyArtifact = artifacts.find(item => item.artifact_type === "copy");
+    const copyVersion = copyArtifact?.versions.find(version => version.id === copyArtifact.current_version_id);
+    const copyReview = copyVersion?.reviews?.[copyVersion.reviews.length - 1];
+    if (!copyArtifact || !copyVersion || copyReview?.decision !== "approved") {
+      setError("请先完成文案当前版本审核，再进行渠道适配。");
+      return;
+    }
+    const imageVersions = artifacts
+      .filter(item => item.artifact_type === "image")
+      .flatMap(item => item.versions.filter(version => version.id === item.current_version_id && version.reviews?.[version.reviews.length - 1]?.decision === "approved"));
+    const content = copyVersion.content_json || {};
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await createChannelContent(storeId, task.id, {
+        channel_key: "douyin",
+        copy_version_id: copyVersion.id,
+        channel_spec_version_id: spec.id,
+        payload: {
+          title: typeof content.title === "string" ? content.title : "",
+          body: typeof content.body === "string" ? content.body : "",
+          hashtags: typeof content.hashtags === "string" ? content.hashtags.split(/[、,，\s]+/).filter(Boolean) : [],
+        },
+        image_version_ids: imageVersions.map(version => version.id),
+      });
+      await loadContent(task.id);
+      setNotice("渠道内容适配快照已创建。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
+  async function runQuality(content: ChannelContentRecord) {
+    if (!task || saving) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const job = await runChannelContentQuality(storeId, task.id, content);
+      setNotice("质检任务已提交（" + job.job_id + "）。完成后点击刷新产物查看报告。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
+  async function acceptQuality(report: ChannelContentRecord["quality_reports"][number]) {
+    if (!task || saving || !qualityResolutionReason.trim()) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await createQualityResolution(storeId, report.id, report.input_fingerprint, qualityResolutionReason.trim());
+      setQualityResolutionReason("");
+      await loadContent(task.id);
+      setNotice("已记录当前质检报告的人工接受决议。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
+  async function freezePackage(content: ChannelContentRecord, report: ChannelContentRecord["quality_reports"][number]) {
+    if (!task || saving) return;
+    const confirmedFacts = taskFactSnapshots.filter(fact =>
+      fact.confirmation_status === "confirmed" && selectedPackageFacts.includes(fact.id)
+    );
+    if (!confirmedFacts.length) {
+      setError("发布包至少需要选择一项已确认的经营事实快照。");
+      return;
+    }
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await freezePublishPackage(storeId, task.id, {
+        expected_task_version: task.version,
+        fact_snapshot_ids: confirmedFacts.map(fact => fact.id),
+        items: [{
+          channel_content_id: content.id,
+          quality_report_id: report.id,
+          delivery_mode: "manual_handoff",
+        }],
+      });
+      await loadContent(task.id);
+      setNotice("发布包已冻结。冻结后内容不会被静默修改。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
+  async function confirmPackage(pkg: PublishPackageRecord) {
+    if (!task || saving || pkg.confirmation) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      await confirmPublishPackage(storeId, pkg.id, pkg.package_fingerprint, confirmationNote.trim());
+      setConfirmationNote("");
+      await loadContent(task.id);
+      setNotice("已确认该不可变发布包。实际发布状态仍需外部平台凭证确认。");
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+
   async function reviewArtifact(artifact: ContentArtifact, version: ArtifactVersionRecord, decision: "approved" | "revision_requested" | "rejected") {
     if (!task || saving) return;
     if (decision === "revision_requested" && !reviewComment.trim()) { setError("请填写具体的修改意见。"); return; }
@@ -447,6 +566,36 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           </article>;
         })}</div>}
         <label className="field"><span>审核修改意见（要求修改时必填）</span><textarea rows={2} value={reviewComment} onChange={event => setReviewComment(event.target.value)} placeholder="明确指出需要调整的内容、位置和原因" /></label>
+      </section>
+
+      <section className="task-panel">
+        <div className="section-title"><div><h2>渠道适配与质检</h2><p>仅使用已审核的当前版本；渠道规格未核验时明确阻断，不展示虚假的官方校验结果。</p></div><button className="text-button" type="button" disabled={saving} onClick={() => task && void loadContent(task.id)}>刷新渠道内容</button></div>
+        {channelSpecs.map(spec => <div className="task-step-title" key={spec.id}><strong>{spec.channel_key === "douyin" ? "抖音" : spec.channel_key}</strong><span className={spec.current_version?.verification_status === "verified" ? "status-chip" : "status-chip danger"}>{spec.current_version?.verification_status === "verified" ? "规格已核验" : "规格待核验"}</span><span className="muted">{spec.current_version ? "V" + spec.current_version.spec_version : "暂无版本"}</span></div>)}
+        <p className="muted">渠道适配使用当前已审核文案和图片版本。官方规格仍待核验时，服务端会拒绝创建内容快照。</p>
+        <div className="form-footer"><p>首期渠道适配目前支持抖音图文结构；AI 自动适配尚未接入。</p><div className="form-actions"><button className="primary" type="button" disabled={saving || !channelSpecs.some(spec => spec.channel_key === "douyin" && spec.current_version?.verification_status === "verified")} onClick={() => void createChannelDraft()}>创建抖音适配快照</button></div></div>
+        {channelContents.length === 0 ? <p className="muted">尚无渠道内容快照。完成文案审核并核验渠道规格后，可创建适配内容。</p> : <div className="task-content-artifacts">{channelContents.map(content => {
+          const report = content.quality_reports[content.quality_reports.length - 1];
+          const resolution = report?.resolutions[report.resolutions.length - 1];
+          return <article className="task-content-artifact" key={content.id}>
+            <div className="task-step-title"><strong>{content.channel_key} · 渠道内容</strong><span className={content.status === "ready" ? "status-chip" : "status-chip danger"}>{content.status === "ready" ? "可质检" : content.status === "stale" ? "内容已过期" : "内容阻断"}</span></div>
+            <p className="muted">内容指纹：{content.input_fingerprint.slice(0, 16)}… · 图片 {content.image_version_ids.length} 张</p>
+            <div className="form-footer"><p>{report ? "最新质检：" + report.result + (resolution ? " · 人工决议：" + resolution.decision : "") : "尚无质检报告"}</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || content.status !== "ready"} onClick={() => void runQuality(content)}>运行结构质检</button></div></div>
+            {report && <div className="muted"><p>规则版本：{report.rule_version} · {report.issues.length} 项问题</p>{report.issues.map((issue, index) => <p key={index}>{String(issue.code || "QUALITY_ISSUE")} · {String(issue.severity || "info")}</p>)}</div>}
+            {report?.result === "needs_human" && !resolution && <><label className="field"><span>人工复核理由</span><textarea rows={2} value={qualityResolutionReason} onChange={event => setQualityResolutionReason(event.target.value)} placeholder="说明已核对哪些经营事实及为何接受该质检提示" /></label><button className="secondary" type="button" disabled={saving || qualityResolutionReason.trim().length < 8} onClick={() => void acceptQuality(report)}>接受人工复核结果</button></>}
+            {report && (report.result === "pass" || (report.result === "needs_human" && resolution?.decision === "accepted")) && <button className="primary" type="button" disabled={saving || !taskFactSnapshots.some(fact => fact.confirmation_status === "confirmed")} onClick={() => void freezePackage(content, report)}>冻结为发布包（人工交付）</button>}
+          </article>;
+        })}</div>}
+      </section>
+      <section className="task-panel">
+        <div className="section-title"><div><h2>最终发布确认</h2><p>发布包冻结后绑定完整内容与经营事实指纹；确认仅表示商家批准交付，不代表平台已发布。</p></div><button className="text-button" type="button" disabled={saving} onClick={() => task && void loadContent(task.id)}>刷新发布包</button></div>
+        <div className="task-facts">{taskFactSnapshots.map(fact => <label className="task-fact-option" key={fact.id}><input type="checkbox" checked={selectedPackageFacts.includes(fact.id)} disabled={fact.confirmation_status !== "confirmed"} onChange={event => setSelectedPackageFacts(current => event.target.checked ? [...current, fact.id] : current.filter(id => id !== fact.id))} /><span>{fact.fact_key} · V{fact.version_no}</span><small>{fact.confirmation_status === "confirmed" ? "已确认" : fact.confirmation_status}</small></label>)}</div>
+        <label className="field"><span>最终确认备注（可选）</span><textarea rows={2} value={confirmationNote} onChange={event => setConfirmationNote(event.target.value)} placeholder="补充本次交付确认说明" /></label>
+        {publishPackages.length === 0 ? <p className="muted">尚无冻结发布包。完成渠道内容质检并选择已确认经营事实后，可生成发布包。</p> : <div className="task-content-artifacts">{publishPackages.map(pkg => <article className="task-content-artifact" key={pkg.id}>
+          <div className="task-step-title"><strong>发布包 V{pkg.package_version}</strong><span className={pkg.confirmation ? "status-chip" : "status-chip danger"}>{pkg.confirmation ? "已确认" : "待最终确认"}</span></div>
+          <p className="muted">指纹：{pkg.package_fingerprint} · 渠道数：{pkg.items.length} · 冻结时间：{new Date(pkg.frozen_at).toLocaleString()}</p>
+          {pkg.items.map(item => <p className="muted" key={item.id}>{item.channel_key} · {item.delivery_mode === "manual_handoff" ? "人工交付" : "官方 API"} · 内容 {item.channel_content_id.slice(0, 8)}…</p>)}
+          {pkg.confirmation ? <p className="muted">确认时间：{new Date(pkg.confirmation.confirmed_at).toLocaleString()}</p> : <button className="primary" type="button" disabled={saving} onClick={() => void confirmPackage(pkg)}>确认该发布包</button>}
+        </article>)}</div>}
       </section>
       <section className="task-panel"><div className="section-title"><div><h2>固定执行流程</h2><p>步骤状态由服务端状态机维护，必需审核节点不可跳过。</p></div><span className="status-chip">{stepProgress}/10 已完成</span></div>
         <div className="task-step-list">{task.steps.map((step, index) => <article className="task-step" key={step.id}><div className="task-step-index">{index + 1}</div><div className="task-step-body"><div className="task-step-title"><strong>{stepLabels[step.step_key]}</strong><span className={step.status === "failed" || step.block_code ? "status-chip danger" : "status-chip"}>{statusLabels[step.status]}</span><span className="task-applicability">{statusLabels[step.applicability]}</span></div>{step.block_code && <p className="task-block-reason">{step.block_code}{step.block_detail ? ` · ${JSON.stringify(step.block_detail)}` : ""}</p>}{step.skip_reason && <p className="muted">跳过原因：{step.skip_reason}</p>}{step.output_refs.length > 0 && <p className="muted">已关联 {step.output_refs.length} 项输出</p>}<div className="task-step-actions">{["active","waiting_for_user"].includes(task.lifecycle_status) && step.applicability === "optional" && step.status === "pending" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "skip")}>记录跳过原因</button>}{["active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && ["failed","stale","waiting_for_user"].includes(step.status) && step.applicability !== "not_applicable" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "recover")}>恢复此步骤</button>}</div></div></article>)}</div>

@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from store_operator.auth.context import AuthContext
@@ -10,6 +11,7 @@ from store_operator.auth.dependencies import (
     require_csrf,
     require_store_context,
 )
+from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.domain.marketing_task import (
     MarketingTaskStatus,
@@ -41,6 +43,7 @@ from store_operator.marketing_tasks.service import (
     update_requirement_draft,
     update_strategy_draft,
 )
+from store_operator.models.marketing_task import BusinessFactSnapshot, MarketingTask
 
 router = APIRouter(prefix="/marketing-tasks", tags=["marketing-tasks"])
 
@@ -85,6 +88,56 @@ def list_tasks(
         limit=limit,
         offset=offset,
     )
+
+
+
+@router.get("/{task_id}/business-facts")
+def list_task_business_facts(
+    task_id: UUID,
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[dict[str, object]]:
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+    task = db.scalar(
+        select(BusinessFactSnapshot.task_id).where(
+            BusinessFactSnapshot.task_id == task_id,
+            BusinessFactSnapshot.store_id == store_id,
+        ).limit(1)
+    )
+    if task is None:
+        task_exists = db.scalar(
+            select(MarketingTask.id).where(
+                MarketingTask.id == task_id,
+                MarketingTask.store_id == store_id,
+            )
+        )
+        if task_exists is None:
+            raise ApiError(404, "TASK_NOT_FOUND", "Marketing task not found")
+    facts = db.scalars(
+        select(BusinessFactSnapshot)
+        .where(
+            BusinessFactSnapshot.task_id == task_id,
+            BusinessFactSnapshot.store_id == store_id,
+        )
+        .order_by(BusinessFactSnapshot.fact_key, BusinessFactSnapshot.version_no.desc())
+    ).all()
+    latest: dict[str, BusinessFactSnapshot] = {}
+    for fact in facts:
+        latest.setdefault(fact.fact_key, fact)
+    return [
+        {
+            "id": str(fact.id),
+            "fact_key": fact.fact_key,
+            "version_no": fact.version_no,
+            "value": fact.value_json,
+            "content_fingerprint": fact.content_fingerprint,
+            "confirmation_status": fact.confirmation_status,
+            "confirmed_at": fact.confirmed_at.isoformat() if fact.confirmed_at else None,
+        }
+        for fact in latest.values()
+    ]
 
 
 @router.get("/{task_id}", response_model=MarketingTaskDetail)

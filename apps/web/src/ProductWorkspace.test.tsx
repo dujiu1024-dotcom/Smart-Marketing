@@ -72,6 +72,7 @@ describe("production product workspace", () => {
     await waitFor(() => expect(api.createProduct).toHaveBeenCalledWith(
       "store-1",
       expect.objectContaining({ name: "鲜果茶", price_amount: null, currency: null }),
+      expect.any(String),
     ));
   });
 });

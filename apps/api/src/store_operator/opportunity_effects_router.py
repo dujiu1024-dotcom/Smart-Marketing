@@ -288,6 +288,19 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
             work.ownership_status not in {"verified_system_publish", "verified_platform_api"}
             or work.verified_at is None
         ):
+            verified_evidence_id = db.scalar(
+                select(WorkOwnershipEvidence.id).where(
+                    WorkOwnershipEvidence.store_id == store_id,
+                    WorkOwnershipEvidence.published_work_id == work.id,
+                    WorkOwnershipEvidence.evidence_status == "verified",
+                )
+            )
+            if verified_evidence_id is None:
+                raise ApiError(
+                    409,
+                    "PUBLISHED_WORK_EVIDENCE_MISSING",
+                    "A verified ownership evidence record is required",
+                )
             raise ApiError(
                 409,
                 "PUBLISHED_WORK_NOT_VERIFIED",
@@ -1079,6 +1092,19 @@ def create_attribution(
         work.ownership_status not in {"verified_system_publish", "verified_platform_api"}
         or work.verified_at is None
     ):
+        verified_evidence_id = db.scalar(
+            select(WorkOwnershipEvidence.id).where(
+                WorkOwnershipEvidence.store_id == store_id,
+                WorkOwnershipEvidence.published_work_id == work.id,
+                WorkOwnershipEvidence.evidence_status == "verified",
+            )
+        )
+        if verified_evidence_id is None:
+            raise ApiError(
+                409,
+                "PUBLISHED_WORK_EVIDENCE_MISSING",
+                "A verified ownership evidence record is required",
+            )
         raise ApiError(
             409,
             "PUBLISHED_WORK_NOT_VERIFIED",
@@ -1093,6 +1119,7 @@ def create_attribution(
     if (
         outcome.authenticity_status not in {"official_api", "verified_import"}
         or outcome.integrity_status != "complete"
+        or not outcome.source_evidence_ref
     ):
         raise ApiError(
             409,

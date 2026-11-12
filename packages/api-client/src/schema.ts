@@ -448,6 +448,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/effects/attributions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Attributions */
+        get: operations["list_attributions_api_v1_effects_attributions_get"];
+        put?: never;
+        /** Create Attribution */
+        post: operations["create_attribution_api_v1_effects_attributions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/effects/business-outcomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Business Outcomes */
+        get: operations["list_business_outcomes_api_v1_effects_business_outcomes_get"];
+        put?: never;
+        /** Create Manual Business Outcome */
+        post: operations["create_manual_business_outcome_api_v1_effects_business_outcomes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/effects/definitions": {
         parameters: {
             query?: never;
@@ -528,6 +564,40 @@ export interface paths {
         get: operations["effects_overview_api_v1_effects_overview_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/effects/published-works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Published Works */
+        get: operations["list_published_works_api_v1_effects_published_works_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/effects/published-works/from-publish-operation/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register Published Work From Readback */
+        post: operations["register_published_work_from_readback_api_v1_effects_published_works_from_publish_operation__operation_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1620,6 +1690,33 @@ export interface components {
             /** Upload Url */
             upload_url: string;
         };
+        /** AttributionInput */
+        AttributionInput: {
+            /**
+             * Allocation Percent
+             * @default 100
+             */
+            allocation_percent: number | string;
+            /** Attribution Method */
+            attribution_method: string;
+            /** Evidence Strength */
+            evidence_strength: string;
+            /**
+             * Marketing Task Id
+             * Format: uuid
+             */
+            marketing_task_id: string;
+            /**
+             * Outcome Evidence Id
+             * Format: uuid
+             */
+            outcome_evidence_id: string;
+            /**
+             * Published Work Id
+             * Format: uuid
+             */
+            published_work_id: string;
+        };
         /** AudienceProfileCreate */
         AudienceProfileCreate: {
             /** Audience Description */
@@ -1839,6 +1936,24 @@ export interface components {
              * @enum {string}
              */
             record_type: "store_profile" | "product" | "offer" | "audience_profile" | "brand_guideline" | "knowledge_item";
+        };
+        /** BusinessOutcomeInput */
+        BusinessOutcomeInput: {
+            /** Currency */
+            currency?: string | null;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Outcome Type */
+            outcome_type: string;
+            /** Source Evidence Ref */
+            source_evidence_ref: string;
+            /** Source Record Id */
+            source_record_id?: string | null;
+            /** Value Numeric */
+            value_numeric: number | string;
         };
         /** ChannelContentCreate */
         ChannelContentCreate: {
@@ -4017,6 +4132,146 @@ export interface operations {
             };
         };
     };
+    list_attributions_api_v1_effects_attributions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_attribution_api_v1_effects_attributions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttributionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_business_outcomes_api_v1_effects_business_outcomes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_manual_business_outcome_api_v1_effects_business_outcomes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BusinessOutcomeInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_metric_definitions_api_v1_effects_definitions_get: {
         parameters: {
             query?: never;
@@ -4195,6 +4450,74 @@ export interface operations {
                 "X-Store-ID"?: string | null;
             };
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_published_works_api_v1_effects_published_works_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_published_work_from_readback_api_v1_effects_published_works_from_publish_operation__operation_id__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                operation_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

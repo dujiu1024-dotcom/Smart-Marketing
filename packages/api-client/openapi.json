@@ -579,6 +579,57 @@
         "title": "AssetUploadIntentRead",
         "type": "object"
       },
+      "AttributionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "allocation_percent": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "default": "100",
+            "title": "Allocation Percent"
+          },
+          "attribution_method": {
+            "title": "Attribution Method",
+            "type": "string"
+          },
+          "evidence_strength": {
+            "title": "Evidence Strength",
+            "type": "string"
+          },
+          "marketing_task_id": {
+            "format": "uuid",
+            "title": "Marketing Task Id",
+            "type": "string"
+          },
+          "outcome_evidence_id": {
+            "format": "uuid",
+            "title": "Outcome Evidence Id",
+            "type": "string"
+          },
+          "published_work_id": {
+            "format": "uuid",
+            "title": "Published Work Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "marketing_task_id",
+          "published_work_id",
+          "outcome_evidence_id",
+          "attribution_method",
+          "evidence_strength"
+        ],
+        "title": "AttributionInput",
+        "type": "object"
+      },
       "AudienceProfileCreate": {
         "properties": {
           "audience_description": {
@@ -1618,6 +1669,73 @@
           "record_id"
         ],
         "title": "BusinessFactReference",
+        "type": "object"
+      },
+      "BusinessOutcomeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "maxLength": 3,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "outcome_type": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Outcome Type",
+            "type": "string"
+          },
+          "source_evidence_ref": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Source Evidence Ref",
+            "type": "string"
+          },
+          "source_record_id": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Record Id"
+          },
+          "value_numeric": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value Numeric"
+          }
+        },
+        "required": [
+          "outcome_type",
+          "value_numeric",
+          "source_evidence_ref",
+          "occurred_at"
+        ],
+        "title": "BusinessOutcomeInput",
         "type": "object"
       },
       "ChannelContentCreate": {
@@ -7284,6 +7402,230 @@
         ]
       }
     },
+    "/api/v1/effects/attributions": {
+      "get": {
+        "operationId": "list_attributions_api_v1_effects_attributions_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Attributions Api V1 Effects Attributions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Attributions",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      },
+      "post": {
+        "operationId": "create_attribution_api_v1_effects_attributions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttributionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Attribution Api V1 Effects Attributions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Attribution",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/effects/business-outcomes": {
+      "get": {
+        "operationId": "list_business_outcomes_api_v1_effects_business_outcomes_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Business Outcomes Api V1 Effects Business Outcomes Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Business Outcomes",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      },
+      "post": {
+        "operationId": "create_manual_business_outcome_api_v1_effects_business_outcomes_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusinessOutcomeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Manual Business Outcome Api V1 Effects Business Outcomes Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Manual Business Outcome",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
     "/api/v1/effects/definitions": {
       "get": {
         "operationId": "list_metric_definitions_api_v1_effects_definitions_get",
@@ -7628,6 +7970,120 @@
           }
         },
         "summary": "Effects Overview",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/effects/published-works": {
+      "get": {
+        "operationId": "list_published_works_api_v1_effects_published_works_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Published Works Api V1 Effects Published Works Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Published Works",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/effects/published-works/from-publish-operation/{operation_id}": {
+      "post": {
+        "operationId": "register_published_work_from_readback_api_v1_effects_published_works_from_publish_operation__operation_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Register Published Work From Readback Api V1 Effects Published Works From Publish Operation  Operation Id  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Published Work From Readback",
         "tags": [
           "opportunities",
           "effects"

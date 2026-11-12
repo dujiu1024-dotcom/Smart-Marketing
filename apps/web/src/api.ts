@@ -285,3 +285,56 @@ export async function confirmProductFacts(storeId: string, product: Product): Pr
     }),
   }, storeId);
 }
+
+
+export interface Offer {
+  id: string;
+  store_id: string;
+  title: string;
+  offer_type: string;
+  terms_json: Record<string, unknown>;
+  eligibility_rules_json: Record<string, unknown>;
+  starts_at: string | null;
+  ends_at: string | null;
+  stacking_policy: string | null;
+  usage_limit: number | null;
+  status: "draft" | "active" | "paused" | "expired" | "archived";
+  fact_status: string;
+  current_version: number;
+}
+export type OfferInput = Omit<Offer, "id" | "store_id" | "fact_status" | "current_version">;
+
+export async function getOffers(storeId: string): Promise<{ items: Offer[]; total: number }> {
+  return request("/store/offers?limit=200&offset=0", {}, storeId);
+}
+export async function createOffer(storeId: string, input: OfferInput): Promise<Offer> {
+  return request("/store/offers", {
+    method: "POST",
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify(input),
+  }, storeId);
+}
+export async function updateOffer(storeId: string, offer: Offer, input: OfferInput): Promise<Offer> {
+  return request(`/store/offers/${offer.id}`, {
+    method: "PATCH",
+    headers: { "If-Match": String(offer.current_version) },
+    body: JSON.stringify(input),
+  }, storeId);
+}
+export async function deleteOffer(storeId: string, offer: Offer): Promise<void> {
+  return request(`/store/offers/${offer.id}`, {
+    method: "DELETE",
+    headers: { "If-Match": String(offer.current_version) },
+  }, storeId);
+}
+export async function confirmOfferFacts(storeId: string, offer: Offer): Promise<Offer> {
+  return request(`/store/offers/${offer.id}/confirm-facts`, {
+    method: "POST",
+    headers: { "If-Match": String(offer.current_version) },
+    body: JSON.stringify({
+      source_type: "merchant_ui_confirmation",
+      source_ref: "store-offers-page",
+      confirmation_note: "由当前门店成员核对活动规则与适用条件后确认",
+    }),
+  }, storeId);
+}

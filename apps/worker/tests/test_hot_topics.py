@@ -10,7 +10,6 @@ import httpx
 
 from store_operator_worker.handlers import (
     JobExecutionContext,
-    JobExecutionError,
     clear_job_handlers_for_testing,
     resolve_job_handler,
 )

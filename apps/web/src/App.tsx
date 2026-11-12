@@ -17,6 +17,7 @@ import {
   type StoreProfile,
   type User,
 } from "./api";
+import ProductWorkspace from "./ProductWorkspace";
 
 interface ProfileForm {
   display_name: string;
@@ -155,6 +156,12 @@ function Field({
   );
 }
 
+function storeSectionFromHash(): string {
+  if (window.location.hash.startsWith("#store-editor:product:")) return "products";
+  const match = window.location.hash.match(/^#store:([^:]+)$/);
+  return match?.[1] ?? "profile";
+}
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [stores, setStores] = useState<StoreMembership[]>([]);
@@ -167,8 +174,15 @@ export default function App() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [storeSection, setStoreSection] = useState(storeSectionFromHash);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const syncSection = () => setStoreSection(storeSectionFromHash());
+    window.addEventListener("hashchange", syncSection);
+    return () => window.removeEventListener("hashchange", syncSection);
+  }, []);
 
   const loadStoreContext = useCallback(async () => {
     const response = await getStores();
@@ -399,17 +413,20 @@ export default function App() {
           <div className="side-link disabled" aria-disabled="true">AI 营销 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">营销任务 · 待接入</div>
           <div className="side-label spaced">门店资料</div>
-          <a className="side-link active" href="#store:profile">门店档案</a>
-          <div className="side-link disabled" aria-disabled="true">商品与服务 · 待接入</div>
+          <a className={`side-link ${storeSection === "profile" ? "active" : ""}`} href="#store:profile">门店档案</a>
+          <a className={`side-link ${storeSection === "products" ? "active" : ""}`} href="#store:products">商品与服务</a>
           <div className="side-link disabled" aria-disabled="true">活动与优惠 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">品牌规范 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">客群与经营 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">门店知识库 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">素材资产库 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">渠道账号 · 待接入</div>
-          <div className="sidebar-foot">当前仅接入真实门店档案。未接入模块明确标记，不使用演示数据冒充生产数据。</div>
+          <div className="sidebar-foot">当前已接入门店档案与商品服务。其他模块明确标记待接入，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
+          {!stores.length ? (
+            <section className="empty-card"><h2>当前账号尚未加入门店</h2><p>请联系门店所有者邀请你加入后，再维护经营资料。</p></section>
+          ) : storeSection === "products" ? <ProductWorkspace storeId={storeId} /> : <>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STORE PROFILE</p>
@@ -494,6 +511,7 @@ export default function App() {
               </div>
             </form>
           )}
+          </>}
         </main>
       </div>
     </div>

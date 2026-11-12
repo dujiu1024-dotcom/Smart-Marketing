@@ -7,6 +7,7 @@ import logging
 import os
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
+from typing import cast
 from uuid import UUID, uuid4
 
 from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
@@ -65,13 +66,13 @@ _MAX_IMAGE_BYTES = 25 * 1024 * 1024
 
 
 def download_object_bytes(*, object_key: str, max_bytes: int) -> bytes:
-    from store_operator.object_storage import download_object_bytes as download
+    from store_operator.object_storage import download_object_bytes as download  # type: ignore[import-untyped]
 
-    return download(object_key=object_key, max_bytes=max_bytes)
+    return cast(bytes, download(object_key=object_key, max_bytes=max_bytes))
 
 
 def delete_object(*, object_key: str) -> None:
-    from store_operator.object_storage import delete_object as delete
+    from store_operator.object_storage import delete_object as delete  # type: ignore[import-untyped]
 
     delete(object_key=object_key)
 

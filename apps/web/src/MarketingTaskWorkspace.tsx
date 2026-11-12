@@ -215,7 +215,10 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     if (!task || draftDirty || selectedFacts.length === 0) return;
     setSaving(true); setError(""); setNotice("");
     try {
-      const refs = facts.filter(fact => selectedFacts.includes(fact.fact_key)).map(({ label: _label, ...reference }) => reference);
+      const refs: BusinessFactReference[] = facts.filter(fact => selectedFacts.includes(fact.fact_key)).map(fact => ({
+        fact_key: fact.fact_key, record_type: fact.record_type, record_id: fact.record_id,
+        expected_version_no: fact.expected_version_no,
+      }));
       const updated = await confirmMarketingTaskRequirement(storeId, task, refs);
       setTask(updated); setNotice("需求与经营事实已确认，策略生成任务已进入异步队列。");
     } catch (reason) { setError(errorText(reason)); }

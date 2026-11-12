@@ -477,7 +477,6 @@ def test_manual_business_outcome_is_retained_as_unverified_evidence(
     import store_operator.auth.router as auth_router
 
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
-    _identity(db_session, "outcome@example.com", "Outcome Shop")
     _, store = _identity(db_session, "outcome@example.com", "Outcome Shop")
     headers = _login(identity_client, "outcome@example.com", store.id)
 

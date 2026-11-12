@@ -34,7 +34,10 @@ def _redact(value: Any, key: str = "") -> Any:
     if any(fragment in normalized for fragment in _SENSITIVE_KEY_FRAGMENTS):
         return "[REDACTED]"
     if isinstance(value, Mapping):
-        return {str(child_key): _redact(child_value, str(child_key)) for child_key, child_value in value.items()}
+        return {
+            str(child_key): _redact(child_value, str(child_key))
+            for child_key, child_value in value.items()
+        }
     if isinstance(value, (list, tuple)):
         return [_redact(item) for item in value]
     return value

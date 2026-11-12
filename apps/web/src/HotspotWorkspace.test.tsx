@@ -53,5 +53,9 @@ describe("hotspot opportunity workspace", () => {
     await waitFor(() => expect(api.decideOpportunity).toHaveBeenCalledWith(
       "store-1", "11111111-1111-4111-8111-111111111111", "adopt", "", expect.any(String),
     ));
+    fireEvent.click(await screen.findByRole("button", { name: "基于此机会制作内容" }));
+    expect(window.location.hash).toBe("#create");
+    expect(JSON.parse(sessionStorage.getItem("store-operator.opportunity-handoff.store-1") ?? "{}"))
+      .toMatchObject({ opportunity_id: "11111111-1111-4111-8111-111111111111" });
   });
 });

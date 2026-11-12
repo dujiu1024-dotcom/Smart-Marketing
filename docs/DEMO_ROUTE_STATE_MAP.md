@@ -108,3 +108,12 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - 列表、创建、更新、事实确认分别调用 Store Knowledge API；请求按当前门店上下文授权，创建带 Idempotency-Key，更新/确认带 If-Match。
 - 商品价格/币种同时为空代表未知价格；不以 0 伪造未知金额。
 - 商品/服务与活动优惠、品牌规范、客群经营、知识库、素材资产、渠道账号及营销任务仍未接入生产 Web。
+
+
+## 10. 活动与优惠生产路由映射（2026-11-12）
+
+- Demo `#store:offers` 对应真实活动优惠列表，数据来自 GET `/api/v1/store/offers`。
+- `#store-editor:offer:new` 与 `#store-editor:offer:<id>` 对应独立活动编辑二级页面；创建使用 Idempotency-Key，更新使用 If-Match。
+- `terms_json` 按优惠类型构造：discount_percent、discount_amount、fixed_price、buy_x_get_y、gift、threshold_discount；买赠/赠品商品关联使用真实 Product ID。
+- `starts_at` / `ends_at` 输入必须包含 ISO 8601 时区，服务端存储 UTC；在 Store.timezone 尚未接入当前工作台前，不使用浏览器时区伪装门店本地时间。
+- 活动事实确认使用 POST `/api/v1/store/offers/<id>/confirm-facts` 并绑定当前版本；未保存修改时不允许确认。

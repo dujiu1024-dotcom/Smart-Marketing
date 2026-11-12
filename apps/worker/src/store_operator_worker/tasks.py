@@ -8,7 +8,6 @@ import os
 import socket
 from datetime import UTC, datetime, timedelta
 from math import ceil
-from pathlib import PurePosixPath
 from threading import Event, Thread
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -596,14 +595,14 @@ def cleanup_orphaned_ai_image_objects(
             if not isinstance(object_key, str) or store_id is None:
                 continue
 
-            path = PurePosixPath(object_key)
+            key_parts = object_key.split("/")
             if (
                 object_key.startswith("/")
                 or "\\" in object_key
-                or len(path.parts) < 3
-                or path.parts[0] != "stores"
-                or path.parts[1] != str(store_id)
-                or any(part in {".", ".."} for part in path.parts)
+                or len(key_parts) < 3
+                or key_parts[0] != "stores"
+                or key_parts[1] != str(store_id)
+                or any(part in {"", ".", ".."} for part in key_parts)
             ):
                 response_ref["orphan_cleanup_completed_at"] = now.isoformat()
                 response_ref["orphan_cleanup_result"] = "skipped_invalid_key"

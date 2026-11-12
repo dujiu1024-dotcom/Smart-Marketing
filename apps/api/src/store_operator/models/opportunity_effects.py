@@ -324,7 +324,8 @@ class PublishedWork(Base):
             "OR verified_at IS NOT NULL",
             name="verified_ownership_requires_timestamp",
         ),
-        Index("ix_published_works_store_channel_published", "store_id", "channel_key", "published_at"),
+        Index("ix_published_works_store_channel_published", "store_id", "channel_key",
+            "published_at"),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -369,7 +370,8 @@ class WorkOwnershipEvidence(Base):
             "evidence_status IN ('pending', 'verified', 'rejected', 'revoked')",
             name="evidence_status",
         ),
-        Index("ix_work_ownership_evidence_work_status", "store_id", "published_work_id", "evidence_status"),
+        Index("ix_work_ownership_evidence_work_status", "store_id", "published_work_id",
+            "evidence_status"),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -378,7 +380,8 @@ class WorkOwnershipEvidence(Base):
     )
     published_work_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     evidence_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    evidence_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+    evidence_status: Mapped[str] = mapped_column(String(16), nullable=False,
+        server_default="pending")
     source_system: Mapped[str] = mapped_column(String(80), nullable=False)
     evidence_ref: Mapped[str | None] = mapped_column(String(2048))
     evidence_payload_json: Mapped[dict[str, object]] = mapped_column(
@@ -431,7 +434,8 @@ class BusinessOutcomeEvidence(Base):
     source_evidence_ref: Mapped[str | None] = mapped_column(String(2048))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     authenticity_status: Mapped[str] = mapped_column(String(24), nullable=False)
-    integrity_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="unknown")
+    integrity_status: Mapped[str] = mapped_column(String(16), nullable=False,
+        server_default="unknown")
     deduplication_key: Mapped[str] = mapped_column(String(64), nullable=False)
     imported_by_user_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
@@ -473,13 +477,15 @@ class AttributionEvidence(Base):
             "'temporal_association', 'manual_claim')",
             name="attribution_method",
         ),
-        CheckConstraint("evidence_strength IN ('strong', 'medium', 'weak')", name="evidence_strength"),
+        CheckConstraint("evidence_strength IN ('strong', 'medium', 'weak')",
+            name="evidence_strength"),
         CheckConstraint("status IN ('active', 'superseded', 'rejected')", name="status"),
         CheckConstraint(
             "allocation_percent > 0 AND allocation_percent <= 100",
             name="allocation_percent_range",
         ),
-        Index("ix_attribution_evidence_store_task_status", "store_id", "marketing_task_id", "status"),
+        Index("ix_attribution_evidence_store_task_status", "store_id", "marketing_task_id",
+            "status"),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -491,7 +497,8 @@ class AttributionEvidence(Base):
     outcome_evidence_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     attribution_method: Mapped[str] = mapped_column(String(32), nullable=False)
     evidence_strength: Mapped[str] = mapped_column(String(16), nullable=False)
-    allocation_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="100")
+    allocation_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False,
+        server_default="100")
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")
     attribution_snapshot_json: Mapped[dict[str, object]] = mapped_column(
         JSONB, nullable=False, server_default="{}"

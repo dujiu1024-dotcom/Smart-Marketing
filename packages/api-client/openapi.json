@@ -4472,6 +4472,32 @@
         "title": "PublishOperationCreateRequest",
         "type": "object"
       },
+      "PublishPackageConfirm": {
+        "properties": {
+          "confirmation_note": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Note"
+          },
+          "expected_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_fingerprint"
+        ],
+        "title": "PublishPackageConfirm",
+        "type": "object"
+      },
       "PublishPackageConfirmRequest": {
         "properties": {
           "confirmation_note": {
@@ -4496,6 +4522,24 @@
           "package_fingerprint"
         ],
         "title": "PublishPackageConfirmRequest",
+        "type": "object"
+      },
+      "PublishPackageCreate": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublishPackageItemCreate"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "PublishPackageCreate",
         "type": "object"
       },
       "PublishPackageFreezeRequest": {
@@ -4531,6 +4575,56 @@
           "items"
         ],
         "title": "PublishPackageFreezeRequest",
+        "type": "object"
+      },
+      "PublishPackageItemCreate": {
+        "properties": {
+          "channel_account_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Account Id"
+          },
+          "channel_content_id": {
+            "format": "uuid",
+            "title": "Channel Content Id",
+            "type": "string"
+          },
+          "delivery_mode": {
+            "pattern": "^(official_api|manual_handoff)$",
+            "title": "Delivery Mode",
+            "type": "string"
+          },
+          "planned_publish_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Publish At"
+          },
+          "quality_report_id": {
+            "format": "uuid",
+            "title": "Quality Report Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel_content_id",
+          "quality_report_id",
+          "delivery_mode"
+        ],
+        "title": "PublishPackageItemCreate",
         "type": "object"
       },
       "PublishPackageItemInput": {
@@ -8541,6 +8635,84 @@
         "summary": "List Publish Packages",
         "tags": [
           "content-publishing"
+        ]
+      },
+      "post": {
+        "operationId": "freeze_publish_package_api_v1_marketing_tasks__task_id__publish_packages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishPackageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Freeze Publish Package Api V1 Marketing Tasks  Task Id  Publish Packages Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Freeze Publish Package",
+        "tags": [
+          "content-quality"
         ]
       }
     },

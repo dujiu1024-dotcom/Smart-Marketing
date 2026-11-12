@@ -82,13 +82,15 @@ def test_http_image_provider_separates_generation_and_edit_operations() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
-        operations.append(payload["operation"])
+        operation = payload["operation"]
+        operations.append(operation)
+        suffix = "generated" if operation == "image.generate" else "edited"
         return httpx.Response(
             200,
             json={
                 "model_id": "image-v1",
-                "asset_object_key": "private/generated/result.png",
-                "sha256": "a" * 64,
+                "asset_object_key": f"private/{suffix}/result.png",
+                "sha256": ("a" if suffix == "generated" else "b") * 64,
                 "mime_type": "image/png",
                 "width": 1024,
                 "height": 1024,
@@ -118,7 +120,8 @@ def test_http_image_provider_separates_generation_and_edit_operations() -> None:
         )
     )
 
-    assert generated.asset_object_key != edited.asset_object_key or generated.sha256 == edited.sha256
+    assert generated.asset_object_key != edited.asset_object_key
+    assert generated.sha256 != edited.sha256
     assert operations == ["image.generate", "image.edit"]
     asyncio.run(client_transport._client.aclose())
 

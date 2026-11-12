@@ -97,6 +97,59 @@ class MetricObservationInput(BaseModel):
             raise ValueError("period_timezone must be a valid IANA timezone") from exc
         return value
 
+class BusinessOutcomeInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    outcome_type: str = Field(min_length=1, max_length=32)
+    value_numeric: Decimal = Field(ge=0, max_digits=20, decimal_places=6)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    source_record_id: str | None = Field(default=None, max_length=300)
+    source_evidence_ref: str = Field(min_length=1, max_length=2048)
+    occurred_at: datetime
+
+    @field_validator("occurred_at")
+    @classmethod
+    def require_aware_occurred_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("occurred_at must include timezone information")
+        return value
+
+    @field_validator("currency")
+    @classmethod
+    def normalize_outcome_currency(cls, value: str | None) -> str | None:
+        return value.upper() if value else None
+
+    @field_validator("outcome_type")
+    @classmethod
+    def validate_outcome_type(cls, value: str) -> str:
+        if value not in {"revenue", "orders", "redemptions", "store_visits", "leads"}:
+            raise ValueError("Unsupported business outcome type")
+        return value
+
+
+class AttributionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    marketing_task_id: UUID
+    published_work_id: UUID
+    outcome_evidence_id: UUID
+    attribution_method: str
+    evidence_strength: str
+    allocation_percent: Decimal = Field(default=Decimal("100"), gt=0, le=100)
+
+    @field_validator("attribution_method")
+    @classmethod
+    def validate_attribution_method(cls, value: str) -> str:
+        if value not in {"direct_code", "platform_reported"}:
+            raise ValueError("Attribution requires direct or platform-reported evidence")
+        return value
+
+    @field_validator("evidence_strength")
+    @classmethod
+    def validate_evidence_strength(cls, value: str) -> str:
+        if value not in {"strong", "medium"}:
+            raise ValueError("Weak evidence cannot create formal attribution")
+        return value
+
+
 class MetricImportInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     csv_text: str = Field(min_length=1, max_length=5_000_000)
@@ -122,6 +175,52 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
         "published_work_id": str(item.published_work_id) if item.published_work_id else None,
         "marketing_task_id": str(item.marketing_task_id) if item.marketing_task_id else None,
     }
+
+def _published_work_read(item: PublishedWork) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "task_id": str(item.task_id) if item.task_id else None,
+        "publish_operation_id": str(item.publish_operation_id) if item.publish_operation_id else None,
+        "channel_account_id": str(item.channel_account_id) if item.channel_account_id else None,
+        "channel_key": item.channel_key,
+        "external_work_id": item.external_work_id,
+        "title": item.title,
+        "permalink": item.permalink,
+        "published_at": item.published_at.isoformat() if item.published_at else None,
+        "ownership_status": item.ownership_status,
+        "verified_at": item.verified_at.isoformat() if item.verified_at else None,
+        "source_snapshot": item.source_snapshot_json,
+    }
+
+
+def _business_outcome_read(item: BusinessOutcomeEvidence) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "outcome_type": item.outcome_type,
+        "value_numeric": str(item.value_numeric),
+        "currency": item.currency,
+        "source_system": item.source_system,
+        "source_record_id": item.source_record_id,
+        "source_evidence_ref": item.source_evidence_ref,
+        "occurred_at": item.occurred_at.isoformat(),
+        "authenticity_status": item.authenticity_status,
+        "integrity_status": item.integrity_status,
+    }
+
+
+def _attribution_read(item: AttributionEvidence) -> dict[str, object]:
+    return {
+        "id": str(item.id),
+        "marketing_task_id": str(item.marketing_task_id),
+        "published_work_id": str(item.published_work_id),
+        "outcome_evidence_id": str(item.outcome_evidence_id),
+        "attribution_method": item.attribution_method,
+        "evidence_strength": item.evidence_strength,
+        "allocation_percent": str(item.allocation_percent),
+        "status": item.status,
+        "snapshot": item.attribution_snapshot_json,
+    }
+
 
 def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservationInput,
                         authenticity: str, source_system: str = "manual",
@@ -632,6 +731,374 @@ def effects_overview(
             "reason": "没有已核验的真实经营结果与成本证据时，不计算 ROI、销售增长或到店增长。",
         },
     }
+
+
+@router.get("/effects/published-works")
+def list_published_works(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    rows = db.scalars(
+        select(PublishedWork)
+        .where(PublishedWork.store_id == store_id)
+        .order_by(PublishedWork.created_at.desc())
+    ).all()
+    return {
+        "items": [_published_work_read(item) for item in rows],
+        "total": len(rows),
+        "verified_count": sum(
+            1 for item in rows
+            if item.ownership_status in {"verified_system_publish", "verified_platform_api"}
+            and item.verified_at is not None
+        ),
+    }
+
+
+@router.post("/effects/published-works/from-publish-operation/{operation_id}")
+def register_published_work_from_readback(
+    operation_id: UUID,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    row = db.execute(
+        select(PublishOperation, PublishPackage, PublishPackageItem, ChannelAccount)
+        .join(
+            PublishPackage,
+            and_(
+                PublishPackage.store_id == PublishOperation.store_id,
+                PublishPackage.id == PublishOperation.publish_package_id,
+            ),
+        )
+        .join(
+            PublishPackageItem,
+            and_(
+                PublishPackageItem.store_id == PublishOperation.store_id,
+                PublishPackageItem.id == PublishOperation.publish_package_item_id,
+            ),
+        )
+        .join(
+            ChannelAccount,
+            and_(
+                ChannelAccount.store_id == PublishOperation.store_id,
+                ChannelAccount.id == PublishOperation.channel_account_id,
+            ),
+        )
+        .where(
+            PublishOperation.id == operation_id,
+            PublishOperation.store_id == store_id,
+            PublishOperation.status == "published",
+            PublishOperation.platform_item_id.is_not(None),
+            PublishOperation.last_readback_at.is_not(None),
+        )
+        .with_for_update()
+    ).first()
+    if row is None:
+        raise ApiError(
+            409,
+            "PUBLISH_READBACK_NOT_VERIFIED",
+            "A published status and platform readback are required before registering work ownership",
+        )
+    operation, package, package_item, account = row
+    existing = db.scalar(
+        select(PublishedWork).where(
+            PublishedWork.store_id == store_id,
+            PublishedWork.publish_operation_id == operation.id,
+        )
+    )
+    if existing is not None:
+        return {"item": _published_work_read(existing), "replayed": True}
+    snapshot = {
+        "publish_operation_id": str(operation.id),
+        "publish_package_id": str(package.id),
+        "publish_package_item_id": str(package_item.id),
+        "marketing_task_id": str(package.task_id),
+        "channel_account_id": str(account.id),
+        "channel_provider": account.provider,
+        "platform_item_id": operation.platform_item_id,
+        "publish_status": operation.status,
+        "last_readback_at": operation.last_readback_at.isoformat(),
+        "request_fingerprint": operation.request_fingerprint,
+        "confirmed_package_fingerprint": operation.confirmed_package_fingerprint,
+    }
+    item = PublishedWork(
+        id=uuid4(),
+        store_id=store_id,
+        task_id=package.task_id,
+        publish_operation_id=operation.id,
+        channel_account_id=account.id,
+        channel_key=package_item.channel_key,
+        external_work_id=operation.platform_item_id,
+        ownership_status="verified_system_publish",
+        verified_at=operation.last_readback_at,
+        source_snapshot_json=snapshot,
+    )
+    db.add(item)
+    db.flush()
+    evidence = WorkOwnershipEvidence(
+        id=uuid4(),
+        store_id=store_id,
+        published_work_id=item.id,
+        evidence_type="system_publish_readback",
+        evidence_status="verified",
+        source_system=account.provider,
+        evidence_payload_json=snapshot,
+        verified_by_user_id=auth.user.id,
+        verified_at=operation.last_readback_at,
+    )
+    db.add(evidence)
+    record_audit(
+        db,
+        request,
+        action="effects.published_work.verified",
+        target_type="published_work",
+        target_id=item.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "publish_operation_id": str(operation.id),
+            "platform_item_id": operation.platform_item_id,
+            "evidence_type": "system_publish_readback",
+        },
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        existing = db.scalar(
+            select(PublishedWork).where(
+                PublishedWork.store_id == store_id,
+                PublishedWork.publish_operation_id == operation_id,
+            )
+        )
+        if existing is not None:
+            return {"item": _published_work_read(existing), "replayed": True}
+        raise ApiError(409, "PUBLISHED_WORK_CONFLICT", "Published work registration conflicted") from exc
+    return {"item": _published_work_read(item), "replayed": False}
+
+
+@router.get("/effects/business-outcomes")
+def list_business_outcomes(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    rows = db.scalars(
+        select(BusinessOutcomeEvidence)
+        .where(BusinessOutcomeEvidence.store_id == store_id)
+        .order_by(BusinessOutcomeEvidence.occurred_at.desc())
+    ).all()
+    return {"items": [_business_outcome_read(item) for item in rows], "total": len(rows)}
+
+
+@router.post("/effects/business-outcomes")
+def create_manual_business_outcome(
+    payload: BusinessOutcomeInput,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    if payload.outcome_type == "revenue" and payload.currency is None:
+        raise ApiError(422, "CURRENCY_REQUIRED", "Revenue outcomes require an ISO 4217 currency")
+    material = "|".join(
+        [
+            str(store_id),
+            "manual",
+            payload.outcome_type,
+            payload.source_record_id or "",
+            str(payload.value_numeric),
+            payload.currency or "",
+            payload.occurred_at.isoformat(),
+        ]
+    )
+    deduplication_key = hashlib.sha256(material.encode("utf-8")).hexdigest()
+    existing = db.scalar(
+        select(BusinessOutcomeEvidence).where(
+            BusinessOutcomeEvidence.store_id == store_id,
+            BusinessOutcomeEvidence.deduplication_key == deduplication_key,
+        )
+    )
+    if existing is not None:
+        return {"item": _business_outcome_read(existing), "replayed": True}
+    item = BusinessOutcomeEvidence(
+        id=uuid4(),
+        store_id=store_id,
+        outcome_type=payload.outcome_type,
+        value_numeric=payload.value_numeric,
+        currency=payload.currency,
+        source_system="manual",
+        source_record_id=payload.source_record_id,
+        source_evidence_ref=payload.source_evidence_ref,
+        occurred_at=payload.occurred_at,
+        authenticity_status="merchant_reported",
+        integrity_status="unknown",
+        deduplication_key=deduplication_key,
+        imported_by_user_id=auth.user.id,
+    )
+    db.add(item)
+    record_audit(
+        db,
+        request,
+        action="effects.business_outcome.reported",
+        target_type="business_outcome_evidence",
+        target_id=item.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={"outcome_type": item.outcome_type, "authenticity_status": item.authenticity_status},
+    )
+    db.commit()
+    return {
+        "item": _business_outcome_read(item),
+        "replayed": False,
+        "message": "该结果为商家报告，尚未核验，不进入正式归因或经营结论。",
+    }
+
+
+@router.get("/effects/attributions")
+def list_attributions(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    rows = db.scalars(
+        select(AttributionEvidence)
+        .where(
+            AttributionEvidence.store_id == store_id,
+            AttributionEvidence.status == "active",
+        )
+        .order_by(AttributionEvidence.created_at.desc())
+    ).all()
+    return {"items": [_attribution_read(item) for item in rows], "total": len(rows)}
+
+
+@router.post("/effects/attributions")
+def create_attribution(
+    payload: AttributionInput,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    work = db.scalar(
+        select(PublishedWork).where(
+            PublishedWork.id == payload.published_work_id,
+            PublishedWork.store_id == store_id,
+        )
+    )
+    task = db.scalar(
+        select(MarketingTask).where(
+            MarketingTask.id == payload.marketing_task_id,
+            MarketingTask.store_id == store_id,
+        )
+    )
+    outcome = db.scalar(
+        select(BusinessOutcomeEvidence).where(
+            BusinessOutcomeEvidence.id == payload.outcome_evidence_id,
+            BusinessOutcomeEvidence.store_id == store_id,
+        )
+    )
+    if work is None or task is None or outcome is None:
+        raise ApiError(404, "ATTRIBUTION_SOURCE_NOT_FOUND", "Attribution source not found")
+    if (
+        work.ownership_status not in {"verified_system_publish", "verified_platform_api"}
+        or work.verified_at is None
+    ):
+        raise ApiError(
+            409,
+            "PUBLISHED_WORK_NOT_VERIFIED",
+            "Only verified platform works can be attributed",
+        )
+    if work.task_id != task.id:
+        raise ApiError(
+            409,
+            "PUBLISHED_WORK_TASK_MISMATCH",
+            "Published work does not belong to the supplied marketing task",
+        )
+    if (
+        outcome.authenticity_status not in {"official_api", "verified_import"}
+        or outcome.integrity_status != "complete"
+    ):
+        raise ApiError(
+            409,
+            "BUSINESS_OUTCOME_NOT_VERIFIED",
+            "Merchant-reported or incomplete outcomes cannot enter formal attribution",
+        )
+    existing = db.scalar(
+        select(AttributionEvidence.id).where(
+            AttributionEvidence.store_id == store_id,
+            AttributionEvidence.outcome_evidence_id == outcome.id,
+            AttributionEvidence.marketing_task_id == task.id,
+            AttributionEvidence.status == "active",
+        )
+    )
+    if existing is not None:
+        raise ApiError(409, "ATTRIBUTION_ALREADY_EXISTS", "This outcome is already attributed to this task")
+    allocated = db.scalar(
+        select(func.coalesce(func.sum(AttributionEvidence.allocation_percent), 0)).where(
+            AttributionEvidence.store_id == store_id,
+            AttributionEvidence.outcome_evidence_id == outcome.id,
+            AttributionEvidence.status == "active",
+        )
+    ) or Decimal("0")
+    if allocated + payload.allocation_percent > Decimal("100"):
+        raise ApiError(
+            409,
+            "OUTCOME_ALLOCATION_EXCEEDED",
+            "Attribution allocations for an outcome cannot exceed 100 percent",
+        )
+    snapshot = {
+        "marketing_task_id": str(task.id),
+        "published_work_id": str(work.id),
+        "external_work_id": work.external_work_id,
+        "channel_key": work.channel_key,
+        "work_ownership_status": work.ownership_status,
+        "work_verified_at": work.verified_at.isoformat(),
+        "outcome_evidence_id": str(outcome.id),
+        "outcome_type": outcome.outcome_type,
+        "outcome_value": str(outcome.value_numeric),
+        "outcome_currency": outcome.currency,
+        "outcome_authenticity_status": outcome.authenticity_status,
+        "outcome_integrity_status": outcome.integrity_status,
+        "attribution_method": payload.attribution_method,
+        "evidence_strength": payload.evidence_strength,
+        "allocation_percent": str(payload.allocation_percent),
+    }
+    item = AttributionEvidence(
+        id=uuid4(),
+        store_id=store_id,
+        marketing_task_id=task.id,
+        published_work_id=work.id,
+        outcome_evidence_id=outcome.id,
+        attribution_method=payload.attribution_method,
+        evidence_strength=payload.evidence_strength,
+        allocation_percent=payload.allocation_percent,
+        status="active",
+        attribution_snapshot_json=snapshot,
+    )
+    db.add(item)
+    record_audit(
+        db,
+        request,
+        action="effects.attribution.created",
+        target_type="attribution_evidence",
+        target_id=item.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "marketing_task_id": str(task.id),
+            "published_work_id": str(work.id),
+            "outcome_evidence_id": str(outcome.id),
+            "allocation_percent": str(payload.allocation_percent),
+        },
+    )
+    db.commit()
+    return {"item": _attribution_read(item), "message": "归因证据已保存；历史快照不可覆盖。"}
 
 
 @router.post("/effects/observations")

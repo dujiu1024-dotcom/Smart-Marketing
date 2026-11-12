@@ -4,7 +4,6 @@ import hashlib
 import json
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractContextManager
-from decimal import Decimal
 from time import monotonic
 from typing import TypeVar, cast
 
@@ -40,6 +39,17 @@ ResponseT = TypeVar("ResponseT", bound=BaseModel)
 SessionContextFactory = Callable[[], AbstractContextManager[Session]]
 
 
+def _image_response_reference(result: ImageGenerateResponse) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "object_key": result.asset_object_key,
+        "sha256": result.sha256,
+        "mime_type": result.mime_type,
+        "width": result.width,
+        "height": result.height,
+    }
+
+
 class AIProviderExecutor:
     """Execute provider calls with persisted invocation/usage audit boundaries.
 
@@ -68,6 +78,7 @@ class AIProviderExecutor:
         context = payload.pop("context", {})
         if isinstance(context, dict):
             context.pop("request_id", None)
+            context.pop("attempt_id", None)
         canonical = json.dumps(
             {
                 "capability": capability.value,
@@ -222,14 +233,9 @@ class AIProviderExecutor:
             request=request,
             call=lambda: provider.generate(request),
             side_effect_state=SideEffectState.UNKNOWN,
-            response_ref=lambda result: {
-                "schema_version": 1,
-                "object_key": result.asset_object_key,
-                "sha256": result.sha256,
-                "mime_type": result.mime_type,
-                "width": result.width,
-                "height": result.height,
-            },
+            response_ref=lambda result: _image_response_reference(
+                cast(ImageGenerateResponse, result)
+            ),
         )
 
     async def edit_image(

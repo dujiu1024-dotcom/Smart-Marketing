@@ -401,9 +401,8 @@ def test_publish_package_requires_accepted_quality_and_confirmed_facts(
     package_item = db_session.query(PublishPackageItem).filter(
         PublishPackageItem.publish_package_id == package_row.id
     ).one()
-    package_item.delivery_mode = "official_api"
-    package_item.channel_account_id = account.id
-    db_session.flush()
+    # Publish package rows are immutable after freeze. The read-scope test
+    # seeds a persisted operation row without mutating its frozen item.
     operation = PublishOperation(
         id=uuid4(),
         store_id=store.id,

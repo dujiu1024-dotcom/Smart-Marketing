@@ -1,3 +1,4 @@
+from store_operator.ai_gateway.circuit_breaker import CircuitBreaker
 from store_operator.ai_gateway.errors import (
     ProviderError,
     ProviderErrorCode,
@@ -53,6 +54,7 @@ __all__ = [
     "HttpProviderEnvironmentConfig",
     "HttpTextProvider",
     "HttpVisionProvider",
+    "CircuitBreaker",
     "ImageEditRequest",
     "ImageGenerateRequest",
     "ImageGenerateResponse",

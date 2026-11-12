@@ -470,6 +470,19 @@ class AttributionEvidence(Base):
             unique=True,
             postgresql_where=text("status = 'active'"),
         ),
+        UniqueConstraint(
+            "store_id",
+            "outcome_evidence_id",
+            "marketing_task_id",
+            "attribution_version",
+            name="uq_attribution_evidence_version",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "supersedes_attribution_id"],
+            ["attribution_evidence.store_id", "attribution_evidence.id"],
+            name="fk_attribution_evidence_supersedes_same_store",
+            ondelete="RESTRICT",
+        ),
         ForeignKeyConstraint(
             ["store_id", "marketing_task_id"],
             ["marketing_tasks.store_id", "marketing_tasks.id"],
@@ -489,13 +502,17 @@ class AttributionEvidence(Base):
             ondelete="RESTRICT",
         ),
         CheckConstraint(
-            "attribution_method IN ('direct_code', 'platform_reported', "
-            "'temporal_association', 'manual_claim')",
+            "attribution_method IN ('direct_code', 'platform_reported')",
             name="attribution_method",
         ),
         CheckConstraint("evidence_strength IN ('strong', 'medium')",
             name="evidence_strength"),
         CheckConstraint("status IN ('active', 'superseded', 'rejected')", name="status"),
+        CheckConstraint("attribution_version >= 1", name="attribution_version_positive"),
+        CheckConstraint(
+            "supersedes_attribution_id IS NULL OR supersedes_attribution_id != id",
+            name="attribution_cannot_supersede_itself",
+        ),
         CheckConstraint(
             "status != 'rejected' OR (reversal_reason IS NOT NULL AND "
             "reversed_at IS NOT NULL AND reversed_by_user_id IS NOT NULL)",
@@ -516,6 +533,8 @@ class AttributionEvidence(Base):
     marketing_task_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     published_work_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     outcome_evidence_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    attribution_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    supersedes_attribution_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     attribution_method: Mapped[str] = mapped_column(String(32), nullable=False)
     evidence_strength: Mapped[str] = mapped_column(String(16), nullable=False)
     allocation_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False,

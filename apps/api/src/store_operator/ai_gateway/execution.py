@@ -242,9 +242,7 @@ class AIProviderExecutor:
             request=request,
             call=lambda: provider.generate(request),
             side_effect_state=SideEffectState.UNKNOWN,
-            response_ref=lambda result: _image_response_reference(
-                cast(ImageGenerateResponse, result)
-            ),
+            response_ref=_image_response_reference,
         )
 
     async def edit_image(

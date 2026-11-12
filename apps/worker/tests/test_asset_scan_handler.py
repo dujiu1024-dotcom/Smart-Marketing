@@ -16,6 +16,10 @@ class ScanSession:
         self.asset = asset
         self.intent = intent
         self.scalar_calls = 0
+        self.job = SimpleNamespace(attempt_count=0, max_attempts=5)
+
+    def get(self, _model, _job_id):
+        return self.job
 
     def scalar(self, _statement):
         self.scalar_calls += 1
@@ -33,6 +37,7 @@ class ScanSessionFactory:
 
 def make_context(store_id):
     return SimpleNamespace(
+        job_id=uuid4(),
         store_id=store_id,
         check_control=lambda: None,
         update_progress=lambda **_kwargs: None,
@@ -134,6 +139,28 @@ def test_asset_scan_retries_when_scanner_is_unavailable(monkeypatch) -> None:
     assert error.value.retryable
     assert asset.status == "quarantined"
     assert intent.status == "scanning"
+
+
+def test_asset_scan_marks_scan_failed_after_final_scanner_retry(monkeypatch) -> None:
+    tasks, context, payload, asset, intent, factory = setup_handler(monkeypatch)
+    factory.session.job.attempt_count = 5
+
+    def unavailable(*_args, **_kwargs):
+        raise AssetScannerUnavailable("private scanner detail")
+
+    monkeypatch.setattr(tasks, "scan_bytes", unavailable)
+
+    with pytest.raises(JobExecutionError) as error:
+        tasks.execute_asset_scan(context, payload)
+
+    assert error.value.code == "ASSET_SCANNER_UNAVAILABLE"
+    assert not error.value.retryable
+    assert asset.status == "scan_failed"
+    assert asset.version_no == 2
+    assert intent.status == "scan_failed"
+    assert intent.rejection_reason == (
+        "Security scanner could not complete the scan; the asset remains blocked"
+    )
 
 
 def test_asset_scan_fails_closed_when_stored_bytes_do_not_match_asset_hash(monkeypatch) -> None:

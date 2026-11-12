@@ -6,7 +6,8 @@ afterEach(() => cleanup());
 const api = vi.hoisted(() => ({
   archiveMarketingTask: vi.fn(), cancelMarketingTask: vi.fn(),
   confirmMarketingTaskRequirement: vi.fn(), confirmMarketingTaskStrategy: vi.fn(),
-  createMarketingTask: vi.fn(), getAudienceProfiles: vi.fn(), getBrandGuideline: vi.fn(),
+  createMarketingTask: vi.fn(), createTaskArtifact: vi.fn(), createTaskArtifactVersion: vi.fn(), createTaskArtifactReview: vi.fn(),
+  getMediaAssets: vi.fn(), listTaskArtifacts: vi.fn(), getAudienceProfiles: vi.fn(), getBrandGuideline: vi.fn(),
   getKnowledgeItems: vi.fn(), getMarketingTask: vi.fn(), listOffers: vi.fn(),
   getProducts: vi.fn(), getStoreProfile: vi.fn(), listMarketingTasks: vi.fn(),
   recoverMarketingTaskStep: vi.fn(), skipMarketingTaskStep: vi.fn(),
@@ -48,6 +49,10 @@ describe("marketing task workspace", () => {
     api.listMarketingTasks.mockResolvedValue({ items: [{ ...task, steps: undefined }], total: 1 });
     api.getMarketingTask.mockResolvedValue(task);
     api.createMarketingTask.mockResolvedValue(task);
+    api.listTaskArtifacts.mockResolvedValue([]);
+    api.getMediaAssets.mockResolvedValue({ items: [], total: 0 });
+    api.createTaskArtifact.mockResolvedValue({ id: "artifact-copy", task_id: task.id, artifact_type: "copy", current_version_id: "version-1", created_at: "2026-11-12T01:00:00Z", updated_at: "2026-11-12T01:00:00Z", versions: [] });
+    api.createTaskArtifactReview.mockResolvedValue({ id: "review-1" });
     api.confirmMarketingTaskRequirement.mockResolvedValue({ ...task, lifecycle_status: "active", version: 2 });
     mockFactSources();
   });
@@ -73,6 +78,45 @@ describe("marketing task workspace", () => {
         requirement_draft: expect.objectContaining({ goal: "提高周末到店转化", target_audience: "附近白领" }),
         task_options: expect.objectContaining({ includes_copy: true, includes_image: true, selected_channel_keys: ["douyin"] }),
       }),
+      expect.any(String),
+    ));
+  });
+
+  it("creates a merchant-edited copy artifact through the real artifact API", async () => {
+    sessionStorage.setItem(`store-operator.current-task-id.${storeId}`, task.id);
+    window.location.hash = "#task";
+    render(<MarketingTaskWorkspace storeId={storeId} />);
+    fireEvent.change(await screen.findByLabelText("文案标题"), { target: { value: "周末新品" } });
+    fireEvent.change(screen.getByLabelText("文案正文"), { target: { value: "本周末到店体验新品。" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存文案版本" }));
+    await waitFor(() => expect(api.createTaskArtifact).toHaveBeenCalledWith(
+      storeId, task.id, "copy",
+      expect.objectContaining({
+        source_type: "manual_edit",
+        content_json: expect.objectContaining({ title: "周末新品", body: "本周末到店体验新品。" }),
+      }),
+      expect.any(String),
+    ));
+  });
+  it("records approval against the exact current artifact version", async () => {
+    const artifact = {
+      id: "artifact-copy", task_id: task.id, artifact_type: "copy", current_version_id: "version-1",
+      created_at: "2026-11-12T01:00:00Z", updated_at: "2026-11-12T01:00:00Z",
+      versions: [{
+        id: "version-1", artifact_id: "artifact-copy", version_no: 3, source_type: "manual_edit",
+        source_refs: [], instruction: null, content_json: { title: "周末新品", body: "到店体验。" },
+        content_hash: "abc", provider_id: null, model_id: null, prompt_version_id: null,
+        input_fingerprint: "fingerprint", created_at: "2026-11-12T01:00:00Z",
+      }],
+    };
+    api.listTaskArtifacts.mockResolvedValue([artifact]);
+    sessionStorage.setItem(`store-operator.current-task-id.${storeId}`, task.id);
+    window.location.hash = "#task";
+    render(<MarketingTaskWorkspace storeId={storeId} />);
+    fireEvent.click(await screen.findByRole("button", { name: "审核通过" }));
+    await waitFor(() => expect(api.createTaskArtifactReview).toHaveBeenCalledWith(
+      storeId, task.id, artifact, artifact.versions[0],
+      { expected_version: 3, review_type: "copy", decision: "approved", comment: null },
       expect.any(String),
     ));
   });

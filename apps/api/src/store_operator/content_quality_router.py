@@ -462,17 +462,26 @@ def freeze_publish_package(
             {"channel_key": content.channel_key, "fingerprint": item_fingerprint}
         )
 
-    facts = list(
+    fact_rows = list(
         db.scalars(
             select(BusinessFactSnapshot)
             .where(
                 BusinessFactSnapshot.store_id == store_id,
                 BusinessFactSnapshot.task_id == task_id,
-                BusinessFactSnapshot.confirmation_status == "confirmed",
             )
             .order_by(BusinessFactSnapshot.fact_key, BusinessFactSnapshot.version_no)
         ).all()
     )
+    latest_facts: dict[str, BusinessFactSnapshot] = {}
+    for fact in fact_rows:
+        current = latest_facts.get(fact.fact_key)
+        if current is None or fact.version_no > current.version_no:
+            latest_facts[fact.fact_key] = fact
+    facts = [
+        fact
+        for fact in latest_facts.values()
+        if fact.confirmation_status == "confirmed"
+    ]
     if not facts:
         raise ApiError(
             409, "CONFIRMED_FACTS_REQUIRED", "At least one confirmed business fact is required"

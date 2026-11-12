@@ -88,7 +88,6 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [publishPackages, setPublishPackages] = useState<PublishPackageRecord[]>([]);
   const [taskFactSnapshots, setTaskFactSnapshots] = useState<TaskBusinessFactSnapshot[]>([]);
   const [selectedPackageFacts, setSelectedPackageFacts] = useState<string[]>([]);
-  const [selectedChannelContent, setSelectedChannelContent] = useState("");
   const [qualityResolutionReason, setQualityResolutionReason] = useState("");
   const [confirmationNote, setConfirmationNote] = useState("");
   const [copyTitle, setCopyTitle] = useState("");

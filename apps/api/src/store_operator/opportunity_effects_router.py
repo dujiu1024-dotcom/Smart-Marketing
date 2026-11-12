@@ -2042,7 +2042,7 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
         if not required.issubset(set(normalized_headers)):
             raise ValueError("Worksheet must include metric_key, value_numeric, period_timezone")
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=normalized_headers, lineterminator="\\n")
+        writer = csv.DictWriter(output, fieldnames=normalized_headers, lineterminator="\n")
         writer.writeheader()
         for row_number, values in enumerate(rows, start=2):
             if row_number > 10001:

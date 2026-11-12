@@ -636,20 +636,23 @@ def effects_overview(
             }
         )
 
-    grouped: dict[str, list[tuple[MetricObservation, MetricDefinition]]] = {}
+    grouped: dict[tuple[str, str, str, str], list[tuple[MetricObservation, MetricDefinition]]] = {}
     for item, definition in verified_rows:
         if item.period_start is None or item.period_end is None:
             continue
         period_key = "|".join(
             [item.period_start.isoformat(), item.period_end.isoformat()]
         )
-        grouped.setdefault(item.metric_key + "|" + period_key, []).append(
-            (item, definition)
+        group_key = (
+            item.metric_key,
+            item.source_system,
+            definition.channel_key or "",
+            period_key,
         )
+        grouped.setdefault(group_key, []).append((item, definition))
 
-    metric_periods: dict[str, list[dict[str, object]]] = {}
-    for key, samples in grouped.items():
-        metric_key = key.split("|", 1)[0]
+    metric_periods: dict[tuple[str, str, str], list[dict[str, object]]] = {}
+    for (metric_key, source_system, channel_key, _), samples in grouped.items():
         definition = samples[0][1]
         values = [sample.value_numeric for sample, _ in samples]
         numeric_values = [value for value in values if value is not None]
@@ -672,7 +675,7 @@ def effects_overview(
         zone = ZoneInfo(first.period_timezone)
         period_start = first.period_start.astimezone(zone)
         period_end = first.period_end.astimezone(zone)
-        metric_periods.setdefault(metric_key, []).append(
+        metric_periods.setdefault((metric_key, source_system, channel_key), []).append(
             {
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
@@ -681,11 +684,13 @@ def effects_overview(
                 "timezone": first.period_timezone,
                 "aggregation_rule": rule,
                 "display_name": definition.display_name,
+                "source_system": source_system,
+                "channel_key": channel_key or None,
             }
         )
 
     trends = []
-    for metric_key, points in metric_periods.items():
+    for (metric_key, source_system, channel_key), points in metric_periods.items():
         points.sort(
             key=lambda point: datetime.fromisoformat(str(point["period_end"])).astimezone(UTC)
         )
@@ -720,6 +725,8 @@ def effects_overview(
         trends.append(
             {
                 "metric_key": metric_key,
+                "source_system": source_system,
+                "channel_key": channel_key or None,
                 "display_name": str(points[-1]["display_name"]),
                 "points": points[-30:],
                 "comparison": comparison,
@@ -745,11 +752,13 @@ def effects_overview(
     period_index = {
         (
             metric_key,
+            source_system,
+            channel_key,
             str(point["period_start"]),
             str(point["period_end"]),
             str(point["timezone"]),
         ): point
-        for metric_key, points in metric_periods.items()
+        for (metric_key, source_system, channel_key), points in metric_periods.items()
         for point in points
     }
     conversion_pairs = [
@@ -760,43 +769,58 @@ def effects_overview(
     ]
     conversion_rates: list[dict[str, object]] = []
     for numerator_key, denominator_key, display_name in conversion_pairs:
-        numerator_points = metric_periods.get(numerator_key, [])
-        for numerator_point in numerator_points:
-            period_key = (
-                str(numerator_point["period_start"]),
-                str(numerator_point["period_end"]),
-                str(numerator_point["timezone"]),
-            )
-            denominator_point = period_index.get((denominator_key, *period_key))
-            if denominator_point is None:
-                continue
-            denominator_value = Decimal(str(denominator_point["value"]))
-            numerator_value = Decimal(str(numerator_point["value"]))
-            if denominator_value <= 0:
-                conversion_status = "zero_denominator"
-                conversion_value = None
-            else:
-                conversion_status = "available"
-                conversion_value = str(
-                    (numerator_value / denominator_value * 100).quantize(
-                        Decimal("0.01")
+        numerator_series = [
+            (source_system, channel_key, points)
+            for (metric_key, source_system, channel_key), points in metric_periods.items()
+            if metric_key == numerator_key
+        ]
+        for source_system, channel_key, numerator_points in numerator_series:
+            for numerator_point in numerator_points:
+                period_key = (
+                    str(numerator_point["period_start"]),
+                    str(numerator_point["period_end"]),
+                    str(numerator_point["timezone"]),
+                )
+                denominator_point = period_index.get(
+                    (
+                        denominator_key,
+                        source_system,
+                        channel_key,
+                        *period_key,
                     )
                 )
-            conversion_rates.append(
-                {
-                    "metric_key": f"{numerator_key}_per_{denominator_key}",
-                    "display_name": display_name,
-                    "numerator_key": numerator_key,
-                    "denominator_key": denominator_key,
-                    "period_start": numerator_point["period_start"],
-                    "period_end": numerator_point["period_end"],
-                    "timezone": numerator_point["timezone"],
-                    "numerator_value": str(numerator_value),
-                    "denominator_value": str(denominator_value),
-                    "value_percent": conversion_value,
-                    "status": conversion_status,
-                }
-            )
+                if denominator_point is None:
+                    continue
+                denominator_value = Decimal(str(denominator_point["value"]))
+                numerator_value = Decimal(str(numerator_point["value"]))
+                if denominator_value <= 0:
+                    conversion_status = "zero_denominator"
+                    conversion_value = None
+                else:
+                    conversion_status = "available"
+                    conversion_value = str(
+                        (numerator_value / denominator_value * 100).quantize(
+                            Decimal("0.01")
+                        )
+                    )
+                conversion_rates.append(
+                    {
+                        "metric_key": f"{numerator_key}_per_{denominator_key}",
+                        "display_name": display_name,
+                        "numerator_key": numerator_key,
+                        "denominator_key": denominator_key,
+                        "source_system": source_system,
+                        "channel_key": channel_key or None,
+                        "period_start": numerator_point["period_start"],
+                        "period_end": numerator_point["period_end"],
+                        "timezone": numerator_point["timezone"],
+                        "numerator_value": str(numerator_value),
+                        "denominator_value": str(denominator_value),
+                        "value_percent": conversion_value,
+                        "status": conversion_status,
+                    }
+                )
+
 
     content_rows = db.execute(
         select(MetricObservation, MetricDefinition, PublishedWork)

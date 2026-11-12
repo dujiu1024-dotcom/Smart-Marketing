@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 import httpx
 from pydantic import BaseModel, ValidationError
 
+from store_operator.ai_gateway.circuit_breaker import CircuitBreaker
 from store_operator.ai_gateway.errors import ProviderError, ProviderErrorCode, SideEffectState
 from store_operator.ai_gateway.prompt_runtime import (
     parse_and_validate_structured_output,
@@ -50,6 +51,7 @@ class HttpJsonTransport:
         timeout_seconds: float = 45,
         endpoints: ProviderEndpoints | None = None,
         client: httpx.AsyncClient | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
         parsed = urlsplit(base_url)
         if (
@@ -73,6 +75,7 @@ class HttpJsonTransport:
         self.endpoints = endpoints or ProviderEndpoints()
         self._client = client
         self._owns_client = client is None
+        self._circuit_breaker = circuit_breaker or CircuitBreaker()
 
     async def aclose(self) -> None:
         if self._owns_client and self._client is not None:
@@ -88,6 +91,7 @@ class HttpJsonTransport:
     ) -> dict[str, Any]:
         if not path.startswith("/") or path.startswith("//"):
             raise ValueError("Provider endpoint paths must be absolute paths")
+        self._circuit_breaker.before_call()
         client = self._client or httpx.AsyncClient(timeout=self._timeout)
         close_client = self._client is None
         try:
@@ -106,6 +110,7 @@ class HttpJsonTransport:
                 timeout=self._timeout,
             )
         except httpx.TimeoutException as exc:
+            self._circuit_breaker.record_failure()
             raise ProviderError(
                 ProviderErrorCode.TIMEOUT,
                 retryable=True,
@@ -113,6 +118,7 @@ class HttpJsonTransport:
                 user_safe_summary="The AI provider did not respond before the request deadline.",
             ) from exc
         except httpx.HTTPError as exc:
+            self._circuit_breaker.record_failure()
             raise ProviderError(
                 ProviderErrorCode.UNAVAILABLE,
                 retryable=True,
@@ -124,6 +130,7 @@ class HttpJsonTransport:
                 await client.aclose()
 
         if response.status_code == 429:
+            self._circuit_breaker.record_failure()
             raw_retry_after = response.headers.get("Retry-After")
             try:
                 retry_after = max(0.0, float(raw_retry_after)) if raw_retry_after else None
@@ -137,6 +144,7 @@ class HttpJsonTransport:
                 user_safe_summary="The AI provider rate limit was reached.",
             )
         if response.status_code in {401, 403}:
+            self._circuit_breaker.record_rejected()
             raise ProviderError(
                 ProviderErrorCode.AUTH_FAILED,
                 retryable=False,
@@ -145,6 +153,10 @@ class HttpJsonTransport:
             )
         if response.status_code in {400, 404, 413, 415, 422} or response.is_error:
             retryable = response.status_code >= 500 or response.status_code in {408, 425}
+            if retryable:
+                self._circuit_breaker.record_failure()
+            else:
+                self._circuit_breaker.record_rejected()
             code = ProviderErrorCode.UNAVAILABLE if retryable else ProviderErrorCode.INVALID_REQUEST
             raise ProviderError(
                 code,
@@ -159,6 +171,7 @@ class HttpJsonTransport:
         try:
             payload = response.json()
         except ValueError as exc:
+            self._circuit_breaker.record_failure()
             raise ProviderError(
                 ProviderErrorCode.OUTPUT_INVALID,
                 retryable=False,
@@ -166,12 +179,14 @@ class HttpJsonTransport:
                 user_safe_summary="The AI provider returned an invalid response.",
             ) from exc
         if not isinstance(payload, dict):
+            self._circuit_breaker.record_failure()
             raise ProviderError(
                 ProviderErrorCode.OUTPUT_INVALID,
                 retryable=False,
                 side_effect_state=side_effect_state,
                 user_safe_summary="The AI provider returned an unsupported response shape.",
             )
+        self._circuit_breaker.record_success()
         return payload
 
     @staticmethod

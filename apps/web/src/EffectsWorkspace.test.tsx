@@ -5,7 +5,7 @@ import EffectsWorkspace from "./EffectsWorkspace";
 afterEach(() => cleanup());
 const api = vi.hoisted(() => ({
   getEffectsOverview: vi.fn(), getMetricDefinitions: vi.fn(), getMetricObservations: vi.fn(),
-  createMetricObservation: vi.fn(), importMetricCsv: vi.fn(),
+  createMetricObservation: vi.fn(), importMetricCsv: vi.fn(), importMetricXlsx: vi.fn(),
   getPublishedWorks: vi.fn(), getBusinessOutcomes: vi.fn(), getAttributions: vi.fn(),
   getDataSourceCapabilities: vi.fn(), checkDataSourceCapabilities: vi.fn(), getPublishReadbacks: vi.fn(), registerPublishedWorkFromReadback: vi.fn(),
 }));

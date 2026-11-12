@@ -935,6 +935,19 @@ export async function runChannelContentQuality(
     }, storeId,
   );
 }
+
+export async function createQualityResolution(
+  storeId: string, reportId: string, expectedFingerprint: string, reason: string,
+  idempotencyKey: string = crypto.randomUUID(),
+): Promise<{ id: string; quality_report_id: string; decision: "accepted" | "rejected"; reason: string }> {
+  return request(
+    "/marketing-tasks/quality-reports/" + encodeURIComponent(reportId) + "/resolutions",
+    {
+      method: "POST", headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ decision: "accepted", reason, expected_fingerprint: expectedFingerprint }),
+    }, storeId,
+  );
+}
 export async function freezePublishPackage(
   storeId: string, taskId: string, input: PublishPackageFreezeInput,
   idempotencyKey: string = crypto.randomUUID(),

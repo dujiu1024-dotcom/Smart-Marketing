@@ -50,6 +50,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_constraint(
+        "ck_attribution_evidence_rejected_requires_reversal_metadata",
+        "attribution_evidence",
+        type_="check",
+    )
     op.drop_index(
         "uq_attribution_evidence_active_outcome_task",
         table_name="attribution_evidence",

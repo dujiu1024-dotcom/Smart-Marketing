@@ -15,7 +15,7 @@ describe("effects workspace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.getEffectsOverview.mockResolvedValue({
-      items: [], trends: [], content_performance: [],
+      items: [], trends: [], content_performance: [], insights: [], conversion_rates: [],
       data_quality: { total_observations: 0, verified_observations: 0, delayed_observations: 0,
         incomplete_or_anomalous_observations: 0, status: "unavailable", reason: "暂无可核验数据" },
       data_status: "unavailable",
@@ -54,6 +54,17 @@ describe("effects workspace", () => {
     api.getEffectsOverview.mockResolvedValue({
       items: [],
       trends: [],
+      insights: [{
+        metric_key: "views",
+        display_name: "播放量",
+        source_system: "official_api",
+        channel_key: "douyin",
+        period_end: "2026-11-03T00:00:00+00:00",
+        sample_count: 2,
+        comparison_status: "available",
+        observation: "相邻周期上升 50%。",
+        next_action: "复核作品主题和发布时间。",
+      }],
       content_performance: [{
         published_work_id: "work-verified-1",
         marketing_task_id: "task-1",

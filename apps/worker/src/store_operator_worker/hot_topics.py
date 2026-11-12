@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any, cast
 import hashlib
 import html
 import ipaddress
@@ -13,6 +14,7 @@ from email.utils import parsedate_to_datetime
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
+import httpcore
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -50,7 +52,25 @@ def _allowed_hosts() -> set[str]:
     }
 
 
-def _assert_public_host(host: str, allowed: set[str]) -> None:
+class _PinnedSyncBackend(httpcore.SyncBackend):
+    """Connect to the exact public IP validated before the request; preserve URL host for TLS SNI."""
+
+    def __init__(self, hostname: str, address: str) -> None:
+        self.hostname = hostname.lower()
+        self.address = address
+
+    def connect_tcp(self, host: str, port: int, timeout: float | None = None,
+                    local_address: str | None = None,
+                    socket_options: Any = None) -> httpcore.NetworkStream:
+        if host.lower() != self.hostname:
+            raise OSError("Unexpected hostname passed to pinned feed transport")
+        return super().connect_tcp(
+            self.address, port, timeout=timeout, local_address=local_address,
+            socket_options=socket_options,
+        )
+
+
+def _assert_public_host(host: str, allowed: set[str]) -> str:
     if host.lower() not in allowed:
         raise JobExecutionError("SOURCE_HOST_NOT_ALLOWED", "Feed host is not in the configured allowlist.", retryable=False)
     try:
@@ -59,15 +79,16 @@ def _assert_public_host(host: str, allowed: set[str]) -> None:
         raise JobExecutionError("SOURCE_DNS_FAILED", "Feed host could not be resolved.", retryable=True) from exc
     if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
         raise JobExecutionError("SOURCE_HOST_NOT_PUBLIC", "Feed host resolves to a non-public network address.", retryable=False)
+    return sorted(addresses)[0]
 
 
-def _safe_https_url(value: str, allowed: set[str]) -> str:
+def _safe_https_url(value: str, allowed: set[str]) -> tuple[str, str]:
     parsed = urlsplit(value)
     host = (parsed.hostname or "").lower()
     if parsed.scheme != "https" or not host or parsed.username or parsed.password:
         raise JobExecutionError("SOURCE_URL_INVALID", "Source URL must be a credential-free HTTPS URL.", retryable=False)
-    _assert_public_host(host, allowed)
-    return value
+    address = _assert_public_host(host, allowed)
+    return value, address
 
 
 def _text(node: ET.Element, tag: str) -> str:
@@ -254,12 +275,16 @@ def _brand_risk_flags(topic_text: str, brand: BrandGuideline | None) -> list[str
 
 
 def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> int:
-    feed_url = _safe_https_url(source.source_url, allowed)
-    terms_url = _safe_https_url(source.terms_url or "", allowed)
+    feed_url, feed_ip = _safe_https_url(source.source_url, allowed)
+    terms_url, _ = _safe_https_url(source.terms_url or "", allowed)
     if not source.permitted_use or not terms_url:
         raise JobExecutionError("SOURCE_TERMS_MISSING", "Source usage terms are not registered.", retryable=False)
     try:
-        with httpx.Client(timeout=HTTP_TIMEOUT, follow_redirects=False,
+        transport = httpx.HTTPTransport()
+        cast(Any, transport)._pool._network_backend = _PinnedSyncBackend(
+            (urlsplit(feed_url).hostname or "").lower(), feed_ip
+        )
+        with httpx.Client(transport=transport, timeout=HTTP_TIMEOUT, follow_redirects=False,
                           headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml"}) as client:
             response = client.get(feed_url)
             response.raise_for_status()

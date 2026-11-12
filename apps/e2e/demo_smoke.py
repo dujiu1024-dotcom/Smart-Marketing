@@ -146,6 +146,20 @@ async def main() -> None:
             await page.locator(f'[data-copy-platform="{platform}"]').click()
             await page.locator('[data-action="approve-copy"]').click()
 
+        # A copy revision invalidates the dependent image and requires re-review.
+        await page.locator('[data-copy-platform="xhs"]').click()
+        await page.locator("#copyInstruction").fill("标题更简洁，突出新品和门店特色。")
+        await page.locator('[data-action="revise-copy"]').click()
+        await page.get_by_text("已生成修改后的文案新版本，等待审核").wait_for(state="visible")
+
+        await page.locator('[data-task-tab="image"]').click()
+        await page.locator('[data-action="generate-image"]').click()
+        await page.get_by_text("请先审核通过所有目标渠道的文案版本").wait_for(state="visible")
+
+        await page.locator('[data-task-tab="copy"]').click()
+        await page.locator('[data-copy-platform="xhs"]').click()
+        await page.locator('[data-action="approve-copy"]').click()
+
         await page.locator('[data-task-tab="image"]').click()
         await page.locator('[data-action="generate-image"]').click()
         await page.locator('[data-action="approve-image"]').click()

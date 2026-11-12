@@ -33,7 +33,7 @@ describe("hotspot opportunity workspace", () => {
   it("records an explicit decision and keeps adoption gated by eligibility", async () => {
     api.getOpportunities.mockResolvedValue({
       items: [{
-        id: "opportunity-1", title: "Local spring drinks", summary: "A reviewed source item",
+        id: "11111111-1111-4111-8111-111111111111", title: "Local spring drinks", summary: "A reviewed source item",
         source_url: "https://example.test/item", published_at: null, discovered_at: "2026-11-11T00:00:00Z",
         expires_at: null, region: null, heat_value: null, heat_unit: null, evidence_status: "collected",
         relevance_score: "82.5", match_method: "rules", reason_summary: "Matches a confirmed product",
@@ -41,7 +41,7 @@ describe("hotspot opportunity workspace", () => {
       }], total: 1, source_status: "available", empty_reason: null,
     });
     api.getOpportunity.mockResolvedValue({
-      id: "opportunity-1", title: "Local spring drinks", summary: "A reviewed source item",
+      id: "11111111-1111-4111-8111-111111111111", title: "Local spring drinks", summary: "A reviewed source item",
       source: { url: "https://example.test/item", evidence_status: "collected" },
       match: { eligibility_status: "eligible", method: "rules", score: "82.5", reason: "Matches a confirmed product" },
     });
@@ -51,7 +51,7 @@ describe("hotspot opportunity workspace", () => {
     expect(await screen.findByRole("heading", { name: "Local spring drinks" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "采纳机会" }));
     await waitFor(() => expect(api.decideOpportunity).toHaveBeenCalledWith(
-      "store-1", "opportunity-1", "adopt", "", expect.any(String),
+      "store-1", "11111111-1111-4111-8111-111111111111", "adopt", "", expect.any(String),
     ));
   });
 });

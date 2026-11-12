@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, importMetricCsv,
-  type EffectsOverview, type MetricDefinitionRecord, type MetricObservationRecord } from "./api";
+import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, importMetricCsv,
+  type EffectsOverview, type MetricDefinitionRecord, type MetricObservationRecord, type PublishedWorkRecord,
+  type BusinessOutcomeEvidenceRecord, type AttributionEvidenceRecord } from "./api";
 
 const tierLabels = { content_performance: "内容表现", intent: "互动意向", business_outcome: "经营结果" } as const;
 const errorText = (error: unknown) => error instanceof Error ? error.message : "请求失败，请稍后重试。";
@@ -9,6 +10,9 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [overview, setOverview] = useState<EffectsOverview | null>(null);
   const [definitions, setDefinitions] = useState<MetricDefinitionRecord[]>([]);
   const [observations, setObservations] = useState<MetricObservationRecord[]>([]);
+  const [publishedWorks, setPublishedWorks] = useState<PublishedWorkRecord[]>([]);
+  const [businessOutcomes, setBusinessOutcomes] = useState<BusinessOutcomeEvidenceRecord[]>([]);
+  const [attributions, setAttributions] = useState<AttributionEvidenceRecord[]>([]);
   const [tier, setTier] = useState<"all" | keyof typeof tierLabels>("all");
   const [metricKey, setMetricKey] = useState("");
   const [value, setValue] = useState("");
@@ -27,10 +31,12 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [summary, dictionary, history] = await Promise.all([
+      const [summary, dictionary, history, works, outcomes, attributionHistory] = await Promise.all([
         getEffectsOverview(storeId), getMetricDefinitions(), getMetricObservations(storeId),
+        getPublishedWorks(storeId), getBusinessOutcomes(storeId), getAttributions(storeId),
       ]);
       setOverview(summary); setDefinitions(dictionary.items); setObservations(history.items);
+      setPublishedWorks(works.items); setBusinessOutcomes(outcomes.items); setAttributions(attributionHistory.items);
       setMetricKey(current => current || dictionary.items[0]?.metric_key || "");
     } catch (reason) { setError(errorText(reason)); }
     finally { setLoading(false); }
@@ -91,6 +97,31 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
           </div>)}
         </div> : <p className="muted">{overview?.data_quality?.reason ?? "暂无可用于趋势分析的已核验周期数据。"}</p>}
         <p className="footnote">数据质量：观测 {overview?.data_quality.total_observations ?? 0} 条 · 已核验 {overview?.data_quality.verified_observations ?? 0} 条 · 延迟 {overview?.data_quality.delayed_observations ?? 0} 条 · 不完整/异常 {overview?.data_quality.incomplete_or_anomalous_observations ?? 0} 条</p>
+      </article>
+      <article className="form-card">
+        <div className="section-title"><div><h2>作品归属与经营结果归因</h2><p>仅系统发布读回或官方作品核验可以确立作品归属；正式归因还要求已核验经营结果。</p></div></div>
+        <div className="effects-grid">
+          <div><strong>已核验作品：{publishedWorks.filter(item => ["verified_system_publish", "verified_platform_api"].includes(item.ownership_status) && item.verified_at).length}</strong><p className="muted">待核验或商家自行申报的作品不会进入归因。</p></div>
+          <div><strong>经营结果证据：{businessOutcomes.length}</strong><p className="muted">商家报告与已核验结果分开记录。</p></div>
+          <div><strong>有效归因：{attributions.length}</strong><p className="muted">归因保存证据快照和分摊比例。</p></div>
+        </div>
+        <div className="catalog-list">
+          {publishedWorks.map(work => <div className="catalog-item" key={work.id}>
+            <div className="catalog-item-main"><div><h3>{work.title ?? work.external_work_id}</h3><p>{work.channel_key} · {work.external_work_id}</p></div><span className="status-chip">{work.ownership_status}</span></div>
+            <p className="catalog-description">{work.verified_at ? `核验时间：${new Date(work.verified_at).toLocaleString()}` : "尚未核验作品归属"}{work.task_id ? ` · 营销任务：${work.task_id}` : ""}</p>
+          </div>)}
+          {!publishedWorks.length && <p className="muted">暂无已读回或已登记的作品。</p>}
+        </div>
+        <div className="catalog-list">
+          {businessOutcomes.map(outcome => <div className="catalog-item" key={outcome.id}>
+            <div className="catalog-item-main"><div><h3>{outcome.outcome_type} · {outcome.value_numeric}{outcome.currency ? ` ${outcome.currency}` : ""}</h3><p>{outcome.source_system} · {new Date(outcome.occurred_at).toLocaleString()}</p></div><span className="status-chip">{outcome.authenticity_status} / {outcome.integrity_status}</span></div>
+          </div>)}
+          {!businessOutcomes.length && <p className="muted">暂无经营结果证据；没有真实证据时不计算 ROI。</p>}
+        </div>
+        {attributions.length > 0 && <div className="catalog-list">{attributions.map(item => <div className="catalog-item" key={item.id}>
+          <p>营销任务 {item.marketing_task_id} · 作品 {item.published_work_id} · 经营结果 {item.outcome_evidence_id}</p>
+          <p className="catalog-description">{item.attribution_method} · {item.evidence_strength} · 分摊 {item.allocation_percent}%</p>
+        </div>)}</div>}
       </article>
       <article className="form-card">
         <div className="section-title"><div><h2>经营结论门禁</h2><p>经营结果需要真实证据，内容热度不能推导销售或到店增长。</p></div></div>

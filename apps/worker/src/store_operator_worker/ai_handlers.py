@@ -531,21 +531,22 @@ def _complete_copy(
             ).with_for_update()
         )
         if previous_version_id is not None:
+            if artifact is None or artifact.current_version_id != previous_version_id:
+                raise _safe_error(
+                    "AI_COPY_REVISION_STALE",
+                    "The copy version selected for revision is no longer current.",
+                )
             previous_version = db.scalar(
                 select(ArtifactVersion).where(
                     ArtifactVersion.id == previous_version_id,
                     ArtifactVersion.store_id == task.store_id,
-                    ArtifactVersion.artifact_id == artifact.id if artifact is not None else None,
+                    ArtifactVersion.artifact_id == artifact.id,
                 )
             )
-            if (
-                artifact is None
-                or artifact.current_version_id != previous_version_id
-                or previous_version is None
-            ):
+            if previous_version is None:
                 raise _safe_error(
                     "AI_COPY_REVISION_STALE",
-                    "The copy version selected for revision is no longer current.",
+                    "The copy version selected for revision is no longer available.",
                 )
         elif revision_instruction and artifact is not None and artifact.current_version_id is not None:
             previous_version = db.scalar(
@@ -555,6 +556,8 @@ def _complete_copy(
                     ArtifactVersion.artifact_id == artifact.id,
                 )
             )
+            if previous_version is not None:
+                previous_version_id = previous_version.id
         else:
             previous_version = None
         previous_copy = (

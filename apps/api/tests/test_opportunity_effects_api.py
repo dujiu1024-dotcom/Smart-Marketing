@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -892,3 +892,60 @@ def test_douyin_capability_check_distinguishes_readback_from_metrics_and_version
     latest_items = {item["capability_key"]: item for item in latest.json()["items"]}
     assert latest_items["content_metrics_read"]["reason"]
     assert "video.list" in latest_items["published_work_readback"]["required_scopes"]
+
+
+def test_future_observation_window_is_marked_accumulating_and_excluded_from_trends(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store = _identity(db_session, "window@example.com", "Window Shop")
+    definition = MetricDefinition(
+        id=uuid4(),
+        source_system="official_api",
+        metric_key="future_views",
+        metric_tier="content_performance",
+        display_name="未来周期播放量",
+        value_type="count",
+        definition="Metric for a not-yet-complete observation window",
+        aggregation_rule="sum",
+        period_semantics="period_delta",
+        definition_version=1,
+        status="active",
+    )
+    now = datetime.now(UTC)
+    observation = MetricObservation(
+        id=uuid4(),
+        store_id=store.id,
+        metric_definition_id=definition.id,
+        metric_key="future_views",
+        metric_tier="content_performance",
+        value_numeric=Decimal("50"),
+        unit="count",
+        source_system="official_api",
+        source_record_id="future-window-1",
+        period_start=now - timedelta(hours=1),
+        period_end=now + timedelta(hours=1),
+        period_timezone="UTC",
+        collected_at=now,
+        definition_version=1,
+        integrity_status="complete",
+        authenticity_status="official_api",
+        sync_status="current",
+        deduplication_key="f" * 64,
+    )
+    db_session.add_all([definition, observation])
+    db_session.flush()
+    headers = _login(identity_client, "window@example.com", store.id)
+
+    overview = identity_client.get("/api/v1/effects/overview", headers=headers)
+    history = identity_client.get("/api/v1/effects/observations", headers=headers)
+
+    assert overview.status_code == 200, overview.text
+    assert overview.json()["data_status"] == "unavailable"
+    assert overview.json()["trends"] == []
+    assert overview.json()["data_quality"]["accumulating_observations"] == 1
+    assert overview.json()["items"][0]["status"] == "accumulating"
+    assert history.status_code == 200, history.text
+    assert history.json()["items"][0]["observation_window_status"] == "accumulating"

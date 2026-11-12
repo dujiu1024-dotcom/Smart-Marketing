@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { decideOpportunity, getOpportunity, getOpportunities, type OpportunityItem } from "./api";
+import { decideOpportunity, getOpportunity, getOpportunities, requestOpportunityCollection, type OpportunityItem } from "./api";
 
 const labels: Record<string, string> = {
   eligible: "可采纳", review_required: "需要人工核对", ineligible: "不适合本店", unassessed: "尚未评估",
@@ -16,6 +16,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -48,6 +49,16 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
     if (match) void loadDetail(match[1]);
     else setDetail(null);
   }, [route, loadDetail]);
+
+  async function collect() {
+    setCollecting(true); setError(""); setNotice("");
+    try {
+      const result = await requestOpportunityCollection(storeId, crypto.randomUUID());
+      setNotice(result.message ?? (result.job_id ? `已创建采集任务：${result.job_id}` : "当前没有可采集来源。"));
+      if (result.job_id) await load();
+    } catch (reasonValue) { setError(errorText(reasonValue)); }
+    finally { setCollecting(false); }
+  }
 
   async function decide(decision: "adopt" | "ignore" | "snooze") {
     const id = typeof detail?.id === "string" ? detail.id : "";
@@ -100,7 +111,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
   }
 
   return <section className="opportunity-workspace">
-    <div className="page-heading"><div><p className="eyebrow">HOT TOPICS & OPPORTUNITIES</p><h1>发现营销机会</h1><p className="muted">从有来源证据的经营机会中发现方向；也可以跳过热点，直接按需制作。</p></div><button className="secondary" onClick={() => void load()} disabled={loading}>刷新列表</button></div>
+    <div className="page-heading"><div><p className="eyebrow">HOT TOPICS & OPPORTUNITIES</p><h1>发现营销机会</h1><p className="muted">从有来源证据的经营机会中发现方向；也可以跳过热点，直接按需制作。</p></div><div className="form-actions"><button className="secondary" onClick={() => void load()} disabled={loading}>刷新列表</button><button className="primary" onClick={() => void collect()} disabled={collecting}> {collecting ? "提交中…" : "采集并匹配"} </button></div></div>
     {error && <div className="alert error" role="alert">{error}</div>}
     {notice && <div className="alert success" role="status">{notice}</div>}
     <div className="task-filter-row">

@@ -4,7 +4,7 @@ import HotspotWorkspace from "./HotspotWorkspace";
 
 afterEach(() => cleanup());
 const api = vi.hoisted(() => ({
-  getOpportunities: vi.fn(), getOpportunity: vi.fn(), decideOpportunity: vi.fn(),
+  getOpportunities: vi.fn(), getOpportunity: vi.fn(), decideOpportunity: vi.fn(), requestOpportunityCollection: vi.fn(),
 }));
 vi.mock("./api", async () => ({ ...(await vi.importActual<typeof import("./api")>("./api")), ...api }));
 
@@ -22,6 +22,13 @@ describe("hotspot opportunity workspace", () => {
     expect(await screen.findByRole("heading", { name: "发现营销机会" })).toBeInTheDocument();
     expect(screen.getByText(/不会用演示数据冒充实时热点/)).toBeInTheDocument();
     expect(api.getOpportunities).toHaveBeenCalledWith("store-1");
+  });
+  it("reports unavailable sources without creating a collection job", async () => {
+    api.requestOpportunityCollection.mockResolvedValue({ status: "unavailable", job_id: null, message: "没有已启用且完成使用条款登记的热点来源；未创建采集任务。" });
+    render(<HotspotWorkspace storeId="store-1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "采集并匹配" }));
+    expect(await screen.findByText(/没有已启用且完成使用条款登记的热点来源/)).toBeInTheDocument();
+    expect(api.requestOpportunityCollection).toHaveBeenCalledWith("store-1", expect.any(String));
   });
   it("records an explicit decision and keeps adoption gated by eligibility", async () => {
     api.getOpportunities.mockResolvedValue({

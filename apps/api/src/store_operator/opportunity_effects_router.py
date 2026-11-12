@@ -4,8 +4,8 @@ import io
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated
-from uuid import UUID, uuid4
 from urllib.parse import urlsplit
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query, Request
@@ -261,7 +261,7 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
             "suggested_scenario": opportunity.suggested_scenario, "content_angle": opportunity.content_angle,
             "risk_flags": opportunity.risk_flags_json, "eligibility_status": opportunity.eligibility_status,
             "decision": decision.decision if decision else None})
-    return {"items": items, "total": total, "source_status": "available" if items else "unavailable",
+    return {"items": items, "total": total, "source_status": "available" if total else "unavailable",
         "empty_reason": None if items else "当前没有已核验来源生成的有效机会；请勿将演示样例视为实时热点。按需制作仍可直接使用。"}
 
 @router.get("/opportunities/{opportunity_id}")
@@ -354,7 +354,8 @@ def effects_overview(context: Annotated[AuthContext, Depends(require_store_conte
         .where(MetricObservation.store_id == store_id).order_by(MetricObservation.collected_at.desc())).all()
     latest: dict[str, tuple[MetricObservation, MetricDefinition]] = {}
     for item, definition in rows:
-        latest.setdefault(item.metric_key, (item, definition))
+        if item.authenticity_status in {"official_api", "verified_import"}:
+            latest.setdefault(item.metric_key, (item, definition))
     cards = []
     for item, definition in latest.values():
         trusted = item.authenticity_status in {"official_api", "verified_import"} and item.sync_status in {"current", "delayed"}
@@ -377,6 +378,8 @@ def create_manual_observation(payload: MetricObservationInput, request: Request,
     store_id = _store_id(context)
     item = _create_observation(db, store_id=store_id, payload=payload, authenticity="merchant_reported")
     definition = db.get(MetricDefinition, item.metric_definition_id)
+    if definition is None:
+        raise ApiError(500, "METRIC_DEFINITION_MISSING", "Metric definition is unavailable")
     record_audit(db, request, action="effects.observation.merchant_reported", target_type="metric_observation",
         target_id=item.id, actor_user_id=auth.user.id, store_id=store_id,
         metadata={"metric_key": item.metric_key, "authenticity_status": item.authenticity_status})
@@ -404,7 +407,6 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
                 period_start=datetime.fromisoformat(row["period_start"]) if row.get("period_start") else None,
                 period_end=datetime.fromisoformat(row["period_end"]) if row.get("period_end") else None,
                 period_timezone=(row.get("period_timezone") or "").strip(),
-                currency=(row.get("currency") or "").strip().upper() or None,
                 currency=(row.get("currency") or "").strip().upper() or None,
                 source_record_id=(row.get("source_record_id") or "").strip() or None,
                 source_evidence_ref=(row.get("source_evidence_ref") or "").strip() or None)

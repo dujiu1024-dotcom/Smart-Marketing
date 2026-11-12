@@ -74,6 +74,7 @@ from store_operator_worker.handlers import (
     register_job_handler,
     resolve_job_handler,
 )
+from store_operator_worker.hot_topics import register_hot_topic_handlers
 from store_operator_worker.media_scanner import (
     MalwareDetected,
     image_dimensions,
@@ -89,8 +90,6 @@ engine = create_engine(database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(
     bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
 )
-
-from store_operator_worker.hot_topics import register_hot_topic_handlers
 
 register_hot_topic_handlers(SessionLocal)
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"

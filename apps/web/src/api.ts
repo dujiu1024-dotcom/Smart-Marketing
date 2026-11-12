@@ -1091,3 +1091,11 @@ export function importMetricCsv(storeId: string, csvText: string): Promise<{
 }> {
   return request("/effects/import", { method: "POST", body: JSON.stringify({ csv_text: csvText }) }, storeId);
 }
+
+export function requestOpportunityCollection(storeId: string, idempotencyKey: string): Promise<{
+  status: string; job_id: string | null; source_count?: number; message?: string;
+}> {
+  return request("/opportunities/collect", {
+    method: "POST", headers: { "Idempotency-Key": idempotencyKey },
+  }, storeId);
+}

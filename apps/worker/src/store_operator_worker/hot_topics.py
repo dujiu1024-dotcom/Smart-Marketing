@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from store_operator.config import settings
 from store_operator.models import (
     AudienceProfile,
+    BrandGuideline,
     HotTopic,
     HotTopicSource,
     Offer,
@@ -127,6 +128,52 @@ def _match_score(topic_text: str, fact_text: str) -> float:
     return len(topic_tokens & fact_tokens) / len(topic_tokens | fact_tokens)
 
 
+def _store_profile_text(profile: StoreProfile) -> str:
+    values = [
+        profile.display_name,
+        profile.business_type or "",
+        profile.industry_category or "",
+        profile.introduction or "",
+        profile.service_radius or "",
+        profile.region or "",
+        profile.province or "",
+        profile.city or "",
+        profile.district or "",
+        *(profile.service_capabilities_json or []),
+    ]
+    return " ".join(value for value in values if value)
+
+
+def _brand_guideline_text(brand: BrandGuideline | None) -> str:
+    if brand is None:
+        return ""
+    values = [
+        brand.brand_story or "",
+        brand.positioning or "",
+        brand.differentiators or "",
+        brand.tone_of_voice or "",
+        brand.visual_style or "",
+        *(brand.core_values_json or []),
+        *(brand.common_phrases_json or []),
+        *(brand.cta_preferences_json or []),
+    ]
+    return " ".join(value for value in values if value)
+
+
+def _brand_risk_flags(topic_text: str, brand: BrandGuideline | None) -> list[str]:
+    if brand is None:
+        return []
+    normalized = topic_text.lower()
+    prohibited = [
+        phrase.strip()
+        for phrase in (brand.prohibited_phrases_json or [])
+        if isinstance(phrase, str) and phrase.strip()
+    ]
+    return ["brand_prohibited_phrase"] if any(
+        phrase.lower() in normalized for phrase in prohibited
+    ) else []
+
+
 def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> int:
     feed_url = _safe_https_url(source.source_url, allowed)
     terms_url = _safe_https_url(source.terms_url or "", allowed)
@@ -193,9 +240,15 @@ def _match_store(db: Session, store_id: UUID, topics: list[HotTopic], context: J
         Offer.fact_status == "confirmed", Offer.status == "active")).all()
     audiences = db.scalars(select(AudienceProfile).where(AudienceProfile.store_id == store_id,
         AudienceProfile.fact_status == "confirmed")).all()
+    brand = db.scalar(select(BrandGuideline).where(
+        BrandGuideline.store_id == store_id,
+        BrandGuideline.fact_status == "confirmed",
+    ))
     if profile is None or (not products and not offers and not audiences):
         return 0
     context_parts = [str(profile.current_version)]
+    if brand is not None:
+        context_parts.append(f"brand:{brand.id}:{brand.current_version}")
     context_parts.extend(f"p:{item.id}:{item.current_version}" for item in products)
     context_parts.extend(f"o:{item.id}:{item.current_version}" for item in offers)
     context_parts.extend(f"a:{item.id}:{item.current_version}" for item in audiences)
@@ -205,7 +258,17 @@ def _match_store(db: Session, store_id: UUID, topics: list[HotTopic], context: J
         context.check_control()
         if topic.evidence_status != "collected" or (topic.expires_at and topic.expires_at <= datetime.now(UTC)):
             continue
-        topic_text = " ".join([topic.title, topic.summary or "", *topic.topic_tags_json, *topic.industry_tags_json])
+        topic_text = " ".join(
+            [topic.title, topic.summary or "", *topic.topic_tags_json, *topic.industry_tags_json]
+        )
+        profile_text = _store_profile_text(profile)
+        brand_text = _brand_guideline_text(brand)
+        industry_score = _match_score(topic_text, profile_text)
+        brand_score = _match_score(topic_text, brand_text)
+        risk_flags = _brand_risk_flags(topic_text, brand)
+        if topic.region and profile.region:
+            if _match_score(topic.region, profile.region) == 0:
+                risk_flags.append("region_mismatch")
         product_scores = []
         for product in products:
             product_text = " ".join([product.name, product.category or "", product.description or "",
@@ -229,7 +292,12 @@ def _match_store(db: Session, store_id: UUID, topics: list[HotTopic], context: J
                 audience_scores.append((score, audience))
         if not product_scores and not offer_scores and not audience_scores:
             continue
-        score = max([value for value, _ in product_scores] + [value for value, _ in offer_scores] + [value for value, _ in audience_scores])
+        score = max(
+            [value for value, _ in product_scores]
+            + [value for value, _ in offer_scores]
+            + [value for value, _ in audience_scores]
+            + [industry_score * 0.8, brand_score * 0.5]
+        )
         latest = db.scalar(select(StoreOpportunity).where(
             StoreOpportunity.store_id == store_id, StoreOpportunity.hot_topic_id == topic.id)
             .order_by(StoreOpportunity.matching_version.desc()).limit(1).with_for_update())
@@ -238,7 +306,11 @@ def _match_store(db: Session, store_id: UUID, topics: list[HotTopic], context: J
         if latest:
             latest.stale_at = datetime.now(UTC)
         version = (latest.matching_version + 1) if latest else 1
-        status = "eligible" if score >= 0.12 and product_scores else "review_required"
+        status = (
+            "eligible"
+            if score >= 0.12 and product_scores and not risk_flags
+            else "review_required"
+        )
         product_ids = [str(item.id) for _, item in sorted(product_scores, key=lambda pair: pair[0], reverse=True)[:5]]
         offer_ids = [str(item.id) for _, item in sorted(offer_scores, key=lambda pair: pair[0], reverse=True)[:5]]
         audience_ids = [str(item.id) for _, item in sorted(audience_scores, key=lambda pair: pair[0], reverse=True)[:5]]
@@ -250,8 +322,11 @@ def _match_store(db: Session, store_id: UUID, topics: list[HotTopic], context: J
             matched_product_ids_json=product_ids, matched_offer_ids_json=offer_ids,
             matched_audience_profile_ids_json=audience_ids, suggested_scenario=(best_offer.title if best_offer else None),
             content_angle=(f"围绕{best_product.name}回应当前话题" if best_product else None),
-            reason_summary="基于已确认的门店商品/活动与来源话题关键词重合计算；该分值仅代表文本相关性，不代表趋势热度或经营效果。",
-            risk_flags_json=[], eligibility_status=status, matched_at=datetime.now(UTC),
+            reason_summary=(
+                "综合门店行业/区域/品牌规范与商品、活动、客群的规则文本相关性；"
+                "该分值仅代表文本相关性，不代表趋势热度或经营效果。"
+            ),
+            risk_flags_json=risk_flags, eligibility_status=status, matched_at=datetime.now(UTC),
             expires_at=topic.expires_at))
         created += 1
     db.flush()

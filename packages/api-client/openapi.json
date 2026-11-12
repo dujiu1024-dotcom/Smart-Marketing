@@ -1725,6 +1725,31 @@
         "title": "ChannelSpecVersionPublishRequest",
         "type": "object"
       },
+      "DecisionInput": {
+        "properties": {
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "title": "DecisionInput",
+        "type": "object"
+      },
       "FactConfirmationRequest": {
         "properties": {
           "confirmation_note": {
@@ -3327,6 +3352,108 @@
           "status"
         ],
         "title": "MemberSummary",
+        "type": "object"
+      },
+      "MetricImportInput": {
+        "additionalProperties": false,
+        "properties": {
+          "csv_text": {
+            "maxLength": 5000000,
+            "minLength": 1,
+            "title": "Csv Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csv_text"
+        ],
+        "title": "MetricImportInput",
+        "type": "object"
+      },
+      "MetricObservationInput": {
+        "additionalProperties": false,
+        "properties": {
+          "metric_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Metric Key",
+            "type": "string"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_timezone": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Period Timezone",
+            "type": "string"
+          },
+          "source_evidence_ref": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Evidence Ref"
+          },
+          "source_record_id": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Record Id"
+          },
+          "value_numeric": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Numeric"
+          }
+        },
+        "required": [
+          "metric_key",
+          "period_timezone"
+        ],
+        "title": "MetricObservationInput",
         "type": "object"
       },
       "OfferCreate": {
@@ -6916,6 +7043,284 @@
         ]
       }
     },
+    "/api/v1/effects/definitions": {
+      "get": {
+        "operationId": "list_metric_definitions_api_v1_effects_definitions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Metric Definitions Api V1 Effects Definitions Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Metric Definitions",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/effects/import": {
+      "post": {
+        "operationId": "import_manual_observations_api_v1_effects_import_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricImportInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Import Manual Observations Api V1 Effects Import Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Manual Observations",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/effects/observations": {
+      "get": {
+        "operationId": "list_metric_observations_api_v1_effects_observations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "metric_tier",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Metric Tier"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Metric Observations Api V1 Effects Observations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Metric Observations",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      },
+      "post": {
+        "operationId": "create_manual_observation_api_v1_effects_observations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricObservationInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Manual Observation Api V1 Effects Observations Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Manual Observation",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/effects/overview": {
+      "get": {
+        "operationId": "effects_overview_api_v1_effects_overview_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Effects Overview Api V1 Effects Overview Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Effects Overview",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
     "/api/v1/jobs/{job_id}": {
       "get": {
         "operationId": "get_job_api_v1_jobs__job_id__get",
@@ -9182,6 +9587,256 @@
         "summary": "List My Stores",
         "tags": [
           "store-context"
+        ]
+      }
+    },
+    "/api/v1/opportunities": {
+      "get": {
+        "operationId": "list_opportunities_api_v1_opportunities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Opportunities Api V1 Opportunities Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Opportunities",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/opportunities/{opportunity_id}": {
+      "get": {
+        "operationId": "get_opportunity_api_v1_opportunities__opportunity_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opportunity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Opportunity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Opportunity Api V1 Opportunities  Opportunity Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Opportunity",
+        "tags": [
+          "opportunities",
+          "effects"
+        ]
+      }
+    },
+    "/api/v1/opportunities/{opportunity_id}/decisions": {
+      "post": {
+        "operationId": "decide_opportunity_api_v1_opportunities__opportunity_id__decisions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "opportunity_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Opportunity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Decide Opportunity Api V1 Opportunities  Opportunity Id  Decisions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Opportunity",
+        "tags": [
+          "opportunities",
+          "effects"
         ]
       }
     },

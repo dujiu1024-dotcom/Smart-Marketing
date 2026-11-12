@@ -413,6 +413,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/effects/definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Metric Definitions */
+        get: operations["list_metric_definitions_api_v1_effects_definitions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/effects/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Manual Observations */
+        post: operations["import_manual_observations_api_v1_effects_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/effects/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Metric Observations */
+        get: operations["list_metric_observations_api_v1_effects_observations_get"];
+        put?: never;
+        /** Create Manual Observation */
+        post: operations["create_manual_observation_api_v1_effects_observations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/effects/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Effects Overview */
+        get: operations["effects_overview_api_v1_effects_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -869,6 +938,57 @@ export interface paths {
         get: operations["list_my_stores_api_v1_me_stores_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Opportunities */
+        get: operations["list_opportunities_api_v1_opportunities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Opportunity */
+        get: operations["get_opportunity_api_v1_opportunities__opportunity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunity_id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide Opportunity */
+        post: operations["decide_opportunity_api_v1_opportunities__opportunity_id__decisions_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1709,6 +1829,13 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** DecisionInput */
+        DecisionInput: {
+            /** Decision */
+            decision: string;
+            /** Reason */
+            reason?: string | null;
+        };
         /** FactConfirmationRequest */
         FactConfirmationRequest: {
             /** Confirmation Note */
@@ -2227,6 +2354,28 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+        };
+        /** MetricImportInput */
+        MetricImportInput: {
+            /** Csv Text */
+            csv_text: string;
+        };
+        /** MetricObservationInput */
+        MetricObservationInput: {
+            /** Metric Key */
+            metric_key: string;
+            /** Period End */
+            period_end?: string | null;
+            /** Period Start */
+            period_start?: string | null;
+            /** Period Timezone */
+            period_timezone: string;
+            /** Source Evidence Ref */
+            source_evidence_ref?: string | null;
+            /** Source Record Id */
+            source_record_id?: string | null;
+            /** Value Numeric */
+            value_numeric?: number | string | null;
         };
         /** OfferCreate */
         OfferCreate: {
@@ -3680,6 +3829,171 @@ export interface operations {
             };
         };
     };
+    list_metric_definitions_api_v1_effects_definitions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    import_manual_observations_api_v1_effects_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetricImportInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_metric_observations_api_v1_effects_observations_get: {
+        parameters: {
+            query?: {
+                metric_tier?: string | null;
+                limit?: number;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_manual_observation_api_v1_effects_observations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetricObservationInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    effects_overview_api_v1_effects_overview_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_job_api_v1_jobs__job_id__get: {
         parameters: {
             query?: never;
@@ -4789,6 +5103,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoresResponse"];
+                };
+            };
+        };
+    };
+    list_opportunities_api_v1_opportunities_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+                query?: string | null;
+                status?: string | null;
+            };
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_opportunity_api_v1_opportunities__opportunity_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_opportunity_api_v1_opportunities__opportunity_id__decisions_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                opportunity_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

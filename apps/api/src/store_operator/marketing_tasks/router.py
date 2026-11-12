@@ -13,12 +13,12 @@ from store_operator.auth.dependencies import (
     require_store_context,
 )
 from store_operator.db import get_db
-from store_operator.models.marketing_task import BusinessFactSnapshot, MarketingTask
 from store_operator.domain.marketing_task import (
     MarketingTaskStatus,
     MarketingTaskType,
     TaskStepKey,
 )
+from store_operator.models.marketing_task import BusinessFactSnapshot, MarketingTask
 from store_operator.marketing_tasks.schemas import (
     MarketingTaskAction,
     MarketingTaskCreate,

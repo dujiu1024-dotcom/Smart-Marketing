@@ -16,6 +16,7 @@ from store_operator.domain.marketing_task import (
 class MarketingTaskOptions(BaseModel):
     includes_copy: bool | None = None
     includes_image: bool | None = None
+    includes_video_script: bool = False
     opportunity_applicable: bool | None = None
     selected_channel_keys: list[str] = Field(default_factory=list, max_length=20)
     requires_external_delivery: bool = False
@@ -56,6 +57,14 @@ class MarketingTaskCreate(BaseModel):
                 )
             if not options.includes_copy and not options.includes_image:
                 raise ValueError("merchant_content must include copy, image, or both")
+        if options.includes_video_script and (
+            self.task_type in {
+                MarketingTaskType.IMAGE_ONLY,
+                MarketingTaskType.IMAGE_OPTIMIZATION,
+            }
+            or options.includes_copy is False
+        ):
+            raise ValueError("video scripts require a copy deliverable")
         return self
 
 

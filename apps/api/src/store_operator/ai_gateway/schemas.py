@@ -21,6 +21,8 @@ class ProviderCallContext(GatewaySchema):
     request_id: str = Field(min_length=1, max_length=128)
     store_id: UUID
     job_id: UUID | None = None
+    attempt_id: UUID | None = None
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=200)
     marketing_task_id: UUID | None = None
     prompt_version_id: UUID | None = None
 

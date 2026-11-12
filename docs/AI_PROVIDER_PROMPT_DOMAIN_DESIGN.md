@@ -279,3 +279,37 @@ AIInvocation 由 #9 持有。每次调用必须关联：
 ## 产品范围约束：AI 不生成视频（2026-11-12）
 
 #10 的 Provider capability 仅覆盖文本（含视频脚本文本）、图片生成/编辑，以及经确认需要的 Vision/OCR 质检。不得增加 text-to-video、image-to-video、video editing、video rendering 或视频转码 Provider 能力。视频脚本按普通文本 Schema 生成、审核和版本化，不建立 VideoArtifact。
+
+
+## 12. Issue #136 implementation notes (2026-11-12)
+
+The repository implementation now includes the following executable building blocks:
+
+- `ai_gateway.http_provider`: capability-specific asynchronous HTTP adapters for text, image generation/editing, vision inspection and OCR. All operations use the versioned Store Operator JSON wire contract; provider SDKs do not leak into domain modules.
+- `ai_gateway.provider_config`: opt-in environment configuration. The provider remains disabled when no `AI_PROVIDER_*` configuration is supplied. Only explicitly declared capability/model pairs are registered.
+- `ai_gateway.secrets`: resolves `env://NAME` references or reads an external SecretStore JSON value by reference. The application stores only the reference; the API key is injected into the adapter at runtime.
+- `ProviderRegistry.resolve`: checks provider, capability, model and region together. Explicit provider selection never silently falls back.
+- `ai_gateway.prompt_runtime`: renders only published PromptVersion records, validates variables and validates structured model output against the declared JSON Schema subset. Unsupported schema keywords fail closed.
+- `apps/api/tests/test_ai_provider_runtime.py`: contract tests use HTTPX MockTransport and test credentials only; they do not represent real model acceptance.
+
+### Provider wire contract
+
+Each configured provider endpoint implements POST JSON requests with `schema_version=1`, an operation name and the typed request payload:
+
+| Capability | Default endpoint | Operation |
+|---|---|---|
+| Text generation | `/v1/text/generate` | `text.generate` |
+| Image generation | `/v1/images/generate` | `image.generate` |
+| Image editing | `/v1/images/edit` | `image.edit` |
+| Vision inspection | `/v1/vision/inspect` | `vision.inspect` |
+| OCR | `/v1/ocr/extract` | `ocr.extract` |
+
+Endpoint paths can be replaced by constructing `ProviderEndpoints`. Responses must satisfy the existing Pydantic response contracts. The adapter normalizes 429, authentication, timeout, transport, request and malformed-output failures without returning provider response bodies or credentials to callers. A per-provider circuit breaker opens after a configurable transient-failure threshold and permits one half-open recovery probe after its cooldown. Image mutations mark timeout outcomes as unknown side effects; the adapter never starts an internal retry loop.
+
+### Configuration and security
+
+Set `AI_PROVIDER_ID`, `AI_PROVIDER_DISPLAY_NAME`, `AI_PROVIDER_BASE_URL`, `AI_PROVIDER_SECRET_REF`, and one or more capability model lists. The API key itself must be injected separately (for example as a runtime environment secret referenced by `env://AI_PROVIDER_API_KEY`) or resolved through the existing AWS Secrets Manager SecretStore. Remote endpoints require HTTPS. No real provider is selected by default; deployment owners must verify that their gateway implements this wire contract and declare only its actual model capabilities.
+
+### Acceptance boundary
+
+Automated adapter and prompt-runtime tests are contract tests, not proof of a live model account or generated quality. Live credentials, provider account availability, model capability verification, output quality and latency remain in the separate real-device/provider acceptance issue. AI output remains a candidate artifact; this layer does not approve merchant content or bypass facts, review, visual quality or merchant-confirmation gates.

@@ -1077,7 +1077,7 @@ export interface BusinessOutcomeEvidenceRecord {
 export interface AttributionEvidenceRecord {
   id: string; marketing_task_id: string; published_work_id: string; outcome_evidence_id: string;
   attribution_method: string; evidence_strength: string; allocation_percent: string;
-  status: string; snapshot: Record<string, unknown>;
+  status: string; snapshot: Record<string, unknown>; reversal_reason: string | null; reversed_at: string | null;
 }
 export interface EffectsOverview {
   items: Array<{
@@ -1165,6 +1165,13 @@ export function createBusinessOutcome(storeId: string, payload: {
 }
 export function getAttributions(storeId: string): Promise<{ items: AttributionEvidenceRecord[]; total: number }> {
   return request("/effects/attributions", {}, storeId);
+}
+export function reverseAttribution(storeId: string, attributionId: string, reason: string): Promise<{ item: AttributionEvidenceRecord; message: string }> {
+  return request(
+    `/effects/attributions/${encodeURIComponent(attributionId)}/reversal`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+    storeId,
+  );
 }
 export function registerPublishedWorkFromReadback(storeId: string, operationId: string): Promise<{ item: PublishedWorkRecord; replayed: boolean }> {
   return request(

@@ -10,7 +10,6 @@ from uuid import UUID, uuid4
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
 from store_operator.ai_gateway import (
     AIProviderExecutor,
     HttpProviderEnvironmentConfig,

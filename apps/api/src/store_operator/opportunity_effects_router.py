@@ -16,12 +16,24 @@ from sqlalchemy.orm import Session
 
 from store_operator.auth.audit import record_audit
 from store_operator.auth.context import AuthContext
-from store_operator.auth.dependencies import AuthenticatedSession, require_csrf, require_platform_admin, require_store_context
+from store_operator.auth.dependencies import (
+    AuthenticatedSession,
+    require_csrf,
+    require_platform_admin,
+    require_store_context,
+)
 from store_operator.auth.errors import ApiError
 from store_operator.config import settings
 from store_operator.db import get_db
 from store_operator.jobs.service import JobIdempotencyConflict, create_job
-from store_operator.models.opportunity_effects import HotTopic, HotTopicSource, MetricDefinition, MetricObservation, OpportunityDecision, StoreOpportunity
+from store_operator.models.opportunity_effects import (
+    HotTopic,
+    HotTopicSource,
+    MetricDefinition,
+    MetricObservation,
+    OpportunityDecision,
+    StoreOpportunity,
+)
 
 router = APIRouter(tags=["opportunities", "effects"])
 
@@ -99,15 +111,19 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
         MetricDefinition.status == "active",
     ).order_by(MetricDefinition.definition_version.desc()))
     if definition is None:
-        raise ApiError(422, "UNKNOWN_METRIC", "Metric key is not present in the active metric dictionary")
+        raise ApiError(422, "UNKNOWN_METRIC",
+            "Metric key is not present in the active metric dictionary")
     if payload.period_start and payload.period_end and payload.period_end <= payload.period_start:
         raise ApiError(422, "INVALID_PERIOD", "period_end must be later than period_start")
-    if payload.metric_key == "revenue" and payload.value_numeric is not None and payload.currency is None:
-        raise ApiError(422, "CURRENCY_REQUIRED", "Revenue observations require an ISO 4217 currency")
+    if payload.metric_key == "revenue" and payload.value_numeric is not None and payload.currency is None:  # noqa: E501
+        raise ApiError(422, "CURRENCY_REQUIRED",
+            "Revenue observations require an ISO 4217 currency")
     material = "|".join([str(store_id), source_system, payload.metric_key,
         payload.period_start.isoformat() if payload.period_start else "",
-        payload.period_end.isoformat() if payload.period_end else "", payload.source_record_id or "",
-        str(payload.value_numeric) if payload.value_numeric is not None else "NULL", payload.currency or ""])
+        payload.period_end.isoformat() if payload.period_end else "",
+            payload.source_record_id or "",
+        str(payload.value_numeric) if payload.value_numeric is not None else "NULL",
+            payload.currency or ""])
     dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
     existing = db.scalar(select(MetricObservation).where(
         MetricObservation.store_id == store_id, MetricObservation.deduplication_key == dedupe))
@@ -139,10 +155,11 @@ class HotTopicSourceInput(BaseModel):
 
 def _validate_feed_url(value: str) -> str:
     parsed = urlsplit(value)
-    allowed = {host.strip().lower() for host in settings.hot_topic_allowed_hosts.split(",") if host.strip()}
+    allowed = {host.strip().lower() for host in settings.hot_topic_allowed_hosts.split(",") if host.strip()}  # noqa: E501
     host = (parsed.hostname or "").lower()
-    if parsed.scheme != "https" or not host or parsed.username or parsed.password or host not in allowed:
-        raise ApiError(422, "SOURCE_HOST_NOT_ALLOWED", "Feed URL must use HTTPS and an administrator-approved host")
+    if parsed.scheme != "https" or not host or parsed.username or parsed.password or host not in allowed:  # noqa: E501
+        raise ApiError(422, "SOURCE_HOST_NOT_ALLOWED",
+            "Feed URL must use HTTPS and an administrator-approved host")
     return value
 
 
@@ -167,8 +184,10 @@ def create_hot_topic_source(payload: HotTopicSourceInput,
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
     source = HotTopicSource(id=uuid4(), source_key=payload.source_key.strip(),
         display_name=payload.display_name.strip(), source_type="rss",
-        source_url=_validate_feed_url(payload.source_url), terms_url=_validate_feed_url(payload.terms_url),
-        permitted_use=payload.permitted_use.strip(), attribution_template=payload.attribution_template,
+        source_url=_validate_feed_url(payload.source_url),
+            terms_url=_validate_feed_url(payload.terms_url),
+        permitted_use=payload.permitted_use.strip(),
+            attribution_template=payload.attribution_template,
         enabled=False, health_status="unknown")
     db.add(source)
     try:
@@ -184,13 +203,14 @@ def enable_hot_topic_source(source_id: UUID,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
     admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
-    source = db.scalar(select(HotTopicSource).where(HotTopicSource.id == source_id).with_for_update())
+    source = db.scalar(select(HotTopicSource).where(HotTopicSource.id == source_id).with_for_update())  # noqa: E501
     if source is None:
         raise ApiError(404, "RESOURCE_NOT_FOUND", "Source not found")
     _validate_feed_url(source.source_url)
     _validate_feed_url(source.terms_url or "")
     if not source.permitted_use:
-        raise ApiError(409, "SOURCE_TERMS_REQUIRED", "Source usage terms must be reviewed before enabling")
+        raise ApiError(409, "SOURCE_TERMS_REQUIRED",
+            "Source usage terms must be reviewed before enabling")
     source.enabled = True
     source.health_status = "unknown"
     db.commit()
@@ -211,12 +231,14 @@ def request_opportunity_collection(request: Request,
             "message": "没有已启用且完成使用条款登记的热点来源；未创建采集任务。"}
     try:
         job = create_job(db, job_type="hot_topics.collect_and_match.v1",
-            payload_ref={"schema_version": 1, "source_ids": sorted(str(item.id) for item in sources)},
+            payload_ref={"schema_version": 1,
+                "source_ids": sorted(str(item.id) for item in sources)},
             idempotency_key=idempotency_key, store_id=store_id, actor_type="user",
             actor_user_id=auth.user.id, queue_name="default", priority=0,
             max_attempts=3, timeout_seconds=300)
     except JobIdempotencyConflict as exc:
-        raise ApiError(409, "IDEMPOTENCY_KEY_REUSED", "Collection key was used for a different request") from exc
+        raise ApiError(409, "IDEMPOTENCY_KEY_REUSED",
+            "Collection key was used for a different request") from exc
     record_audit(db, request, action="opportunity.collection.requested", target_type="job",
         target_id=job.id, actor_user_id=auth.user.id, store_id=store_id,
         metadata={"source_count": len(sources)})
@@ -229,51 +251,66 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
     offset: int = Query(default=0, ge=0), query: str | None = None,
     status_filter: str | None = Query(default=None, alias="status")) -> dict[str, object]:
     store_id = _store_id(context)
-    statement = select(StoreOpportunity, HotTopic).join(HotTopic, HotTopic.id == StoreOpportunity.hot_topic_id).where(
-        StoreOpportunity.store_id == store_id, HotTopic.evidence_status == "collected", StoreOpportunity.stale_at.is_(None),
+    statement = select(StoreOpportunity, HotTopic).join(HotTopic,
+        HotTopic.id == StoreOpportunity.hot_topic_id).where(
+        StoreOpportunity.store_id == store_id, HotTopic.evidence_status == "collected",
+            StoreOpportunity.stale_at.is_(None),
         (StoreOpportunity.expires_at.is_(None)) | (StoreOpportunity.expires_at > datetime.now(UTC)))
     if query:
         statement = statement.where(HotTopic.title.ilike(f"%{query[:120]}%"))
     if status_filter:
         statement = statement.where(StoreOpportunity.eligibility_status == status_filter)
-    total = db.scalar(statement.order_by(None).limit(None).offset(None).with_only_columns(func.count())) or 0
+    total = db.scalar(statement.order_by(None).limit(None).offset(None).with_only_columns(func.count())) or 0  # noqa: E501
     rows = db.execute(statement.order_by(StoreOpportunity.relevance_score.desc().nullslast(),
         HotTopic.published_at.desc().nullslast()).limit(limit).offset(offset)).all()
     items: list[dict[str, object]] = []
     for opportunity, topic in rows:
         decision = db.scalar(select(OpportunityDecision).where(
-            OpportunityDecision.store_id == store_id, OpportunityDecision.opportunity_id == opportunity.id
+            OpportunityDecision.store_id == store_id,
+                OpportunityDecision.opportunity_id == opportunity.id
         ).order_by(OpportunityDecision.created_at.desc()).limit(1))
         items.append({
             "id": str(opportunity.id), "title": topic.title, "summary": topic.summary,
-            "source_url": topic.canonical_url, "published_at": topic.published_at.isoformat() if topic.published_at else None,
-            "discovered_at": topic.discovered_at.isoformat(), "expires_at": opportunity.expires_at.isoformat() if opportunity.expires_at else None,
-            "region": topic.region, "heat_value": str(topic.heat_value) if topic.heat_value is not None else None,
+            "source_url": topic.canonical_url,
+                "published_at": topic.published_at.isoformat() if topic.published_at else None,
+            "discovered_at": topic.discovered_at.isoformat(),
+                "expires_at": opportunity.expires_at.isoformat() if opportunity.expires_at else None,  # noqa: E501
+            "region": topic.region, "heat_value": str(topic.heat_value) if topic.heat_value is not None else None,  # noqa: E501
             "heat_unit": topic.heat_unit, "evidence_status": topic.evidence_status,
-            "relevance_score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,
+            "relevance_score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,  # noqa: E501
             "match_method": opportunity.match_method, "reason_summary": opportunity.reason_summary,
-            "suggested_scenario": opportunity.suggested_scenario, "content_angle": opportunity.content_angle,
-            "risk_flags": opportunity.risk_flags_json, "eligibility_status": opportunity.eligibility_status,
+            "suggested_scenario": opportunity.suggested_scenario,
+                "content_angle": opportunity.content_angle,
+            "risk_flags": opportunity.risk_flags_json,
+                "eligibility_status": opportunity.eligibility_status,
             "decision": decision.decision if decision else None})
-    return {"items": items, "total": total, "source_status": "available" if total else "unavailable",
+    return {"items": items, "total": total,
+        "source_status": "available" if total else "unavailable",
         "empty_reason": None if items else "当前没有已核验来源生成的有效机会；请勿将演示样例视为实时热点。按需制作仍可直接使用。"}
 
 @router.get("/opportunities/{opportunity_id}")
-def get_opportunity(opportunity_id: UUID, context: Annotated[AuthContext, Depends(require_store_context)],
+def get_opportunity(opportunity_id: UUID, context: Annotated[AuthContext,
+    Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
     store_id = _store_id(context)
-    row = db.execute(select(StoreOpportunity, HotTopic).join(HotTopic, HotTopic.id == StoreOpportunity.hot_topic_id)
-        .where(StoreOpportunity.id == opportunity_id, StoreOpportunity.store_id == store_id)).first()
+    row = db.execute(select(StoreOpportunity, HotTopic).join(HotTopic,
+        HotTopic.id == StoreOpportunity.hot_topic_id)
+        .where(StoreOpportunity.id == opportunity_id,
+            StoreOpportunity.store_id == store_id)).first()
     if row is None:
         raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
     opportunity, topic = row
     return {"id": str(opportunity.id), "title": topic.title, "summary": topic.summary,
-        "source": {"url": topic.canonical_url, "published_at": topic.published_at.isoformat() if topic.published_at else None,
-            "discovered_at": topic.discovered_at.isoformat(), "evidence_status": topic.evidence_status},
-        "match": {"score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,
+        "source": {"url": topic.canonical_url,
+            "published_at": topic.published_at.isoformat() if topic.published_at else None,
+            "discovered_at": topic.discovered_at.isoformat(),
+                "evidence_status": topic.evidence_status},
+        "match": {"score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,  # noqa: E501
             "method": opportunity.match_method, "reason": opportunity.reason_summary,
-            "products": opportunity.matched_product_ids_json, "offers": opportunity.matched_offer_ids_json,
-            "audiences": opportunity.matched_audience_profile_ids_json, "scenario": opportunity.suggested_scenario,
+            "products": opportunity.matched_product_ids_json,
+                "offers": opportunity.matched_offer_ids_json,
+            "audiences": opportunity.matched_audience_profile_ids_json,
+                "scenario": opportunity.suggested_scenario,
             "content_angle": opportunity.content_angle, "risk_flags": opportunity.risk_flags_json,
             "eligibility_status": opportunity.eligibility_status},
         "expires_at": opportunity.expires_at.isoformat() if opportunity.expires_at else None}
@@ -281,7 +318,8 @@ def get_opportunity(opportunity_id: UUID, context: Annotated[AuthContext, Depend
 @router.post("/opportunities/{opportunity_id}/decisions")
 def decide_opportunity(opportunity_id: UUID, payload: DecisionInput, request: Request,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
-    context: Annotated[AuthContext, Depends(require_store_context)], db: Annotated[Session, Depends(get_db)],
+    context: Annotated[AuthContext, Depends(require_store_context)], db: Annotated[Session,
+        Depends(get_db)],
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]) -> dict[str, object]:
     store_id = _store_id(context)
     key = idempotency_key.strip()
@@ -292,20 +330,26 @@ def decide_opportunity(opportunity_id: UUID, payload: DecisionInput, request: Re
         OpportunityDecision.idempotency_key == key))
     if replay is not None:
         if replay.opportunity_id != opportunity_id or replay.decision != payload.decision:
-            raise ApiError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was reused for a different decision")
+            raise ApiError(409, "IDEMPOTENCY_KEY_REUSED",
+                "Idempotency key was reused for a different decision")
         return {"id": str(replay.id), "decision": replay.decision, "replayed": True}
-    row = db.execute(select(StoreOpportunity, HotTopic).join(HotTopic, HotTopic.id == StoreOpportunity.hot_topic_id).where(
-        StoreOpportunity.id == opportunity_id, StoreOpportunity.store_id == store_id).with_for_update()).first()
+    row = db.execute(select(StoreOpportunity, HotTopic).join(HotTopic,
+        HotTopic.id == StoreOpportunity.hot_topic_id).where(
+        StoreOpportunity.id == opportunity_id,
+            StoreOpportunity.store_id == store_id).with_for_update()).first()
     if row is None:
         raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
     opportunity, topic = row
-    if payload.decision == "adopt" and (topic.evidence_status != "collected" or opportunity.eligibility_status != "eligible" or
-        opportunity.stale_at is not None or (opportunity.expires_at and opportunity.expires_at <= datetime.now(UTC))):
-        raise ApiError(409, "OPPORTUNITY_NOT_ADOPTABLE", "Opportunity is expired, stale or requires review")
+    if payload.decision == "adopt" and (topic.evidence_status != "collected" or opportunity.eligibility_status != "eligible" or  # noqa: E501
+        opportunity.stale_at is not None or (opportunity.expires_at and opportunity.expires_at <= datetime.now(UTC))):  # noqa: E501
+        raise ApiError(409, "OPPORTUNITY_NOT_ADOPTABLE",
+            "Opportunity is expired, stale or requires review")
     item = OpportunityDecision(id=uuid4(), store_id=store_id, opportunity_id=opportunity_id,
-        actor_user_id=auth.user.id, decision=payload.decision, reason=payload.reason, idempotency_key=key)
+        actor_user_id=auth.user.id, decision=payload.decision, reason=payload.reason,
+            idempotency_key=key)
     db.add(item)
-    record_audit(db, request, action="opportunity.decision.recorded", target_type="store_opportunity",
+    record_audit(db, request, action="opportunity.decision.recorded",
+        target_type="store_opportunity",
         target_id=opportunity_id, actor_user_id=auth.user.id, store_id=store_id,
         metadata={"decision": payload.decision})
     try:
@@ -314,15 +358,17 @@ def decide_opportunity(opportunity_id: UUID, payload: DecisionInput, request: Re
         db.rollback()
         raise ApiError(409, "IDEMPOTENCY_CONFLICT", "Decision was already submitted") from exc
     return {"id": str(item.id), "decision": item.decision, "replayed": False,
-        "next_step": "Review the opportunity reference in the existing marketing task flow; no task is created automatically."}
+        "next_step": "Review the opportunity reference in the existing marketing task flow; no task is created automatically."}  # noqa: E501
 
 @router.get("/effects/definitions")
 def list_metric_definitions(db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
     definitions = db.scalars(select(MetricDefinition).where(MetricDefinition.status == "active")
         .order_by(MetricDefinition.metric_tier, MetricDefinition.display_name)).all()
-    return {"items": [{"id": str(item.id), "source_system": item.source_system, "metric_key": item.metric_key,
+    return {"items": [{"id": str(item.id), "source_system": item.source_system,
+        "metric_key": item.metric_key,
         "metric_tier": item.metric_tier, "display_name": item.display_name, "unit": item.unit,
-        "definition": item.definition, "definition_version": item.definition_version} for item in definitions]}
+        "definition": item.definition,
+            "definition_version": item.definition_version} for item in definitions]}
 
 @router.get("/effects/observations")
 def list_metric_observations(context: Annotated[AuthContext, Depends(require_store_context)],
@@ -330,7 +376,7 @@ def list_metric_observations(context: Annotated[AuthContext, Depends(require_sto
     limit: int = Query(default=100, ge=1, le=500)) -> dict[str, object]:
     store_id = _store_id(context)
     statement = select(MetricObservation, MetricDefinition).join(
-        MetricDefinition, MetricDefinition.id == MetricObservation.metric_definition_id).where(MetricObservation.store_id == store_id)
+        MetricDefinition, MetricDefinition.id == MetricObservation.metric_definition_id).where(MetricObservation.store_id == store_id)  # noqa: E501
     if metric_tier:
         if metric_tier not in {"content_performance", "intent", "business_outcome"}:
             raise ApiError(422, "INVALID_METRIC_TIER", "Unknown metric tier")
@@ -518,11 +564,13 @@ def create_manual_observation(payload: MetricObservationInput, request: Request,
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
     store_id = _store_id(context)
-    item = _create_observation(db, store_id=store_id, payload=payload, authenticity="merchant_reported")
+    item = _create_observation(db, store_id=store_id, payload=payload,
+        authenticity="merchant_reported")
     definition = db.get(MetricDefinition, item.metric_definition_id)
     if definition is None:
         raise ApiError(500, "METRIC_DEFINITION_MISSING", "Metric definition is unavailable")
-    record_audit(db, request, action="effects.observation.merchant_reported", target_type="metric_observation",
+    record_audit(db, request, action="effects.observation.merchant_reported",
+        target_type="metric_observation",
         target_id=item.id, actor_user_id=auth.user.id, store_id=store_id,
         metadata={"metric_key": item.metric_key, "authenticity_status": item.authenticity_status})
     db.commit()
@@ -538,7 +586,8 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
     reader = csv.DictReader(io.StringIO(payload.csv_text))
     required = {"metric_key", "value_numeric", "period_timezone"}
     if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
-        raise ApiError(422, "CSV_COLUMNS_REQUIRED", "CSV must include metric_key,value_numeric,period_timezone")
+        raise ApiError(422, "CSV_COLUMNS_REQUIRED",
+            "CSV must include metric_key,value_numeric,period_timezone")
     created = 0
     skipped = 0
     for line_number, row in enumerate(reader, start=2):
@@ -546,8 +595,8 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
             raw = (row.get("value_numeric") or "").strip()
             data = MetricObservationInput(metric_key=(row.get("metric_key") or "").strip(),
                 value_numeric=Decimal(raw) if raw else None,
-                period_start=datetime.fromisoformat(row["period_start"]) if row.get("period_start") else None,
-                period_end=datetime.fromisoformat(row["period_end"]) if row.get("period_end") else None,
+                period_start=datetime.fromisoformat(row["period_start"]) if row.get("period_start") else None,  # noqa: E501
+                period_end=datetime.fromisoformat(row["period_end"]) if row.get("period_end") else None,  # noqa: E501
                 period_timezone=(row.get("period_timezone") or "").strip(),
                 currency=(row.get("currency") or "").strip().upper() or None,
                 source_record_id=(row.get("source_record_id") or "").strip() or None,
@@ -555,19 +604,25 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
             material = "|".join([str(store_id), "manual", data.metric_key,
                 data.period_start.isoformat() if data.period_start else "",
                 data.period_end.isoformat() if data.period_end else "", data.source_record_id or "",
-                str(data.value_numeric) if data.value_numeric is not None else "NULL", data.currency or ""])
+                str(data.value_numeric) if data.value_numeric is not None else "NULL",
+                    data.currency or ""])
             dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
             existed = db.scalar(select(MetricObservation.id).where(
-                MetricObservation.store_id == store_id, MetricObservation.deduplication_key == dedupe))
-            _create_observation(db, store_id=store_id, payload=data, authenticity="merchant_reported")
+                MetricObservation.store_id == store_id,
+                    MetricObservation.deduplication_key == dedupe))
+            _create_observation(db, store_id=store_id, payload=data,
+                authenticity="merchant_reported")
             created += 1 if existed is None else 0
             skipped += 0 if existed is None else 1
         except (ValueError, InvalidOperation, KeyError) as exc:
             db.rollback()
             raise ApiError(422, "CSV_ROW_INVALID", f"CSV row {line_number} is invalid") from exc
-    record_audit(db, request, action="effects.observations.imported", target_type="metric_observation",
+    record_audit(db, request, action="effects.observations.imported",
+        target_type="metric_observation",
         target_id=None, actor_user_id=auth.user.id, store_id=store_id,
-        metadata={"created": created, "duplicates": skipped, "authenticity_status": "merchant_reported"})
+        metadata={"created": created, "duplicates": skipped,
+            "authenticity_status": "merchant_reported"})
     db.commit()
-    return {"created": created, "duplicates_skipped": skipped, "authenticity_status": "merchant_reported",
+    return {"created": created, "duplicates_skipped": skipped,
+        "authenticity_status": "merchant_reported",
         "message": "导入记录均标记为商家报告；未经独立核验的数据不会进入正式经营结果或 ROI 计算。"}

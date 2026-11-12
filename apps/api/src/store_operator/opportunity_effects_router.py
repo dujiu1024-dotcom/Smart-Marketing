@@ -103,7 +103,11 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
         "period_timezone": item.period_timezone, "collected_at": item.collected_at.isoformat(),
         "definition_version": item.definition_version, "integrity_status": item.integrity_status,
         "authenticity_status": item.authenticity_status, "sync_status": item.sync_status,
-        "supersedes_observation_id": str(item.supersedes_observation_id) if item.supersedes_observation_id else None,
+        "supersedes_observation_id": (
+            str(item.supersedes_observation_id)
+            if item.supersedes_observation_id
+            else None
+        ),
         "import_batch_id": str(item.import_batch_id) if item.import_batch_id else None,
     }
 
@@ -739,8 +743,16 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
             raw = (row.get("value_numeric") or "").strip()
             data = MetricObservationInput(metric_key=(row.get("metric_key") or "").strip(),
                 value_numeric=Decimal(raw) if raw else None,
-                period_start=datetime.fromisoformat(row["period_start"]) if row.get("period_start") else None,
-                period_end=datetime.fromisoformat(row["period_end"]) if row.get("period_end") else None,
+                period_start=(
+                    datetime.fromisoformat(row["period_start"])
+                    if row.get("period_start")
+                    else None
+                ),
+                period_end=(
+                    datetime.fromisoformat(row["period_end"])
+                    if row.get("period_end")
+                    else None
+                ),
                 period_timezone=(row.get("period_timezone") or "").strip(),
                 currency=(row.get("currency") or "").strip().upper() or None,
                 source_record_id=(row.get("source_record_id") or "").strip() or None,

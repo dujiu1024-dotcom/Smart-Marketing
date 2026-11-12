@@ -30,6 +30,7 @@ from store_operator.ai_gateway.secrets import (  # type: ignore[import-untyped]
 )
 from store_operator.channels.secret_store import AwsSecretsManagerStore, SecretStoreError  # type: ignore[import-untyped]
 from store_operator.models import (  # type: ignore[import-untyped]
+    AIInvocation,
     Artifact,
     ArtifactVersion,
     BusinessFactSnapshot,
@@ -64,6 +65,49 @@ def _operation_idempotency_key(job: Job, operation: str) -> str:
     return hashlib.sha256(
         f"{job.idempotency_key}:{operation}".encode()
     ).hexdigest()
+
+
+
+def _ai_invocation_source_refs(
+    db: Session,
+    *,
+    store_id: UUID,
+    job_id: UUID,
+    attempt_id: UUID,
+    prompt_capabilities: tuple[tuple[UUID, str], ...],
+) -> list[dict[str, str]]:
+    """Return exact successful provider invocation references for this Job attempt."""
+    invocations = db.scalars(
+        select(AIInvocation)
+        .where(
+            AIInvocation.store_id == store_id,
+            AIInvocation.job_id == job_id,
+            AIInvocation.attempt_id == attempt_id,
+            AIInvocation.status == "succeeded",
+        )
+        .order_by(AIInvocation.created_at.desc())
+    ).all()
+    by_capability_and_prompt: dict[tuple[str, UUID], AIInvocation] = {}
+    for invocation in invocations:
+        if invocation.prompt_version_id is None:
+            continue
+        key = (invocation.capability, invocation.prompt_version_id)
+        by_capability_and_prompt.setdefault(key, invocation)
+
+    refs: list[dict[str, str]] = []
+    for prompt_version_id, capability in prompt_capabilities:
+        invocation = by_capability_and_prompt.get((capability, prompt_version_id))
+        if invocation is None:
+            raise _safe_error(
+                "AI_INVOCATION_AUDIT_MISSING",
+                "A successful AI provider invocation could not be linked to its output.",
+            )
+        refs.append({
+            "type": "ai_invocation",
+            "id": str(invocation.id),
+            "capability": capability,
+        })
+    return refs
 
 
 def _provider_secret_resolver(secret_ref: str) -> ProviderSecretResolver:
@@ -452,10 +496,17 @@ def _complete_strategy(
         step.status = "waiting_for_user"
         step.version += 1
         step.finished_at = datetime.now(UTC)
+        invocation_refs = _ai_invocation_source_refs(
+            db,
+            store_id=store_id,
+            job_id=context.job_id,
+            attempt_id=context.attempt_id,
+            prompt_capabilities=((version.id, ProviderCapability.TEXT.value),),
+        )
         step.output_refs_json = [{
             "type": "strategy_draft",
             "prompt_version_id": str(version.id),
-        }]
+        }, *invocation_refs]
         step.blocked_by_json = []
         step.block_code = None
         step.block_detail_json = None
@@ -811,6 +862,31 @@ def _complete_copy(
             )
             db.add(artifact_version)
             db.flush()
+        invocation_prompt_capabilities = [(version.id, ProviderCapability.TEXT.value)]
+        if video_script_version is not None:
+            invocation_prompt_capabilities.append(
+                (video_script_version.id, ProviderCapability.TEXT.value)
+            )
+        invocation_refs = _ai_invocation_source_refs(
+            db,
+            store_id=store_id,
+            job_id=context.job_id,
+            attempt_id=context.attempt_id,
+            prompt_capabilities=tuple(invocation_prompt_capabilities),
+        )
+        existing_source_refs = list(artifact_version.source_refs_json or [])
+        existing_invocation_ids = {
+            item.get("id")
+            for item in existing_source_refs
+            if item.get("type") == "ai_invocation"
+        }
+        artifact_version.source_refs_json = [
+            *existing_source_refs,
+            *[
+                ref for ref in invocation_refs
+                if ref["id"] not in existing_invocation_ids
+            ],
+        ]
         artifact.current_version_id = artifact_version.id
         task.version += 1
         step.status = "waiting_for_user"
@@ -826,6 +902,7 @@ def _complete_copy(
                 "type": "video_script",
                 "prompt_version_id": str(video_script_version.id),
             })
+        step.output_refs_json.extend(invocation_refs)
         step.blocked_by_json = []
         step.block_code = None
         step.block_detail_json = None

@@ -1,8 +1,13 @@
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
-from store_operator_worker.ai_handlers import _merge_copy_revision, _prompt_variables
+from store_operator_worker.ai_handlers import (
+    _ai_invocation_source_refs,
+    _merge_copy_revision,
+    _prompt_variables,
+)
 from store_operator_worker.handlers import JobExecutionError
 
 
@@ -149,3 +154,64 @@ def test_copy_revision_preserves_existing_delivery_fields_and_video_script() -> 
     assert merged["call_to_action"] == "Visit today"
     assert merged["change_summary"] == "Tightened the offer message"
     assert merged["video_script"] == previous_copy["video_script"]
+
+
+def test_text_outputs_link_exact_successful_provider_invocations() -> None:
+    text_prompt_id, script_prompt_id = uuid4(), uuid4()
+    invocations = [
+        SimpleNamespace(
+            id=uuid4(),
+            capability="text",
+            prompt_version_id=text_prompt_id,
+        ),
+        SimpleNamespace(
+            id=uuid4(),
+            capability="text",
+            prompt_version_id=script_prompt_id,
+        ),
+    ]
+
+    class FakeScalarResult:
+        def all(self):
+            return invocations
+
+    class FakeSession:
+        def scalars(self, statement):
+            return FakeScalarResult()
+
+    refs = _ai_invocation_source_refs(
+        FakeSession(),
+        store_id=uuid4(),
+        job_id=uuid4(),
+        attempt_id=uuid4(),
+        prompt_capabilities=(
+            (text_prompt_id, "text"),
+            (script_prompt_id, "text"),
+        ),
+    )
+
+    assert [ref["id"] for ref in refs] == [
+        str(invocation.id) for invocation in invocations
+    ]
+    assert all(ref["type"] == "ai_invocation" for ref in refs)
+
+
+def test_text_output_audit_fails_closed_when_provider_invocation_is_missing() -> None:
+    class FakeScalarResult:
+        def all(self):
+            return []
+
+    class FakeSession:
+        def scalars(self, statement):
+            return FakeScalarResult()
+
+    with pytest.raises(JobExecutionError) as exc_info:
+        _ai_invocation_source_refs(
+            FakeSession(),
+            store_id=uuid4(),
+            job_id=uuid4(),
+            attempt_id=uuid4(),
+            prompt_capabilities=((uuid4(), "text"),),
+        )
+
+    assert exc_info.value.code == "AI_INVOCATION_AUDIT_MISSING"

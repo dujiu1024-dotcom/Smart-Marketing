@@ -16,11 +16,9 @@ def _generation_context() -> tuple[SimpleNamespace, SimpleNamespace, SimpleNames
     requirement = SimpleNamespace(
         payload_json={
             "requirement": {"objective": "Increase store visits"},
-            "business_facts": [],
-        "business_fact_refs": [
-            {"fact_key": "offer", "value": "Buy one get one"}
-        ],
-        "business_facts_by_key": {},
+            "business_facts": [
+                {"fact_key": "offer", "value": "Buy one get one"}
+            ],
         }
     )
     version = SimpleNamespace(
@@ -55,7 +53,11 @@ def test_prompt_variables_bind_only_declared_task_context() -> None:
         "task_title": "Weekend promotion",
         "task_type": "promotion",
         "requirement": {"objective": "Increase store visits"},
-        "business_facts": [{"fact_key": "offer", "value": "Buy one get one"}],
+        "business_facts": [],
+        "business_fact_refs": [
+            {"fact_key": "offer", "value": "Buy one get one"}
+        ],
+        "business_facts_by_key": {},
         "task_options": {"selected_channel_keys": ["douyin"]},
         "strategy": {},
         "selected_channels": ["douyin"],

@@ -110,4 +110,4 @@ h1 { margin: 0; color: #1f3029; font-size: clamp(25px, 3vw, 32px); letter-spacin
 .product-check-list { margin-top: 16px; }
 .product-check { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid #e8ede9; border-radius: 8px; background: #fbfcfb; color: #526158; font-size: 12px; }
 .product-check input { width: 15px; min-height: 15px; margin: 0; accent-color: #356c50; }
-\n.catalog-description { margin-top: 12px !important; color: #53635b !important; font-size: 13px !important; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }\n
+.catalog-description { margin-top: 12px !important; color: #53635b !important; font-size: 13px !important; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }

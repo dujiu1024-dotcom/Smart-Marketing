@@ -102,7 +102,6 @@ if MAX_RUNNING_JOBS_PER_STORE < 1 or CONCURRENCY_DEFER_SECONDS < 1:
     raise RuntimeError("Worker store concurrency settings must be positive")
 
 
-@celery_app.task(name="jobs.relay_outbox", ignore_result=True)  # type: ignore[untyped-decorator]
 def _normalize_outbox_batch_size(batch_size: int) -> int:
     if batch_size < 1:
         raise ValueError("Outbox batch_size must be positive")
@@ -121,6 +120,7 @@ def _parse_dispatch_job_id(payload: object) -> UUID:
         raise ValueError("Outbox job_id must be a UUID") from exc
 
 
+@celery_app.task(name="jobs.relay_outbox", ignore_result=True)  # type: ignore[untyped-decorator]
 def relay_outbox(batch_size: int = 50) -> int:
     """Publish committed Outbox rows; a crash after publish can cause safe redelivery."""
     safe_batch_size = _normalize_outbox_batch_size(batch_size)

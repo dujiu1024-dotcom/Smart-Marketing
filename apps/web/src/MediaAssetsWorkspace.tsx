@@ -149,7 +149,7 @@ export default function MediaAssetsWorkspace({ storeId }: { storeId: string }) {
         <div className="catalog-meta"><span>{rightsLabels[asset.usage_rights_status]}</span><span>SHA-256：{asset.sha256.slice(0, 12)}…</span><span>{new Date(asset.created_at).toLocaleString()}</span></div>
         {rightsAssetId === asset.id && asset.status === "ready" && asset.usage_rights_status === "unknown" && <form className="asset-rights-form" onSubmit={event => void confirmRights(event, asset)}>
           <label className="field"><span>使用权结论</span><select value={rightsChoice} onChange={event => setRightsChoice(event.target.value as typeof rightsChoice)}><option value="confirmed_allowed">我确认门店拥有该素材的使用权</option><option value="restricted">限制使用，不允许用于营销内容</option></select></label>
-          <label className="field"><span>来源 / 授权说明 *</span><textarea rows={2} required minLength={3} value={licenseNote} onChange={event => setLicenseNote(event.target.value)} placeholder="例如：门店自行拍摄；摄影师授权用于门店官方账号"/></label>
+          <label className="field"><span>来源 / 授权说明 *</span><textarea rows={2} value={licenseNote} onChange={event => setLicenseNote(event.target.value)} placeholder="例如：门店自行拍摄；摄影师授权用于门店官方账号"/></label>
           <div className="catalog-actions"><button className="secondary" type="button" onClick={() => setRightsAssetId("")}>取消</button><button className="primary" type="submit" disabled={busy || licenseNote.trim().length < 3}>提交确认</button></div>
         </form>}
         <div className="catalog-actions">

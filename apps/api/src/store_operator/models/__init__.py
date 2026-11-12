@@ -54,6 +54,7 @@ from store_operator.models.opportunity_effects import (
     HotTopic,
     HotTopicSource,
     MetricDefinition,
+    MetricImportBatch,
     MetricObservation,
     OpportunityDecision,
     StoreOpportunity,

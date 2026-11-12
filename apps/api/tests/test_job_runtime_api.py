@@ -3,7 +3,6 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-
 from sqlalchemy.orm import Session
 
 from store_operator.ai_gateway.errors import SideEffectState
@@ -386,7 +385,7 @@ def test_revoked_store_membership_cancels_job_before_worker_claim(
         )
         .one()
     )
-    membership.status = "revoked"
+    membership.status = "removed"
     db_session.flush()
 
     claim = claim_job(

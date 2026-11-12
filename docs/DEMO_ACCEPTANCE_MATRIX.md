@@ -436,3 +436,17 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 策略确认 | 等待异步 Worker 生成；仅在 waiting_for_user 状态提供编辑与确认 | 不在前端伪造策略；AI Provider/真实生成仍由 Issue #10 验收 |
 | 步骤决策 | 可选步骤跳过、失败/过期/等待步骤恢复；任务取消/归档 | 所有操作带 expected_version、Idempotency-Key 和服务端原因校验 |
 | 未完成 | 文案/图片产物生产与审核、质检、渠道适配、发布包和真实发布 UI、热点机会入口 | 由 Issue #8/#10/#11/#12 继续实现；Issue #7 不关闭 |
+
+
+
+## 2026-11-12 #8 文案/图片产物与版本审核 Web 接入（PR 待 CI）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 文案产物 | 营销任务详情可手动编辑并创建 copy Artifact/ArtifactVersion | 明确标记商家手动编辑，不伪装为 AI 生成 |
+| 图片产物 | 从当前门店素材中选择 ready 且 confirmed_allowed 的素材创建 image ArtifactVersion | 来源 MediaAsset 不被覆盖；图片二进制仍由私有对象存储管理 |
+| 版本管理 | 修改已存在产物时创建不可变新版本；展示当前版本与版本历史 | 审核必须绑定当前精确版本；旧版本审核不继承 |
+| 双审核 | 文案/图片分别提供通过、要求修改、拒绝；要求修改必须填写意见 | API 服务端校验 review_type、expected_version 和 revision comment |
+| 未完成 | AI Provider 生成/图片编辑、渠道规格选择与 ChannelContent 适配、质检报告/人工复核、发布包冻结/最终确认/人工交付 UI | 由 #10/#12 及后续 #8 PR 完成；Issue #8 不关闭 |
+
+Web 单元测试覆盖手动文案产物创建和精确版本审核请求；真实 AI 生成与完整发布浏览器链路未在本 PR 中实现。

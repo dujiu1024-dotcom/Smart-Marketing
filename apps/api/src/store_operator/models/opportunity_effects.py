@@ -485,7 +485,7 @@ class AttributionEvidence(Base):
             "'temporal_association', 'manual_claim')",
             name="attribution_method",
         ),
-        CheckConstraint("evidence_strength IN ('strong', 'medium', 'weak')",
+        CheckConstraint("evidence_strength IN ('strong', 'medium')",
             name="evidence_strength"),
         CheckConstraint("status IN ('active', 'superseded', 'rejected')", name="status"),
         CheckConstraint(

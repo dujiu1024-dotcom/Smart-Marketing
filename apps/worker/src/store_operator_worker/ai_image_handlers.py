@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import logging
 import json
+import logging
 import os
 
-from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from uuid import UUID, uuid4
 
+from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -32,8 +32,8 @@ from store_operator.models import (
     MarketingTask,
     MediaAsset,
     OutboxEvent,
-    RequirementSnapshot,
     PromptVersion,
+    RequirementSnapshot,
     StrategySnapshot,
     TaskStep,
 )

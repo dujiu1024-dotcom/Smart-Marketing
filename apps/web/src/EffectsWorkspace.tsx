@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, getPublishReadbacks, registerPublishedWorkFromReadback, importMetricCsv,
+import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getMetricObservations, getPublishedWorks, getBusinessOutcomes, getAttributions, getDataSourceCapabilities, getPublishReadbacks, registerPublishedWorkFromReadback, createBusinessOutcome, importMetricCsv,
   type EffectsOverview, type MetricDefinitionRecord, type MetricObservationRecord, type PublishedWorkRecord,
   type BusinessOutcomeEvidenceRecord, type AttributionEvidenceRecord, type DataSourceCapabilitySnapshotRecord, type PublishReadbackCandidate } from "./api";
 
@@ -25,6 +25,12 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
   const [sourceId, setSourceId] = useState("");
   const [evidenceRef, setEvidenceRef] = useState("");
   const [csvText, setCsvText] = useState("");
+  const [outcomeType, setOutcomeType] = useState("orders");
+  const [outcomeValue, setOutcomeValue] = useState("");
+  const [outcomeCurrency, setOutcomeCurrency] = useState("CNY");
+  const [outcomeSourceId, setOutcomeSourceId] = useState("");
+  const [outcomeEvidence, setOutcomeEvidence] = useState("");
+  const [outcomeOccurredAt, setOutcomeOccurredAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -63,6 +69,26 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
       });
       setNotice("已保存为商家手工报告。该数据不会自动成为已核验经营结果或 ROI 依据。");
       setValue(""); setCurrency(""); setSourceId(""); setEvidenceRef(""); await load();
+    } catch (reason) { setError(errorText(reason)); }
+    finally { setSaving(false); }
+  }
+  async function saveBusinessOutcome(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const occurredAt = toIso(outcomeOccurredAt);
+      if (!occurredAt) throw new Error("请选择有效的经营结果发生时间");
+      const result = await createBusinessOutcome(storeId, {
+        outcome_type: outcomeType,
+        value_numeric: outcomeValue,
+        currency: outcomeType === "revenue" ? outcomeCurrency.trim().toUpperCase() : null,
+        source_record_id: outcomeSourceId.trim() || null,
+        source_evidence_ref: outcomeEvidence.trim(),
+        occurred_at: occurredAt,
+      });
+      setNotice(result.message ?? "已保存为商家报告；尚未核验，不进入正式归因或 ROI。");
+      setOutcomeValue(""); setOutcomeSourceId(""); setOutcomeEvidence("");
+      await load();
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
   }
@@ -139,6 +165,22 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
           </div>)}
           {!publishedWorks.length && <p className="muted">暂无已读回或已登记的作品。</p>}
         </div>
+        <form className="form-card" onSubmit={saveBusinessOutcome}>
+          <h3>登记经营结果证据</h3>
+          <p className="muted">手工登记只作为商家报告留痕，不能直接成为已核验经营结果或归因依据。</p>
+          <div className="form-grid">
+            <label>结果类型<select value={outcomeType} onChange={event => setOutcomeType(event.target.value)}>
+              <option value="orders">订单数</option><option value="revenue">营业额</option>
+              <option value="redemptions">优惠核销</option><option value="store_visits">到店人数</option><option value="leads">咨询线索</option>
+            </select></label>
+            <label>结果数值<input type="number" min="0" step="0.01" value={outcomeValue} onChange={event => setOutcomeValue(event.target.value)} required /></label>
+            {outcomeType === "revenue" && <label>币种<input value={outcomeCurrency} onChange={event => setOutcomeCurrency(event.target.value)} maxLength={3} required /></label>}
+            <label>发生时间<input type="datetime-local" value={outcomeOccurredAt} onChange={event => setOutcomeOccurredAt(event.target.value)} required /></label>
+            <label>来源记录 ID（可选）<input value={outcomeSourceId} onChange={event => setOutcomeSourceId(event.target.value)} /></label>
+            <label className="form-field-wide">证据说明或凭证链接<input value={outcomeEvidence} onChange={event => setOutcomeEvidence(event.target.value)} required /></label>
+          </div>
+          <button className="primary" type="submit" disabled={saving || !outcomeValue || !outcomeEvidence.trim()}>保存商家报告</button>
+        </form>
         <div className="catalog-list">
           {businessOutcomes.map(outcome => <div className="catalog-item" key={outcome.id}>
             <div className="catalog-item-main"><div><h3>{outcome.outcome_type} · {outcome.value_numeric}{outcome.currency ? ` ${outcome.currency}` : ""}</h3><p>{outcome.source_system} · {new Date(outcome.occurred_at).toLocaleString()}</p></div><span className="status-chip">{outcome.authenticity_status} / {outcome.integrity_status}</span></div>

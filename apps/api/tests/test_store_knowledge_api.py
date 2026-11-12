@@ -349,6 +349,7 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
     user = create_user(db_session, "asset-upload@example.com")
     store = create_store(db_session, user, "Asset Upload Store")
+    store_b = create_store(db_session, user, "Other Asset Upload Store")
     login = identity_client.post(
         "/api/v1/auth/login",
         json={"email": "asset-upload@example.com", "password": "test-password-123"},
@@ -362,6 +363,7 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
         "X-Store-ID": str(store.id),
         "Idempotency-Key": "asset-upload-intent-1",
     }
+    headers_b = {**headers, "X-Store-ID": str(store_b.id)}
     sha256 = "a" * 64
     monkeypatch.setattr(
         knowledge_router,
@@ -389,6 +391,12 @@ def test_media_asset_upload_is_verified_and_quarantined_before_use(
     assert intent.store_id == store.id
     assert intent.object_key.startswith(f"stores/{store.id}/quarantine/")
     assert ".." not in intent.object_key
+
+    hidden_completion = identity_client.post(
+        f"/api/v1/store/assets/upload-intents/{intent.id}/complete",
+        headers={**headers_b, "Idempotency-Key": "asset-upload-cross-store-complete"},
+    )
+    assert hidden_completion.status_code == 404
 
     monkeypatch.setattr(
         knowledge_router,

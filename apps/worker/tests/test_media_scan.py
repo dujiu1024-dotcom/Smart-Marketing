@@ -22,12 +22,12 @@ from store_operator_worker.media_scanner import (
 
 def png_bytes(width: int = 640, height: int = 480) -> bytes:
     return (
-        b"\\x89PNG\\r\\n\\x1a\\n"
+        b"\x89PNG\r\n\x1a\n"
         + struct.pack(">I", 13)
         + b"IHDR"
         + struct.pack(">II", width, height)
-        + b"\\x08\\x06\\x00\\x00\\x00"
-        + b"\\x00\\x00\\x00\\x00IEND\\xaeB\\x60\\x82"
+        + b"\x08\x06\x00\x00\x00"
+        + b"\x00\x00\x00\x00IEND\xaeB\x60\x82"
     )
 
 
@@ -41,7 +41,7 @@ def clamd_server(response: bytes) -> tuple[socket.socket, threading.Thread, list
         connection, _ = server.accept()
         with closing(connection):
             command = connection.recv(10)
-            assert command == b"zINSTREAM\\0"
+            assert command == b"zINSTREAM\0"
             chunks = bytearray()
             while True:
                 header = bytearray()
@@ -74,7 +74,7 @@ def test_declared_mime_must_match_image_signature() -> None:
 
 
 def test_clamd_instream_protocol_accepts_clean_content() -> None:
-    server, thread, received = clamd_server(b"stream: OK\\0")
+    server, thread, received = clamd_server(b"stream: OK\0")
     try:
         scan_with_clamd(b"small-image", host="127.0.0.1", port=server.getsockname()[1])
     finally:
@@ -84,7 +84,7 @@ def test_clamd_instream_protocol_accepts_clean_content() -> None:
 
 
 def test_clamd_instream_protocol_rejects_malware() -> None:
-    server, thread, _ = clamd_server(b"stream: Eicar-Test-Signature FOUND\\0")
+    server, thread, _ = clamd_server(b"stream: Eicar-Test-Signature FOUND\0")
     try:
         with pytest.raises(MalwareDetected):
             scan_with_clamd(b"malware", host="127.0.0.1", port=server.getsockname()[1])
@@ -94,7 +94,7 @@ def test_clamd_instream_protocol_rejects_malware() -> None:
 
 
 def test_clamd_indeterminate_response_fails_closed() -> None:
-    server, thread, _ = clamd_server(b"stream: scan failed ERROR\\0")
+    server, thread, _ = clamd_server(b"stream: scan failed ERROR\0")
     try:
         with pytest.raises(ClamAvError):
             scan_with_clamd(b"image", host="127.0.0.1", port=server.getsockname()[1])

@@ -641,7 +641,7 @@ def effects_overview(
         if item.period_start is None or item.period_end is None:
             continue
         period_key = "|".join(
-            [item.period_start.isoformat(), item.period_end.isoformat()]
+            [item.period_start.isoformat(), item.period_end.isoformat(), item.period_timezone]
         )
         group_key = (
             item.metric_key,

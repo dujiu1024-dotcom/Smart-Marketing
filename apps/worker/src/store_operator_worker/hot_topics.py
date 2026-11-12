@@ -16,8 +16,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from store_operator.config import settings
-from store_operator.models import AudienceProfile, HotTopic, HotTopicSource, Offer, Product, StoreOpportunity, StoreProfile
-from store_operator_worker.handlers import JobExecutionContext, JobExecutionError, register_job_handler
+from store_operator.models import (
+    AudienceProfile,
+    HotTopic,
+    HotTopicSource,
+    Offer,
+    Product,
+    StoreOpportunity,
+    StoreProfile,
+)
+from store_operator_worker.handlers import (
+    JobExecutionContext,
+    JobExecutionError,
+    register_job_handler,
+)
 
 MAX_FEED_BYTES = 2_000_000
 MAX_FEED_ITEMS = 200

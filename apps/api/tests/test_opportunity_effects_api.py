@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from store_operator.auth.security import hash_password
 from store_operator.models.identity import Store, StoreMembership, User
+from store_operator.models.marketing_task import MarketingTask
 from store_operator.models.opportunity_effects import (
     BusinessOutcomeEvidence,
     HotTopic,
@@ -12,6 +13,7 @@ from store_operator.models.opportunity_effects import (
     MetricObservation,
     PublishedWork,
     StoreOpportunity,
+    WorkOwnershipEvidence,
 )
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -506,3 +508,111 @@ def test_manual_business_outcome_is_retained_as_unverified_evidence(
     assert readbacks.json()["items"] == []
     assert capabilities.status_code == 200
     assert capabilities.json()["items"] == []
+
+
+def test_effects_overview_breaks_down_verified_content_metrics_by_published_work(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user, store = _identity(db_session, "work-trend@example.com", "Work Trend Shop")
+    task = MarketingTask(
+        id=uuid4(),
+        store_id=store.id,
+        task_type="full_marketing",
+        lifecycle_status="draft",
+        title="Verified content performance task",
+        version=1,
+        requirement_draft_json={"goal": "Track verified work performance"},
+        strategy_draft_json={},
+        task_options_json={},
+        created_by_user_id=user.id,
+    )
+    db_session.add(task)
+    db_session.flush()
+
+    work = PublishedWork(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task.id,
+        channel_key="douyin",
+        external_work_id="verified-work-001",
+        ownership_status="verified_platform_api",
+        verified_at=datetime(2026, 11, 4, tzinfo=UTC),
+        source_snapshot_json={"verification": "official platform API"},
+    )
+    db_session.add(work)
+    db_session.flush()
+    db_session.add(
+        WorkOwnershipEvidence(
+            id=uuid4(),
+            store_id=store.id,
+            published_work_id=work.id,
+            evidence_type="platform_api",
+            evidence_status="verified",
+            source_system="douyin",
+            evidence_ref="https://platform.example.test/works/verified-work-001",
+            evidence_payload_json={"verified": True},
+            verified_by_user_id=user.id,
+            verified_at=datetime(2026, 11, 4, tzinfo=UTC),
+        )
+    )
+    definition = MetricDefinition(
+        id=uuid4(),
+        source_system="official_api",
+        metric_key="work_views",
+        metric_tier="content_performance",
+        display_name="作品播放量",
+        value_type="count",
+        definition="Verified view count for one published work",
+        aggregation_rule="sum",
+        period_semantics="period_delta",
+        definition_version=1,
+        status="active",
+    )
+    db_session.add(definition)
+    db_session.flush()
+    for index, (start, end, value) in enumerate(
+        [
+            ("2026-11-01T00:00:00+00:00", "2026-11-02T00:00:00+00:00", "20"),
+            ("2026-11-02T00:00:00+00:00", "2026-11-03T00:00:00+00:00", "30"),
+        ]
+    ):
+        db_session.add(
+            MetricObservation(
+                id=uuid4(),
+                store_id=store.id,
+                metric_definition_id=definition.id,
+                metric_key="work_views",
+                metric_tier="content_performance",
+                value_numeric=Decimal(value),
+                unit="count",
+                source_system="official_api",
+                source_record_id=f"verified-work-001-{index}",
+                period_start=datetime.fromisoformat(start),
+                period_end=datetime.fromisoformat(end),
+                period_timezone="UTC",
+                collected_at=datetime(2026, 11, 4 + index, tzinfo=UTC),
+                definition_version=1,
+                integrity_status="complete",
+                authenticity_status="official_api",
+                sync_status="current",
+                deduplication_key=f"w{index}" * 32,
+                published_work_id=work.id,
+                marketing_task_id=task.id,
+            )
+        )
+    db_session.flush()
+    headers = _login(identity_client, "work-trend@example.com", store.id)
+
+    response = identity_client.get("/api/v1/effects/overview", headers=headers)
+
+    assert response.status_code == 200, response.text
+    breakdown = response.json()["content_performance"]
+    assert len(breakdown) == 1
+    assert breakdown[0]["published_work_id"] == str(work.id)
+    assert breakdown[0]["marketing_task_id"] == str(task.id)
+    assert breakdown[0]["comparison"]["status"] == "available"
+    assert breakdown[0]["comparison"]["change_percent"] == "50.00"
+    assert [point["value"] for point in breakdown[0]["points"]] == ["20", "30"]

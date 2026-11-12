@@ -190,10 +190,7 @@ def _business_fact_snapshots(
                 "A confirmed business fact snapshot reference is invalid.",
             ) from exc
     if not fact_ids:
-        raise _safe_error(
-            "AI_BUSINESS_FACTS_REQUIRED",
-            "At least one confirmed business fact is required for AI generation.",
-        )
+        return []
     facts = db.scalars(
         select(BusinessFactSnapshot)
         .where(

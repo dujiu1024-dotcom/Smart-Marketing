@@ -669,6 +669,7 @@ def test_revoked_creator_membership_prevents_worker_claim(db_session) -> None:
     db_session.refresh(job)
     assert job.status == "cancelled"
     assert job.error_code == "ACTOR_MEMBERSHIP_REVOKED"
+    assert job.cancelled_at is not None
     assert db_session.scalars(
         select(JobAttempt).where(JobAttempt.job_id == job.id)
     ).all() == []
@@ -693,6 +694,7 @@ def test_inactive_store_prevents_worker_claim(db_session) -> None:
     db_session.refresh(job)
     assert job.status == "cancelled"
     assert job.error_code == "STORE_NOT_ACTIVE"
+    assert job.cancelled_at is not None
     assert db_session.scalars(
         select(JobAttempt).where(JobAttempt.job_id == job.id)
     ).all() == []

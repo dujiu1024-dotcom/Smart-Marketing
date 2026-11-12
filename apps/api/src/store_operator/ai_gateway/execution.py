@@ -5,7 +5,7 @@ import json
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractContextManager
 from time import monotonic
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -107,8 +107,9 @@ class AIProviderExecutor:
         side_effect_state: SideEffectState = SideEffectState.NONE,
         response_ref: Callable[[ResponseT], dict[str, object] | None] | None = None,
     ) -> ResponseT:
-        context = getattr(request, "context")
-        model_id = getattr(request, "model_id")
+        typed_request = cast(Any, request)
+        context = typed_request.context
+        model_id = typed_request.model_id
         fingerprint = self._fingerprint(
             request,
             capability=capability,
@@ -156,7 +157,10 @@ class AIProviderExecutor:
                     ProviderErrorCode.OUTPUT_INVALID,
                     retryable=False,
                     side_effect_state=side_effect_state,
-                    user_safe_summary="The AI provider returned a model identifier different from the requested model.",
+                    user_safe_summary=(
+                        "The AI provider returned a model identifier different "
+                        "from the requested model."
+                    ),
                 )
         except ProviderError as exc:
             with self._session_context_factory() as db:

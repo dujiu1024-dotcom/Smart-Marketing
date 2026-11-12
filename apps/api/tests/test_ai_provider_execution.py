@@ -7,10 +7,14 @@ from sqlalchemy import select
 
 from store_operator.ai_gateway import (
     AIProviderExecutor,
+    ImageGenerateRequest,
     ProviderCallContext,
     ProviderCapability,
     ProviderDescriptor,
+    ProviderError,
+    ProviderErrorCode,
     ProviderRegistry,
+    SideEffectState,
     TextGenerateRequest,
     TextGenerateResponse,
 )
@@ -105,3 +109,73 @@ def test_async_image_execution_requires_idempotency_key(db_session) -> None:
 
     with pytest.raises(ValueError, match="idempotency key"):
         asyncio.run(executor.generate_image(request, provider_id="test-provider"))
+
+
+
+class TimeoutAfterImageSubmissionProvider:
+    def __init__(self) -> None:
+        self.idempotency_key: str | None = None
+
+    async def generate(self, request: ImageGenerateRequest):
+        self.idempotency_key = request.context.idempotency_key
+        raise ProviderError(
+            ProviderErrorCode.TIMEOUT,
+            retryable=True,
+            user_safe_summary="The image provider timed out.",
+            side_effect_state=SideEffectState.UNKNOWN,
+        )
+
+
+def test_image_provider_timeout_preserves_unknown_side_effect_and_audit(
+    db_session,
+) -> None:
+    store = Store(name="AI Image Timeout Store", timezone="Asia/Tokyo")
+    db_session.add(store)
+    db_session.flush()
+
+    provider = TimeoutAfterImageSubmissionProvider()
+    registry = ProviderRegistry()
+    registry.register(
+        ProviderDescriptor(
+            provider_id="image-test-provider",
+            display_name="Image Test Provider",
+            capabilities=frozenset({ProviderCapability.IMAGE}),
+            supported_models={ProviderCapability.IMAGE: ("image-test-v1",)},
+        ),
+        provider,
+    )
+    executor = AIProviderExecutor(
+        registry=registry,
+        session_context_factory=lambda: nullcontext(db_session),
+    )
+    request = ImageGenerateRequest(
+        context=ProviderCallContext(
+            request_id="image-timeout-request",
+            store_id=store.id,
+            idempotency_key="stable-image-job-operation-key",
+        ),
+        model_id="image-test-v1",
+        prompt="Generate a promotional image",
+    )
+
+    with pytest.raises(ProviderError) as exc_info:
+        asyncio.run(
+            executor.generate_image(
+                request,
+                provider_id="image-test-provider",
+            )
+        )
+
+    invocation = db_session.scalar(
+        select(AIInvocation).where(
+            AIInvocation.store_id == store.id,
+            AIInvocation.capability == ProviderCapability.IMAGE.value,
+        )
+    )
+    assert provider.idempotency_key == "stable-image-job-operation-key"
+    assert exc_info.value.code is ProviderErrorCode.TIMEOUT
+    assert exc_info.value.retryable is True
+    assert exc_info.value.side_effect_state is SideEffectState.UNKNOWN
+    assert invocation is not None
+    assert invocation.status == "failed"
+    assert invocation.error_code == ProviderErrorCode.TIMEOUT.value

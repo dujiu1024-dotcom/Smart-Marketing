@@ -351,6 +351,14 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 有效期 | ISO 8601 且必须显式带时区偏移；客户端归一化为 UTC | 列表明确显示 UTC；当前 UI 尚未读取 Store.timezone 并转换为门店本地时间 |
 | 活动状态 | draft/active/paused/expired/archived | 可通过编辑归档；不提供物理删除入口 |
 | 页面路由 | `#store:offers`；`#store-editor:offer:new`；`#store-editor:offer:<id>` | 对照 Demo 活动列表与独立二级编辑页 |
-| 未完成 | 门店时区本地化展示、商品关联选择器、完整浏览器视觉/移动端验收 | 不据此关闭 Issue #6 |
+| 未完成 | 门店时区本地化展示、完整浏览器视觉/移动端验收 | 不据此关闭 Issue #6 |
 
 该页已接入真实 Offer API；CI 验收覆盖六组工作流。门店本地时区展示仍是明确缺口，不将 UTC 展示伪称为本地时间。
+
+
+### PR #105 代码审查补充
+
+- 优惠类型已按 `discount_percent`、`discount_amount`、`fixed_price`、`buy_x_get_y`、`gift`、`threshold_discount` 提供结构化字段，并校验对应必填数值。
+- 买赠与赠品规则通过当前门店真实商品清单选择 Product ID；不要求商家手工输入 UUID。
+- 创建幂等键在同一编辑草稿的重试期间保持稳定；未保存修改时禁止确认旧版本事实。
+- 活动使用 `archived` 状态归档，不提供物理删除入口。

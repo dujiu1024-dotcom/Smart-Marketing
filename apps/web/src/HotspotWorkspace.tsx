@@ -19,6 +19,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
   const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [adoptedOpportunityId, setAdoptedOpportunityId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,7 +66,8 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
     setSaving(true); setError(""); setNotice("");
     try {
       await decideOpportunity(storeId, id, decision, reason, crypto.randomUUID());
-      setNotice(`已记录：${labels[decision]}。采纳不会自动创建营销任务，请返回既有营销任务流程核对机会来源。`);
+      setAdoptedOpportunityId(decision === "adopt" ? id : null);
+      setNotice(decision === "adopt" ? "机会已采纳。你可以主动选择基于该机会制作营销内容；系统不会自动创建任务。" : `已记录：${labels[decision]}。`);
       await load();
     } catch (reasonValue) { setError(errorText(reasonValue)); }
     finally { setSaving(false); }
@@ -104,6 +106,13 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
             <button className="primary" disabled={saving || match.eligibility_status !== "eligible"} onClick={() => void decide("adopt")}>采纳机会</button>
           </div>
           {match.eligibility_status !== "eligible" && <p className="footnote">当前机会未达到可采纳条件；系统不会绕过来源、有效期或人工核对门槛。</p>}
+          {adoptedOpportunityId === id && <button className="primary" onClick={() => {
+            sessionStorage.setItem(`store-operator.opportunity-handoff.${storeId}`, JSON.stringify({
+              opportunity_id: id, title: detail.title, summary: detail.summary,
+              suggested_scenario: match.scenario, content_angle: match.content_angle,
+            }));
+            window.location.hash = "#create";
+          }}>基于此机会制作内容</button>}
         </article>
       </> : <div className="empty-card"><h2>机会不可用</h2><p>该机会不存在、已失效或不属于当前门店。</p></div>}
     </section>;

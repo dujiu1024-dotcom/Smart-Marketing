@@ -6,13 +6,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from store_operator.auth.context import AuthContext
+from store_operator.auth.errors import ApiError
 from store_operator.auth.dependencies import (
     AuthenticatedSession,
     require_csrf,
     require_store_context,
 )
 from store_operator.db import get_db
-from store_operator.models.marketing_task import BusinessFactSnapshot
+from store_operator.models.marketing_task import BusinessFactSnapshot, MarketingTask
 from store_operator.domain.marketing_task import (
     MarketingTaskStatus,
     MarketingTaskType,
@@ -98,8 +99,6 @@ def list_task_business_facts(
 ) -> list[dict[str, object]]:
     store_id = context.request_store_id
     if store_id is None:
-        from store_operator.auth.errors import ApiError
-
         raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
     task = db.scalar(
         select(BusinessFactSnapshot.task_id).where(
@@ -108,8 +107,6 @@ def list_task_business_facts(
         ).limit(1)
     )
     if task is None:
-        from store_operator.auth.errors import ApiError
-
         task_exists = db.scalar(
             select(MarketingTask.id).where(
                 MarketingTask.id == task_id,

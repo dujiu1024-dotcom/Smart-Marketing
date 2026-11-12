@@ -9,6 +9,8 @@ from store_operator.models import (
     ArtifactVersion,
     BusinessFactSnapshot,
     ChannelContent,
+    ChannelSpec,
+    ChannelSpecVersion,
     MarketingTask,
     PublishConfirmation,
     PublishPackage,
@@ -242,7 +244,11 @@ def create_package_inputs(
         channel_key="douyin",
         copy_version_id=version.id,
         payload_json={"title": "Local store update", "body": "Visit us this week."},
-        channel_spec_version_id=uuid4(),
+        channel_spec_version_id=db.query(ChannelSpecVersion)
+        .join(ChannelSpec, ChannelSpec.id == ChannelSpecVersion.channel_spec_id)
+        .filter(ChannelSpec.channel_key == "douyin")
+        .one()
+        .id,
         input_fingerprint="6" * 64,
         status="ready",
     )

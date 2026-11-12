@@ -322,3 +322,18 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | Demo 全量页面与导航 | 未完成 | 本 PR 仅接入门店档案，不代表完整 Demo 已生产化 |
 
 该 PR 同时为 Vite 开发服务与 Compose Nginx 增加同源 `/api` 代理。CI 验收必须覆盖前端测试、构建、E2E 与 Infrastructure；本地测试未执行。
+
+
+## 2026-11-12 #6 第二个生产 Web 页面：商品与服务
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 商品列表 | 接入门店隔离的 `GET /api/v1/store/products` | 按当前 X-Store-ID 读取，不使用 Demo seed |
+| 商品新增 | 接入 `POST /api/v1/store/products` | Idempotency-Key；未知价格和币种均为 NULL |
+| 商品编辑 | 接入 `PATCH /api/v1/store/products/{id}` | If-Match 乐观锁；编辑后生成新版本并重置为待确认 |
+| 事实确认 | 接入 `POST /api/v1/store/products/{id}/confirm-facts` | 独立显式确认，确认版本可追溯 |
+| 商品字段 | 名称、分类、SKU、规格、单位、价格/币种、供应状态、库存/产能、卖点、介绍、原料/材质、过敏原/限制、服务流程、交付方式 | 未知字段不填造值；价格金额与币种成对提交 |
+| 页面路由 | `#store:products`；`#store-editor:product:new`；`#store-editor:product:<id>` | 对照 Demo 商品列表和独立二级编辑页 |
+| 未完成 | 删除/归档的完整 UX、商品与活动关联、完整浏览器视觉/移动端验收 | 不据此关闭 Issue #6 |
+
+本页通过真实 API 读写商品资料；事实状态和版本由服务端返回。CI 验收覆盖 Web、API、Worker、Contracts、E2E、Infrastructure；实际运行结果以该 PR 对应最新 CI 为准。

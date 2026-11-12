@@ -321,6 +321,22 @@ def freeze_publish_package(
         )
         if report is None:
             raise ApiError(409, "QUALITY_REPORT_REQUIRED", "A current quality report is required")
+        latest_report_id = db.scalar(
+            select(QualityReport.id)
+            .where(
+                QualityReport.store_id == store_id,
+                QualityReport.channel_content_id == content.id,
+                QualityReport.input_fingerprint == content.input_fingerprint,
+            )
+            .order_by(QualityReport.created_at.desc(), QualityReport.id.desc())
+            .limit(1)
+        )
+        if latest_report_id != report.id:
+            raise ApiError(
+                409,
+                "QUALITY_REPORT_STALE",
+                "The latest quality report must be used for package freeze",
+            )
         if report.result == "needs_human":
             resolution = db.scalar(
                 select(QualityResolution).where(
@@ -361,7 +377,9 @@ def freeze_publish_package(
         if item.delivery_mode == "official_api":
             if item.channel_account_id is None:
                 raise ApiError(
-                    422, "CHANNEL_ACCOUNT_REQUIRED", "Official API delivery requires a connected account"
+                    422,
+                    "CHANNEL_ACCOUNT_REQUIRED",
+                    "Official API delivery requires a connected account",
                 )
             account = db.scalar(
                 select(ChannelAccount).where(
@@ -373,7 +391,9 @@ def freeze_publish_package(
             )
             if account is None:
                 raise ApiError(
-                    409, "CHANNEL_ACCOUNT_NOT_ACTIVE", "An active account for this channel is required"
+                    409,
+                    "CHANNEL_ACCOUNT_NOT_ACTIVE",
+                    "An active account for this channel is required",
                 )
             if not spec_version.publish_supported:
                 raise ApiError(
@@ -393,6 +413,7 @@ def freeze_publish_package(
                     | (ChannelCapabilitySnapshot.expires_at > now),
                 )
                 .order_by(ChannelCapabilitySnapshot.checked_at.desc())
+                .limit(1)
             )
             if capability is None:
                 raise ApiError(

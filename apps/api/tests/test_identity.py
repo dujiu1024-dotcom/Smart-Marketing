@@ -528,3 +528,30 @@ def test_password_change_requires_current_password_without_revoking_session(
     assert changed.status_code == 401
     assert changed.json()["error"]["code"] == "REAUTHENTICATION_REQUIRED"
     assert identity_client.get("/api/v1/auth/me").status_code == 200
+
+
+
+def test_suspended_store_is_rejected_on_the_next_request(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    fake_redis(monkeypatch)
+    user = make_user(db_session, "suspended-store@example.com")
+    store = make_store(db_session, "Suspended Store", user)
+    login(identity_client, "suspended-store@example.com")
+    headers = {**ORIGIN, "X-Store-ID": str(store.id)}
+
+    before = identity_client.get("/_test/store-context", headers=headers)
+    assert before.status_code == 200
+
+    store.status = "suspended"
+    db_session.flush()
+
+    after = identity_client.get("/_test/store-context", headers=headers)
+    assert after.status_code == 404
+    assert after.json()["error"]["code"] == "STORE_NOT_FOUND"
+    denied = (
+        db_session.query(AuditEvent)
+        .filter_by(action="store.context.access", result="denied", target_id=store.id)
+        .one()
+    )
+    assert denied.metadata_json["reason"] == "not_member_or_inactive"

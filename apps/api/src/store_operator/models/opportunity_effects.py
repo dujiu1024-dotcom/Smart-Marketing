@@ -534,7 +534,9 @@ class AttributionEvidence(Base):
     marketing_task_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     published_work_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     outcome_evidence_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
-    attribution_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    attribution_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
     supersedes_attribution_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     attribution_method: Mapped[str] = mapped_column(String(32), nullable=False)
     evidence_strength: Mapped[str] = mapped_column(String(16), nullable=False)

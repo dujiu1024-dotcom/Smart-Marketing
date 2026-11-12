@@ -99,7 +99,7 @@ async def receive_douyin_webhook(
     message_id = request.headers.get("Msg-Id", "").strip()
     if not message_id or len(message_id) > 160:
         raise ApiError(400, "WEBHOOK_MESSAGE_ID_INVALID", "Webhook message ID is required")
-    open_id, revoked_scopes = _parse_douyin_unauthorize_event(payload)
+    open_id, event_scopes = _parse_douyin_unauthorize_event(payload)
 
     existing = db.scalar(
         select(DouyinWebhookReceipt.id).where(
@@ -116,7 +116,7 @@ async def receive_douyin_webhook(
         message_id=message_id,
         event_type="unauthorize",
         external_user_id_hash=hashlib.sha256(open_id.encode("utf-8")).hexdigest(),
-        scopes_json=revoked_scopes,
+        scopes_json=event_scopes,
         received_at=now,
         processed_at=now,
     )

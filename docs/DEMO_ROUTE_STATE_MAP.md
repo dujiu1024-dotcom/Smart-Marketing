@@ -117,3 +117,11 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - 活动读写与事实确认调用 Store Knowledge API；创建带 Idempotency-Key，更新/确认带 If-Match。
 - 优惠规则和适用条件以 JSON 对象保存；客户端要求开始/结束时间包含明确时区偏移，并规范化为 UTC。
 - 当前不从门店 membership 读取 Store.timezone，因此列表明确显示 UTC；本地时区呈现需要先扩展只读门店上下文契约，不在前端猜测时区。
+
+
+## 11. 第四个生产 Web 页面映射（2026-11-12）
+
+- Demo `#store:brand` 已接入真实品牌规范工作区。
+- 页面覆盖品牌故事/定位/差异化/价值、语气/常用表达/禁用表达/CTA、Logo 资产引用/色彩/字体/视觉风格。
+- BrandGuideline 为门店单例记录；GET 404 时进入创建态，POST 创建，PATCH 使用 If-Match 更新，事实确认单独调用 confirm-facts。
+- Logo 暂以资产 ID 引用，待素材库页面接入后提供可选资产选择器；当前不虚构上传或选图能力。

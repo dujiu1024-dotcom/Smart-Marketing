@@ -261,9 +261,9 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
           {!businessOutcomes.length && <p className="muted">暂无经营结果证据；没有真实证据时不计算 ROI。</p>}
         </div>
         {attributions.length > 0 && <div className="catalog-list">{attributions.map(item => <div className="catalog-item" key={item.id}>
-          <p>营销任务 {item.marketing_task_id} · 作品 {item.published_work_id} · 经营结果 {item.outcome_evidence_id}</p>
+          <p>营销任务 {item.marketing_task_id} · 作品 {item.published_work_id} · 经营结果 {item.outcome_evidence_id} · 版本 v{item.attribution_version}</p>
           <p className="catalog-description">{item.attribution_method} · {item.evidence_strength} · 分摊 {item.allocation_percent}% · {item.status}</p>
-          {item.reversal_reason && <p className="catalog-description">撤销原因：{item.reversal_reason} · {item.reversed_at ? new Date(item.reversed_at).toLocaleString() : ""}</p>}
+          {item.supersedes_attribution_id && <p className="catalog-description">替代归因：{item.supersedes_attribution_id}</p>}{item.reversal_reason && <p className="catalog-description">撤销原因：{item.reversal_reason} · {item.reversed_at ? new Date(item.reversed_at).toLocaleString() : ""}</p>}
           {item.status === "active" && <div className="form-actions">
             <input aria-label={`撤销归因原因 ${item.id}`} value={attributionReversalReason} onChange={event => setAttributionReversalReason(event.target.value)} placeholder="填写撤销原因（至少 8 个字）" />
             <button className="secondary" disabled={saving || attributionReversalReason.trim().length < 8} onClick={() => void reverseAttributionEvidence(item)}>撤销归因</button>

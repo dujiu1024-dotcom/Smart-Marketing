@@ -33,6 +33,8 @@ services:
   clamav:
     image: clamav/clamav:1.4
     restart: unless-stopped
+    environment:
+      CLAMD_CONF_StreamMaxLength: 30M
     volumes: ["clamav_data:/var/lib/clamav"]
 
   api:

@@ -57,7 +57,9 @@ PROMPT_TASK_CONTRACTS: dict[PromptTaskType, PromptTaskContract] = {
     ),
     PromptTaskType.VISUAL_QUALITY_CHECK: PromptTaskContract(
         "vision",
-        frozenset({"findings", "overall_severity", "revision_suggestions", "human_review_required"}),
+        frozenset(
+            {"findings", "overall_severity", "revision_suggestions", "human_review_required"}
+        ),
         frozenset({"human_review_required"}),
     ),
     PromptTaskType.OCR_EXTRACTION: PromptTaskContract(

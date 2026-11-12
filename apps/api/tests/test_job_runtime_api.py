@@ -143,6 +143,13 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
 
     headers_b = {**headers, "X-Store-ID": str(store_b.id)}
     queued = create_job_for_store(db_session, user, store, "queued-cancel-1")
+    cancelled = identity_client.post(
+        f"/api/v1/jobs/{queued.id}/cancel",
+        headers=headers,
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["status"] == "cancelled"
+
     hidden_cancel = identity_client.post(
         f"/api/v1/jobs/{queued.id}/cancel",
         headers={**headers_b, "Idempotency-Key": "cross-store-job-cancel"},
@@ -153,13 +160,7 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
         headers={"X-Store-ID": str(store.id)},
     )
     assert visible_after_cross_store_attempt.status_code == 200
-    assert visible_after_cross_store_attempt.json()["status"] == "queued"
-    cancelled = identity_client.post(
-        f"/api/v1/jobs/{queued.id}/cancel",
-        headers=headers,
-    )
-    assert cancelled.status_code == 200, cancelled.text
-    assert cancelled.json()["status"] == "cancelled"
+    assert visible_after_cross_store_attempt.json()["status"] == "cancelled"
 
     retry = create_job_for_store(
         db_session, user, store, "failed-retry-api-1"
@@ -188,15 +189,6 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
         **headers,
         "Idempotency-Key": "manual-retry-api-1",
     }
-    hidden_retry = identity_client.post(
-        f"/api/v1/jobs/{retry.id}/retry",
-        headers={**headers_b, "Idempotency-Key": "cross-store-job-retry"},
-        json={
-            "reason": "Provider confirmed no side effect",
-            "side_effects_confirmed_absent": True,
-        },
-    )
-    assert hidden_retry.status_code == 404
     retried = identity_client.post(
         f"/api/v1/jobs/{retry.id}/retry",
         headers=retry_headers,
@@ -218,6 +210,16 @@ def test_job_cancel_and_manual_retry_api_require_csrf_and_idempotency(
     )
     assert replay.status_code == 200, replay.text
     assert replay.json()["status"] == "queued"
+
+    hidden_retry = identity_client.post(
+        f"/api/v1/jobs/{retry.id}/retry",
+        headers={**headers_b, "Idempotency-Key": "cross-store-job-retry"},
+        json={
+            "reason": "Provider confirmed no side effect",
+            "side_effects_confirmed_absent": True,
+        },
+    )
+    assert hidden_retry.status_code == 404
 
     missing_csrf = identity_client.post(
         f"/api/v1/jobs/{retry.id}/retry",

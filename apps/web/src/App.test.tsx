@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import App from "./App";
 import { ApiError } from "./api";
 
-const api = vi.hoisted(() => ({
+afterEach(() => cleanup());\n\nconst api = vi.hoisted(() => ({
   login: vi.fn(),
   getCurrentUser: vi.fn(),
   getStores: vi.fn(),

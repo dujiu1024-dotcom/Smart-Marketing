@@ -39,7 +39,9 @@ DOUYIN_REQUIRED_SCOPES = frozenset({"user_info", "video.create", "video.list"})
 
 
 
-def _verify_douyin_webhook_signature(*, raw_body: bytes, signature: str, client_secret: str) -> bool:
+def _verify_douyin_webhook_signature(
+    *, raw_body: bytes, signature: str, client_secret: str
+) -> bool:
     if not signature or not client_secret:
         return False
     expected = hashlib.sha1(client_secret.encode("utf-8") + raw_body).hexdigest()
@@ -84,7 +86,11 @@ async def receive_douyin_webhook(
     if not settings.douyin_client_key or not settings.douyin_client_secret:
         raise ApiError(503, "CHANNEL_NOT_CONFIGURED", "Douyin channel is not configured")
     if payload.get("client_key") != settings.douyin_client_key:
-        raise ApiError(403, "WEBHOOK_CLIENT_MISMATCH", "Webhook client does not match configuration")
+        raise ApiError(
+            403,
+            "WEBHOOK_CLIENT_MISMATCH",
+            "Webhook client does not match configuration",
+        )
     signature = request.headers.get("X-Douyin-Signature", "")
     if not _verify_douyin_webhook_signature(
         raw_body=raw_body,

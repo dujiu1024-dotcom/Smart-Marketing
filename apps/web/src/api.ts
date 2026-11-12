@@ -257,3 +257,19 @@ export async function updateOffer(storeId: string, item: OfferRecord, input: Off
 export async function deleteOffer(storeId: string, item: OfferRecord): Promise<void> {
   return request(`/offers/${item.id}`, { method: "DELETE", headers: { "If-Match": String(item.current_version) } }, storeId);
 }
+
+export async function confirmStoreRecordFacts(
+  storeId: string,
+  resource: "products" | "offers",
+  item: ProductRecord | OfferRecord,
+): Promise<void> {
+  await request(`/${resource}/${item.id}/confirm-facts`, {
+    method: "POST",
+    headers: { "If-Match": String(item.current_version) },
+    body: JSON.stringify({
+      source_type: "merchant_ui_confirmation",
+      source_ref: `store-${resource}-page`,
+      confirmation_note: "由当前门店成员核对后确认",
+    }),
+  }, storeId);
+}

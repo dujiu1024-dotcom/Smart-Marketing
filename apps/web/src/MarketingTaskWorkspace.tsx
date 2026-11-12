@@ -381,7 +381,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     finally { setSaving(false); }
   }
 
-  async function acceptQuality(content: ChannelContentRecord, report: ChannelContentRecord["quality_reports"][number]) {
+  async function acceptQuality(report: ChannelContentRecord["quality_reports"][number]) {
     if (!task || saving || !qualityResolutionReason.trim()) return;
     setSaving(true); setError(""); setNotice("");
     try {
@@ -581,7 +581,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
             <p className="muted">内容指纹：{content.input_fingerprint.slice(0, 16)}… · 图片 {content.image_version_ids.length} 张</p>
             <div className="form-footer"><p>{report ? "最新质检：" + report.result + (resolution ? " · 人工决议：" + resolution.decision : "") : "尚无质检报告"}</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || content.status !== "ready"} onClick={() => void runQuality(content)}>运行结构质检</button></div></div>
             {report && <div className="muted"><p>规则版本：{report.rule_version} · {report.issues.length} 项问题</p>{report.issues.map((issue, index) => <p key={index}>{String(issue.code || "QUALITY_ISSUE")} · {String(issue.severity || "info")}</p>)}</div>}
-            {report?.result === "needs_human" && !resolution && <><label className="field"><span>人工复核理由</span><textarea rows={2} value={qualityResolutionReason} onChange={event => setQualityResolutionReason(event.target.value)} placeholder="说明已核对哪些经营事实及为何接受该质检提示" /></label><button className="secondary" type="button" disabled={saving || qualityResolutionReason.trim().length < 8} onClick={() => void acceptQuality(content, report)}>接受人工复核结果</button></>}
+            {report?.result === "needs_human" && !resolution && <><label className="field"><span>人工复核理由</span><textarea rows={2} value={qualityResolutionReason} onChange={event => setQualityResolutionReason(event.target.value)} placeholder="说明已核对哪些经营事实及为何接受该质检提示" /></label><button className="secondary" type="button" disabled={saving || qualityResolutionReason.trim().length < 8} onClick={() => void acceptQuality(report)}>接受人工复核结果</button></>}
             {report && (report.result === "pass" || (report.result === "needs_human" && resolution?.decision === "accepted")) && <button className="primary" type="button" disabled={saving || !taskFactSnapshots.some(fact => fact.confirmation_status === "confirmed")} onClick={() => void freezePackage(content, report)}>冻结为发布包（人工交付）</button>}
           </article>;
         })}</div>}

@@ -16,12 +16,12 @@ from store_operator.ai_gateway import (
     HttpProviderEnvironmentConfig,
     ProviderCallContext,
     ProviderCapability,
-    validate_structured_output,
     TextGenerateRequest,
     build_http_provider_registry,
     parse_and_validate_structured_output,
     render_published_prompt,
     validate_prompt_task_contract,
+    validate_structured_output,
 )
 from store_operator.ai_gateway.secrets import (
     EnvironmentSecretResolver,
@@ -80,7 +80,7 @@ def _load_executor() -> tuple[AIProviderExecutor, httpx.AsyncClient, str, str]:
             secret_resolver=resolver,
             client=client,
         )
-    except Exception:
+    except (SecretStoreError, ValueError, httpx.HTTPError):
         asyncio.run(client.aclose())
         raise _safe_error(
             "AI_PROVIDER_CONFIGURATION_INVALID",

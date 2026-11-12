@@ -85,6 +85,7 @@ describe("marketing task workspace", () => {
     fireEvent.change(screen.getByLabelText("任务名称 *"), { target: { value: "周末新品推广" } });
     fireEvent.change(screen.getByLabelText("经营目标 *"), { target: { value: "提高周末到店转化" } });
     fireEvent.change(screen.getByLabelText("目标客群"), { target: { value: "附近白领" } });
+    fireEvent.click(screen.getByLabelText("同时生成视频脚本文本（仅脚本，不生成视频）"));
     fireEvent.click(screen.getByRole("button", { name: "创建营销任务" }));
     await waitFor(() => expect(api.createMarketingTask).toHaveBeenCalledWith(
       storeId,
@@ -92,7 +93,7 @@ describe("marketing task workspace", () => {
         task_type: "full_marketing",
         title: "周末新品推广",
         requirement_draft: expect.objectContaining({ goal: "提高周末到店转化", target_audience: "附近白领" }),
-        task_options: expect.objectContaining({ includes_copy: true, includes_image: true, selected_channel_keys: ["douyin"] }),
+        task_options: expect.objectContaining({ includes_copy: true, includes_image: true, includes_video_script: true, selected_channel_keys: ["douyin"] }),
       }),
       expect.any(String),
     ));

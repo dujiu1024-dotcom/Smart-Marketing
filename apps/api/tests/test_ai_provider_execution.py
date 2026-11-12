@@ -7,10 +7,10 @@ from sqlalchemy import select
 
 from store_operator.ai_gateway import (
     AIProviderExecutor,
+    ProviderCallContext,
     ProviderCapability,
     ProviderDescriptor,
     ProviderRegistry,
-    ProviderCallContext,
     TextGenerateRequest,
     TextGenerateResponse,
 )

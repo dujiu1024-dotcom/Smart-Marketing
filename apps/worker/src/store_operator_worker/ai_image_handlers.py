@@ -8,8 +8,8 @@ from datetime import UTC, datetime
 from pathlib import PurePosixPath
 from uuid import UUID, uuid4
 
-import httpx
 from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 from store_operator.ai_gateway import (
     ImageEditRequest,
@@ -30,11 +30,11 @@ from store_operator.models import (
     MediaAsset,
     OutboxEvent,
     RequirementSnapshot,
-    StrategySnapshot,
     PromptVersion,
+    StrategySnapshot,
     TaskStep,
 )
-from store_operator.models.store_knowledge import product_media_assets
+from store_operator.models.store_knowledge import product_media_assets  # type: ignore[import-untyped]
 from store_operator.object_storage import (
     ObjectStorageNotConfigured,
     delete_object,
@@ -114,7 +114,7 @@ def _image_prompt_variables(
 
 
 def _resolve_source_asset(
-    db,
+    db: Session,
     *,
     task: MarketingTask,
     store_id: UUID,
@@ -435,15 +435,6 @@ def _complete_image(
         )
         base_variables = _image_prompt_variables(
             image_prompt_version,
-            task=task,
-            requirement=requirement,
-            strategy=strategy,
-            business_facts=business_facts,
-            revision_instruction=revision_instruction,
-            source_asset=source_asset,
-        )
-        vision_variables = _image_prompt_variables(
-            vision_version,
             task=task,
             requirement=requirement,
             strategy=strategy,

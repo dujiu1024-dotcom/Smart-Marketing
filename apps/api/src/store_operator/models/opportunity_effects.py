@@ -188,6 +188,18 @@ class MetricObservation(Base):
     __table_args__ = (
         UniqueConstraint("store_id", "deduplication_key",
             name="uq_metric_observations_store_dedupe"),
+        ForeignKeyConstraint(
+            ["store_id", "published_work_id"],
+            ["published_works.store_id", "published_works.id"],
+            name="fk_metric_observations_published_work_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "marketing_task_id"],
+            ["marketing_tasks.store_id", "marketing_tasks.id"],
+            name="fk_metric_observations_task_same_store",
+            ondelete="RESTRICT",
+        ),
         CheckConstraint("integrity_status IN ('complete', 'partial', 'anomalous', 'unknown')",
             name="integrity_status"),
         CheckConstraint("authenticity_status IN ('official_api', 'verified_import', 'merchant_reported', 'demo_sample')", name="authenticity_status"),  # noqa: E501
@@ -226,6 +238,8 @@ class MetricObservation(Base):
         ForeignKey("metric_observations.id", ondelete="RESTRICT"))
     import_batch_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True),
         ForeignKey("metric_import_batches.id", ondelete="RESTRICT"))
+    published_work_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    marketing_task_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         server_default=func.now(), nullable=False)
 
@@ -266,3 +280,267 @@ class MetricImportBatch(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+class PublishedWork(Base):
+    __tablename__ = "published_works"
+    __table_args__ = (
+        UniqueConstraint("store_id", "id", name="uq_published_works_store_id"),
+        UniqueConstraint(
+            "store_id",
+            "channel_key",
+            "external_work_id",
+            name="uq_published_works_store_channel_external",
+        ),
+        UniqueConstraint(
+            "store_id",
+            "publish_operation_id",
+            name="uq_published_works_store_publish_operation",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "task_id"],
+            ["marketing_tasks.store_id", "marketing_tasks.id"],
+            name="fk_published_works_task_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "publish_operation_id"],
+            ["publish_operations.store_id", "publish_operations.id"],
+            name="fk_published_works_operation_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "channel_account_id"],
+            ["channel_accounts.store_id", "channel_accounts.id"],
+            name="fk_published_works_account_same_store",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "ownership_status IN ('pending_verification', 'verified_system_publish', "
+            "'verified_platform_api', 'merchant_claim', 'rejected', 'revoked')",
+            name="ownership_status",
+        ),
+        CheckConstraint(
+            "ownership_status NOT IN ('verified_system_publish', 'verified_platform_api') "
+            "OR verified_at IS NOT NULL",
+            name="verified_ownership_requires_timestamp",
+        ),
+        Index("ix_published_works_store_channel_published", "store_id", "channel_key", "published_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False
+    )
+    task_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    publish_operation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    channel_account_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    channel_key: Mapped[str] = mapped_column(String(48), nullable=False)
+    external_work_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(300))
+    permalink: Mapped[str | None] = mapped_column(String(2048))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ownership_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="pending_verification"
+    )
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_snapshot_json: Mapped[dict[str, object]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class WorkOwnershipEvidence(Base):
+    __tablename__ = "work_ownership_evidence"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["store_id", "published_work_id"],
+            ["published_works.store_id", "published_works.id"],
+            name="fk_work_ownership_evidence_work_same_store",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "evidence_type IN ('system_publish_readback', 'platform_api', "
+            "'merchant_attestation', 'external_import')",
+            name="evidence_type",
+        ),
+        CheckConstraint(
+            "evidence_status IN ('pending', 'verified', 'rejected', 'revoked')",
+            name="evidence_status",
+        ),
+        Index("ix_work_ownership_evidence_work_status", "store_id", "published_work_id", "evidence_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False
+    )
+    published_work_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    evidence_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    evidence_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="pending")
+    source_system: Mapped[str] = mapped_column(String(80), nullable=False)
+    evidence_ref: Mapped[str | None] = mapped_column(String(2048))
+    evidence_payload_json: Mapped[dict[str, object]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    verified_by_user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class BusinessOutcomeEvidence(Base):
+    __tablename__ = "business_outcome_evidence"
+    __table_args__ = (
+        UniqueConstraint("store_id", "id", name="uq_business_outcome_evidence_store_id"),
+        UniqueConstraint(
+            "store_id",
+            "deduplication_key",
+            name="uq_business_outcome_evidence_store_dedupe",
+        ),
+        CheckConstraint(
+            "outcome_type IN ('revenue', 'orders', 'redemptions', 'store_visits', 'leads')",
+            name="outcome_type",
+        ),
+        CheckConstraint(
+            "authenticity_status IN ('official_api', 'verified_import', "
+            "'merchant_reported', 'demo_sample')",
+            name="authenticity_status",
+        ),
+        CheckConstraint(
+            "integrity_status IN ('complete', 'partial', 'anomalous', 'unknown')",
+            name="integrity_status",
+        ),
+        CheckConstraint("value_numeric >= 0", name="value_nonnegative"),
+        Index("ix_business_outcome_evidence_store_occurred", "store_id", "occurred_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False
+    )
+    outcome_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    value_numeric: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+    currency: Mapped[str | None] = mapped_column(String(3))
+    source_system: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_record_id: Mapped[str | None] = mapped_column(String(300))
+    source_evidence_ref: Mapped[str | None] = mapped_column(String(2048))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    authenticity_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    integrity_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="unknown")
+    deduplication_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    imported_by_user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AttributionEvidence(Base):
+    __tablename__ = "attribution_evidence"
+    __table_args__ = (
+        UniqueConstraint(
+            "store_id",
+            "outcome_evidence_id",
+            "marketing_task_id",
+            name="uq_attribution_evidence_store_outcome_task",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "marketing_task_id"],
+            ["marketing_tasks.store_id", "marketing_tasks.id"],
+            name="fk_attribution_evidence_task_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "published_work_id"],
+            ["published_works.store_id", "published_works.id"],
+            name="fk_attribution_evidence_work_same_store",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "outcome_evidence_id"],
+            ["business_outcome_evidence.store_id", "business_outcome_evidence.id"],
+            name="fk_attribution_evidence_outcome_same_store",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "attribution_method IN ('direct_code', 'platform_reported', "
+            "'temporal_association', 'manual_claim')",
+            name="attribution_method",
+        ),
+        CheckConstraint("evidence_strength IN ('strong', 'medium', 'weak')", name="evidence_strength"),
+        CheckConstraint("status IN ('active', 'superseded', 'rejected')", name="status"),
+        CheckConstraint(
+            "allocation_percent > 0 AND allocation_percent <= 100",
+            name="allocation_percent_range",
+        ),
+        Index("ix_attribution_evidence_store_task_status", "store_id", "marketing_task_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False
+    )
+    marketing_task_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    published_work_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    outcome_evidence_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    attribution_method: Mapped[str] = mapped_column(String(32), nullable=False)
+    evidence_strength: Mapped[str] = mapped_column(String(16), nullable=False)
+    allocation_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, server_default="100")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="active")
+    attribution_snapshot_json: Mapped[dict[str, object]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class DataSourceCapabilitySnapshot(Base):
+    __tablename__ = "data_source_capability_snapshots"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('unsupported', 'pending', 'available', 'reauth_required', 'failed')",
+            name="status",
+        ),
+        UniqueConstraint(
+            "store_id",
+            "channel_key",
+            "capability_key",
+            "snapshot_version",
+            name="uq_data_source_capability_snapshot_version",
+        ),
+        Index(
+            "ix_data_source_capability_snapshots_store_checked",
+            "store_id",
+            "checked_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False
+    )
+    channel_key: Mapped[str] = mapped_column(String(48), nullable=False)
+    capability_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    required_scopes_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
+    )
+    granted_scopes_json: Mapped[list[str]] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
+    )
+    evidence_ref: Mapped[str | None] = mapped_column(String(2048))
+    snapshot_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot_json: Mapped[dict[str, object]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+    checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+

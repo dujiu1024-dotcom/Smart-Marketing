@@ -1053,6 +1053,7 @@ export interface MetricObservationRecord {
   import_batch_id: string | null;
   published_work_id: string | null;
   marketing_task_id: string | null;
+  observation_window_status: string;
 }
 export interface DataSourceCapabilitySnapshotRecord {
   id: string; channel_key: string; capability_key: string; status: string;

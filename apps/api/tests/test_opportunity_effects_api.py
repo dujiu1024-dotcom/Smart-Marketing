@@ -249,3 +249,79 @@ def test_adopted_opportunity_handoff_creates_store_scoped_immutable_snapshot(
     assert updated.status_code == 200, updated.text
     assert updated.json()["task_options"]["opportunity_snapshot"] == snapshot
     assert updated.json()["task_options"]["opportunity_applicable"] is True
+
+
+def test_manual_observation_correction_appends_without_mutating_original(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store = _identity(db_session, "correction@example.com", "Correction Shop")
+    db_session.add(
+        MetricDefinition(
+            id=uuid4(),
+            source_system="manual",
+            metric_key="views",
+            metric_tier="content_performance",
+            display_name="播放/浏览",
+            value_type="count",
+            definition="Views within a period",
+            aggregation_rule="sum",
+            period_semantics="period_delta",
+            definition_version=1,
+            status="active",
+        )
+    )
+    db_session.flush()
+    headers = _login(identity_client, "correction@example.com", store.id)
+    original_response = identity_client.post(
+        "/api/v1/effects/observations",
+        headers=headers,
+        json={
+            "metric_key": "views",
+            "value_numeric": "125",
+            "period_start": "2026-11-01T00:00:00+09:00",
+            "period_end": "2026-11-02T00:00:00+09:00",
+            "period_timezone": "Asia/Tokyo",
+            "source_record_id": "merchant-report-1",
+        },
+    )
+    assert original_response.status_code == 200, original_response.text
+    original = original_response.json()["item"]
+
+    correction = identity_client.post(
+        f"/api/v1/effects/observations/{original['id']}/corrections",
+        headers=headers,
+        json={
+            "metric_key": "views",
+            "value_numeric": "140",
+            "period_start": "2026-11-01T00:00:00+09:00",
+            "period_end": "2026-11-02T00:00:00+09:00",
+            "period_timezone": "Asia/Tokyo",
+            "source_record_id": "merchant-report-1-corrected",
+            "source_evidence_ref": "merchant correction note",
+        },
+    )
+    assert correction.status_code == 200, correction.text
+    corrected = correction.json()["item"]
+    assert corrected["supersedes_observation_id"] == original["id"]
+    assert corrected["value_numeric"] == "140"
+    assert corrected["authenticity_status"] == "merchant_reported"
+
+    history = identity_client.get("/api/v1/effects/observations", headers=headers)
+    assert history.status_code == 200, history.text
+    by_id = {item["id"]: item for item in history.json()["items"]}
+    assert by_id[original["id"]]["value_numeric"] == "125"
+    assert by_id[corrected["id"]]["value_numeric"] == "140"
+
+    duplicate = identity_client.post(
+        f"/api/v1/effects/observations/{original['id']}/corrections",
+        headers=headers,
+        json={
+            "metric_key": "views",
+            "value_numeric": "150",
+            "period_timezone": "Asia/Tokyo",
+        },
+    )
+    assert duplicate.status_code == 409

@@ -470,6 +470,7 @@ class AttributionEvidence(Base):
             unique=True,
             postgresql_where=text("status = 'active'"),
         ),
+        UniqueConstraint("store_id", "id", name="uq_attribution_evidence_store_id"),
         UniqueConstraint(
             "store_id",
             "outcome_evidence_id",

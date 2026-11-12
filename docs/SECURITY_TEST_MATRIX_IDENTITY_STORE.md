@@ -129,3 +129,33 @@
 | ADMIN-10 | 平台成员管理范围 | 管理员读取成员关系最小字段 | 允许；响应不含业务资料/营销内容 |
 | ADMIN-11 | 平台身份不能访问门店业务 | 管理员无 StoreMembership，调用门店任务/素材 API | 404 |
 | ADMIN-12 | 邀请流程未冻结 | 调用尚未启用的邀请端点 | 不得返回成功；明确功能未启用 |
+
+
+## 当前实现与覆盖盘点（2026-11-12，Issue #135 审计）
+
+以下是代码存在性盘点，不代表每个场景已在当前 PR 的 CI 中通过，也不代表完整矩阵覆盖。
+
+| 领域 | 主干已有自动化证据 | 尚未证明完整的缺口 |
+|---|---|---|
+| 认证 / Session | `test_identity.py` 覆盖登录 Cookie/CSRF、登录限流、Session 过期/撤销、登出全部设备、密码轮换、双标签页请求门店上下文、成员撤销即时生效、审计追加写 | 匿名与无效 Cookie 全矩阵、禁用用户、token 轮换边界、CORS 凭据、所有 Origin/CSRF 组合仍需逐项核验 |
+| 门店上下文 / 成员 | `test_identity.py` 覆盖请求级门店选择器、非成员门店拒绝、双标签页隔离、成员撤销后拒绝 | 门店停用、成员角色变更、最后 owner、并发撤销与 TOCTOU 的完整组合仍需补证 |
+| 门店资料 / 商品 / 活动 / 素材 | `test_store_knowledge_api.py` 覆盖资料/商品租户范围、商品跨店读取拒绝、活动/知识/品牌/客群事实确认、素材上传校验、权限和归档约束 | 各资源详情/更新/删除/下载/批量路径的 A→B 与 B→A 矩阵、上传回调归属和无副作用断言仍需补齐 |
+| 营销任务 | `test_marketing_task_api.py` 覆盖任务列表/详情门店隔离、创建幂等、确认快照、恢复/取消/归档 | 跨店写入、路径 ID 与 body ID 混用、并发操作及所有状态转换的资源级 IDOR 仍需补齐 |
+| 内容版本 / 审核 | `test_content_delivery_api.py`、`test_content_delivery_models.py` 覆盖版本绑定、审核版本绑定和同店约束 | Artifact/Version 的跨店详情、读取、恢复等 API IDOR 矩阵尚未证明完整 |
+| 质检 / 发布包 | `test_content_quality_api.py`、`test_publish_package_api.py` 覆盖当前文案审核门禁、幂等、质检阻断、已确认事实和发布包约束 | 跨店读取、冻结、确认、操作及所有关联 ID 替换的 404/无副作用断言仍需补齐 |
+| 渠道账号 / Provider | `test_channel_spec_api.py`、`test_channel_delivery_security.py`、抖音 Adapter/Webhook 测试覆盖渠道规格授权、密钥存储、OAuth state、发布确认和回读核验 | ChannelAccount 资源跨店访问、凭据状态泄露、授权撤销后的访问矩阵仍需补齐 |
+| Job / AI Invocation | `test_job_runtime_api.py`、`test_ai_invocation_service.py` 覆盖 Job 和 AI Invocation 门店范围、取消/重试/人工恢复；`test_job_runtime_service.py` 覆盖幂等、租约 fencing、超时恢复、重复投递相关服务规则和未知副作用 | Job 创建后成员撤销、资源归属不一致、Worker 执行前权限重验及完整 API 越权矩阵仍需补齐 |
+| 日志 / Trace | `test_observability.py`、`test_tracing.py`、`test_health.py` 覆盖递归敏感字段脱敏、Trace 导出、请求 ID 和错误响应 | Cookie/Token/个人数据在所有日志、Trace、Provider 错误和 Worker 日志路径的端到端脱敏仍需补证 |
+| 文件 / 缓存 / 并发 | `test_object_storage_download.py` 与素材 API 测试覆盖部分下载和素材授权边界 | 缓存串店、对象直链、连接池上下文泄漏、并发切店、授权后撤销再写入等场景仍需自动化验证 |
+
+### Issue #135 本轮 E2E 状态
+
+- 原有 `apps/web/e2e/smoke.py` 只验证生产 Web 登录入口，不是完整营销业务 E2E。
+- 原有 `apps/e2e/demo_smoke.py` 主要验证 Demo 路由、Tab、编辑页和浏览器历史，不覆盖完整业务提交流程。
+- PR #141 在 `apps/e2e/demo_smoke.py` 增加需求/策略门禁、文案审核、图片审核、渠道预览、质检、最终确认、发布包冻结及刷新恢复流程。该新增测试必须以 PR CI 实际结果为准。
+
+### 生产运维质量门禁状态
+
+- 主干已有 JSON 结构化日志、请求 ID、OpenTelemetry Trace、递归脱敏及健康检查。
+- Issue #135 分支新增 PostgreSQL custom-format 备份与显式确认恢复脚本，并在 CI Infrastructure Job 中加入备份/破坏性恢复演练。
+- 监控告警规则/告警路由、故障注入和恢复演练记录仍需单独核验；不能用日志或健康检查代替告警能力。

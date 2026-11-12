@@ -500,3 +500,13 @@ Job Runtime API 是平台内部/受权限保护的运维能力，不向普通商
 - 新增 PostgreSQL 集成测试覆盖 Worker 崩溃后租约过期、Attempt 标记 lease_expired、Job 进入人工对账、审计事件保留原 lease token，以及重复 Sweeper 不重复恢复。
 - 该路径不自动重跑任务：租约过期时外部副作用可能已经发生，必须先对账，再由授权人员执行带幂等键的恢复操作。
 - 测试在 PR CI 中执行；本地未执行（当前通过 GitHub 远程仓库工作流验证）。
+
+
+## 2026-11-12 MediaAsset 安全扫描 Job
+
+- `complete_asset_upload` 在创建 MediaAsset、更新 UploadIntent 为 scanning 的同一 PostgreSQL 事务内创建 `store.asset.scan` Job 与 `job.dispatch_requested` Outbox 事件；避免提交成功后进程崩溃导致素材永不扫描。
+- Job payload 仅引用 `asset_id` 与 `upload_intent_id`，Worker 重新按 `context.store_id` 查询并加行锁，不信任客户端传入对象 key。
+- Worker 从私有对象存储读取对象，再次校验字节数和 SHA-256；随后通过 ClamAV TCP INSTREAM 协议扫描，不在日志或 Job 结果中记录原始内容/病毒样本。
+- clean → MediaAsset.ready / UploadIntent.completed；malware 或对象完整性失败 → rejected；扫描服务或对象存储错误按 Job 重试，耗尽后写入 scan_failed 并保持下载关闭。
+- `scan_failed` 允许归档但不允许确认使用权或下载；商家重新上传新版本素材。Worker 不自动把扫描失败降级为 ready。
+- Compose Worker/Scheduler 依赖 ClamAV 健康检查；生产必须显式配置 ASSET_SCANNER_HOST/PORT/TIMEOUT。

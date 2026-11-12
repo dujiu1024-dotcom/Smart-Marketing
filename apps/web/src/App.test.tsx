@@ -67,6 +67,7 @@ describe("store profile workspace", () => {
 
   it("loads a real store profile and saves it with the current version", async () => {
     render(<App />);
+    await screen.findByRole("heading", { name: "登录门店工作台" });
     fireEvent.change(screen.getByLabelText("邮箱 *"), { target: { value: user.email } });
     fireEvent.change(screen.getByLabelText("密码 *"), { target: { value: "correct-password" } });
     fireEvent.click(screen.getByRole("button", { name: "登录" }));

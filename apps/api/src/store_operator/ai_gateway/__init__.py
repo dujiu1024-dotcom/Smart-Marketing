@@ -17,16 +17,16 @@ from store_operator.ai_gateway.prompt_runtime import (
     render_published_prompt,
     validate_json_schema,
 )
-from store_operator.ai_gateway.provider_config import (
-    HttpProviderBundle,
-    HttpProviderEnvironmentConfig,
-    build_http_provider_registry,
-)
 from store_operator.ai_gateway.protocols import (
     ImageProvider,
     OCRProvider,
     TextProvider,
     VisionProvider,
+)
+from store_operator.ai_gateway.provider_config import (
+    HttpProviderBundle,
+    HttpProviderEnvironmentConfig,
+    build_http_provider_registry,
 )
 from store_operator.ai_gateway.registry import ProviderRegistry
 from store_operator.ai_gateway.schemas import (

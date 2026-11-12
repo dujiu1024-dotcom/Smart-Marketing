@@ -63,9 +63,13 @@ def _parse_published(value: str) -> datetime | None:
         return None
     try:
         parsed = parsedate_to_datetime(value)
-        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
     except (TypeError, ValueError, OverflowError):
-        return None
+        try:
+            # Atom timestamps are RFC 3339 / ISO 8601, unlike RSS pubDate.
+            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except (TypeError, ValueError, OverflowError):
+            return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
 def _parse_feed(payload: bytes) -> list[dict[str, object]]:

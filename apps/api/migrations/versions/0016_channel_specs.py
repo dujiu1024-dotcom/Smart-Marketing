@@ -96,15 +96,18 @@ def upgrade() -> None:
     op.execute(
         """
         UPDATE channel_specs AS spec
-        SET current_version_id = latest.id,
-            updated_at = now()
-        FROM LATERAL (
+        SET current_version_id = (
             SELECT version.id
             FROM channel_spec_versions AS version
             WHERE version.channel_spec_id = spec.id
             ORDER BY version.spec_version DESC
             LIMIT 1
-        ) AS latest
+        ),
+        updated_at = now()
+        WHERE EXISTS (
+            SELECT 1 FROM channel_spec_versions AS version
+            WHERE version.channel_spec_id = spec.id
+        )
         """
     )
 

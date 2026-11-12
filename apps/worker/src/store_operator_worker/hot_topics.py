@@ -53,7 +53,7 @@ def _allowed_hosts() -> set[str]:
 
 
 class _PinnedSyncBackend(httpcore.SyncBackend):
-    """Connect to the exact public IP validated before the request; preserve URL host for TLS SNI."""
+    """Connect to the validated IP while preserving the URL hostname for TLS SNI."""
 
     def __init__(self, hostname: str, address: str) -> None:
         self.hostname = hostname.lower()
@@ -72,13 +72,23 @@ class _PinnedSyncBackend(httpcore.SyncBackend):
 
 def _assert_public_host(host: str, allowed: set[str]) -> str:
     if host.lower() not in allowed:
-        raise JobExecutionError("SOURCE_HOST_NOT_ALLOWED", "Feed host is not in the configured allowlist.", retryable=False)
+        raise JobExecutionError(
+            "SOURCE_HOST_NOT_ALLOWED",
+            "Feed host is not in the configured allowlist.",
+            retryable=False,
+        )
     try:
         addresses = {item[4][0] for item in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)}
     except OSError as exc:
-        raise JobExecutionError("SOURCE_DNS_FAILED", "Feed host could not be resolved.", retryable=True) from exc
+        raise JobExecutionError(
+            "SOURCE_DNS_FAILED", "Feed host could not be resolved.", retryable=True
+        ) from exc
     if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
-        raise JobExecutionError("SOURCE_HOST_NOT_PUBLIC", "Feed host resolves to a non-public network address.", retryable=False)
+        raise JobExecutionError(
+            "SOURCE_HOST_NOT_PUBLIC",
+            "Feed host resolves to a non-public network address.",
+            retryable=False,
+        )
     return sorted(addresses)[0]
 
 
@@ -88,9 +98,21 @@ def _safe_https_url(value: str, allowed: set[str]) -> tuple[str, str]:
     try:
         port = parsed.port
     except ValueError as exc:
-        raise JobExecutionError("SOURCE_URL_INVALID", "Source URL port is invalid.", retryable=False) from exc
-    if parsed.scheme != "https" or not host or parsed.username or parsed.password or port not in {None, 443}:
-        raise JobExecutionError("SOURCE_URL_INVALID", "Source URL must use credential-free HTTPS on port 443.", retryable=False)
+        raise JobExecutionError(
+            "SOURCE_URL_INVALID", "Source URL port is invalid.", retryable=False
+        ) from exc
+    if (
+        parsed.scheme != "https"
+        or not host
+        or parsed.username
+        or parsed.password
+        or port not in {None, 443}
+    ):
+        raise JobExecutionError(
+            "SOURCE_URL_INVALID",
+            "Source URL must use credential-free HTTPS on port 443.",
+            retryable=False,
+        )
     address = _assert_public_host(host, allowed)
     return value, address
 
@@ -288,8 +310,16 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
         cast(Any, transport)._pool._network_backend = _PinnedSyncBackend(
             (urlsplit(feed_url).hostname or "").lower(), feed_ip
         )
-        with httpx.Client(transport=transport, timeout=HTTP_TIMEOUT, follow_redirects=False,
-                          headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml"}) as client:
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml",
+        }
+        with httpx.Client(
+            transport=transport,
+            timeout=HTTP_TIMEOUT,
+            follow_redirects=False,
+            headers=headers,
+        ) as client:
             with client.stream("GET", feed_url) as response:
                 response.raise_for_status()
                 chunks: list[bytes] = []
@@ -307,7 +337,11 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
     except JobExecutionError:
         raise
     except (httpx.HTTPError, OSError) as exc:
-        raise JobExecutionError("SOURCE_FETCH_FAILED", "Feed request failed; retry according to the source policy.", retryable=True) from exc
+        raise JobExecutionError(
+            "SOURCE_FETCH_FAILED",
+            "Feed request failed; retry according to the source policy.",
+            retryable=True,
+        ) from exc
 
     now = datetime.now(UTC)
     inserted = 0
@@ -319,7 +353,13 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
             continue
         parsed_link = urlsplit(link)
         link_host = (parsed_link.hostname or "").lower()
-        if parsed_link.scheme != "https" or not link_host or parsed_link.username or parsed_link.password or link_host not in allowed:
+        if (
+            parsed_link.scheme != "https"
+            or not link_host
+            or parsed_link.username
+            or parsed_link.password
+            or link_host not in allowed
+        ):
             continue
         summary = str(entry.get("summary") or "")[:5000]
         fingerprint = hashlib.sha256(f"{link}|{title}".encode()).hexdigest()

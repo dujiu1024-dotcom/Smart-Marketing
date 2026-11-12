@@ -737,6 +737,8 @@ def effects_overview(
         else:
             aggregate = sum(numeric_values, Decimal("0"))
         first = samples[0][0]
+        if first.period_start is None or first.period_end is None:
+            continue
         zone = ZoneInfo(first.period_timezone)
         period_start = first.period_start.astimezone(zone)
         period_end = first.period_end.astimezone(zone)
@@ -880,16 +882,16 @@ def effects_overview(
         ]
         for source_system, channel_key, numerator_points in numerator_series:
             for numerator_point in numerator_points:
-                period_key = (
+                conversion_period_key = (
                     str(numerator_point["period_start"]),
                     str(numerator_point["period_end"]),
                     str(numerator_point["timezone"]),
                 )
                 numerator_candidates = period_index.get(
-                    (numerator_key, source_system, channel_key, *period_key), []
+                    (numerator_key, source_system, channel_key, *conversion_period_key), []
                 )
                 denominator_candidates = period_index.get(
-                    (denominator_key, source_system, channel_key, *period_key), []
+                    (denominator_key, source_system, channel_key, *conversion_period_key), []
                 )
                 if len(numerator_candidates) != 1 or len(denominator_candidates) != 1:
                     continue
@@ -1015,49 +1017,50 @@ def effects_overview(
     for observation, definition, work in content_rows:
         if observation.period_start is None or observation.period_end is None:
             continue
-        period_key = "|".join(
+        content_period_key = "|".join(
             [
                 observation.period_start.isoformat(),
                 observation.period_end.isoformat(),
                 observation.period_timezone,
             ]
         )
-        group_key = "|".join(
+        content_decision_key = "|".join(
             [
                 str(work.id),
                 observation.metric_key,
                 observation.source_system,
                 str(definition.definition_version),
-                period_key,
+                content_period_key,
             ]
         )
-        content_groups.setdefault(group_key, []).append((observation, definition, work))
+        content_groups.setdefault(content_decision_key, []).append((observation, definition, work))
 
     content_periods: dict[str, list[dict[str, object]]] = {}
-    for samples in content_groups.values():
-        observation, definition, work = samples[0]
-        values = [
-            sample.value_numeric
-            for sample, _, _ in samples
-            if sample.value_numeric is not None
-        ]
-        if not values:
+    for content_samples in content_groups.values():
+        observation, definition, work = content_samples[0]
+        content_values: list[Decimal] = []
+        for content_observation, _, _ in content_samples:
+            if content_observation.value_numeric is not None:
+                content_values.append(content_observation.value_numeric)
+        if not content_values:
             continue
         rule = definition.aggregation_rule
         if definition.period_semantics == "cumulative_snapshot" or rule == "latest":
-            aggregate = values[0]
+            content_aggregate = content_values[0]
         elif rule == "avg":
-            aggregate = sum(values) / Decimal(len(values))
+            content_aggregate = sum(content_values) / Decimal(len(content_values))
         elif rule == "max":
-            aggregate = max(values)
+            content_aggregate = max(content_values)
         elif rule == "min":
-            aggregate = min(values)
+            content_aggregate = min(content_values)
         else:
-            aggregate = sum(values, Decimal("0"))
+            content_aggregate = sum(content_values, Decimal("0"))
+        if observation.period_start is None or observation.period_end is None:
+            continue
         zone = ZoneInfo(observation.period_timezone)
-        period_start = observation.period_start.astimezone(zone)
-        period_end = observation.period_end.astimezone(zone)
-        group_key = "|".join(
+        content_period_start = observation.period_start.astimezone(zone)
+        content_period_end = observation.period_end.astimezone(zone)
+        content_group_key = "|".join(
             [
                 str(work.id),
                 observation.metric_key,
@@ -1065,7 +1068,7 @@ def effects_overview(
                 str(definition.definition_version),
             ]
         )
-        content_periods.setdefault(group_key, []).append(
+        content_periods.setdefault(content_group_key, []).append(
             {
                 "published_work_id": str(work.id),
                 "marketing_task_id": str(work.task_id) if work.task_id else None,
@@ -1075,10 +1078,10 @@ def effects_overview(
                 "source_system": observation.source_system,
                 "definition_version": definition.definition_version,
                 "display_name": definition.display_name,
-                "period_start": period_start.isoformat(),
-                "period_end": period_end.isoformat(),
-                "value": str(aggregate),
-                "sample_count": len(values),
+                "period_start": content_period_start.isoformat(),
+                "period_end": content_period_end.isoformat(),
+                "value": str(content_aggregate),
+                "sample_count": len(content_values),
                 "timezone": observation.period_timezone,
             }
         )
@@ -2090,7 +2093,7 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             for row_index, row_node in enumerate(sheet_data.findall("main:row", ns), start=1):
                 if row_index > 10001:
                     raise ValueError("Worksheet exceeds the 10,000-row limit")
-                cells = []
+                cells: list[object | None] = []
                 for cell in row_node.findall("main:c", ns):
                     reference = cell.attrib.get("r", "")
                     column_letters = re.match(r"[A-Z]+", reference.upper())
@@ -2109,19 +2112,21 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                         )
                     cell_type = cell.attrib.get("t")
                     value_node = cell.find("main:v", ns)
-                    value = value_node.text if value_node is not None else None
-                    if cell_type == "s" and value is not None:
-                        value = shared_strings[int(value)]
+                    cell_value: str | datetime | None = (
+                        value_node.text if value_node is not None else None
+                    )
+                    if cell_type == "s" and cell_value is not None:
+                        cell_value = shared_strings[int(cell_value)]
                     elif cell_type == "inlineStr":
                         inline = cell.find("main:is", ns)
-                        value = "".join(inline.itertext()) if inline is not None else ""
-                    elif cell_type == "b" and value is not None:
-                        value = "true" if value == "1" else "false"
-                    elif cell_type == "d" and value:
-                        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
-                    elif value is not None and int(cell.attrib.get("s", "0")) in date_style_ids:
-                        value = datetime(1899, 12, 30) + timedelta(days=float(value))
-                    cells[column_index - 1] = value
+                        cell_value = "".join(inline.itertext()) if inline is not None else ""
+                    elif cell_type == "b" and cell_value is not None:
+                        cell_value = "true" if cell_value == "1" else "false"
+                    elif cell_type == "d" and isinstance(cell_value, str):
+                        cell_value = datetime.fromisoformat(cell_value.replace("Z", "+00:00"))
+                    elif isinstance(cell_value, str) and int(cell.attrib.get("s", "0")) in date_style_ids:
+                        cell_value = datetime(1899, 12, 30) + timedelta(days=float(cell_value))
+                    cells[column_index - 1] = cell_value
                 parsed_rows.append(cells)
             if not parsed_rows:
                 raise ValueError("Worksheet is empty")
@@ -2146,8 +2151,8 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             for row_number, row_values in enumerate(parsed_rows[1:], start=2):
                 mapped = {}
                 for index, key in enumerate(normalized_headers):
-                    value = row_values[index] if index < len(row_values) else None
-                    if isinstance(value, date) and key in {"period_start", "period_end"}:
+                    row_value: object | None = row_values[index] if index < len(row_values) else None
+                    if isinstance(row_value, date) and key in {"period_start", "period_end"}:
                         timezone_index = normalized_headers.index("period_timezone")
                         timezone_value = (
                             row_values[timezone_index]
@@ -2162,17 +2167,17 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                                 f"Row {row_number}: period_timezone must be a valid IANA timezone"
                             ) from exc
                         if isinstance(value, datetime):
-                            value = value.replace(tzinfo=zone) if value.tzinfo is None else value
+                            row_value = row_value.replace(tzinfo=zone) if row_value.tzinfo is None else row_value
                         else:
-                            value = datetime.combine(value, datetime.min.time(), tzinfo=zone)
-                        value = value.isoformat()
-                    elif value is None:
-                        value = ""
-                    elif isinstance(value, float) and not math.isfinite(value):
+                            row_value = datetime.combine(row_value, datetime.min.time(), tzinfo=zone)
+                        row_value = row_value.isoformat()
+                    elif row_value is None:
+                        row_value = ""
+                    elif isinstance(row_value, float) and not math.isfinite(row_value):
                         raise ValueError(f"Row {row_number}: non-finite numeric cell")
                     else:
-                        value = str(value)
-                    mapped[key] = value
+                        row_value = str(row_value)
+                    mapped[key] = str(row_value)
                 writer.writerow(mapped)
     except ApiError:
         raise

@@ -110,3 +110,17 @@ h1 { margin: 0; color: #1f3029; font-size: clamp(25px, 3vw, 32px); letter-spacin
 .product-check-list { margin-top: 16px; }
 .product-check { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid #e8ede9; border-radius: 8px; background: #fbfcfb; color: #526158; font-size: 12px; }
 .product-check input { width: 15px; min-height: 15px; margin: 0; accent-color: #356c50; }
+
+
+.asset-upload-button { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 17px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.asset-upload-button input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.asset-policy { margin: -8px 0 18px; padding: 13px 15px; border: 1px solid #e5eae6; border-radius: 9px; background: #fafcfb; color: #68766e; font-size: 12px; line-height: 1.7; }
+.asset-rights-form { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(280px, 1.2fr); gap: 14px; margin-top: 17px; padding: 16px; border: 1px solid #e6ece7; border-radius: 9px; background: #fbfcfb; }
+.asset-rights-form .catalog-actions { grid-column: 1 / -1; margin-top: 0; padding-top: 0; border-top: 0; }
+.asset-preview { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; padding: 14px 16px; border: 1px solid #e5eae6; border-radius: 9px; background: #fff; font-size: 13px; }
+.asset-preview a { color: #356c50; }
+@media (max-width: 640px) {
+  .asset-rights-form { grid-template-columns: 1fr; }
+  .asset-rights-form .catalog-actions { grid-column: auto; }
+  .asset-preview { align-items: flex-start; flex-direction: column; }
+}

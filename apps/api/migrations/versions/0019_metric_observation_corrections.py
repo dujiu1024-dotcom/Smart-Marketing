@@ -7,7 +7,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0019_metric_observation_corrections"
+revision: str = "0019_metric_obs_corrections"
 down_revision: str | None = "0018_opportunity_effects"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None

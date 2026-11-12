@@ -430,12 +430,16 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           const body = typeof content.body === "string" ? content.body : "";
           const titleText = typeof content.title === "string" ? content.title : "";
           const asset = current?.source_refs.find(ref => ref.type === "media_asset");
+          const reviews = current?.reviews || [];
+          const latestReview = reviews[reviews.length - 1];
+          const reviewLabels: Record<string, string> = { approved: "审核通过", revision_requested: "需要修改", rejected: "已拒绝" };
           return <article className="task-content-artifact" key={artifact.id}>
-            <div className="task-step-title"><strong>{artifact.artifact_type === "copy" ? "文案产物" : "图片产物"}</strong><span className="status-chip">{current ? `当前版本 V${current.version_no}` : "无当前版本"}</span></div>
+            <div className="task-step-title"><strong>{artifact.artifact_type === "copy" ? "文案产物" : "图片产物"}</strong><span className="status-chip">{current ? `当前版本 V${current.version_no} · ${latestReview ? reviewLabels[latestReview.decision] : "待审核"}` : "无当前版本"}</span></div>
             {current && artifact.artifact_type === "copy" && <div className="task-readonly-grid"><div><strong>{titleText || "未填写标题"}</strong><span>{body}</span></div></div>}
             {current && artifact.artifact_type === "image" && <p className="muted">已关联素材引用：{asset && typeof asset.id === "string" ? asset.id : current.content_hash}</p>}
             <p className="muted">版本历史：{artifact.versions.map(version => `V${version.version_no}`).join(" · ")}</p>
-            {current && <div className="task-step-actions">
+            {latestReview && <p className="muted">最近审核：{reviewLabels[latestReview.decision]} · {new Date(latestReview.created_at).toLocaleString()}{latestReview.comment ? ` · ${latestReview.comment}` : ""}</p>}
+            {current && !latestReview && <div className="task-step-actions">
               <button className="text-button" type="button" disabled={saving} onClick={() => void reviewArtifact(artifact, current, "approved")}>审核通过</button>
               <button className="text-button" type="button" disabled={saving || !reviewComment.trim()} onClick={() => void reviewArtifact(artifact, current, "revision_requested")}>要求修改</button>
               <button className="text-button" type="button" disabled={saving} onClick={() => void reviewArtifact(artifact, current, "rejected")}>拒绝当前版本</button>

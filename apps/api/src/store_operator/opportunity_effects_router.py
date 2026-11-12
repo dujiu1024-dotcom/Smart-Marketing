@@ -636,7 +636,10 @@ def effects_overview(
             }
         )
 
-    grouped: dict[tuple[str, str, str, int, str], list[tuple[MetricObservation, MetricDefinition]]] = {}
+    grouped: dict[
+        tuple[str, str, str, int, str],
+        list[tuple[MetricObservation, MetricDefinition]],
+    ] = {}
     for item, definition in verified_rows:
         if item.period_start is None or item.period_end is None:
             continue
@@ -676,7 +679,9 @@ def effects_overview(
         zone = ZoneInfo(first.period_timezone)
         period_start = first.period_start.astimezone(zone)
         period_end = first.period_end.astimezone(zone)
-        metric_periods.setdefault((metric_key, source_system, channel_key, definition_version), []).append(
+        metric_periods.setdefault(
+            (metric_key, source_system, channel_key, definition_version), []
+        ).append(
             {
                 "period_start": period_start.isoformat(),
                 "period_end": period_end.isoformat(),
@@ -693,7 +698,12 @@ def effects_overview(
         )
 
     trends = []
-    for (metric_key, source_system, channel_key, definition_version), points in metric_periods.items():
+    for (
+        metric_key,
+        source_system,
+        channel_key,
+        definition_version,
+    ), points in metric_periods.items():
         points.sort(
             key=lambda point: datetime.fromisoformat(str(point["period_end"])).astimezone(UTC)
         )
@@ -778,7 +788,12 @@ def effects_overview(
     for numerator_key, denominator_key, display_name in conversion_pairs:
         numerator_series = [
             (source_system, channel_key, definition_version, points)
-            for (metric_key, source_system, channel_key, definition_version), points in metric_periods.items()
+            for (
+                metric_key,
+                source_system,
+                channel_key,
+                definition_version,
+            ), points in metric_periods.items()
             if metric_key == numerator_key
         ]
         for source_system, channel_key, definition_version, numerator_points in numerator_series:
@@ -953,7 +968,14 @@ def effects_overview(
         zone = ZoneInfo(observation.period_timezone)
         period_start = observation.period_start.astimezone(zone)
         period_end = observation.period_end.astimezone(zone)
-        group_key = f"{work.id}|{observation.metric_key}|{observation.source_system}|{definition.definition_version}"
+        group_key = "|".join(
+            [
+                str(work.id),
+                observation.metric_key,
+                observation.source_system,
+                str(definition.definition_version),
+            ]
+        )
         content_periods.setdefault(group_key, []).append(
             {
                 "published_work_id": str(work.id),
@@ -973,7 +995,9 @@ def effects_overview(
         )
     content_performance = []
     for key, points in content_periods.items():
-        points.sort(key=lambda point: str(point["period_end"]))
+        points.sort(
+            key=lambda point: datetime.fromisoformat(str(point["period_end"])).astimezone(UTC)
+        )
         previous = points[-2] if len(points) > 1 else None
         current = points[-1] if points else None
         comparison_status = "insufficient_samples"

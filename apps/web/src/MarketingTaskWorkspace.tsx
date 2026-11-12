@@ -44,6 +44,7 @@ const statusLabels: Record<string, string> = {
 const errorText = (error: unknown) => error instanceof Error ? error.message : "请求失败，请稍后重试。";
 const selectedTaskKey = (storeId: string) => `store-operator.current-task-id.${storeId}`;
 const createTaskKey = (storeId: string) => `store-operator.task-create.${storeId}`;
+const opportunityHandoffKey = (storeId: string) => `store-operator.opportunity-handoff.${storeId}`;
 const readText = (record: Record<string, unknown>, key: string) => typeof record[key] === "string" ? String(record[key]) : "";
 function safeJson(value: Record<string, unknown>): string { return JSON.stringify(value, null, 2); }
 interface FactOption extends BusinessFactReference { label: string; }
@@ -102,6 +103,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState("all");
   const [taskType, setTaskType] = useState<MarketingTaskType>("full_marketing");
+  const [opportunityId, setOpportunityId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
   const [targetAudience, setTargetAudience] = useState("");
@@ -210,6 +212,26 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       if (taskId) void loadContent(taskId);
     }
     if (route === "#create") {
+      const handoffRaw = sessionStorage.getItem(opportunityHandoffKey(storeId));
+      if (handoffRaw) {
+        try {
+          const handoff = JSON.parse(handoffRaw) as {
+            opportunity_id?: string; title?: string; summary?: string;
+            suggested_scenario?: string; content_angle?: string;
+          };
+          if (handoff.opportunity_id) {
+            setOpportunityId(handoff.opportunity_id);
+            setTitle(handoff.title ? `热点机会：${handoff.title}`.slice(0, 200) : "基于热点机会制作内容");
+            setGoal(handoff.suggested_scenario || "结合已采纳的热点机会制作门店营销内容");
+            setCoreMessage([handoff.summary, handoff.content_angle].filter(Boolean).join("\\n"));
+          }
+        } catch {
+          sessionStorage.removeItem(opportunityHandoffKey(storeId));
+          setOpportunityId(null);
+        }
+      } else {
+        setOpportunityId(null);
+      }
       const key = createTaskKey(storeId);
       createKey.current = sessionStorage.getItem(key) ?? crypto.randomUUID();
       sessionStorage.setItem(key, createKey.current);
@@ -233,11 +255,12 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       const input: MarketingTaskCreateInput = {
         task_type: taskType,
         title: title.trim(),
+        opportunity_id: opportunityId,
         requirement_draft: requirementPayload({ goal, target_audience: targetAudience, core_message: coreMessage, constraints }),
         task_options: {
           includes_copy: taskType === "merchant_content" ? includesCopy : scope.includes_copy,
           includes_image: taskType === "merchant_content" ? includesImage : scope.includes_image,
-          opportunity_applicable: false,
+          opportunity_applicable: Boolean(opportunityId),
           selected_channel_keys: channelSelected ? ["douyin"] : [],
           requires_external_delivery: externalDelivery && channelSelected,
         },
@@ -245,6 +268,8 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       if (!input.requirement_draft.goal) throw new Error("请先填写营销目标。");
       const created = await createMarketingTask(storeId, input, createKey.current || crypto.randomUUID());
       sessionStorage.removeItem(createTaskKey(storeId));
+      sessionStorage.removeItem(opportunityHandoffKey(storeId));
+      setOpportunityId(null);
       openTask(created.id);
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }

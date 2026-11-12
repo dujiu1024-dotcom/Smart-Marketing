@@ -2151,6 +2151,8 @@ export interface components {
         };
         /** MarketingTaskCreate */
         MarketingTaskCreate: {
+            /** Opportunity Id */
+            opportunity_id?: string | null;
             /** Requirement Draft */
             requirement_draft?: {
                 [key: string]: unknown;
@@ -2226,6 +2228,10 @@ export interface components {
             includes_image?: boolean | null;
             /** Opportunity Applicable */
             opportunity_applicable?: boolean | null;
+            /** Opportunity Snapshot */
+            opportunity_snapshot?: {
+                [key: string]: unknown;
+            } | null;
             /**
              * Requires External Delivery
              * @default false

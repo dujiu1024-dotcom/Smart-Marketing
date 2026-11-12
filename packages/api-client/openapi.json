@@ -2703,6 +2703,18 @@
       },
       "MarketingTaskCreate": {
         "properties": {
+          "opportunity_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opportunity Id"
+          },
           "requirement_draft": {
             "additionalProperties": true,
             "title": "Requirement Draft",
@@ -2895,6 +2907,18 @@
               }
             ],
             "title": "Opportunity Applicable"
+          },
+          "opportunity_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opportunity Snapshot"
           },
           "requires_external_delivery": {
             "default": false,

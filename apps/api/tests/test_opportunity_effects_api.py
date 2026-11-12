@@ -826,3 +826,37 @@ def test_effects_overview_does_not_compare_gaps_or_zero_baselines(
     assert comparisons["gap_views"]["change_percent"] is None
     assert comparisons["zero_views"]["status"] == "zero_baseline"
     assert comparisons["zero_views"]["change_percent"] is None
+
+
+def test_douyin_capability_check_distinguishes_readback_from_metrics_and_versions_snapshots(
+    identity_client, db_session, monkeypatch
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    _, store = _identity(db_session, "capabilities@example.com", "Capabilities Shop")
+    headers = _login(identity_client, "capabilities@example.com", store.id)
+
+    first = identity_client.post(
+        "/api/v1/effects/data-source-capabilities/check", headers=headers
+    )
+    assert first.status_code == 200, first.text
+    first_items = {item["capability_key"]: item for item in first.json()["items"]}
+    assert first.json()["total"] == 3
+    assert first_items["published_work_readback"]["status"] == "unsupported"
+    assert first_items["content_metrics_read"]["status"] == "unsupported"
+    assert first_items["business_outcome_read"]["status"] == "unsupported"
+
+    second = identity_client.post(
+        "/api/v1/effects/data-source-capabilities/check", headers=headers
+    )
+    assert second.status_code == 200, second.text
+    assert {item["snapshot_version"] for item in second.json()["items"]} == {2}
+
+    latest = identity_client.get(
+        "/api/v1/effects/data-source-capabilities", headers=headers
+    )
+    assert latest.status_code == 200
+    latest_items = {item["capability_key"]: item for item in latest.json()["items"]}
+    assert latest_items["content_metrics_read"]["reason"]
+    assert "video.list" in latest_items["published_work_readback"]["required_scopes"]

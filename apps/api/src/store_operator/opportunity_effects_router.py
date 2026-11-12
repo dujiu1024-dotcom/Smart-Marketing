@@ -759,11 +759,13 @@ def effects_overview(
             metric_key,
             source_system,
             channel_key,
+            definition_version,
             str(point["period_start"]),
             str(point["period_end"]),
             str(point["timezone"]),
         ): point
-        for (metric_key, source_system, channel_key, definition_version), points in metric_periods.items()
+        for (metric_key, source_system, channel_key, definition_version), points
+        in metric_periods.items()
         for point in points
     }
     conversion_pairs = [
@@ -917,16 +919,18 @@ def effects_overview(
             ]
         )
         group_key = "|".join(
-            [str(work.id), observation.metric_key, observation.source_system, period_key]
+            [
+                str(work.id),
+                observation.metric_key,
+                observation.source_system,
+                str(definition.definition_version),
+                period_key,
+            ]
         )
         content_groups.setdefault(group_key, []).append((observation, definition, work))
 
     content_periods: dict[str, list[dict[str, object]]] = {}
-        values = [
-            sample.value_numeric
-            for sample, _, _ in samples
-            if sample.value_numeric is not None
-        ]
+    for samples in content_groups.values():
         observation, definition, work = samples[0]
         values = [
             sample.value_numeric

@@ -464,6 +464,8 @@ def cleanup_orphaned_ai_image_objects(
                 Job.status.in_(("succeeded", "failed", "cancelled", "needs_human")),
                 AIInvocation.created_at <= cutoff,
                 AIInvocation.response_ref_json.is_not(None),
+                AIInvocation.response_ref_json["object_key"].as_string().is_not(None),
+                AIInvocation.response_ref_json["orphan_cleanup"].is_(None),
             )
             .order_by(AIInvocation.created_at, AIInvocation.id)
             .limit(limit)

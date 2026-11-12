@@ -3,7 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import App from "./App";
 import { ApiError } from "./api";
 
-afterEach(() => cleanup());\n\nconst api = vi.hoisted(() => ({
+afterEach(() => cleanup());
+
+const api = vi.hoisted(() => ({
   login: vi.fn(),
   getCurrentUser: vi.fn(),
   getStores: vi.fn(),

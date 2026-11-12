@@ -243,3 +243,34 @@ class PublishOperationAttempt(Base):
     retryable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DouyinWebhookReceipt(Base):
+    """Idempotency and audit receipt for signed Douyin authorization webhooks."""
+
+    __tablename__ = "douyin_webhook_receipts"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "message_id",
+            name="uq_douyin_webhook_receipts_provider_message_id",
+        ),
+        CheckConstraint("provider IN ('douyin')", name="provider"),
+        CheckConstraint("event_type IN ('unauthorize')", name="event_type"),
+        CheckConstraint("length(message_id) > 0", name="message_id_nonempty"),
+        CheckConstraint("length(external_user_id_hash) = 64", name="external_user_hash_length"),
+        CheckConstraint("affected_account_count >= 0", name="affected_account_count_nonnegative"),
+        Index("ix_douyin_webhook_receipts_received_at", "received_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    message_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    external_user_id_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    scopes_json: Mapped[list[str]] = mapped_column(JSONB, nullable=False, server_default="[]")
+    affected_account_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

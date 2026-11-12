@@ -1,6 +1,7 @@
 from store_operator.models.base import Base
 from store_operator.models.channel_delivery import (
     ChannelAccount,
+    DouyinWebhookReceipt,
     OAuthAuthorizationAttempt,
     PublishOperation,
     PublishOperationAttempt,
@@ -61,6 +62,7 @@ from store_operator.models.store_knowledge import (
 __all__ = [
     "Artifact",
     "ChannelAccount",
+    "DouyinWebhookReceipt",
     "OAuthAuthorizationAttempt",
     "PublishOperation",
     "PublishOperationAttempt",

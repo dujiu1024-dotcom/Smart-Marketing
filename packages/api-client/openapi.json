@@ -6599,6 +6599,25 @@
         ]
       }
     },
+    "/api/v1/channels/douyin/webhook": {
+      "post": {
+        "operationId": "receive_douyin_webhook_api_v1_channels_douyin_webhook_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Receive Douyin Webhook",
+        "tags": [
+          "channel-accounts"
+        ]
+      }
+    },
     "/api/v1/jobs/{job_id}": {
       "get": {
         "operationId": "get_job_api_v1_jobs__job_id__get",

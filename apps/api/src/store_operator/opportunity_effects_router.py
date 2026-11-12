@@ -829,20 +829,25 @@ def effects_overview(
         for item, _ in rows
         if item.integrity_status in {"partial", "anomalous", "unknown"}
     )
-    period_index = {
-        (
-            metric_key,
-            source_system,
-            channel_key,
-            definition_version,
-            str(point["period_start"]),
-            str(point["period_end"]),
-            str(point["timezone"]),
-        ): point
-        for (metric_key, source_system, channel_key, definition_version), points
-        in metric_periods.items()
-        for point in points
-    }
+    period_index: dict[
+        tuple[str, str, str, str, str, str],
+        list[tuple[int, dict[str, object]]],
+    ] = {}
+    for (metric_key, source_system, channel_key, definition_version), points in (
+        metric_periods.items()
+    ):
+        for point in points:
+            period_index.setdefault(
+                (
+                    metric_key,
+                    source_system,
+                    channel_key,
+                    str(point["period_start"]),
+                    str(point["period_end"]),
+                    str(point["timezone"]),
+                ),
+                [],
+            ).append((definition_version, point))
     conversion_pairs = [
         ("clicks", "views", "点击率"),
         ("consultations", "views", "咨询率"),
@@ -852,35 +857,29 @@ def effects_overview(
     conversion_rates: list[dict[str, object]] = []
     for numerator_key, denominator_key, display_name in conversion_pairs:
         numerator_series = [
-            (source_system, channel_key, definition_version, points)
-            for (
-                metric_key,
-                source_system,
-                channel_key,
-                definition_version,
-            ), points in metric_periods.items()
+            (source_system, channel_key, points)
+            for (metric_key, source_system, channel_key, _), points in metric_periods.items()
             if metric_key == numerator_key
         ]
-        for source_system, channel_key, definition_version, numerator_points in numerator_series:
+        for source_system, channel_key, numerator_points in numerator_series:
             for numerator_point in numerator_points:
                 period_key = (
                     str(numerator_point["period_start"]),
                     str(numerator_point["period_end"]),
                     str(numerator_point["timezone"]),
                 )
-                denominator_point = period_index.get(
-                    (
-                        denominator_key,
-                        source_system,
-                        channel_key,
-                        definition_version,
-                        *period_key,
-                    )
+                numerator_candidates = period_index.get(
+                    (numerator_key, source_system, channel_key, *period_key), []
                 )
-                if denominator_point is None:
+                denominator_candidates = period_index.get(
+                    (denominator_key, source_system, channel_key, *period_key), []
+                )
+                if len(numerator_candidates) != 1 or len(denominator_candidates) != 1:
                     continue
+                numerator_version, numerator_sample = numerator_candidates[0]
+                denominator_version, denominator_point = denominator_candidates[0]
                 denominator_value = Decimal(str(denominator_point["value"]))
-                numerator_value = Decimal(str(numerator_point["value"]))
+                numerator_value = Decimal(str(numerator_sample["value"]))
                 if denominator_value <= 0:
                     conversion_status = "zero_denominator"
                     conversion_value = None
@@ -899,10 +898,11 @@ def effects_overview(
                         "denominator_key": denominator_key,
                         "source_system": source_system,
                         "channel_key": channel_key or None,
-                        "definition_version": definition_version,
-                        "period_start": numerator_point["period_start"],
-                        "period_end": numerator_point["period_end"],
-                        "timezone": numerator_point["timezone"],
+                        "numerator_definition_version": numerator_version,
+                        "denominator_definition_version": denominator_version,
+                        "period_start": numerator_sample["period_start"],
+                        "period_end": numerator_sample["period_end"],
+                        "timezone": numerator_sample["timezone"],
                         "numerator_value": str(numerator_value),
                         "denominator_value": str(denominator_value),
                         "value_percent": conversion_value,

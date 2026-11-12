@@ -810,7 +810,7 @@ def test_effects_overview_does_not_compare_gaps_or_zero_baselines(
                 integrity_status="complete",
                 authenticity_status="official_api",
                 sync_status="current",
-                deduplication_key=key[0] * 64,
+                deduplication_key=key.ljust(64, "0"),
             )
         )
     db_session.flush()

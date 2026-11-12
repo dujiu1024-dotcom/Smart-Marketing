@@ -60,6 +60,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
 )
 from store_operator.object_storage import (  # type: ignore[import-untyped]
     ObjectStorageNotConfigured,
+    delete_object,
     download_object_bytes,
 )
 
@@ -444,6 +445,36 @@ def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     with SessionLocal.begin() as db:
         return int(recover_expired_jobs(db, batch_size=batch_size))
+
+
+@celery_app.task(
+    name="media.expire_upload_intents", ignore_result=True
+)  # type: ignore[untyped-decorator]
+def expire_upload_intents(batch_size: int = 100) -> int:
+    """Expire stale, uncompleted upload intents and remove their private objects."""
+    processed = 0
+    safe_batch_size = max(1, min(batch_size, 500))
+    cutoff = datetime.now(UTC) - timedelta(minutes=5)
+    for _ in range(safe_batch_size):
+        with SessionLocal.begin() as db:
+            intent = db.scalar(
+                select(UploadIntent)
+                .where(
+                    UploadIntent.status == "created",
+                    UploadIntent.expires_at <= cutoff,
+                )
+                .order_by(UploadIntent.expires_at, UploadIntent.id)
+                .limit(1)
+                .with_for_update(skip_locked=True)
+            )
+            if intent is None:
+                break
+            # Keep the row locked until deletion succeeds. On storage errors the
+            # transaction rolls back, allowing the next beat run to retry safely.
+            delete_object(object_key=intent.object_key)
+            intent.status = "expired"
+            processed += 1
+    return processed
 
 
 @celery_app.task(

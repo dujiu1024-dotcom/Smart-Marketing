@@ -22,6 +22,10 @@ celery_app.conf.update(
             "task": "jobs.relay_outbox",
             "schedule": 1.0,
         },
+        "expire-upload-intents-every-5-minutes": {
+            "task": "media.expire_upload_intents",
+            "schedule": 300.0,
+        },
         "scan-quarantined-media-every-15-seconds": {
             "task": "media.scan_quarantined_assets",
             "schedule": 15.0,

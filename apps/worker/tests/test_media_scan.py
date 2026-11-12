@@ -189,3 +189,58 @@ def test_quarantine_worker_rejects_infected_upload(monkeypatch) -> None:
     assert asset.status == "rejected"
     assert intent.status == "rejected"
     assert intent.rejection_reason == "Uploaded media was rejected by malware scanning"
+
+
+def test_expired_upload_intents_are_deleted_and_marked_expired(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    from store_operator_worker import tasks
+
+    intent = UploadIntent(
+        id=uuid4(),
+        store_id=uuid4(),
+        created_by_user_id=uuid4(),
+        object_key="stores/test/quarantine/expired.png",
+        expected_mime_type="image/png",
+        expected_byte_size=128,
+        expected_sha256="a" * 64,
+        status="created",
+        expires_at=datetime.now(UTC) - timedelta(minutes=10),
+    )
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        tasks, "SessionLocal", FakeSessionFactory(FakeSession([intent, None]))
+    )
+    monkeypatch.setattr(tasks, "delete_object", lambda *, object_key: deleted.append(object_key))
+
+    assert tasks.expire_upload_intents(batch_size=1) == 1
+    assert intent.status == "expired"
+    assert deleted == ["stores/test/quarantine/expired.png"]
+
+
+def test_expired_upload_intent_storage_failure_is_retryable(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://test:test@localhost/test")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    from store_operator_worker import tasks
+
+    intent = UploadIntent(
+        id=uuid4(),
+        store_id=uuid4(),
+        created_by_user_id=uuid4(),
+        object_key="stores/test/quarantine/retry.png",
+        expected_mime_type="image/png",
+        expected_byte_size=128,
+        expected_sha256="b" * 64,
+        status="created",
+        expires_at=datetime.now(UTC) - timedelta(minutes=10),
+    )
+    monkeypatch.setattr(tasks, "SessionLocal", FakeSessionFactory(FakeSession([intent])))
+    monkeypatch.setattr(
+        tasks,
+        "delete_object",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("storage unavailable")),
+    )
+
+    with pytest.raises(RuntimeError, match="storage unavailable"):
+        tasks.expire_upload_intents(batch_size=1)
+    assert intent.status == "created"

@@ -75,6 +75,14 @@ def head_object(*, object_key: str) -> dict[str, Any]:
     )
 
 
+def delete_object(*, object_key: str) -> None:
+    """Delete a private object; S3 delete_object is idempotent for missing keys."""
+    _client().delete_object(
+        Bucket=settings.object_storage_bucket,
+        Key=object_key,
+    )
+
+
 def create_download_url(*, object_key: str, expires_in: int | None = None) -> str:
     return cast(
         str,

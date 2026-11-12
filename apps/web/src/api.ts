@@ -498,7 +498,7 @@ export interface MediaAsset {
   sha256: string;
   original_filename_sanitized: string | null;
   usage_rights_status: "unknown" | "confirmed_allowed" | "restricted";
-  status: "uploading" | "quarantined" | "scanning" | "ready" | "rejected" | "archived";
+  status: "uploading" | "quarantined" | "scanning" | "ready" | "rejected" | "scan_failed" | "archived";
   parent_asset_id: string | null;
   version_no: number;
   created_at: string;

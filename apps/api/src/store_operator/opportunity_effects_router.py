@@ -2124,7 +2124,10 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                         cell_value = "true" if cell_value == "1" else "false"
                     elif cell_type == "d" and isinstance(cell_value, str):
                         cell_value = datetime.fromisoformat(cell_value.replace("Z", "+00:00"))
-                    elif isinstance(cell_value, str) and int(cell.attrib.get("s", "0")) in date_style_ids:
+                    elif (
+                        isinstance(cell_value, str)
+                        and int(cell.attrib.get("s", "0")) in date_style_ids
+                    ):
                         cell_value = datetime(1899, 12, 30) + timedelta(days=float(cell_value))
                     cells[column_index - 1] = cell_value
                 parsed_rows.append(cells)
@@ -2151,7 +2154,9 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
             for row_number, row_values in enumerate(parsed_rows[1:], start=2):
                 mapped = {}
                 for index, key in enumerate(normalized_headers):
-                    row_value: object | None = row_values[index] if index < len(row_values) else None
+                    row_value: object | None = (
+                        row_values[index] if index < len(row_values) else None
+                    )
                     if isinstance(row_value, date) and key in {"period_start", "period_end"}:
                         timezone_index = normalized_headers.index("period_timezone")
                         timezone_value = (
@@ -2167,9 +2172,15 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                                 f"Row {row_number}: period_timezone must be a valid IANA timezone"
                             ) from exc
                         if isinstance(row_value, datetime):
-                            row_value = row_value.replace(tzinfo=zone) if row_value.tzinfo is None else row_value
+                            row_value = (
+                                row_value.replace(tzinfo=zone)
+                                if row_value.tzinfo is None
+                                else row_value
+                            )
                         else:
-                            row_value = datetime.combine(row_value, datetime.min.time(), tzinfo=zone)
+                            row_value = datetime.combine(
+                                row_value, datetime.min.time(), tzinfo=zone
+                            )
                         row_value = row_value.isoformat()
                     elif row_value is None:
                         row_value = ""

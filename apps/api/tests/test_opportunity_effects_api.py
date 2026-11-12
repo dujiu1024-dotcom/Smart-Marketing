@@ -133,11 +133,14 @@ def test_csv_import_is_idempotent_and_labeled_as_merchant_reported(identity_clie
         json={"csv_text": csv_text})
     assert first.status_code == 200, first.text
     assert first.json()["created"] == 1
+    assert len(first.json()["content_sha256"]) == 64
+    assert first.json()["import_batch_id"]
     second = identity_client.post("/api/v1/effects/import", headers=headers,
         json={"csv_text": csv_text})
     assert second.status_code == 200, second.text
     assert second.json()["created"] == 0
     assert second.json()["duplicates_skipped"] == 1
+    assert second.json()["import_batch_id"] == first.json()["import_batch_id"]
 
 
 def test_adopted_opportunity_handoff_creates_store_scoped_immutable_snapshot(

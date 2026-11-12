@@ -107,6 +107,7 @@ if MAX_RUNNING_JOBS_PER_STORE < 1 or CONCURRENCY_DEFER_SECONDS < 1:
 @celery_app.task(name="jobs.relay_outbox", ignore_result=True)  # type: ignore[untyped-decorator]
 def relay_outbox(batch_size: int = 50) -> int:
     """Publish committed Outbox rows; a crash after publish can cause safe redelivery."""
+    safe_batch_size = max(1, min(batch_size, 500))
     now = datetime.now(UTC)
     relay_id = f"{WORKER_ID}:{uuid4()}"
     with SessionLocal.begin() as db:
@@ -123,7 +124,7 @@ def relay_outbox(batch_size: int = 50) -> int:
                 ),
             )
             .order_by(OutboxEvent.created_at, OutboxEvent.id)
-            .limit(batch_size)
+            .limit(safe_batch_size)
             .with_for_update(skip_locked=True)
         ).all()
         for event in events:
@@ -144,8 +145,11 @@ def relay_outbox(batch_size: int = 50) -> int:
             ):
                 continue
             event_type = event.event_type
-            payload = dict(event.payload_json)
+            raw_payload = event.payload_json
         try:
+            if not isinstance(raw_payload, dict):
+                raise TypeError("Outbox payload must be a JSON object")
+            payload = dict(raw_payload)
             if event_type != "job.dispatch_requested":
                 raise ValueError("Unsupported Outbox event type")
             job_id = payload.get("job_id")

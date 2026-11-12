@@ -255,6 +255,18 @@ def _prompt_variables(
             "selected_channel_keys", []
         ),
     }
+    task_options = dict(task.task_options_json)
+    requirement_fields = requirement_payload.get("requirement", {})
+    strategy_fields = values["strategy"]
+    if isinstance(requirement_fields, dict):
+        for key, value in requirement_fields.items():
+            values.setdefault(key, value)
+    if isinstance(strategy_fields, dict):
+        for key, value in strategy_fields.items():
+            values.setdefault(key, value)
+    for key, value in task_options.items():
+        values.setdefault(key, value)
+
     for fact in business_facts or []:
         fact_value = dict(fact.value_json)
         values.setdefault(fact.fact_key, fact_value)
@@ -583,6 +595,8 @@ def _complete_copy(
             extra_variables["revision_instruction"] = revision_instruction
         if previous_copy is not None:
             extra_variables["previous_copy"] = previous_copy
+            extra_variables["current_copy"] = previous_copy
+            extra_variables["copy"] = previous_copy
         variables = _prompt_variables(
             version,
             task=task,
@@ -644,6 +658,10 @@ def _complete_copy(
                 business_facts=business_facts,
                 extra_variables={
                     "copy": {
+                        key: value for key, value in output.items()
+                        if key != "video_script"
+                    },
+                    "marketing_copy": {
                         key: value for key, value in output.items()
                         if key != "video_script"
                     },

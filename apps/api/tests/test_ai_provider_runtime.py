@@ -344,6 +344,8 @@ def test_provider_environment_config_parses_only_declared_capabilities() -> None
             "AI_PROVIDER_TEXT_MODELS": "text-a, text-b",
             "AI_PROVIDER_IMAGE_MODELS": "image-a",
             "AI_PROVIDER_TIMEOUT_SECONDS": "30",
+            "AI_PROVIDER_CIRCUIT_FAILURE_THRESHOLD": "3",
+            "AI_PROVIDER_CIRCUIT_RESET_SECONDS": "60",
         }
     )
 
@@ -352,6 +354,8 @@ def test_provider_environment_config_parses_only_declared_capabilities() -> None
     assert config.models[ProviderCapability.IMAGE] == ("image-a",)
     assert ProviderCapability.VISION not in config.models
     assert config.timeout_seconds == 30
+    assert config.circuit_failure_threshold == 3
+    assert config.circuit_reset_timeout_seconds == 60
 
 
 def test_configured_registry_resolves_capability_specific_adapters_and_models() -> None:

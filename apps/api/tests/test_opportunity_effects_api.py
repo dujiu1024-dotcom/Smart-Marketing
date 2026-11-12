@@ -437,6 +437,8 @@ def test_effects_overview_aggregates_verified_equal_periods_and_computes_change(
     conversion = overview["conversion_rates"]
     assert len(conversion) == 2
     assert [item["value_percent"] for item in conversion] == ["10.00", "16.00"]
+    assert len(overview["insights"]) == 2
+    assert all(item["next_action"] for item in overview["insights"])
 
 
 def test_attribution_rejects_merchant_claimed_work_and_unverified_outcome(

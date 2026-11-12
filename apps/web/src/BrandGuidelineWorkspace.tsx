@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ApiError,
   confirmBrandGuidelineFacts,
@@ -118,6 +118,8 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
   const [form, setForm] = useState<BrandForm>(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const createKey = useRef("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -128,10 +130,16 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
       const value = await getBrandGuideline(storeId);
       setGuideline(value);
       setForm(fromGuideline(value));
+      setDirty(false);
+      sessionStorage.removeItem(`store-operator.brand-guideline-create.${storeId}`);
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 404) {
         setGuideline(null);
         setForm(emptyForm);
+        setDirty(false);
+        const key = `store-operator.brand-guideline-create.${storeId}`;
+        createKey.current = sessionStorage.getItem(key) ?? crypto.randomUUID();
+        sessionStorage.setItem(key, createKey.current);
       } else {
         setError(errorMessage(reason));
       }
@@ -144,6 +152,7 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
 
   function change<K extends keyof BrandForm>(key: K, value: BrandForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setDirty(true);
     setNotice("");
   }
 
@@ -156,9 +165,11 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
       const input = toGuideline(form);
       const saved = guideline
         ? await updateBrandGuideline(storeId, guideline, input)
-        : await createBrandGuideline(storeId, input);
+        : await createBrandGuideline(storeId, input, createKey.current || crypto.randomUUID());
       setGuideline(saved);
       setForm(fromGuideline(saved));
+      setDirty(false);
+      sessionStorage.removeItem(`store-operator.brand-guideline-create.${storeId}`);
       setNotice(`品牌规范已保存为 V${saved.current_version}，状态为待确认。`);
     } catch (reason) {
       setError(errorMessage(reason));
@@ -168,7 +179,7 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
   }
 
   async function confirmFacts() {
-    if (!guideline) return;
+    if (!guideline || dirty || saving) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -176,6 +187,7 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
       const confirmed = await confirmBrandGuidelineFacts(storeId, guideline);
       setGuideline(confirmed);
       setForm(fromGuideline(confirmed));
+      setDirty(false);
       setNotice(`品牌规范 V${confirmed.current_version} 已确认。`);
     } catch (reason) {
       setError(errorMessage(reason));
@@ -209,7 +221,7 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
             <TextField label="Logo 素材资产 ID" value={form.logo_asset_id} onChange={(v) => change("logo_asset_id", v)} placeholder="素材库接入后可从资产选择" />
             <TextArea label="品牌色彩（JSON 对象数组）" value={form.color_palette} onChange={(v) => change("color_palette", v)} rows={4} placeholder='[{"name":"主色","hex":"#245744"}]' />
           </div></section>
-          <div className="form-footer"><p>{guideline ? `保存会生成新版本；当前 V${guideline.current_version}。` : "首次保存后可核对并确认品牌规范。"}</p><div className="form-actions">{guideline && <button className="secondary" type="button" onClick={() => void reload()}>放弃修改</button>}{guideline && guideline.fact_status !== "confirmed" && <button className="secondary" type="button" disabled={saving} onClick={() => void confirmFacts()}>确认资料</button>}<button className="primary" type="submit" disabled={saving}>{saving ? "保存中…" : guideline ? "保存规范" : "创建品牌规范"}</button></div></div>
+          <div className="form-footer"><p>{guideline ? `保存会生成新版本；当前 V${guideline.current_version}。` : "首次保存后可核对并确认品牌规范。"}</p><div className="form-actions">{guideline && <button className="secondary" type="button" onClick={() => void reload()}>放弃修改</button>}{guideline && guideline.fact_status !== "confirmed" && <button className="secondary" type="button" disabled={saving || dirty} title={dirty ? "请先保存修改，再确认资料" : undefined} onClick={() => void confirmFacts()}>确认资料</button>}<button className="primary" type="submit" disabled={saving}>{saving ? "保存中…" : guideline ? "保存规范" : "创建品牌规范"}</button></div></div>
         </form>
       )}
     </>

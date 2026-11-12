@@ -5,8 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from store_operator.auth.context import AuthContext
-from store_operator.auth.errors import ApiError
 from store_operator.auth.dependencies import require_store_context
+from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
 from store_operator.models.channel_spec import ChannelSpec, ChannelSpecVersion
 

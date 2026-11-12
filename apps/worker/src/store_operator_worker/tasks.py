@@ -74,6 +74,7 @@ from store_operator_worker.handlers import (
     register_job_handler,
     resolve_job_handler,
 )
+from store_operator_worker.observability import emit_operational_alert
 from store_operator_worker.media_scanner import (
     MalwareDetected,
     image_dimensions,
@@ -239,6 +240,12 @@ def execute_job(job_id: str) -> dict[str, str]:
                 error_summary="No domain handler is registered for this job type.",
                 retryable=False,
             )
+        emit_operational_alert(
+            event="job.handler_missing",
+            severity="critical",
+            correlation_id=str(claimed_job_id),
+            attributes={"job_type": job_type},
+        )
         return {"status": "failed", "reason": "handler_not_registered"}
 
     stop_heartbeat = Event()
@@ -368,6 +375,12 @@ def execute_job(job_id: str) -> dict[str, str]:
                 retryable=False,
                 side_effect_state=SideEffectState.UNKNOWN,
             )
+        emit_operational_alert(
+            event="job.timeout",
+            severity="critical",
+            correlation_id=str(claimed_job_id),
+            attributes={"job_type": job_type, "attempt_id": str(attempt_id)},
+        )
         return {"status": "needs_human", "reason": "timeout"}
     except JobExecutionError as exc:
         with SessionLocal.begin() as db:
@@ -382,6 +395,21 @@ def execute_job(job_id: str) -> dict[str, str]:
                 side_effect_state=exc.side_effect_state,
                 retry_delay_seconds=exc.retry_delay_seconds,
             )
+        event = (
+            "channel.delivery.failure"
+            if job_type.startswith(("channel.", "douyin.")) or "publish" in job_type
+            else "job.execution.failure"
+        )
+        emit_operational_alert(
+            event=event,
+            severity="error",
+            correlation_id=str(claimed_job_id),
+            attributes={
+                "job_type": job_type,
+                "error_code": exc.code,
+                "side_effect_state": str(exc.side_effect_state),
+            },
+        )
         return {"status": "failed", "reason": exc.code}
     except ProviderError as exc:
         with SessionLocal.begin() as db:
@@ -400,6 +428,16 @@ def execute_job(job_id: str) -> dict[str, str]:
                     else 30
                 ),
             )
+        emit_operational_alert(
+            event="provider.failure",
+            severity="error",
+            correlation_id=str(claimed_job_id),
+            attributes={
+                "job_type": job_type,
+                "error_code": exc.code.value,
+                "side_effect_state": str(exc.side_effect_state),
+            },
+        )
         return {"status": "failed", "reason": exc.code.value}
     except Exception as exc:  # noqa: BLE001 - final sanitized execution boundary
         logger.error(
@@ -432,6 +470,16 @@ def execute_job(job_id: str) -> dict[str, str]:
                     "error_type": type(persist_exc).__name__,
                 },
             )
+        emit_operational_alert(
+            event="worker.unexpected_failure",
+            severity="critical",
+            correlation_id=str(claimed_job_id),
+            attributes={
+                "job_type": job_type,
+                "attempt_id": str(attempt_id),
+                "error_type": type(exc).__name__,
+            },
+        )
         return {"status": "needs_human", "reason": "unexpected_error"}
     finally:
         stop_heartbeat.set()
@@ -444,7 +492,15 @@ def execute_job(job_id: str) -> dict[str, str]:
 def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     with SessionLocal.begin() as db:
-        return int(recover_expired_jobs(db, batch_size=batch_size))
+        recovered = int(recover_expired_jobs(db, batch_size=batch_size))
+    if recovered:
+        emit_operational_alert(
+            event="worker.expired_leases_recovered",
+            severity="warning",
+            correlation_id=WORKER_ID,
+            attributes={"recovered_jobs": recovered},
+        )
+    return recovered
 
 
 @celery_app.task(

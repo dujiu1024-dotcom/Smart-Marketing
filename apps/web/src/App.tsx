@@ -425,7 +425,7 @@ export default function App() {
           <div className="side-link disabled" aria-disabled="true">门店知识库 · 待接入</div>
           <a className={assetsRoute ? "side-link active" : "side-link"} href="#store:assets">素材资产库</a>
           <div className="side-link disabled" aria-disabled="true">渠道账号 · 待接入</div>
-          <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠、品牌规范、客群与经营。其他模块明确标记待接入，不使用演示数据冒充生产数据。</div>
+          <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠、品牌规范、客群与经营、素材资产。其他未接入模块明确标记待接入，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
           {!stores.length ? <section className="empty-card"><h2>当前账号尚未加入门店</h2><p>请联系门店所有者邀请你加入后，再维护经营资料。</p></section> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : <>

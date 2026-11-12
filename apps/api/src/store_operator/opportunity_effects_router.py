@@ -1743,16 +1743,56 @@ def create_attribution(
             "Merchant-reported or incomplete outcomes cannot enter formal attribution",
         )
     existing = db.scalar(
-        select(AttributionEvidence.id).where(
+        select(AttributionEvidence)
+        .where(
             AttributionEvidence.store_id == store_id,
             AttributionEvidence.outcome_evidence_id == outcome.id,
             AttributionEvidence.marketing_task_id == task.id,
             AttributionEvidence.status == "active",
         )
+        .with_for_update()
+    )
+    latest = db.scalar(
+        select(AttributionEvidence)
+        .where(
+            AttributionEvidence.store_id == store_id,
+            AttributionEvidence.outcome_evidence_id == outcome.id,
+            AttributionEvidence.marketing_task_id == task.id,
+        )
+        .order_by(AttributionEvidence.attribution_version.desc())
+        .limit(1)
+        .with_for_update()
     )
     if existing is not None:
-        raise ApiError(409, "ATTRIBUTION_ALREADY_EXISTS",
-            "This outcome is already attributed to this task")
+        same_input = (
+            existing.published_work_id == work.id
+            and existing.attribution_method == payload.attribution_method
+            and existing.evidence_strength == payload.evidence_strength
+            and existing.allocation_percent == payload.allocation_percent
+        )
+        if same_input:
+            return {
+                "item": _attribution_read(existing),
+                "replayed": True,
+                "message": "相同归因输入已存在，返回原始归因快照。",
+            }
+        existing.status = "superseded"
+        record_audit(
+            db,
+            request,
+            action="effects.attribution.superseded",
+            target_type="attribution_evidence",
+            target_id=existing.id,
+            actor_user_id=auth.user.id,
+            store_id=store_id,
+            metadata={"reason": "attribution_input_changed"},
+        )
+    supersedes_attribution_id = (
+        existing.id if existing is not None else latest.id if latest is not None else None
+    )
+    attribution_version = (
+        (latest.attribution_version + 1) if latest is not None else 1
+    )
     allocated = db.scalar(
         select(func.coalesce(func.sum(AttributionEvidence.allocation_percent), 0)).where(
             AttributionEvidence.store_id == store_id,
@@ -1793,6 +1833,8 @@ def create_attribution(
         evidence_strength=payload.evidence_strength,
         allocation_percent=payload.allocation_percent,
         status="active",
+        attribution_version=attribution_version,
+        supersedes_attribution_id=supersedes_attribution_id,
         attribution_snapshot_json=snapshot,
     )
     db.add(item)
@@ -1809,10 +1851,18 @@ def create_attribution(
             "published_work_id": str(work.id),
             "outcome_evidence_id": str(outcome.id),
             "allocation_percent": str(payload.allocation_percent),
+            "attribution_version": attribution_version,
+            "supersedes_attribution_id": (
+                str(supersedes_attribution_id) if supersedes_attribution_id else None
+            ),
         },
     )
     db.commit()
-    return {"item": _attribution_read(item), "message": "归因证据已保存；历史快照不可覆盖。"}
+    return {
+        "item": _attribution_read(item),
+        "replayed": False,
+        "message": "归因证据已保存；历史快照不可覆盖。",
+    }
 
 
 @router.post("/effects/observations")

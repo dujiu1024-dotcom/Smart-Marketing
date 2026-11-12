@@ -102,7 +102,10 @@ def render_published_prompt(
     placeholders = set(_PLACEHOLDER.findall(version.user_prompt_template))
     if placeholders != set(schema.get("properties", {})):
         raise PromptContractError("Prompt placeholders do not match the published variable schema")
-    rendered = _PLACEHOLDER.sub(lambda match: str(variables[match.group(1)]), version.user_prompt_template)
+    rendered = _PLACEHOLDER.sub(
+        lambda match: str(variables[match.group(1)]),
+        version.user_prompt_template,
+    )
     return version.system_prompt, rendered
 
 

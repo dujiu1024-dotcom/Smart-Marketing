@@ -1056,6 +1056,18 @@ export interface EffectsOverview {
     period_end: string | null; period_timezone: string; collected_at: string;
     authenticity_status: string; integrity_status: string;
   }>;
+  trends: Array<{
+    metric_key: string; display_name: string;
+    points: Array<{
+      period_start: string; period_end: string; value: string; sample_count: number;
+      timezone: string; aggregation_rule: string; display_name: string;
+    }>;
+    comparison: { status: string; change_percent: string | null };
+  }>;
+  data_quality: {
+    total_observations: number; verified_observations: number; delayed_observations: number;
+    incomplete_or_anomalous_observations: number; status: string; reason: string | null;
+  };
   data_status: "available" | "unavailable";
   business_outcomes: { roi: number | null; sales_growth: number | null; store_visit_growth: number | null; reason: string };
 }

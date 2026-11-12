@@ -374,3 +374,15 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 品牌字段 | 故事、定位、差异化、价值观、语气、常用/禁用表达、CTA、视觉风格、字体、色彩、Logo 资产引用 | 色彩为 JSON 对象数组；Logo 仅保存 asset ID，不伪造上传/选择能力 |
 | 创建重试 | sessionStorage 保存本次创建 Idempotency-Key | 请求不确定时重试复用同一 key |
 | 未完成 | Logo 资产选择器、门店本地时区、客群/知识/素材/渠道模块、完整浏览器与移动端验收 | 不据此关闭 Issue #6 |
+
+
+## 2026-11-12 #6 客群与经营生产 Web 接入
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 客群列表 | GET /api/v1/store/audiences，按当前门店查询 | 不使用演示数据或推测样本 |
+| 新增/编辑 | #store-editor:audience:new / :id；POST/PATCH 使用 Idempotency-Key / If-Match | 版本冲突不得静默覆盖 |
+| 客群字段 | 核心/次要/季节/场景客群、描述、消费场景/时段、购买动机、常见异议 | 多值字段结构化为数组 |
+| 样本来源 | source_type、source_ref、sample_size、sampled_at、confidence_level | 没有证据时保持空白；采样时间必须显式含时区 |
+| 事实确认/删除 | 独立 confirm-facts；If-Match 删除 | 未保存修改时禁止确认 |
+| 后续缺口 | 门店本地时区展示、完整浏览器/移动端/无障碍验收 | 不据此关闭 Issue #6 |

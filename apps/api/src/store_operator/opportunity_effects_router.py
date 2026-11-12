@@ -165,6 +165,22 @@ class MetricImportInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     csv_text: str = Field(min_length=1, max_length=5_000_000)
 
+def _observation_window_status(item: MetricObservation) -> str:
+    if item.period_start is None or item.period_end is None:
+        return "unknown"
+    if item.period_end > datetime.now(UTC):
+        return "accumulating"
+    if item.sync_status == "delayed":
+        return "delayed"
+    if item.integrity_status != "complete":
+        return "incomplete"
+    if item.authenticity_status not in {"official_api", "verified_import"}:
+        return "unverified"
+    if item.sync_status != "current":
+        return "unavailable"
+    return "complete"
+
+
 def _observation_read(item: MetricObservation, definition: MetricDefinition) -> dict[str, object]:
     return {
         "id": str(item.id), "metric_key": item.metric_key, "metric_tier": item.metric_tier,
@@ -175,6 +191,7 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
         "period_start": item.period_start.isoformat() if item.period_start else None,
         "period_end": item.period_end.isoformat() if item.period_end else None,
         "period_timezone": item.period_timezone, "collected_at": item.collected_at.isoformat(),
+        "observation_window_status": _observation_window_status(item),
         "definition_version": item.definition_version, "integrity_status": item.integrity_status,
         "authenticity_status": item.authenticity_status, "sync_status": item.sync_status,
         "supersedes_observation_id": (
@@ -593,6 +610,7 @@ def effects_overview(
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
     store_id = _store_id(context)
+    now = datetime.now(UTC)
     rows = db.execute(
         select(MetricObservation, MetricDefinition)
         .join(
@@ -614,7 +632,11 @@ def effects_overview(
         )
         if is_verified:
             latest.setdefault(item.metric_key, (item, definition))
-            if item.period_start is not None and item.period_end is not None:
+            if (
+                item.period_start is not None
+                and item.period_end is not None
+                and item.period_end <= now
+            ):
                 verified_rows.append((item, definition))
 
     cards = []
@@ -625,8 +647,20 @@ def effects_overview(
                 "display_name": definition.display_name,
                 "metric_tier": item.metric_tier,
                 "value": str(item.value_numeric),
-                "status": "available",
-                "reason": None,
+                "status": (
+                    "accumulating"
+                    if item.period_end is not None and item.period_end > now
+                    else "window_unknown"
+                    if item.period_start is None or item.period_end is None
+                    else "available"
+                ),
+                "reason": (
+                    "统计窗口尚未结束，数据仍在积累。"
+                    if item.period_end is not None and item.period_end > now
+                    else "缺少完整统计窗口，暂不纳入趋势分析。"
+                    if item.period_start is None or item.period_end is None
+                    else None
+                ),
                 "source_system": item.source_system,
                 "period_end": item.period_end.isoformat() if item.period_end else None,
                 "period_timezone": item.period_timezone,
@@ -755,6 +789,24 @@ def effects_overview(
         if item.authenticity_status in {"official_api", "verified_import"}
         and item.sync_status == "current"
         and item.integrity_status == "complete"
+        and item.value_numeric is not None
+    )
+    accumulating_count = sum(
+        1
+        for item, _ in rows
+        if item.authenticity_status in {"official_api", "verified_import"}
+        and item.sync_status == "current"
+        and item.integrity_status == "complete"
+        and item.period_end is not None
+        and item.period_end > now
+    )
+    window_unknown_count = sum(
+        1
+        for item, _ in rows
+        if item.authenticity_status in {"official_api", "verified_import"}
+        and item.sync_status == "current"
+        and item.integrity_status == "complete"
+        and (item.period_start is None or item.period_end is None)
     )
     delayed_count = sum(
         1 for item, _ in rows if item.sync_status == "delayed"
@@ -907,6 +959,8 @@ def effects_overview(
             MetricObservation.sync_status == "current",
             MetricObservation.integrity_status == "complete",
             MetricObservation.value_numeric.is_not(None),
+            MetricObservation.period_end.is_not(None),
+            MetricObservation.period_end <= now,
             PublishedWork.ownership_status.in_(
                 ["verified_system_publish", "verified_platform_api"]
             ),
@@ -1049,6 +1103,8 @@ def effects_overview(
         "data_quality": {
             "total_observations": total_observations,
             "verified_observations": verified_count,
+            "accumulating_observations": accumulating_count,
+            "window_unknown_observations": window_unknown_count,
             "delayed_observations": delayed_count,
             "incomplete_or_anomalous_observations": incomplete_count,
             "status": "available" if verified_count else "unavailable",

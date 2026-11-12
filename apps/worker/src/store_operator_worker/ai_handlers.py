@@ -353,7 +353,7 @@ def _complete_copy(
     except ValueError as exc:
         raise _safe_error("AI_COPY_PAYLOAD_INVALID", "Copy generation payload is invalid.") from exc
 
-    with SessionLocal() as db:
+    with _session_factory()() as db:
         job = db.get(Job, context.job_id)
         task = db.scalar(
             select(MarketingTask)
@@ -420,7 +420,7 @@ def _complete_copy(
         ).encode("utf-8")
     ).hexdigest()
 
-    with SessionLocal.begin() as db:
+    with _session_factory().begin() as db:
         task = db.scalar(
             select(MarketingTask)
             .where(MarketingTask.id == task_id, MarketingTask.store_id == store_id)

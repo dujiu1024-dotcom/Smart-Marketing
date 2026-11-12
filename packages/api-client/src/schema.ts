@@ -2615,6 +2615,8 @@ export interface components {
         MetricImportInput: {
             /** Csv Text */
             csv_text: string;
+            /** Source Format */
+            source_format?: "csv" | "xlsx";
         };
         /** MetricXlsxImportInput */
         MetricXlsxImportInput: {

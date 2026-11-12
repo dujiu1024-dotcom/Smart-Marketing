@@ -99,6 +99,8 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     assert created_profile.status_code == 201, created_profile.text
     assert created_profile.json()["fact_status"] == "pending_confirmation"
     assert created_profile.json()["current_version"] == 1
+    hidden_profile = identity_client.get("/api/v1/store/profile", headers=headers_b)
+    assert hidden_profile.status_code == 404
 
     updated_profile = identity_client.patch(
         "/api/v1/store/profile",

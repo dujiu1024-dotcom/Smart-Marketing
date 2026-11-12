@@ -671,6 +671,10 @@ def test_offer_knowledge_audience_and_asset_download_are_store_scoped(
         headers={**headers_b, "If-Match": '"1"'},
         json={"title": "Store B injection"},
     ).status_code == 404
+    assert identity_client.delete(
+        f"/api/v1/store/offers/{offer_id}",
+        headers={**headers_b, "If-Match": '"1"'},
+    ).status_code == 404
 
     knowledge = identity_client.post(
         "/api/v1/store/knowledge",
@@ -686,6 +690,15 @@ def test_offer_knowledge_audience_and_asset_download_are_store_scoped(
     assert identity_client.get(
         f"/api/v1/store/knowledge/{knowledge.json()['id']}", headers=headers_b
     ).status_code == 404
+    assert identity_client.patch(
+        f"/api/v1/store/knowledge/{knowledge.json()['id']}",
+        headers={**headers_b, "If-Match": '"1"'},
+        json={"content_text": "Cross-store write"},
+    ).status_code == 404
+    assert identity_client.delete(
+        f"/api/v1/store/knowledge/{knowledge.json()['id']}",
+        headers={**headers_b, "If-Match": '"1"'},
+    ).status_code == 404
 
     audience = identity_client.post(
         "/api/v1/store/audiences",
@@ -699,6 +712,15 @@ def test_offer_knowledge_audience_and_asset_download_are_store_scoped(
     assert audience.status_code == 201, audience.text
     assert identity_client.get(
         f"/api/v1/store/audiences/{audience.json()['id']}", headers=headers_b
+    ).status_code == 404
+    assert identity_client.patch(
+        f"/api/v1/store/audiences/{audience.json()['id']}",
+        headers={**headers_b, "If-Match": '"1"'},
+        json={"audience_description": "Cross-store write"},
+    ).status_code == 404
+    assert identity_client.delete(
+        f"/api/v1/store/audiences/{audience.json()['id']}",
+        headers={**headers_b, "If-Match": '"1"'},
     ).status_code == 404
 
     asset = MediaAsset(
@@ -716,6 +738,9 @@ def test_offer_knowledge_audience_and_asset_download_are_store_scoped(
     )
     db_session.add(asset)
     db_session.flush()
+    hidden_asset_list = identity_client.get("/api/v1/store/assets", headers=headers_b)
+    assert hidden_asset_list.status_code == 200, hidden_asset_list.text
+    assert str(asset.id) not in hidden_asset_list.text
     hidden_download = identity_client.get(
         f"/api/v1/store/assets/{asset.id}/download-url",
         headers={"X-Store-ID": str(store_b.id)},

@@ -13,7 +13,6 @@ from uuid import UUID, uuid4
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.orm import Session, sessionmaker
 
 from store_operator.config import settings
 from store_operator.models import (
@@ -26,6 +25,8 @@ from store_operator.models import (
     StoreOpportunity,
     StoreProfile,
 )
+from sqlalchemy.orm import Session, sessionmaker
+
 from store_operator_worker.handlers import (
     JobExecutionContext,
     JobExecutionError,
@@ -266,8 +267,11 @@ def _match_store(db: Session, store_id: UUID, topics: list[HotTopic], context: J
         industry_score = _match_score(topic_text, profile_text)
         brand_score = _match_score(topic_text, brand_text)
         risk_flags = _brand_risk_flags(topic_text, brand)
-        if topic.region and profile.region:
-            if _match_score(topic.region, profile.region) == 0:
+        if (
+            topic.region
+            and profile.region
+            and _match_score(topic.region, profile.region) == 0
+        ):
                 risk_flags.append("region_mismatch")
         product_scores = []
         for product in products:

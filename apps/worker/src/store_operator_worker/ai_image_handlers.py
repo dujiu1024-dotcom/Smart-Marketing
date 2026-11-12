@@ -25,6 +25,7 @@ from store_operator.ai_gateway import (  # type: ignore[import-untyped]
 )
 from store_operator.ai_gateway.schemas import ImageGenerateResponse  # type: ignore[import-untyped]
 from store_operator.models import (  # type: ignore[import-untyped]
+    AIInvocation,
     Artifact,
     ArtifactVersion,
     BusinessFactSnapshot,
@@ -359,6 +360,48 @@ def _vision_report(
         "model_id": model_id,
         "prompt_version_id": str(version.id),
     }
+
+
+
+def _ai_invocation_source_refs(
+    db: Session,
+    *,
+    store_id: UUID,
+    job_id: UUID,
+    attempt_id: UUID,
+    prompt_capabilities: tuple[tuple[UUID, str], ...],
+) -> list[dict[str, str]]:
+    """Bind the exact successful provider calls to the resulting image artifact."""
+    invocations = db.scalars(
+        select(AIInvocation)
+        .where(
+            AIInvocation.store_id == store_id,
+            AIInvocation.job_id == job_id,
+            AIInvocation.attempt_id == attempt_id,
+            AIInvocation.status == "succeeded",
+        )
+        .order_by(AIInvocation.created_at.desc())
+    ).all()
+    by_capability_and_prompt: dict[tuple[str, UUID], AIInvocation] = {}
+    for invocation in invocations:
+        key = (invocation.capability, invocation.prompt_version_id)
+        if invocation.prompt_version_id is not None:
+            by_capability_and_prompt.setdefault(key, invocation)
+
+    source_refs: list[dict[str, str]] = []
+    for prompt_version_id, capability in prompt_capabilities:
+        invocation = by_capability_and_prompt.get((capability, prompt_version_id))
+        if invocation is None:
+            raise _safe_error(
+                "AI_IMAGE_INVOCATION_AUDIT_MISSING",
+                "A successful AI provider invocation could not be linked to the image artifact.",
+            )
+        source_refs.append({
+            "type": "ai_invocation",
+            "id": str(invocation.id),
+            "capability": capability,
+        })
+    return source_refs
 
 
 def _complete_image(
@@ -789,6 +832,17 @@ def _complete_image(
                         {"type": "media_asset", "id": str(media_asset.id)},
                         {"type": "image_prompt_version", "id": str(image_prompt_version.id)},
                         {"type": "vision_prompt_version", "id": str(vision_version.id)},
+                        *_ai_invocation_source_refs(
+                            db,
+                            store_id=store_id,
+                            job_id=job.id,
+                            attempt_id=context.attempt_id,
+                            prompt_capabilities=(
+                                (image_prompt_version.id, ProviderCapability.TEXT.value),
+                                (image_version.id, ProviderCapability.IMAGE.value),
+                                (vision_version.id, ProviderCapability.VISION.value),
+                            ),
+                        ),
                         *(
                             [{"type": "source_media_asset", "id": str(source_asset.id)}]
                             if source_asset is not None

@@ -108,7 +108,7 @@ function TextField({ label, value, onChange, placeholder }: {
 
 function prettyTime(value: string | null): string {
   if (!value) return "未设置";
-  return new Date(value).toLocaleString();
+  return `${new Date(value).toISOString().replace("T", " ").replace("Z", "")} UTC`;
 }
 
 export default function OfferWorkspace({ storeId }: { storeId: string }) {

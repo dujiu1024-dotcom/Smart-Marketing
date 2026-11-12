@@ -18,7 +18,6 @@ from store_operator.domain.marketing_task import (
     MarketingTaskType,
     TaskStepKey,
 )
-from store_operator.models.marketing_task import BusinessFactSnapshot, MarketingTask
 from store_operator.marketing_tasks.schemas import (
     MarketingTaskAction,
     MarketingTaskCreate,
@@ -44,6 +43,7 @@ from store_operator.marketing_tasks.service import (
     update_requirement_draft,
     update_strategy_draft,
 )
+from store_operator.models.marketing_task import BusinessFactSnapshot, MarketingTask
 
 router = APIRouter(prefix="/marketing-tasks", tags=["marketing-tasks"])
 

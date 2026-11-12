@@ -8,7 +8,8 @@ interface FormState {
 }
 const empty:FormState={name:"",segment_type:"core",audience_description:"",consumption_scenarios:"",consumption_periods:"",
   purchase_motivations:"",common_objections:"",source_type:"",source_ref:"",sample_size:"",sampled_at:"",confidence_level:""};
-const split=(v:string)=>v.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);\nconst localDate=(value:string)=>{const d=new Date(value);const p=(n:number)=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
+const split=(v:string)=>v.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+const localDate=(value:string)=>{const d=new Date(value);const p=(n:number)=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;};
 const message=(e:unknown)=>e instanceof Error?e.message:"请求失败，请稍后重试。";
 function fromAudience(item:AudienceProfile):FormState {
   return {name:item.name,segment_type:item.segment_type,audience_description:item.audience_description??"",

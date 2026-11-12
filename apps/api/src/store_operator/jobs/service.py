@@ -413,11 +413,11 @@ def claim_job(
                 error_code="STORE_NOT_ACTIVE",
             )
             return None
-        if job.actor_user_id is not None:
+        if job.created_by_user_id is not None:
             active_membership_id = db.scalar(
                 select(StoreMembership.id).where(
                     StoreMembership.store_id == job.store_id,
-                    StoreMembership.user_id == job.actor_user_id,
+                    StoreMembership.user_id == job.created_by_user_id,
                     StoreMembership.status == "active",
                 )
             )

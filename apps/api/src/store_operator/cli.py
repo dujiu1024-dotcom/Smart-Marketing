@@ -10,7 +10,6 @@ from sqlalchemy import select
 
 from store_operator.auth.security import hash_password, normalize_email
 from store_operator.db import SessionLocal
-from store_operator.models.job_runtime import Job, OutboxEvent
 from store_operator.models.identity import (
     AuditEvent,
     PlatformAdminGrant,
@@ -18,6 +17,7 @@ from store_operator.models.identity import (
     StoreMembership,
     User,
 )
+from store_operator.models.job_runtime import Job, OutboxEvent
 
 
 def create_user(email: str) -> None:

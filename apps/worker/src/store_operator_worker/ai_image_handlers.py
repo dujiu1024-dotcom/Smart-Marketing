@@ -31,6 +31,7 @@ from store_operator.models import (
     OutboxEvent,
     RequirementSnapshot,
     StrategySnapshot,
+    PromptVersion,
     TaskStep,
 )
 from store_operator.models.store_knowledge import product_media_assets
@@ -76,7 +77,7 @@ def _image_size(aspect_ratio: object) -> tuple[int, int]:
 
 
 def _image_prompt_variables(
-    version: object,
+    version: PromptVersion,
     *,
     task: MarketingTask,
     requirement: RequirementSnapshot,
@@ -103,7 +104,7 @@ def _image_prompt_variables(
     if extra_variables:
         extra.update(extra_variables)
     return _prompt_variables(
-        version,  # type: ignore[arg-type]
+        version,
         task=task,
         requirement=requirement,
         strategy=strategy,
@@ -252,15 +253,20 @@ def _verify_and_scan_image(result: ImageGenerateResponse) -> tuple[bytes, int, i
     return content, width, height
 
 
+def _operation_idempotency_key(job: Job, operation: str) -> str:
+    return hashlib.sha256(
+        f"{job.idempotency_key}:{operation}".encode("utf-8")
+    ).hexdigest()
+
+
 def _vision_report(
     *,
     context: JobExecutionContext,
     task: MarketingTask,
     job: Job,
-    version,
+    version: PromptVersion,
     variables: dict[str, object],
     asset_object_key: str,
-    image_provider_id: str,
 ) -> dict[str, object]:
     system_instruction, user_input = render_published_prompt(version, variables)
     executor, client, provider_id, model_id = _load_executor(
@@ -273,7 +279,7 @@ def _vision_report(
                 store_id=task.store_id,
                 job_id=job.id,
                 attempt_id=context.attempt_id,
-                idempotency_key=job.idempotency_key,
+                idempotency_key=_operation_idempotency_key(job, "vision-inspection"),
                 marketing_task_id=task.id,
                 prompt_version_id=version.id,
             ),
@@ -436,15 +442,6 @@ def _complete_image(
             revision_instruction=revision_instruction,
             source_asset=source_asset,
         )
-        image_variables = _image_prompt_variables(
-            image_version,
-            task=task,
-            requirement=requirement,
-            strategy=strategy,
-            business_facts=business_facts,
-            revision_instruction=revision_instruction,
-            source_asset=source_asset,
-        )
         vision_variables = _image_prompt_variables(
             vision_version,
             task=task,
@@ -467,6 +464,7 @@ def _complete_image(
             provider_id=text_provider_id,
             model_id=text_model_id,
             executor=text_executor,
+            idempotency_key=_operation_idempotency_key(job, "image-prompt"),
         )
     finally:
         asyncio.run(text_client.aclose())
@@ -525,7 +523,7 @@ def _complete_image(
             store_id=store_id,
             job_id=job.id,
             attempt_id=context.attempt_id,
-            idempotency_key=job.idempotency_key,
+            idempotency_key=_operation_idempotency_key(job, "image-generation"),
             marketing_task_id=task_id,
             prompt_version_id=image_version.id,
         )
@@ -598,7 +596,6 @@ def _complete_image(
         version=vision_version,
         variables=vision_variables,
         asset_object_key=image_result.asset_object_key,
-        image_provider_id=image_provider_id,
     )
     context.check_control()
 
@@ -674,6 +671,7 @@ def _complete_image(
                     ArtifactVersion.input_fingerprint == input_fingerprint,
                 )
             )
+            media_asset: MediaAsset | None = None
             if artifact_version is None:
                 media_asset = db.scalar(
                     select(MediaAsset).where(
@@ -772,6 +770,29 @@ def _complete_image(
                 )
                 db.add(artifact_version)
                 db.flush()
+            if media_asset is None:
+                content_metadata = dict(artifact_version.content_json or {})
+                media_asset_id_value = content_metadata.get("media_asset_id")
+                vision_value = content_metadata.get("vision_inspection")
+                if not isinstance(media_asset_id_value, str) or not isinstance(vision_value, dict):
+                    raise _safe_error(
+                        "AI_IMAGE_REPLAY_METADATA_INVALID",
+                        "The persisted image artifact is missing media or inspection metadata.",
+                    )
+                try:
+                    media_asset_id = UUID(media_asset_id_value)
+                except ValueError as exc:
+                    raise _safe_error(
+                        "AI_IMAGE_REPLAY_METADATA_INVALID",
+                        "The persisted image artifact references an invalid media asset.",
+                    ) from exc
+                media_asset = db.get(MediaAsset, media_asset_id)
+                if media_asset is None or media_asset.store_id != store_id:
+                    raise _safe_error(
+                        "AI_IMAGE_REPLAY_ASSET_MISSING",
+                        "The persisted image artifact references an unavailable media asset.",
+                    )
+                vision = vision_value
             artifact.current_version_id = artifact_version.id
             task.version += 1
             step.status = "waiting_for_user"

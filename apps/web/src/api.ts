@@ -1056,7 +1056,7 @@ export interface MetricObservationRecord {
 export interface DataSourceCapabilitySnapshotRecord {
   id: string; channel_key: string; capability_key: string; status: string;
   required_scopes: string[]; granted_scopes: string[]; evidence_ref: string | null;
-  snapshot_version: number; checked_at: string;
+  snapshot_version: number; checked_at: string; reason: string | null;
 }
 export interface PublishReadbackCandidate {
   publish_operation_id: string; marketing_task_id: string; channel_key: string;

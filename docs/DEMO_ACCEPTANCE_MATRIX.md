@@ -450,7 +450,7 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 未完成 | 过期 UploadIntent 清理、完整解码/缩略图、真实对象存储与 ClamAV 浏览器端到端联调 | Issue #6 继续 Open |
 
 
-## 2026-11-12 #12 抖音门店账号 Web 接入（PR 待 CI）
+## 2026-11-12 #12 抖音门店账号 Web 接入（PR #129 已合并；真实 OAuth 待验收）
 
 | 能力 | 当前实现 | 验收边界 |
 |---|---|---|
@@ -461,7 +461,7 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 未完成 | 断开/撤销 UI、能力快照、ChannelSpecVersion 管理/发现、内容适配、真实授权/发布 E2E | Issue #12 继续 Open |
 
 
-## 2026-11-12 #8 文案/图片产物与版本审核 Web 接入（PR 待 CI）
+## 2026-11-12 #8 文案/图片产物与版本审核 Web 接入（PR #130 已合并；完整内容闭环待验收）
 
 | 能力 | 当前实现 | 验收边界 |
 |---|---|---|

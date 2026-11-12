@@ -58,6 +58,18 @@ describe("media assets workspace", () => {
     expect(await screen.findByRole("link", { name: "在新窗口打开原图" })).toHaveAttribute("href", "https://private.example/signed-object");
     expect(api.getMediaAssetDownloadUrl).toHaveBeenCalledWith("store-1", "asset-1");
   });
+  it("shows scanner infrastructure failure separately and allows safe archive", async () => {
+    api.getMediaAssets.mockResolvedValue({
+      items: [{ ...asset, status: "scan_failed" }],
+      total: 1,
+    });
+    render(<MediaAssetsWorkspace storeId="store-1" />);
+    expect(await screen.findByText("扫描服务异常")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "归档" }));
+    await waitFor(() => expect(api.archiveMediaAsset).toHaveBeenCalledWith(
+      "store-1", expect.objectContaining({ status: "scan_failed" }), expect.any(String),
+    ));
+  });
   it("archives without deleting the original object", async () => {
     render(<MediaAssetsWorkspace storeId="store-1" />);
     fireEvent.click(await screen.findByRole("button", { name: "归档" }));

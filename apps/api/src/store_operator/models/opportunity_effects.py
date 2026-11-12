@@ -15,8 +15,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID

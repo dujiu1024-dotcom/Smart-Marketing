@@ -7,6 +7,8 @@ import {
   getStoreProfile,
   getStores,
   login,
+  logout,
+  refreshCsrfToken,
   setActiveStore,
   updateStoreProfile,
   type ProfileInput,
@@ -188,6 +190,7 @@ export default function App() {
       .then(async (currentUser) => {
         if (!active) return;
         setUser(currentUser);
+        await refreshCsrfToken();
         await loadStoreContext();
       })
       .catch((reason: unknown) => {
@@ -303,15 +306,20 @@ export default function App() {
     }
   }
 
-  function signOutLocally() {
-    clearCsrfToken();
-    setUser(null);
-    setStores([]);
-    setStoreId("");
-    setProfile(null);
-    setPassword("");
-    setNotice("");
-    setError("本地已清除 CSRF 凭据。关闭浏览器会话或通过登录页重新认证。");
+  async function signOut() {
+    setError("");
+    try {
+      await logout();
+      clearCsrfToken();
+      setUser(null);
+      setStores([]);
+      setStoreId("");
+      setProfile(null);
+      setPassword("");
+      setNotice("");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    }
   }
 
   if (loading) {
@@ -357,7 +365,7 @@ export default function App() {
             </label>
           )}
           <span className="user-email">{user.email}</span>
-          <button className="quiet-button" type="button" onClick={signOutLocally}>退出</button>
+          <button className="quiet-button" type="button" onClick={() => void signOut()}>退出</button>
         </div>
       </header>
       <div className="workspace">

@@ -103,6 +103,8 @@ if MAX_RUNNING_JOBS_PER_STORE < 1 or CONCURRENCY_DEFER_SECONDS < 1:
 
 
 def _normalize_outbox_batch_size(batch_size: int) -> int:
+    if not isinstance(batch_size, int) or isinstance(batch_size, bool):
+        raise TypeError("Outbox batch_size must be an integer")
     if batch_size < 1:
         raise ValueError("Outbox batch_size must be positive")
     return min(batch_size, 500)

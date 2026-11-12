@@ -1,6 +1,6 @@
 # 渠道账号与官方发布集成领域设计（Issue #12）
 
-> 状态：抖音首期实施中；OAuth/发布 API 与异步图文发布已合并，真实账号验收和 UI 接入待完成  
+> 状态：抖音首期实施中；OAuth/发布 API、账号 Web 入口已合并；ChannelSpec 数据层实施中，真实账号验收待完成  
 > 日期：2026-11-11  
 > 产品基线：PRODUCT_DESIGN.md v1.8 / UX_AUDIT_AND_REDESIGN.md v1.8  
 > Demo 基线：门店资料 channels、营销任务 task 的 channel / publish 步骤

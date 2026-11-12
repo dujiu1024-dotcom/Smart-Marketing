@@ -24,6 +24,7 @@ import AudienceWorkspace from "./AudienceWorkspace";
 import KnowledgeWorkspace from "./KnowledgeWorkspace";
 import MediaAssetsWorkspace from "./MediaAssetsWorkspace";
 import MarketingTaskWorkspace from "./MarketingTaskWorkspace";
+import ChannelAccountsWorkspace from "./ChannelAccountsWorkspace";
 
 interface ProfileForm {
   display_name: string;
@@ -183,6 +184,7 @@ export default function App() {
   const audienceRoute = route === "#store:audience" || route.startsWith("#store-editor:audience:");
   const knowledgeRoute = route === "#store:knowledge" || route.startsWith("#store-editor:knowledge:");
   const assetsRoute = route === "#store:assets";
+  const channelsRoute = route === "#store:channels";
   const taskWorkspaceRoute = ["#ai", "#tasks", "#create", "#task"].includes(route);
 
   const loadStoreContext = useCallback(async () => {
@@ -420,7 +422,7 @@ export default function App() {
           <a className={route === "#ai" ? "side-link active" : "side-link"} href="#ai">AI 营销</a>
           <a className={["#tasks", "#create", "#task"].includes(route) ? "side-link active" : "side-link"} href="#tasks">营销任务</a>
           <div className="side-label spaced">门店资料</div>
-          <a className={productRoute || offerRoute || brandRoute || audienceRoute || knowledgeRoute || assetsRoute || taskWorkspaceRoute ? "side-link" : "side-link active"} href="#store:profile">门店档案</a>
+          <a className={productRoute || offerRoute || brandRoute || audienceRoute || knowledgeRoute || assetsRoute || channelsRoute || taskWorkspaceRoute ? "side-link" : "side-link active"} href="#store:profile">门店档案</a>
           <a className={productRoute ? "side-link active" : "side-link"} href="#store:products">商品与服务</a>
           <a className={offerRoute ? "side-link active" : "side-link"} href="#store:offers">活动与优惠</a>
           <a className={brandRoute ? "side-link active" : "side-link"} href="#store:brand">品牌规范</a>
@@ -428,11 +430,11 @@ export default function App() {
           
           <a className={knowledgeRoute ? "side-link active" : "side-link"} href="#store:knowledge">门店知识库</a>
           <a className={assetsRoute ? "side-link active" : "side-link"} href="#store:assets">素材资产库</a>
-          <div className="side-link disabled" aria-disabled="true">渠道账号 · 待接入</div>
-          <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠、品牌规范、客群与经营、门店知识库、素材资产及营销任务控制。策略生成与渠道账号仍有待接入能力，不使用演示数据冒充生产数据。</div>
+          <a className={channelsRoute ? "side-link active" : "side-link"} href="#store:channels">渠道账号</a>
+          <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠、品牌规范、客群与经营、门店知识库、素材资产及营销任务控制。策略生成仍待接入；抖音账号 OAuth 页面已接入，真实应用凭据和账号授权验收仍待完成，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
-          {!stores.length ? <section className="empty-card"><h2>当前账号尚未加入门店</h2><p>请联系门店所有者邀请你加入后，再维护经营资料。</p></section> : taskWorkspaceRoute ? <MarketingTaskWorkspace storeId={storeId} /> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : knowledgeRoute ? <KnowledgeWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : <>
+          {!stores.length ? <section className="empty-card"><h2>当前账号尚未加入门店</h2><p>请联系门店所有者邀请你加入后，再维护经营资料。</p></section> : taskWorkspaceRoute ? <MarketingTaskWorkspace storeId={storeId} /> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : knowledgeRoute ? <KnowledgeWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : channelsRoute ? <ChannelAccountsWorkspace storeId={storeId} /> : <>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STORE PROFILE</p>

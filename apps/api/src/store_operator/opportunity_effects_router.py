@@ -684,6 +684,7 @@ def effects_overview(
                 "timezone": first.period_timezone,
                 "aggregation_rule": rule,
                 "display_name": definition.display_name,
+                "metric_tier": definition.metric_tier,
                 "source_system": source_system,
                 "channel_key": channel_key or None,
             }
@@ -728,6 +729,7 @@ def effects_overview(
                 "source_system": source_system,
                 "channel_key": channel_key or None,
                 "display_name": str(points[-1]["display_name"]),
+                "metric_tier": str(points[-1]["metric_tier"]),
                 "points": points[-30:],
                 "comparison": comparison,
             }
@@ -821,6 +823,45 @@ def effects_overview(
                     }
                 )
 
+
+    insights: list[dict[str, object]] = []
+    for trend in trends:
+        comparison = trend["comparison"]
+        current_point = trend["points"][-1]
+        status = str(comparison["status"])
+        change_percent = comparison["change_percent"]
+        metric_tier = str(trend["metric_tier"])
+        if status == "available" and change_percent is not None:
+            change = Decimal(str(change_percent))
+            if change > 0:
+                observation_text = f"相邻等长周期内上升 {change_percent}%，属于已核验指标变化，不代表单一因素导致。"
+            elif change < 0:
+                observation_text = f"相邻等长周期内下降 {abs(change)}%，需要结合样本和内容差异复核。"
+            else:
+                observation_text = "相邻等长周期内基本持平。"
+        elif status == "zero_baseline":
+            observation_text = "上一周期基线为 0，不计算百分比变化。"
+        else:
+            observation_text = "当前缺少连续、等长的已核验周期样本，暂不形成趋势判断。"
+        if metric_tier == "content_performance":
+            next_action = "对比该渠道已核验作品的主题、素材和发布时间，再决定是否复用表现较好的内容方向。"
+        elif metric_tier == "intent":
+            next_action = "检查咨询入口、行动号召和承接流程；不要仅凭点击或咨询数量推断订单增长。"
+        else:
+            next_action = "先核对订单、核销或到店来源凭证及观察窗口，再评估经营结果变化。"
+        insights.append(
+            {
+                "metric_key": trend["metric_key"],
+                "display_name": trend["display_name"],
+                "source_system": trend["source_system"],
+                "channel_key": trend["channel_key"],
+                "period_end": current_point["period_end"],
+                "sample_count": current_point["sample_count"],
+                "comparison_status": status,
+                "observation": observation_text,
+                "next_action": next_action,
+            }
+        )
 
     content_rows = db.execute(
         select(MetricObservation, MetricDefinition, PublishedWork)
@@ -968,6 +1009,7 @@ def effects_overview(
         "trends": trends,
         "conversion_rates": conversion_rates,
         "content_performance": content_performance,
+        "insights": insights,
         "data_quality": {
             "total_observations": total_observations,
             "verified_observations": verified_count,

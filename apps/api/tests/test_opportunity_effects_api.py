@@ -723,7 +723,7 @@ def test_metric_observation_cannot_reference_another_stores_published_work(
     definition = MetricDefinition(
         id=uuid4(),
         source_system="manual",
-        metric_key="views",
+        metric_key="scope_test_views",
         metric_tier="content_performance",
         display_name="播放量",
         value_type="count",
@@ -748,7 +748,7 @@ def test_metric_observation_cannot_reference_another_stores_published_work(
         "/api/v1/effects/observations",
         headers=headers,
         json={
-            "metric_key": "views",
+            "metric_key": "scope_test_views",
             "value_numeric": "10",
             "period_timezone": "Asia/Tokyo",
             "published_work_id": str(work.id),

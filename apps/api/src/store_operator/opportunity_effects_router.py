@@ -936,6 +936,7 @@ def register_published_work_from_readback(
     if (
         package_item.publish_package_id != package.id
         or package_item.channel_key != account.provider
+        or package_item.channel_account_id != account.id
     ):
         raise ApiError(
             409,

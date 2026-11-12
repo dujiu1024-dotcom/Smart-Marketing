@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from typing import Annotated, Literal, cast
+from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request
@@ -48,11 +49,23 @@ def publish_channel_spec_version(
     _admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
     db: Annotated[Session, Depends(get_db)],
 ) -> dict[str, object]:
-    if not payload.source_document_ref.startswith("https://"):
+    official_hosts = {
+        "douyin": {"open.douyin.com"},
+    }
+    source = urlsplit(payload.source_document_ref)
+    allowed_hosts = official_hosts.get(channel_key)
+    if (
+        source.scheme != "https"
+        or source.hostname is None
+        or allowed_hosts is None
+        or source.hostname.lower() not in allowed_hosts
+        or source.username is not None
+        or source.password is not None
+    ):
         raise ApiError(
             422,
             "CHANNEL_SPEC_SOURCE_REQUIRED",
-            "A verified HTTPS official-source reference is required",
+            "A verified official HTTPS source for this channel is required",
         )
     spec = db.scalar(
         select(ChannelSpec)

@@ -103,9 +103,27 @@ if MAX_RUNNING_JOBS_PER_STORE < 1 or CONCURRENCY_DEFER_SECONDS < 1:
 
 
 @celery_app.task(name="jobs.relay_outbox", ignore_result=True)  # type: ignore[untyped-decorator]
+def _normalize_outbox_batch_size(batch_size: int) -> int:
+    if batch_size < 1:
+        raise ValueError("Outbox batch_size must be positive")
+    return min(batch_size, 500)
+
+
+def _parse_dispatch_job_id(payload: object) -> UUID:
+    if not isinstance(payload, dict):
+        raise TypeError("Outbox payload must be a JSON object")
+    job_id = payload.get("job_id")
+    if not isinstance(job_id, str):
+        raise TypeError("Outbox job_id is invalid")
+    try:
+        return UUID(job_id)
+    except ValueError as exc:
+        raise ValueError("Outbox job_id must be a UUID") from exc
+
+
 def relay_outbox(batch_size: int = 50) -> int:
     """Publish committed Outbox rows; a crash after publish can cause safe redelivery."""
-    safe_batch_size = max(1, min(batch_size, 500))
+    safe_batch_size = _normalize_outbox_batch_size(batch_size)
     now = datetime.now(UTC)
     relay_id = f"{WORKER_ID}:{uuid4()}"
     with SessionLocal.begin() as db:
@@ -148,15 +166,9 @@ def relay_outbox(batch_size: int = 50) -> int:
             event_type = event.event_type
             raw_payload = event.payload_json
         try:
-            if not isinstance(raw_payload, dict):
-                raise TypeError("Outbox payload must be a JSON object")
-            payload = dict(raw_payload)
             if event_type != "job.dispatch_requested":
                 raise ValueError("Unsupported Outbox event type")
-            job_id = payload.get("job_id")
-            if not isinstance(job_id, str):
-                raise TypeError("Outbox job_id is invalid")
-            parsed_job_id = UUID(job_id)
+            parsed_job_id = _parse_dispatch_job_id(raw_payload)
             celery_app.send_task(
                 "jobs.execute",
                 args=[str(parsed_job_id)],

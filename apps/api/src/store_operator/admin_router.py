@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from typing import Annotated, Literal, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
@@ -16,6 +16,7 @@ from store_operator.auth.dependencies import (
 from store_operator.auth.errors import ApiError
 from store_operator.auth.schemas import MemberPatchRequest, MemberSummary
 from store_operator.db import get_db
+from store_operator.models.channel_spec import ChannelSpec, ChannelSpecVersion
 from store_operator.models.identity import Store, StoreMembership, User
 from store_operator.models.job_runtime import Job, OutboxEvent
 
@@ -24,6 +25,104 @@ router = APIRouter(prefix="/admin", tags=["platform-admin"])
 
 class OutboxRequeueRequest(BaseModel):
     reason: str = Field(min_length=8, max_length=500)
+
+class ChannelSpecVersionPublishRequest(BaseModel):
+    expected_current_version_id: UUID | None
+    source_document_ref: str = Field(min_length=12, max_length=2048)
+    text_constraints: dict[str, object] = Field(default_factory=dict)
+    media_constraints: dict[str, object] = Field(default_factory=dict)
+    hashtag_constraints: dict[str, object] = Field(default_factory=dict)
+    link_constraints: dict[str, object] = Field(default_factory=dict)
+    schedule_constraints: dict[str, object] = Field(default_factory=dict)
+    draft_supported: bool = False
+    publish_supported: bool = False
+
+
+
+@router.post("/channel-specs/{channel_key}/versions")
+def publish_channel_spec_version(
+    channel_key: str,
+    payload: ChannelSpecVersionPublishRequest,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    _admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    if not payload.source_document_ref.startswith("https://"):
+        raise ApiError(
+            422,
+            "CHANNEL_SPEC_SOURCE_REQUIRED",
+            "A verified HTTPS official-source reference is required",
+        )
+    spec = db.scalar(
+        select(ChannelSpec)
+        .where(ChannelSpec.channel_key == channel_key, ChannelSpec.status == "active")
+        .with_for_update()
+    )
+    if spec is None:
+        raise ApiError(404, "CHANNEL_SPEC_NOT_FOUND", "Channel specification not found")
+    if spec.current_version_id != payload.expected_current_version_id:
+        raise ApiError(
+            409,
+            "STALE_CHANNEL_SPEC_VERSION",
+            "Channel specification changed; refresh and retry",
+        )
+    latest_version = db.scalar(
+        select(func.max(ChannelSpecVersion.spec_version)).where(
+            ChannelSpecVersion.channel_spec_id == spec.id
+        )
+    ) or 0
+    version = ChannelSpecVersion(
+        id=uuid4(),
+        channel_spec_id=spec.id,
+        spec_version=latest_version + 1,
+        text_constraints_json=payload.text_constraints,
+        media_constraints_json=payload.media_constraints,
+        hashtag_constraints_json=payload.hashtag_constraints,
+        link_constraints_json=payload.link_constraints,
+        schedule_constraints_json=payload.schedule_constraints,
+        draft_supported=payload.draft_supported,
+        publish_supported=payload.publish_supported,
+        verification_status="verified",
+        source_document_ref=payload.source_document_ref,
+        published_at=datetime.now(UTC),
+    )
+    db.add(version)
+    db.flush()
+    spec.current_version_id = version.id
+    record_audit(
+        db,
+        request,
+        action="channel.spec_version.published",
+        target_type="channel_spec_version",
+        target_id=version.id,
+        actor_user_id=auth.user.id,
+        actor_type="platform_admin",
+        metadata={
+            "channel_key": channel_key,
+            "spec_version": version.spec_version,
+            "source_document_ref": payload.source_document_ref,
+            "draft_supported": payload.draft_supported,
+            "publish_supported": payload.publish_supported,
+        },
+    )
+    db.commit()
+    return {
+        "id": str(version.id),
+        "channel_spec_id": str(version.channel_spec_id),
+        "spec_version": version.spec_version,
+        "text_constraints": version.text_constraints_json,
+        "media_constraints": version.media_constraints_json,
+        "hashtag_constraints": version.hashtag_constraints_json,
+        "link_constraints": version.link_constraints_json,
+        "schedule_constraints": version.schedule_constraints_json,
+        "draft_supported": version.draft_supported,
+        "publish_supported": version.publish_supported,
+        "verification_status": version.verification_status,
+        "source_document_ref": version.source_document_ref,
+        "published_at": version.published_at.isoformat() if version.published_at else None,
+        "created_at": version.created_at.isoformat(),
+    }
 
 
 @router.get("/stores/{store_id}/members", response_model=list[MemberSummary])

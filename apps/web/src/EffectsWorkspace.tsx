@@ -168,6 +168,15 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
           </div>)}
         </div> : <p className="muted">{overview?.data_quality?.reason ?? "暂无可用于趋势分析的已核验周期数据。"}</p>}
         <div className="catalog-list">
+          <h3>数据洞察与下一次优化建议</h3>
+          {(overview?.insights ?? []).length > 0 ? overview?.insights.map(item => <div className="catalog-item" key={item.metric_key + item.source_system + (item.channel_key ?? "")}>
+            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.source_system}{item.channel_key ? ` · ${item.channel_key}` : ""} · 样本数 {item.sample_count}</p></div>
+              <span className="status-chip">{item.comparison_status === "available" ? "趋势可比较" : item.comparison_status === "zero_baseline" ? "零基线" : "样本不足"}</span></div>
+            <p className="catalog-description">{item.observation}</p>
+            <p className="catalog-description">下一步：{item.next_action}</p>
+          </div>) : <p className="muted">暂无已核验指标洞察；有真实数据后才会生成优化建议。</p>}
+        </div>
+        <div className="catalog-list">
           <h3>互动转化率</h3>
           {(overview?.conversion_rates ?? []).length > 0 ? overview?.conversion_rates.map(item => <div className="catalog-item" key={item.metric_key + item.period_end}>
             <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.numerator_value} / {item.denominator_value} · {item.source_system}{item.channel_key ? ` · ${item.channel_key}` : ""} · {new Date(item.period_start).toLocaleDateString()}–{new Date(item.period_end).toLocaleDateString()}</p></div>

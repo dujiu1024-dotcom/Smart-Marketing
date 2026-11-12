@@ -1053,6 +1053,11 @@ export interface MetricObservationRecord {
   published_work_id: string | null;
   marketing_task_id: string | null;
 }
+export interface DataSourceCapabilitySnapshotRecord {
+  id: string; channel_key: string; capability_key: string; status: string;
+  required_scopes: string[]; granted_scopes: string[]; evidence_ref: string | null;
+  snapshot_version: number; checked_at: string;
+}
 export interface PublishedWorkRecord {
   id: string; task_id: string | null; publish_operation_id: string | null;
   channel_account_id: string | null; channel_key: string; external_work_id: string;
@@ -1129,6 +1134,9 @@ export function importMetricCsv(storeId: string, csvText: string): Promise<{
   return request("/effects/import", { method: "POST", body: JSON.stringify({ csv_text: csvText }) }, storeId);
 }
 
+export function getDataSourceCapabilities(storeId: string): Promise<{ items: DataSourceCapabilitySnapshotRecord[]; total: number }> {
+  return request("/effects/data-source-capabilities", {}, storeId);
+}
 export function getPublishedWorks(storeId: string): Promise<{ items: PublishedWorkRecord[]; total: number; verified_count: number }> {
   return request("/effects/published-works", {}, storeId);
 }

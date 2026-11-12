@@ -117,7 +117,7 @@ jobs:
       - run: uv run --locked --directory apps/api ruff check ../worker
       - run: PYTHONPATH="$GITHUB_WORKSPACE/apps/api/src:$GITHUB_WORKSPACE/apps/worker/src" uv run --locked --directory apps/api mypy ../worker/src
       - name: Run Worker execution contract tests
-        run: PYTHONPATH="$GITHUB_WORKSPACE/apps/api/src:$GITHUB_WORKSPACE/src" REDIS_URL=redis://localhost:6379/0 DATABASE_URL=postgresql+psycopg://ci:ci@localhost:5432/ci uv run --locked --directory apps/api pytest ../worker/tests
+        run: PYTHONPATH="$GITHUB_WORKSPACE/apps/api/src:$GITHUB_WORKSPACE/apps/worker/src" REDIS_URL=redis://localhost:6379/0 DATABASE_URL=postgresql+psycopg://ci:ci@localhost:5432/ci uv run --locked --directory apps/api pytest ../worker/tests
       - run: |
           PYTHONPATH="$GITHUB_WORKSPACE/apps/api/src:$GITHUB_WORKSPACE/apps/worker/src" REDIS_URL=redis://localhost:6379/0 DATABASE_URL=postgresql+psycopg://ci:ci@localhost:5432/ci uv run --locked --directory apps/api python -c 'from store_operator_worker.celery_app import healthcheck; assert healthcheck.run() == {"status": "ok"}'
 

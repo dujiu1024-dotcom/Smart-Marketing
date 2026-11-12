@@ -618,7 +618,7 @@ def confirm_publish_package(
     )
     db.add(confirmation)
     db.flush()
-    response = {
+    response: dict[str, object] = {
         "id": str(confirmation.id),
         "publish_package_id": str(package.id),
         "package_fingerprint": confirmation.package_fingerprint,

@@ -2142,7 +2142,7 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
                 writer.writerow(mapped)
     except ApiError:
         raise
-    except (KeyError, ValueError, TypeError, zipfile.BadZipFile, ET.ParseError, OverflowError) as exc:
+    except (KeyError, IndexError, ValueError, TypeError, zipfile.BadZipFile, ET.ParseError, OverflowError) as exc:
         raise ApiError(422, "XLSX_INVALID", f"Workbook could not be read: {str(exc)[:200]}") from exc
     csv_payload = MetricImportInput(csv_text=output.getvalue(), source_format="xlsx")
     return import_manual_observations(csv_payload, request, auth, context, db)

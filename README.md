@@ -24,6 +24,8 @@ AI 门店运营官是面向线下门店的 AI 营销执行平台：商家按需�
 - [内容生产与发布交付领域设计](docs/CONTENT_DELIVERY_DOMAIN_DESIGN.md)：Issue #8 文案/图片产物、版本审核、渠道适配、质检、多渠道发布包与最终确认契约。
 - [AI Provider 与 Prompt 版本领域设计](docs/AI_PROVIDER_PROMPT_DOMAIN_DESIGN.md)：Issue #10 文本/图片/Vision/OCR Provider Adapter、平台级 Prompt 版本、输入事实安全与调用审计契约。
 - [渠道账号与官方发布集成领域设计](docs/CHANNEL_INTEGRATION_DOMAIN_DESIGN.md)：Issue #12 官方 OAuth、ChannelSpec/Capability、ChannelAdapter、PublishOperation、幂等与外部结果核验契约。
+- [阶段 5 首个渠道候选平台核验](docs/CHANNEL_PLATFORM_PILOT_EVALUATION.md)：抖音/快手/小红书/视频号官方能力初筛、草稿与发布核验差距及项目负责人选择门禁。
+- [热点采集与门店营销机会领域设计](docs/HOT_TOPIC_OPPORTUNITY_DOMAIN_DESIGN.md)：Issue #11 来源证据、去重、StoreOpportunity、门店事实匹配、决策记录与 IterWave 复用映射。
 - [经营效果、作品归属与归因证据领域设计](docs/EFFECT_EVIDENCE_ATTRIBUTION_DOMAIN_DESIGN.md)：Issue #13 指标分层、作品核验、观察窗口、经营结果证据与归因可信度契约。
 - [B/C/D 跨领域契约审查记录](docs/DOMAIN_CONTRACT_REVIEW_LOG.md)：已统一的责任边界、冲突修正、待决项和联合验收场景。 
 - [核心数据模型、API Schema 与事件 Schema v1](docs/CORE_DATA_MODEL_AND_API_SCHEMAS_V1.md)：跨域逻辑 ERD、数据库约束、API 请求/响应示例、事件 Envelope 与实现前门禁。

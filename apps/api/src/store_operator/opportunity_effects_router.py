@@ -340,29 +340,177 @@ def list_metric_observations(context: Annotated[AuthContext, Depends(require_sto
     return {"items": [_observation_read(item, definition) for item, definition in rows]}
 
 @router.get("/effects/overview")
-def effects_overview(context: Annotated[AuthContext, Depends(require_store_context)],
-    db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+def effects_overview(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
     store_id = _store_id(context)
-    rows = db.execute(select(MetricObservation, MetricDefinition)
-        .join(MetricDefinition, MetricDefinition.id == MetricObservation.metric_definition_id)
-        .where(MetricObservation.store_id == store_id).order_by(MetricObservation.collected_at.desc())).all()
+    rows = db.execute(
+        select(MetricObservation, MetricDefinition)
+        .join(
+            MetricDefinition,
+            MetricDefinition.id == MetricObservation.metric_definition_id,
+        )
+        .where(MetricObservation.store_id == store_id)
+        .order_by(MetricObservation.collected_at.desc())
+    ).all()
+
     latest: dict[str, tuple[MetricObservation, MetricDefinition]] = {}
+    verified_rows: list[tuple[MetricObservation, MetricDefinition]] = []
     for item, definition in rows:
-        if item.authenticity_status in {"official_api", "verified_import"}:
+        is_verified = (
+            item.authenticity_status in {"official_api", "verified_import"}
+            and item.sync_status == "current"
+            and item.integrity_status == "complete"
+            and item.value_numeric is not None
+        )
+        if is_verified:
             latest.setdefault(item.metric_key, (item, definition))
+            if item.period_start is not None and item.period_end is not None:
+                verified_rows.append((item, definition))
+
     cards = []
     for item, definition in latest.values():
-        trusted = item.authenticity_status in {"official_api", "verified_import"} and item.sync_status in {"current", "delayed"}
-        cards.append({"metric_key": item.metric_key, "display_name": definition.display_name,
-            "metric_tier": item.metric_tier, "value": str(item.value_numeric) if trusted and item.value_numeric is not None else None,
-            "status": "available" if trusted and item.value_numeric is not None else "unavailable",
-            "reason": None if trusted else "缺少已核验的数据来源；手工报告与演示数据不进入正式指标。",
-            "source_system": item.source_system, "period_end": item.period_end.isoformat() if item.period_end else None,
-            "period_timezone": item.period_timezone, "collected_at": item.collected_at.isoformat(),
-            "authenticity_status": item.authenticity_status, "integrity_status": item.integrity_status})
-    return {"items": cards, "data_status": "available" if any(card["status"] == "available" for card in cards) else "unavailable",
-        "business_outcomes": {"roi": None, "sales_growth": None, "store_visit_growth": None,
-            "reason": "没有已核验的真实经营结果与成本证据时，不计算 ROI、销售增长或到店增长。"}}
+        cards.append(
+            {
+                "metric_key": item.metric_key,
+                "display_name": definition.display_name,
+                "metric_tier": item.metric_tier,
+                "value": str(item.value_numeric),
+                "status": "available",
+                "reason": None,
+                "source_system": item.source_system,
+                "period_end": item.period_end.isoformat() if item.period_end else None,
+                "period_timezone": item.period_timezone,
+                "collected_at": item.collected_at.isoformat(),
+                "authenticity_status": item.authenticity_status,
+                "integrity_status": item.integrity_status,
+            }
+        )
+
+    grouped: dict[str, list[tuple[MetricObservation, MetricDefinition]]] = {}
+    for item, definition in verified_rows:
+        period_key = "|".join(
+            [item.period_start.isoformat(), item.period_end.isoformat()]
+        )
+        grouped.setdefault(item.metric_key + "|" + period_key, []).append(
+            (item, definition)
+        )
+
+    metric_periods: dict[str, list[dict[str, object]]] = {}
+    for key, samples in grouped.items():
+        metric_key = key.split("|", 1)[0]
+        definition = samples[0][1]
+        values = [sample.value_numeric for sample, _ in samples]
+        numeric_values = [value for value in values if value is not None]
+        if not numeric_values:
+            continue
+        rule = definition.aggregation_rule
+        if rule == "avg":
+            aggregate = sum(numeric_values) / Decimal(len(numeric_values))
+        elif rule == "max":
+            aggregate = max(numeric_values)
+        elif rule == "min":
+            aggregate = min(numeric_values)
+        elif rule == "latest":
+            aggregate = samples[0][0].value_numeric
+        else:
+            aggregate = sum(numeric_values)
+        first = samples[0][0]
+        zone = ZoneInfo(first.period_timezone)
+        period_start = first.period_start.astimezone(zone)
+        period_end = first.period_end.astimezone(zone)
+        metric_periods.setdefault(metric_key, []).append(
+            {
+                "period_start": period_start.isoformat(),
+                "period_end": period_end.isoformat(),
+                "value": str(aggregate),
+                "sample_count": len(numeric_values),
+                "timezone": first.period_timezone,
+                "aggregation_rule": rule,
+                "display_name": definition.display_name,
+            }
+        )
+
+    trends = []
+    for metric_key, points in metric_periods.items():
+        points.sort(key=lambda point: str(point["period_end"]))
+        previous = points[-2] if len(points) > 1 else None
+        current = points[-1] if points else None
+        comparison: dict[str, object] = {
+            "status": "insufficient_samples",
+            "change_percent": None,
+        }
+        if previous is not None and current is not None:
+            previous_start = datetime.fromisoformat(str(previous["period_start"]))
+            previous_end = datetime.fromisoformat(str(previous["period_end"]))
+            current_start = datetime.fromisoformat(str(current["period_start"]))
+            current_end = datetime.fromisoformat(str(current["period_end"]))
+            same_window = (
+                previous_end - previous_start == current_end - current_start
+            )
+            previous_value = Decimal(str(previous["value"]))
+            current_value = Decimal(str(current["value"]))
+            if same_window and previous_value != 0:
+                change = (current_value - previous_value) / previous_value * 100
+                comparison = {
+                    "status": "available",
+                    "change_percent": str(change.quantize(Decimal("0.01"))),
+                }
+            elif same_window and previous_value == 0:
+                comparison = {
+                    "status": "zero_baseline",
+                    "change_percent": None,
+                }
+        trends.append(
+            {
+                "metric_key": metric_key,
+                "display_name": str(points[-1]["display_name"]),
+                "points": points[-30:],
+                "comparison": comparison,
+            }
+        )
+
+    total_observations = len(rows)
+    verified_count = sum(
+        1
+        for item, _ in rows
+        if item.authenticity_status in {"official_api", "verified_import"}
+        and item.sync_status == "current"
+        and item.integrity_status == "complete"
+    )
+    delayed_count = sum(
+        1 for item, _ in rows if item.sync_status == "delayed"
+    )
+    incomplete_count = sum(
+        1
+        for item, _ in rows
+        if item.integrity_status in {"partial", "anomalous", "unknown"}
+    )
+    return {
+        "items": cards,
+        "trends": trends,
+        "data_quality": {
+            "total_observations": total_observations,
+            "verified_observations": verified_count,
+            "delayed_observations": delayed_count,
+            "incomplete_or_anomalous_observations": incomplete_count,
+            "status": "available" if verified_count else "unavailable",
+            "reason": (
+                None
+                if verified_count
+                else "缺少完整、当前且已核验的指标观测；手工报告不进入正式趋势和经营结论。"
+            ),
+        },
+        "data_status": "available" if cards else "unavailable",
+        "business_outcomes": {
+            "roi": None,
+            "sales_growth": None,
+            "store_visit_growth": None,
+            "reason": "没有已核验的真实经营结果与成本证据时，不计算 ROI、销售增长或到店增长。",
+        },
+    }
+
 
 @router.post("/effects/observations")
 def create_manual_observation(payload: MetricObservationInput, request: Request,

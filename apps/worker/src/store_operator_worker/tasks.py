@@ -13,7 +13,6 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 import httpx
-from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
 from celery.exceptions import CeleryError  # type: ignore[import-untyped]
 from kombu.exceptions import OperationalError
 from sqlalchemy import create_engine, func, or_, select
@@ -43,7 +42,6 @@ from store_operator.jobs.service import (  # type: ignore[import-untyped]
     recover_expired_jobs,
 )
 from store_operator.models import (  # type: ignore[import-untyped]
-    AIInvocation,
     Artifact,
     ArtifactVersion,
     ChannelAccount,
@@ -440,108 +438,6 @@ def execute_job(job_id: str) -> dict[str, str]:
         stop_heartbeat.set()
         heartbeat_thread.join(timeout=HEARTBEAT_INTERVAL_SECONDS + 1)
 
-
-@celery_app.task(
-    name="ai.cleanup_orphaned_image_objects", ignore_result=True
-)  # type: ignore[untyped-decorator]
-def cleanup_orphaned_ai_image_objects(
-    batch_size: int = 100,
-    minimum_age_minutes: int = 60,
-) -> int:
-    """Delete old provider-created image objects not linked to a persisted asset."""
-    now = datetime.now(UTC)
-    cutoff = now - timedelta(minutes=max(60, minimum_age_minutes))
-    limit = min(max(1, batch_size), 500)
-    with SessionLocal() as db:
-        invocations = db.scalars(
-            select(AIInvocation)
-            .join(Job, AIInvocation.job_id == Job.id)
-            .where(
-                AIInvocation.capability == "image",
-                AIInvocation.status == "succeeded",
-                AIInvocation.job_id.is_not(None),
-                AIInvocation.store_id == Job.store_id,
-                Job.status.in_(("succeeded", "failed", "cancelled", "needs_human")),
-                AIInvocation.created_at <= cutoff,
-                AIInvocation.response_ref_json.is_not(None),
-                AIInvocation.response_ref_json["object_key"].as_string().is_not(None),
-                AIInvocation.response_ref_json["orphan_cleanup"].is_(None),
-            )
-            .order_by(AIInvocation.created_at, AIInvocation.id)
-            .limit(limit)
-        ).all()
-        candidates: list[tuple[UUID, str]] = []
-        referenced: list[UUID] = []
-        for invocation in invocations:
-            response_ref = dict(invocation.response_ref_json or {})
-            cleanup = response_ref.get("orphan_cleanup")
-            if isinstance(cleanup, dict) and cleanup.get("status") in {
-                "deleted",
-                "referenced",
-            }:
-                continue
-            object_key = response_ref.get("object_key")
-            if not isinstance(object_key, str) or not object_key:
-                continue
-            media_asset_id = db.scalar(
-                select(MediaAsset.id).where(MediaAsset.object_key == object_key)
-            )
-            artifact_version_id = db.scalar(
-                select(ArtifactVersion.id).where(
-                    ArtifactVersion.content_ref == object_key
-                )
-            )
-            if media_asset_id is not None or artifact_version_id is not None:
-                referenced.append(invocation.id)
-            else:
-                candidates.append((invocation.id, object_key))
-
-    for invocation_id in referenced:
-        with SessionLocal.begin() as db:
-            invocation = db.scalar(
-                select(AIInvocation)
-                .where(AIInvocation.id == invocation_id)
-                .with_for_update()
-            )
-            if invocation is not None:
-                response_ref = dict(invocation.response_ref_json or {})
-                response_ref["orphan_cleanup"] = {
-                    "status": "referenced",
-                    "checked_at": now.isoformat(),
-                }
-                invocation.response_ref_json = response_ref
-
-    cleaned = 0
-    for invocation_id, object_key in candidates:
-        try:
-            delete_object(object_key=object_key)
-        except (ObjectStorageNotConfigured, BotoCoreError, OSError) as exc:
-            logger.warning(
-                "Orphaned AI image cleanup failed for invocation %s (%s)",
-                invocation_id,
-                type(exc).__name__,
-            )
-            continue
-        with SessionLocal.begin() as db:
-            invocation = db.scalar(
-                select(AIInvocation)
-                .where(AIInvocation.id == invocation_id)
-                .with_for_update()
-            )
-            if invocation is None:
-                continue
-            response_ref = dict(invocation.response_ref_json or {})
-            if response_ref.get("orphan_cleanup") is not None:
-                continue
-            response_ref["orphan_cleanup"] = {
-                "status": "deleted",
-                "cleaned_at": now.isoformat(),
-            }
-            invocation.response_ref_json = response_ref
-        cleaned += 1
-    if cleaned:
-        logger.info("Cleaned %s orphaned AI image objects", cleaned)
-    return cleaned
 
 
 @celery_app.task(

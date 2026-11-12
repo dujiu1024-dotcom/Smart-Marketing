@@ -164,6 +164,11 @@ async def main() -> None:
         await page.locator('[data-action="generate-image"]').click()
         await page.locator('[data-action="approve-image"]').click()
 
+        await page.locator("#imageInstruction").fill("优化背景层次，保持商品主体和品牌标识不变。")
+        await page.locator('[data-action="revise-image"]').click()
+        await page.get_by_text("图片整改版本已创建，等待审核").wait_for(state="visible")
+        await page.locator('[data-action="approve-image"]').click()
+
         await page.locator('[data-task-tab="channel"]').click()
         for platform in ["小红书", "抖音"]:
             await page.locator(f'[data-action="preview-channel"][data-id="{platform}"]').click()

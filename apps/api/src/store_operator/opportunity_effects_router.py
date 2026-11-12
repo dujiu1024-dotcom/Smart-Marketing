@@ -5,8 +5,8 @@ import io
 import math
 import posixpath
 import re
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, cast

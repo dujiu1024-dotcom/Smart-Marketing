@@ -468,7 +468,9 @@ def effects_overview(
         if not numeric_values:
             continue
         rule = definition.aggregation_rule
-        if rule == "avg":
+        if definition.period_semantics == "cumulative_snapshot":
+            aggregate = numeric_values[0]
+        elif rule == "avg":
             aggregate = sum(numeric_values) / Decimal(len(numeric_values))
         elif rule == "max":
             aggregate = max(numeric_values)
@@ -510,6 +512,7 @@ def effects_overview(
             current_end = datetime.fromisoformat(str(current["period_end"]))
             same_window = (
                 previous_end - previous_start == current_end - current_start
+                and previous_end == current_start
             )
             previous_value = Decimal(str(previous["value"]))
             current_value = Decimal(str(current["value"]))
@@ -625,7 +628,7 @@ def correct_manual_observation(
     )
     if original is None:
         raise ApiError(404, "RESOURCE_NOT_FOUND", "Observation not found")
-    if original.authenticity_status not in {"merchant_reported", "demo_sample"}:
+    if original.authenticity_status != "merchant_reported":
         raise ApiError(
             409,
             "VERIFIED_OBSERVATION_IMMUTABLE",
@@ -642,6 +645,12 @@ def correct_manual_observation(
             409,
             "OBSERVATION_ALREADY_SUPERSEDED",
             "This observation already has a correction",
+        )
+    if not payload.source_evidence_ref or not payload.source_evidence_ref.strip():
+        raise ApiError(
+            422,
+            "CORRECTION_EVIDENCE_REQUIRED",
+            "A correction must include its source evidence or correction note",
         )
     if payload.metric_key != original.metric_key:
         raise ApiError(

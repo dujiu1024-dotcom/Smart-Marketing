@@ -10,6 +10,7 @@ from store_operator.models.opportunity_effects import (
     HotTopicSource,
     MetricDefinition,
     MetricObservation,
+    PublishedWork,
     StoreOpportunity,
 )
 

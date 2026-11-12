@@ -183,7 +183,7 @@ async def main() -> None:
         await upload.set_input_files({
             "name": "metrics.xlsx",
             "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "buffer": b"PK\\x03\\x04",
+            "buffer": b"PK\x03\x04",
         })
         await page.get_by_role("button", name="导入 Excel").click()
         await page.get_by_text("Excel 导入完成：新增 2 条，重复跳过 1 条。").wait_for()

@@ -5,7 +5,7 @@ import {
   type MediaAsset,
 } from "./api";
 
-const MAX_BYTES = 25 * 1024 * 1024;
+const MAX_BYTES = 25_000_000;
 const MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const statusLabels: Record<MediaAsset["status"], string> = {
   uploading: "上传中", quarantined: "待隔离处理", scanning: "安全扫描中",

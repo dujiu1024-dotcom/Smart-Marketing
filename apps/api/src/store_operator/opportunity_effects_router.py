@@ -63,6 +63,7 @@ class MetricObservationInput(BaseModel):
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     source_record_id: str | None = Field(default=None, max_length=300)
     source_evidence_ref: str | None = Field(default=None, max_length=2048)
+    supersedes_observation_id: UUID | None = None
 
     @field_validator("period_start", "period_end")
     @classmethod
@@ -104,7 +105,8 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
     }
 
 def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservationInput,
-                        authenticity: str, source_system: str = "manual") -> MetricObservation:
+                        authenticity: str, source_system: str = "manual",
+                        supersedes_observation_id: UUID | None = None) -> MetricObservation:
     definition = db.scalar(select(MetricDefinition).where(
         MetricDefinition.source_system == source_system,
         MetricDefinition.metric_key == payload.metric_key,
@@ -138,7 +140,7 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
         period_end=payload.period_end, period_timezone=payload.period_timezone,
         collected_at=datetime.now(UTC), definition_version=definition.definition_version,
         integrity_status="unknown", authenticity_status=authenticity, sync_status="current",
-        deduplication_key=dedupe)
+        deduplication_key=dedupe, supersedes_observation_id=supersedes_observation_id)
     db.add(item)
     db.flush()
     return item
@@ -564,6 +566,8 @@ def create_manual_observation(payload: MetricObservationInput, request: Request,
     context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
     store_id = _store_id(context)
+    if payload.supersedes_observation_id is not None:
+        raise ApiError(422, "CORRECTION_ENDPOINT_REQUIRED", "Use the observation corrections endpoint")
     item = _create_observation(db, store_id=store_id, payload=payload,
         authenticity="merchant_reported")
     definition = db.get(MetricDefinition, item.metric_definition_id)
@@ -576,6 +580,96 @@ def create_manual_observation(payload: MetricObservationInput, request: Request,
     db.commit()
     return {"item": _observation_read(item, definition),
         "message": "已记录为商家手工报告，不作为已核验经营结果或 ROI 依据。"}
+
+@router.post("/effects/observations/{observation_id}/corrections")
+def correct_manual_observation(
+    observation_id: UUID,
+    payload: MetricObservationInput,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    if payload.supersedes_observation_id not in {None, observation_id}:
+        raise ApiError(
+            422,
+            "CORRECTION_TARGET_MISMATCH",
+            "Correction target must match the observation in the URL",
+        )
+    original = db.scalar(
+        select(MetricObservation)
+        .where(
+            MetricObservation.id == observation_id,
+            MetricObservation.store_id == store_id,
+        )
+        .with_for_update()
+    )
+    if original is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Observation not found")
+    if original.authenticity_status not in {"merchant_reported", "demo_sample"}:
+        raise ApiError(
+            409,
+            "VERIFIED_OBSERVATION_IMMUTABLE",
+            "Verified observations must be corrected by their source adapter",
+        )
+    successor = db.scalar(
+        select(MetricObservation.id).where(
+            MetricObservation.store_id == store_id,
+            MetricObservation.supersedes_observation_id == original.id,
+        )
+    )
+    if successor is not None:
+        raise ApiError(
+            409,
+            "OBSERVATION_ALREADY_SUPERSEDED",
+            "This observation already has a correction",
+        )
+    if payload.metric_key != original.metric_key:
+        raise ApiError(
+            422,
+            "CORRECTION_METRIC_MISMATCH",
+            "A correction must keep the original metric key",
+        )
+    item = _create_observation(
+        db,
+        store_id=store_id,
+        payload=payload,
+        authenticity="merchant_reported",
+        source_system="manual",
+        supersedes_observation_id=original.id,
+    )
+    definition = db.get(MetricDefinition, item.metric_definition_id)
+    if definition is None:
+        raise ApiError(500, "METRIC_DEFINITION_MISSING", "Metric definition is unavailable")
+    record_audit(
+        db,
+        request,
+        action="effects.observation.corrected",
+        target_type="metric_observation",
+        target_id=item.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "supersedes_observation_id": str(original.id),
+            "authenticity_status": item.authenticity_status,
+        },
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ApiError(
+            409,
+            "OBSERVATION_ALREADY_SUPERSEDED",
+            "This observation already has a correction",
+        ) from exc
+    return {
+        "item": _observation_read(item, definition),
+        "supersedes_observation_id": str(original.id),
+        "message": "已追加更正记录；原始观测保持不变，新记录仍标记为商家报告。",
+    }
+
 
 @router.post("/effects/import")
 def import_manual_observations(payload: MetricImportInput, request: Request,

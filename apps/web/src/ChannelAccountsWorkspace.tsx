@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  listChannelSpecs, listDouyinAccounts, refreshDouyinAccount, startDouyinAuthorization,
-  type ChannelSpecRecord, type DouyinAccount,
+  listChannelSpecs, listDouyinAccountCapabilities, listDouyinAccounts, refreshDouyinAccount, startDouyinAuthorization,
+  type ChannelCapabilitySnapshotRecord, type ChannelSpecRecord, type DouyinAccount,
 } from "./api";
 
 const statusLabels: Record<DouyinAccount["status"], string> = {
@@ -14,6 +14,7 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : "
 
 export default function ChannelAccountsWorkspace({ storeId }: { storeId: string }) {
   const [accounts, setAccounts] = useState<DouyinAccount[]>([]);
+  const [capabilities, setCapabilities] = useState<Record<string, ChannelCapabilitySnapshotRecord[]>>({});
   const [douyinSpec, setDouyinSpec] = useState<ChannelSpecRecord | null>(null);
   const [specError, setSpecError] = useState("");
   const [authorizationUrl, setAuthorizationUrl] = useState("");
@@ -26,7 +27,13 @@ export default function ChannelAccountsWorkspace({ storeId }: { storeId: string 
     setLoading(true);
     setError("");
     try {
-      setAccounts(await listDouyinAccounts(storeId));
+      const accountItems = await listDouyinAccounts(storeId);
+      setAccounts(accountItems);
+      const capabilityEntries = await Promise.all(accountItems.map(async account => {
+        try { return [account.id, await listDouyinAccountCapabilities(storeId, account.id)] as const; }
+        catch { return [account.id, []] as const; }
+      }));
+      setCapabilities(Object.fromEntries(capabilityEntries));
       try {
         const specs = await listChannelSpecs(storeId);
         setDouyinSpec(specs.find(item => item.channel_key === "douyin") || null);
@@ -84,7 +91,9 @@ export default function ChannelAccountsWorkspace({ storeId }: { storeId: string 
           {account.avatar_url ? <img src={account.avatar_url} alt="" referrerPolicy="no-referrer" /> : <span className="channel-avatar">抖</span>}
           <div><strong>{account.display_name || "抖音账号"}</strong><small>账号 ID：{account.external_account_id}</small><small>授权于 {new Date(account.connected_at).toLocaleString()}</small></div>
         </div>
-        <div className="channel-account-meta"><span className={account.status === "active" ? "status-chip" : "status-chip danger"}>{statusLabels[account.status]}</span><small>授权范围：{account.granted_scopes.join("、") || "未返回"}</small><small>Access Token 到期：{new Date(account.access_token_expires_at).toLocaleString()}</small><small>最近验证：{account.last_verified_at ? new Date(account.last_verified_at).toLocaleString() : "尚未验证"}</small></div>
+        <div className="channel-account-meta"><span className={account.status === "active" ? "status-chip" : "status-chip danger"}>{statusLabels[account.status]}</span><small>授权范围：{account.granted_scopes.join("、") || "未返回"}</small><small>Access Token 到期：{new Date(account.access_token_expires_at).toLocaleString()}</small><small>最近验证：{account.last_verified_at ? new Date(account.last_verified_at).toLocaleString() : "尚未验证"}</small>
+          <div className="channel-capability-list"><strong>账号能力核验</strong>{(capabilities[account.id] || []).length === 0 ? <small>暂无能力探测记录；当前不将任何未核验能力视为可用。</small> : (capabilities[account.id] || []).map(capability => <small key={capability.id}>{capability.capability_key}：{capability.support_status === "supported" ? "已核验支持" : capability.support_status === "unsupported" ? "不支持" : "待核验"} · {new Date(capability.checked_at).toLocaleString()}</small>)}</div>
+        </div>
         <button className="text-button" type="button" disabled={saving || account.status !== "active"} onClick={() => void refreshAccount(account)}>重新验证授权</button>
       </article>)}</div>}
     </section>

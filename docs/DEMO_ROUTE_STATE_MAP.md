@@ -133,3 +133,10 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - 事实确认通过 POST `/api/v1/store/brand-guideline/<id>/confirm-facts`，未保存修改时禁止确认。
 - Logo 字段仅存储已存在的 MediaAsset ID；Media Assets 页面/选择器尚未完成，因此不显示伪上传入口。
 - 品牌色彩为 JSON 对象数组，字体、核心价值、常用/禁用表达与 CTA 偏好为独立结构化列表。
+
+## 12. 客群与经营生产路由映射（PR 待验收）
+- Demo 门店资料 Tab audience 对应 #store:audience。
+- 新增/编辑页面对应 #store-editor:audience:new 和 #store-editor:audience:<id>。
+- 通过 /store/audiences 执行门店隔离的列表、创建、更新和删除；创建使用 Idempotency-Key，修改/删除/确认使用 If-Match。
+- 客群资料保留样本来源、样本量、采样时间和置信等级；未知值保持空白，不用推测补齐。
+- 当前不连接 POS/CRM，不把客群描述推断成经营效果或销售增长。

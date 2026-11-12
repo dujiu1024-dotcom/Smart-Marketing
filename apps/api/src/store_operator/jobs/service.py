@@ -414,14 +414,16 @@ def claim_job(
             )
             return None
         if job.created_by_user_id is not None:
-            active_membership_id = db.scalar(
-                select(StoreMembership.id).where(
+            active_membership = db.scalar(
+                select(StoreMembership)
+                .where(
                     StoreMembership.store_id == job.store_id,
                     StoreMembership.user_id == job.created_by_user_id,
                     StoreMembership.status == "active",
                 )
+                .with_for_update()
             )
-            if active_membership_id is None:
+            if active_membership is None:
                 _cancel_before_claim(
                     db,
                     job,

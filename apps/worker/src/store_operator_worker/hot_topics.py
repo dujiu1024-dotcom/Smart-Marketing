@@ -85,8 +85,12 @@ def _assert_public_host(host: str, allowed: set[str]) -> str:
 def _safe_https_url(value: str, allowed: set[str]) -> tuple[str, str]:
     parsed = urlsplit(value)
     host = (parsed.hostname or "").lower()
-    if parsed.scheme != "https" or not host or parsed.username or parsed.password:
-        raise JobExecutionError("SOURCE_URL_INVALID", "Source URL must be a credential-free HTTPS URL.", retryable=False)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise JobExecutionError("SOURCE_URL_INVALID", "Source URL port is invalid.", retryable=False) from exc
+    if parsed.scheme != "https" or not host or parsed.username or parsed.password or port not in {None, 443}:
+        raise JobExecutionError("SOURCE_URL_INVALID", "Source URL must use credential-free HTTPS on port 443.", retryable=False)
     address = _assert_public_host(host, allowed)
     return value, address
 
@@ -286,11 +290,20 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
         )
         with httpx.Client(transport=transport, timeout=HTTP_TIMEOUT, follow_redirects=False,
                           headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml"}) as client:
-            response = client.get(feed_url)
-            response.raise_for_status()
-            if len(response.content) > MAX_FEED_BYTES:
-                raise JobExecutionError("SOURCE_FEED_TOO_LARGE", "Feed exceeded the configured size limit.", retryable=False)
-            entries = _parse_feed(response.content)
+            with client.stream("GET", feed_url) as response:
+                response.raise_for_status()
+                chunks: list[bytes] = []
+                total_bytes = 0
+                for chunk in response.iter_bytes():
+                    total_bytes += len(chunk)
+                    if total_bytes > MAX_FEED_BYTES:
+                        raise JobExecutionError(
+                            "SOURCE_FEED_TOO_LARGE",
+                            "Feed exceeded the configured size limit.",
+                            retryable=False,
+                        )
+                    chunks.append(chunk)
+                entries = _parse_feed(b"".join(chunks))
     except JobExecutionError:
         raise
     except (httpx.HTTPError, OSError) as exc:

@@ -147,3 +147,14 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - `sampled_at` 必须带 ISO 8601 显式时区偏移，写入 UTC；门店本地时区展示待 Store.timezone 注入。
 - 未保存的客群编辑不得确认服务器旧版本；无效/越权 ID 显示读取失败，不得回退成新增表单。
 - 创建幂等键在同一 session 草稿重试期间稳定复用。
+
+
+## 13. 素材资产库生产路由映射（2026-11-12）
+
+- Demo `#store:assets` 对应生产 `MediaAssetsWorkspace`，从当前门店上下文读取 `/store/assets`。
+- 图片上传按 SHA-256 建立稳定 session 草稿：创建 `/store/assets/upload-intents`、浏览器直传预签名 PUT、调用 `/complete`；中断后先尝试完成既有 intent，避免重复 PUT 造成覆盖/冲突。
+- 浏览器直传 URL 使用 `OBJECT_STORAGE_PUBLIC_ENDPOINT_URL` 签名；API 内部 HEAD/GET 使用 `OBJECT_STORAGE_ENDPOINT_URL`。Docker Compose API 内部地址为 `http://seaweedfs:8333`，`.env` 的公开地址为浏览器可访问的 `http://localhost:8333`。
+- SeaweedFS 本地 CORS 限制为 `http://localhost:5173` 与 `http://127.0.0.1:5173`；生产 S3 必须按实际 Web Origin 配置 CORS，且仅开放 PUT/GET 和必要请求头。
+- 上传完成后状态为 quarantined/scanning；只有 Worker 安全扫描推进至 ready 且商家确认使用权为 confirmed_allowed，才会开放下载 URL。
+- 页面支持扫描状态查看、来源/授权说明、限制使用、短期原图下载和归档；归档不删除对象，当前品牌 Logo 引用会被服务端阻断。
+- 当前没有声称恶意文件扫描或真实 S3 浏览器联调已完成；扫描 Worker、缩略图、尺寸元数据、过期 intent 清理和素材关联选择器仍待完成。

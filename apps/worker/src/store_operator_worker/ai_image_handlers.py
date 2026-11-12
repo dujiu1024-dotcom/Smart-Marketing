@@ -37,11 +37,6 @@ from store_operator.models import (  # type: ignore[import-untyped]
     TaskStep,
 )
 from store_operator.models.store_knowledge import product_media_assets  # type: ignore[import-untyped]
-from store_operator.object_storage import (  # type: ignore[import-untyped]
-    ObjectStorageNotConfigured,
-    delete_object,
-    download_object_bytes,
-)
 
 from store_operator_worker.ai_handlers import (
     _business_fact_snapshots,
@@ -67,6 +62,28 @@ from store_operator_worker.media_scanner import (
 
 logger = logging.getLogger(__name__)
 _MAX_IMAGE_BYTES = 25 * 1024 * 1024
+
+
+def download_object_bytes(*, object_key: str, max_bytes: int) -> bytes:
+    from store_operator.object_storage import download_object_bytes as download
+
+    return download(object_key=object_key, max_bytes=max_bytes)
+
+
+def delete_object(*, object_key: str) -> None:
+    from store_operator.object_storage import delete_object as delete
+
+    delete(object_key=object_key)
+
+
+def _delete_generated_object(object_key: str) -> None:
+    try:
+        delete_object(object_key=object_key)
+    except (RuntimeError, BotoCoreError, OSError) as cleanup_error:
+        logger.warning(
+            "Could not clean up generated image object (%s)",
+            type(cleanup_error).__name__,
+        )
 
 
 def _image_size(aspect_ratio: object) -> tuple[int, int]:
@@ -203,20 +220,26 @@ def _verify_and_scan_image(result: ImageGenerateResponse) -> tuple[bytes, int, i
         )
     try:
         content = download_object_bytes(object_key=key, max_bytes=_MAX_IMAGE_BYTES)
-    except ObjectStorageNotConfigured as exc:
+    except RuntimeError as exc:
         raise _safe_error(
             "AI_IMAGE_STORAGE_NOT_CONFIGURED",
             "Private image storage is not configured for the Worker.",
         ) from exc
+    except BotoCoreError as exc:
+        raise JobExecutionError(
+            "AI_IMAGE_STORAGE_UNAVAILABLE",
+            "Private image storage is temporarily unavailable.",
+            retryable=True,
+        ) from exc
     except ValueError as exc:
-        delete_object(object_key=key)
+        _delete_generated_object(key)
         raise _safe_error(
             "AI_IMAGE_STORAGE_INVALID",
             "The generated image could not be read within the safety limit.",
         ) from exc
     actual_sha256 = hashlib.sha256(content).hexdigest()
     if actual_sha256 != result.sha256:
-        delete_object(object_key=key)
+        _delete_generated_object(key)
         raise _safe_error(
             "AI_IMAGE_INTEGRITY_FAILED",
             "The generated image failed SHA-256 integrity verification.",
@@ -841,13 +864,7 @@ def _complete_image(
                 )
             )
     except (JobExecutionError, SQLAlchemyError):
-        try:
-            delete_object(object_key=image_result.asset_object_key)
-        except (ObjectStorageNotConfigured, BotoCoreError, OSError) as cleanup_error:
-            logger.warning(
-                "Could not clean up generated image after persistence failure (%s)",
-                type(cleanup_error).__name__,
-            )
+        _delete_generated_object(image_result.asset_object_key)
         raise
 
     return {

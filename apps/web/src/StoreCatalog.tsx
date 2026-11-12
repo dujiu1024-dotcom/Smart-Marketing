@@ -163,14 +163,14 @@ export default function StoreCatalog({ storeId, initialTab }: { storeId: string;
       {busy ? <p className="muted">正在读取…</p> : products.length === 0 ? <p className="muted">暂无商品或服务记录。</p> : <div className="table-wrap"><table><thead><tr><th>名称</th><th>分类 / SKU</th><th>规格</th><th>售价</th><th>可售状态</th><th>事实状态</th><th>操作</th></tr></thead><tbody>{products.map(item=><tr key={item.id}>
         <td>{item.name}</td><td>{item.category || "—"}<small>{item.sku || ""}</small></td><td>{item.specification || "—"}</td>
         <td>{item.price_amount === null ? "未填写" : `${item.currency} ${item.price_amount}`} / {item.unit || "—"}</td>
-        <td>{item.availability_status}</td><td>{item.fact_status === "confirmed" ? "已确认" : "待核对"} · V{item.current_version}</td>
-        <td><button className="text-button" onClick={() => startProduct(item)}>编辑</button><button className="text-button" onClick={() => void removeProduct(item)} disabled={busy}>删除</button></td>
+        <td>{({available:"可售",unavailable:"停售",seasonal:"季节性",limited:"限量",unknown:"未知"} as Record<string,string>)[item.availability_status]}</td><td>{item.fact_status === "confirmed" ? "已确认" : "待核对"} · V{item.current_version}</td>
+        <td><button className="text-button" onClick={() => startProduct(item)}>编辑</button>{item.fact_status !== "confirmed" && <button className="text-button" onClick={() => void confirmProduct(item)} disabled={busy}>确认</button>}<button className="text-button" onClick={() => void removeProduct(item)} disabled={busy}>删除</button></td>
       </tr>)}</tbody></table></div>}</div>}
     {!editing && tab === "offers" && <div className="form-card"><div className="section-title"><div><h2>活动与优惠</h2><p>活动规则与适用条件按结构化 JSON 保存，AI 只能引用经核实的规则。</p></div><button className="primary" onClick={() => startOffer()}>新增活动</button></div>
       {busy ? <p className="muted">正在读取…</p> : offers.length === 0 ? <p className="muted">暂无活动或优惠记录。</p> : <div className="table-wrap"><table><thead><tr><th>活动名称</th><th>类型</th><th>有效期</th><th>状态</th><th>事实状态</th><th>操作</th></tr></thead><tbody>{offers.map(item=><tr key={item.id}>
-        <td>{item.title}</td><td>{item.offer_type}</td><td>{item.starts_at || "不限"} — {item.ends_at || "不限"}</td><td>{item.status}</td>
+        <td>{item.title}</td><td>{({discount:"折扣",bundle:"组合优惠",gift:"赠品",threshold:"满额优惠",other:"其他"} as Record<string,string>)[item.offer_type] ?? item.offer_type}</td><td>{item.starts_at || "不限"} — {item.ends_at || "不限"}</td><td>{({draft:"草稿",active:"生效中",paused:"已暂停",expired:"已过期",archived:"已归档"} as Record<string,string>)[item.status]}</td>
         <td>{item.fact_status === "confirmed" ? "已确认" : "待核对"} · V{item.current_version}</td>
-        <td><button className="text-button" onClick={() => startOffer(item)}>编辑</button><button className="text-button" onClick={() => void removeOffer(item)} disabled={busy}>删除</button></td>
+        <td><button className="text-button" onClick={() => startOffer(item)}>编辑</button>{item.fact_status !== "confirmed" && <button className="text-button" onClick={() => void confirmOffer(item)} disabled={busy}>确认</button>}<button className="text-button" onClick={() => void removeOffer(item)} disabled={busy}>删除</button></td>
       </tr>)}</tbody></table></div>}</div>}
   </section>;
 }

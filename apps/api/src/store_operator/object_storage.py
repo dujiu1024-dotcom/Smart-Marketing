@@ -28,6 +28,16 @@ def _build_client(endpoint_url: str | None) -> Any:
     )
 
 
+def _client() -> Any:
+    return _build_client(settings.object_storage_endpoint_url)
+
+
+def _presign_client() -> Any:
+    return _build_client(
+        settings.object_storage_public_endpoint_url or settings.object_storage_endpoint_url
+    )
+
+
 def create_upload_url(
     *,
     object_key: str,
@@ -36,7 +46,7 @@ def create_upload_url(
     byte_size: int,
     expires_in: int | None = None,
 ) -> str:
-    client = _client()
+    client = _presign_client()
     return cast(
         str,
         client.generate_presigned_url(

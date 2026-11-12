@@ -834,6 +834,19 @@ export async function listChannelSpecVersions(storeId: string, channelKey: strin
 
 
 
+
+export interface TaskBusinessFactSnapshot {
+  id: string;
+  fact_key: string;
+  version_no: number;
+  value: Record<string, unknown>;
+  content_fingerprint: string;
+  confirmation_status: "pending" | "confirmed" | "rejected" | "needs_review";
+  confirmed_at: string | null;
+}
+export async function listTaskBusinessFacts(storeId: string, taskId: string): Promise<TaskBusinessFactSnapshot[]> {
+  return request("/marketing-tasks/" + encodeURIComponent(taskId) + "/business-facts", {}, storeId);
+}
 export interface ChannelContentQualityReport {
   id: string;
   rule_version: string;

@@ -80,10 +80,10 @@ describe("marketing task workspace", () => {
     sessionStorage.setItem(`store-operator.current-task-id.${storeId}`, task.id);
     window.location.hash = "#task";
     render(<MarketingTaskWorkspace storeId={storeId} />);
-    expect(await screen.findByLabelText("门店档案 · 测试门店")).toBeInTheDocument();
+    expect(await screen.findByText("门店档案 · 测试门店")).toBeInTheDocument();
     const confirm = screen.getByRole("button", { name: "确认需求与事实" });
     expect(confirm).toBeDisabled();
-    fireEvent.click(screen.getByLabelText("门店档案 · 测试门店"));
+    fireEvent.click(screen.getByRole("checkbox"));
     expect(confirm).toBeEnabled();
     fireEvent.click(confirm);
     await waitFor(() => expect(api.confirmMarketingTaskRequirement).toHaveBeenCalledWith(

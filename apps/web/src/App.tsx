@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import StoreCatalog from "./StoreCatalog";
 import {
   ApiError,
   clearCsrfToken,
@@ -157,6 +158,7 @@ function Field({
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [section, setSection] = useState<"profile" | "products" | "offers">("profile");
   const [stores, setStores] = useState<StoreMembership[]>([]);
   const [storeId, setStoreId] = useState("");
   const [profile, setProfile] = useState<StoreProfile | null>(null);
@@ -392,9 +394,9 @@ export default function App() {
           <div className="side-link disabled" aria-disabled="true">AI 营销 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">营销任务 · 待接入</div>
           <div className="side-label spaced">门店资料</div>
-          <a className="side-link active" href="#store:profile">门店档案</a>
-          <div className="side-link disabled" aria-disabled="true">商品与服务 · 待接入</div>
-          <div className="side-link disabled" aria-disabled="true">活动与优惠 · 待接入</div>
+          <button className={`side-link ${section === "profile" ? "active" : ""}`} onClick={() => setSection("profile")}>门店档案</button>
+          <button className={`side-link ${section === "products" ? "active" : ""}`} onClick={() => setSection("products")}>商品与服务</button>
+          <button className={`side-link ${section === "offers" ? "active" : ""}`} onClick={() => setSection("offers")}>活动与优惠</button>
           <div className="side-link disabled" aria-disabled="true">品牌规范 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">客群与经营 · 待接入</div>
           <div className="side-link disabled" aria-disabled="true">门店知识库 · 待接入</div>
@@ -403,6 +405,7 @@ export default function App() {
           <div className="sidebar-foot">当前仅接入真实门店档案。未接入模块明确标记，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
+          {section !== "profile" ? <StoreCatalog storeId={storeId} initialTab={section} /> : <>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STORE PROFILE</p>
@@ -487,6 +490,7 @@ export default function App() {
               </div>
             </form>
           )}
+          </>}
         </main>
       </div>
     </div>

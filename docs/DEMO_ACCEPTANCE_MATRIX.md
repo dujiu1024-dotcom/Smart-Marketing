@@ -374,3 +374,14 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 品牌字段 | 故事、定位、差异化、价值观、语气、常用/禁用表达、CTA、视觉风格、字体、色彩、Logo 资产引用 | 色彩为 JSON 对象数组；Logo 仅保存 asset ID，不伪造上传/选择能力 |
 | 创建重试 | sessionStorage 保存本次创建 Idempotency-Key | 请求不确定时重试复用同一 key |
 | 未完成 | Logo 资产选择器、门店本地时区、客群/知识/素材/渠道模块、完整浏览器与移动端验收 | 不据此关闭 Issue #6 |
+
+## 2026-11-12 #6 客群与经营生产 Web（PR 待验收）
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 客群列表/读取 | GET /api/v1/store/audiences | 当前门店隔离；不使用 Demo seed |
+| 客群创建 | POST /api/v1/store/audiences | Idempotency-Key |
+| 客群编辑/删除 | PATCH/DELETE /api/v1/store/audiences/{id} | If-Match 绑定 current_version |
+| 事实确认 | POST /api/v1/store/audiences/{id}/confirm-facts | 独立显式确认；未保存编辑时禁止确认 |
+| 经营画像字段 | 客群类型、描述、消费场景/时段、购买动机、常见异议、来源、样本量、采样时间、置信等级 | 未知样本量/置信度保持空白 |
+| 页面路由 | #store:audience；#store-editor:audience:new；#store-editor:audience:<id> | 与 Demo 门店资料客群 Tab 和二级编辑页对应 |
+| 未完成 | 客群与商品/优惠关联、真实 POS/CRM 数据源准入、完整浏览器与移动端/可访问性验收 | 不据此关闭 Issue #6 |

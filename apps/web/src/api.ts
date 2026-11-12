@@ -260,7 +260,7 @@ export async function getProduct(storeId: string, productId: string): Promise<Pr
   return request(`/store/products/${encodeURIComponent(productId)}`, {}, storeId);
 }
 
-export async function createProduct(storeId: string, input: ProductInput, idempotencyKey = crypto.randomUUID()): Promise<Product> {
+export async function createProduct(storeId: string, input: ProductInput, idempotencyKey: string = crypto.randomUUID()): Promise<Product> {
   return request("/store/products", {
     method: "POST",
     headers: { "Idempotency-Key": idempotencyKey },

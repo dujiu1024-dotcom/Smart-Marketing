@@ -58,6 +58,47 @@ export interface ProfileInput {
   service_capabilities_json: string[];
 }
 
+
+export interface Product {
+  id: string;
+  store_id: string;
+  name: string;
+  category: string | null;
+  sku: string | null;
+  specification: string | null;
+  unit: string | null;
+  price_amount: string | null;
+  currency: string | null;
+  availability_status: "available" | "unavailable" | "seasonal" | "limited" | "unknown";
+  inventory_quantity: string | null;
+  key_selling_points_json: string[] | null;
+  description: string | null;
+  ingredients_or_materials: string | null;
+  allergens_and_restrictions_json: string[] | null;
+  service_process: string | null;
+  delivery_method: string | null;
+  fact_status: string;
+  current_version: number;
+}
+
+export interface ProductInput {
+  name: string;
+  category: string | null;
+  sku: string | null;
+  specification: string | null;
+  unit: string | null;
+  price_amount: string | null;
+  currency: string | null;
+  availability_status: Product["availability_status"];
+  inventory_quantity: string | null;
+  key_selling_points_json: string[];
+  description: string | null;
+  ingredients_or_materials: string | null;
+  allergens_and_restrictions_json: string[];
+  service_process: string | null;
+  delivery_method: string | null;
+}
+
 interface ApiErrorBody {
   error?: { code?: string; message?: string };
   detail?: string;
@@ -208,6 +249,50 @@ export async function confirmStoreProfileFacts(
     },
     storeId,
   );
+}
+
+
+export async function listProducts(storeId: string): Promise<{ items: Product[]; total: number }> {
+  return request("/store/products?limit=200&offset=0", {}, storeId);
+}
+
+export async function getProduct(storeId: string, productId: string): Promise<Product> {
+  return request(`/store/products/${encodeURIComponent(productId)}`, {}, storeId);
+}
+
+export async function createProduct(storeId: string, input: ProductInput): Promise<Product> {
+  return request("/store/products", {
+    method: "POST",
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+    body: JSON.stringify(input),
+  }, storeId);
+}
+
+export async function updateProduct(storeId: string, product: Product, input: ProductInput): Promise<Product> {
+  return request(`/store/products/${encodeURIComponent(product.id)}`, {
+    method: "PATCH",
+    headers: { "If-Match": String(product.current_version) },
+    body: JSON.stringify(input),
+  }, storeId);
+}
+
+export async function deleteProduct(storeId: string, product: Product): Promise<void> {
+  return request(`/store/products/${encodeURIComponent(product.id)}`, {
+    method: "DELETE",
+    headers: { "If-Match": String(product.current_version) },
+  }, storeId);
+}
+
+export async function confirmProductFacts(storeId: string, product: Product): Promise<Product> {
+  return request(`/store/products/${encodeURIComponent(product.id)}/confirm-facts`, {
+    method: "POST",
+    headers: { "If-Match": String(product.current_version) },
+    body: JSON.stringify({
+      source_type: "merchant_ui_confirmation",
+      source_ref: "store-products-editor",
+      confirmation_note: "由当前门店成员核对后确认",
+    }),
+  }, storeId);
 }
 
 export function clearCsrfToken(): void {

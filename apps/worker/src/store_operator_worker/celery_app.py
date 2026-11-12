@@ -22,6 +22,10 @@ celery_app.conf.update(
             "task": "jobs.relay_outbox",
             "schedule": 1.0,
         },
+        "scan-quarantined-media-every-15-seconds": {
+            "task": "media.scan_quarantined_assets",
+            "schedule": 15.0,
+        },
         "recover-expired-job-leases-every-30-seconds": {
             "task": "jobs.recover_expired_leases",
             "schedule": 30.0,

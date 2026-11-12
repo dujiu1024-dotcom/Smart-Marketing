@@ -135,6 +135,47 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
     if definition is None:
         raise ApiError(422, "UNKNOWN_METRIC",
             "Metric key is not present in the active metric dictionary")
+    if payload.published_work_id is not None:
+        published_work = db.scalar(
+            select(PublishedWork).where(
+                PublishedWork.id == payload.published_work_id,
+                PublishedWork.store_id == store_id,
+            )
+        )
+        if published_work is None:
+            raise ApiError(404, "PUBLISHED_WORK_NOT_FOUND", "Published work not found")
+        if published_work.ownership_status not in {
+            "verified_system_publish",
+            "verified_platform_api",
+        } or published_work.verified_at is None:
+            raise ApiError(
+                409,
+                "PUBLISHED_WORK_NOT_VERIFIED",
+                "Unverified or merchant-claimed works cannot be used for attribution",
+            )
+        if published_work.task_id is None:
+            if payload.marketing_task_id is not None:
+                raise ApiError(
+                    409,
+                    "PUBLISHED_WORK_TASK_MISMATCH",
+                    "This published work has no verified marketing task association",
+                )
+        elif payload.marketing_task_id not in {None, published_work.task_id}:
+            raise ApiError(
+                409,
+                "PUBLISHED_WORK_TASK_MISMATCH",
+                "Published work is linked to a different marketing task",
+            )
+        payload.marketing_task_id = published_work.task_id
+    elif payload.marketing_task_id is not None:
+        task = db.scalar(
+            select(MarketingTask).where(
+                MarketingTask.id == payload.marketing_task_id,
+                MarketingTask.store_id == store_id,
+            )
+        )
+        if task is None:
+            raise ApiError(404, "MARKETING_TASK_NOT_FOUND", "Marketing task not found")
     if payload.period_start and payload.period_end and payload.period_end <= payload.period_start:
         raise ApiError(422, "INVALID_PERIOD", "period_end must be later than period_start")
     if payload.metric_key == "revenue" and payload.value_numeric is not None and payload.currency is None:  # noqa: E501
@@ -790,7 +831,9 @@ def import_manual_observations(payload: MetricImportInput, request: Request,
                 data.period_start.isoformat() if data.period_start else "",
                 data.period_end.isoformat() if data.period_end else "", data.source_record_id or "",
                 str(data.value_numeric) if data.value_numeric is not None else "NULL",
-                data.currency or "", ""])
+                data.currency or "", "",
+                str(data.published_work_id) if data.published_work_id else "",
+                str(data.marketing_task_id) if data.marketing_task_id else ""])
             dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
             existed = db.scalar(select(MetricObservation.id).where(
                 MetricObservation.store_id == store_id,

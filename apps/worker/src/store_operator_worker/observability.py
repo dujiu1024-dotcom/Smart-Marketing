@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import socket
+from urllib.request import Request, urlopen
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -82,3 +83,57 @@ def configure_worker_logging() -> None:
     handler.setFormatter(JsonRedactingFormatter())
     handler._store_operator_json = True  # type: ignore[attr-defined]
     root.addHandler(handler)
+
+
+def emit_operational_alert(
+    *,
+    event: str,
+    severity: str,
+    correlation_id: str,
+    attributes: Mapping[str, Any] | None = None,
+) -> None:
+    """Emit a sanitized alert log and optionally POST it to an operator webhook."""
+    safe_attributes = _redact(attributes or {})
+    payload: dict[str, Any] = {
+        "event": event,
+        "severity": severity,
+        "correlation_id": correlation_id,
+        "service": "store-operator-worker",
+        "worker_id": f"{socket.gethostname()}:{os.getpid()}",
+        "timestamp": datetime.now(UTC).isoformat(),
+        "attributes": safe_attributes,
+    }
+    level = logging.ERROR if severity in {"critical", "error"} else logging.WARNING
+    logging.getLogger("store_operator.worker.alerts").log(
+        level,
+        "ops.alert",
+        extra={
+            "alert": True,
+            "alert_type": event,
+            "severity": severity,
+            "correlation_id": correlation_id,
+            "attributes": safe_attributes,
+        },
+    )
+
+    webhook_url = os.environ.get("OPS_ALERT_WEBHOOK_URL")
+    if not webhook_url:
+        return
+    request = Request(
+        webhook_url,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        response = urlopen(request, timeout=3)
+        response.close()
+    except Exception as exc:  # noqa: BLE001 - alert delivery must not fail the job
+        logging.getLogger("store_operator.worker.alerts").error(
+            "ops.alert_delivery_failed",
+            extra={
+                "alert_type": event,
+                "correlation_id": correlation_id,
+                "error_type": type(exc).__name__,
+            },
+        )

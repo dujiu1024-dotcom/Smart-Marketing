@@ -77,3 +77,27 @@ All three Douyin OAuth settings must be supplied together. The Secret Manager re
 - Add full DB/API tests and browser acceptance, then execute a real test-account OAuth/upload/create/readback flow after platform credentials, scopes and account are supplied.
 
 This change adds the persistence migration, models, one-time OAuth state consumption, Secret Manager adapter, OAuth routes, account listing/refresh, and official-API package/account binding. It does not complete publishing or prove a real OAuth grant.
+
+
+## 7. 授权取消 Webhook（2026-11-12）
+
+### 回调验证与验签
+
+- 回调入口：`POST /api/v1/channels/douyin/webhook`，无需商家 Session；这是平台服务器回调，不是用户浏览器 API。
+- `verify_webhook` 事件只回显 `content.challenge`，不访问数据库、不修改账户状态。
+- 其他事件先校验 `client_key`，再以 `SHA1(client_secret + 原始 HTTP body)` 计算十六进制摘要，并使用 constant-time compare 校验 `X-Douyin-Signature`。
+- `unauthorize` 必须提供 `Msg-Id`；按 `(provider, message_id)` 唯一约束去重。重复投递直接成功 ACK，不重复撤销或写入第二条 receipt。
+- 只保存 message id、事件类型、外部账号 ID 的 SHA-256、scope 事件证据、影响账户数和时间戳；不保存原始请求体、token 或 client_secret。
+
+### 授权取消处理
+
+- 通过 `client_key` + `from_user_id` 匹配当前 App 下的 Douyin `ChannelAccount`，跨门店撤销同一外部授权主体对应的账户记录。
+- `unauthorize` 事件将匹配账户置为 `revoked`、清空有效 granted scopes、写入 `revoked_at`；后续发布 Worker 必须只接受 `active` 账户。
+- Webhook 只执行快速数据库操作并立即 ACK；平台要求的短超时与重试通过 `Msg-Id` 去重保证幂等。
+- 当前版本不在回调线程中同步调用 Secrets Manager 删除凭据。Secret 仍保留在 Secrets Manager，但账户状态已阻止发布使用；凭据 tombstone/清理与定时 refresh-token renew worker 仍是后续工作项。
+
+### 官方平台契约
+
+- Webhook 验签使用原始 body，不能对解析后再序列化的 JSON 计算签名。
+- `Msg-Id` 用于回调消息去重；`verify_webhook` 使用 challenge 响应。
+- 真实开放平台应用回调配置与测试账号验收仍未完成；Mock/单元测试不等于真实平台验收。

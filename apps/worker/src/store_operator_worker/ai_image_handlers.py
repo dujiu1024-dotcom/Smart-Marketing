@@ -13,7 +13,7 @@ from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from store_operator.ai_gateway import (
+from store_operator.ai_gateway import (  # type: ignore[import-untyped]
     ImageEditRequest,
     ImageGenerateRequest,
     ProviderCallContext,
@@ -22,8 +22,8 @@ from store_operator.ai_gateway import (
     render_published_prompt,
     validate_structured_output,
 )
-from store_operator.ai_gateway.schemas import ImageGenerateResponse
-from store_operator.models import (
+from store_operator.ai_gateway.schemas import ImageGenerateResponse  # type: ignore[import-untyped]
+from store_operator.models import (  # type: ignore[import-untyped]
     Artifact,
     ArtifactVersion,
     BusinessFactSnapshot,
@@ -37,7 +37,7 @@ from store_operator.models import (
     TaskStep,
 )
 from store_operator.models.store_knowledge import product_media_assets  # type: ignore[import-untyped]
-from store_operator.object_storage import (
+from store_operator.object_storage import (  # type: ignore[import-untyped]
     ObjectStorageNotConfigured,
     delete_object,
     download_object_bytes,

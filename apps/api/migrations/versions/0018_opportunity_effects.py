@@ -215,13 +215,13 @@ def upgrade() -> None:
         ("manual", "likes", "content_performance", "点赞", "作品在统计周期内的点赞次数"),
         ("manual", "comments", "content_performance", "评论", "作品在统计周期内的评论次数"),
         ("manual", "shares", "content_performance", "分享", "作品在统计周期内的分享次数"),
-        ("manual", "consultations", "intent", "咨询", "可核验的咨询意向数量"),
-        ("manual", "clicks", "intent", "点击", "可核验的内容点击数量"),
-        ("manual", "booking_intents", "intent", "预约意向", "可核验的预约意向数量"),
-        ("manual", "store_visits", "business_outcome", "到店", "有来源凭证的到店数量"),
-        ("manual", "orders", "business_outcome", "订单", "有来源凭证的订单数量"),
-        ("manual", "redemptions", "business_outcome", "核销", "有来源凭证的优惠核销数量"),
-        ("manual", "revenue", "business_outcome", "销售额", "有来源凭证的销售金额"),
+        ("manual", "consultations", "intent", "咨询", "count", "可核验的咨询意向数量"),
+        ("manual", "clicks", "intent", "点击", "count", "可核验的内容点击数量"),
+        ("manual", "booking_intents", "intent", "预约意向", "count", "可核验的预约意向数量"),
+        ("manual", "store_visits", "business_outcome", "到店", "count", "有来源凭证的到店数量"),
+        ("manual", "orders", "business_outcome", "订单", "count", "有来源凭证的订单数量"),
+        ("manual", "redemptions", "business_outcome", "核销", "count", "有来源凭证的优惠核销数量"),
+        ("manual", "revenue", "business_outcome", "销售额", "currency", "有来源凭证的销售金额"),
     ]
     for source, key, tier, name, value_type, definition in seeds:
         op.execute(sa.text("""

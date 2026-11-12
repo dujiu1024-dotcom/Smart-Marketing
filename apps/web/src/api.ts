@@ -831,3 +831,19 @@ export async function listChannelSpecs(storeId: string): Promise<ChannelSpecReco
 export async function listChannelSpecVersions(storeId: string, channelKey: string): Promise<ChannelSpecVersionRecord[]> {
   return request(`/channels/specs/${encodeURIComponent(channelKey)}/versions`, {}, storeId);
 }
+
+
+export interface ChannelCapabilitySnapshotRecord {
+  id: string;
+  channel_account_id: string;
+  channel_spec_version_id: string;
+  capability_key: string;
+  support_status: "supported" | "unsupported" | "pending_verification";
+  evidence_ref: string | null;
+  reason: string | null;
+  checked_at: string;
+  expires_at: string | null;
+}
+export async function listDouyinAccountCapabilities(storeId: string, accountId: string): Promise<ChannelCapabilitySnapshotRecord[]> {
+  return request(`/channels/douyin/accounts/${encodeURIComponent(accountId)}/capabilities`, {}, storeId);
+}

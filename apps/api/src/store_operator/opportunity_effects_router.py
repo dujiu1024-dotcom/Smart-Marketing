@@ -895,6 +895,8 @@ def register_published_work_from_readback(
             "A published status and platform readback are required before registering work ownership",
         )
     operation, package, package_item, account = row
+    assert operation.platform_item_id is not None
+    assert operation.last_readback_at is not None
     existing = db.scalar(
         select(PublishedWork).where(
             PublishedWork.store_id == store_id,

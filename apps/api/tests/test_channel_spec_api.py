@@ -205,9 +205,9 @@ def test_platform_admin_publishes_a_new_verified_channel_spec_version(
     assert response.json()["draft_supported"] is True
     assert response.json()["publish_supported"] is False
     db_session.refresh(spec)
-    assert spec.current_version_id == response.json()["id"]
+    assert str(spec.current_version_id) == response.json()["id"]
     audit = db_session.query(AuditEvent).filter_by(action="channel.spec_version.published").one()
-    assert audit.target_id == response.json()["id"]
+    assert str(audit.target_id) == response.json()["id"]
 
     stale = identity_client.post(
         "/api/v1/admin/channel-specs/douyin/versions",

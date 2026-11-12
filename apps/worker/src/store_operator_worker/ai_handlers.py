@@ -705,6 +705,7 @@ def _complete_copy(
                 "requirement_fingerprint": requirement.content_fingerprint,
                 "strategy_fingerprint": strategy.content_fingerprint,
                 "prompt_version_id": str(version.id),
+                "generation_contract_prompt_version_id": str(generation_contract_version.id),
                 "video_script_prompt_version_id": (
                     str(video_script_version.id)
                     if video_script_version is not None
@@ -775,6 +776,11 @@ def _complete_copy(
                 {"type": "requirement_snapshot", "id": str(requirement_id)},
                 {"type": "strategy_snapshot", "id": str(strategy_id)},
             ]
+            if generation_contract_version.id != version.id:
+                source_refs.append({
+                    "type": "copy_generation_contract_prompt_version",
+                    "id": str(generation_contract_version.id),
+                })
             if previous_version is not None:
                 source_refs.append({
                     "type": "previous_artifact_version",

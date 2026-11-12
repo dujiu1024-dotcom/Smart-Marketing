@@ -61,7 +61,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
     setSaving(true); setError(""); setNotice("");
     try {
       const result = await importMetricCsv(storeId, csvText);
-      setNotice(`导入完成：新增 ${result.created} 条，重复跳过 ${result.duplicates_skipped} 条。全部标记为商家报告。`);
+      setNotice(`导入完成：新增 ${result.created} 条，重复跳过 ${result.duplicates_skipped} 条。批次 ${result.import_batch_id}；SHA-256 ${result.content_sha256}。全部标记为商家报告。`);
       setCsvText(""); await load();
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
@@ -101,7 +101,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         <div className="section-title"><div><h2>指标记录</h2><p>手工录入与导入的数据均标记为商家报告，等待独立核验。</p></div>
           <label className="field"><span>指标分类</span><select value={tier} onChange={event => setTier(event.target.value as typeof tier)}><option value="all">全部</option><option value="content_performance">内容表现</option><option value="intent">互动意向</option><option value="business_outcome">经营结果</option></select></label>
         </div>
-        <div className="catalog-list">{filtered.map(item => <div className="catalog-item" key={item.id}><div className="catalog-item-main"><div><h3>{item.display_name}</h3><p>{item.metric_key} · {item.source_system}</p></div><span className="status-chip">{item.authenticity_status === "merchant_reported" ? "商家报告" : item.authenticity_status}</span></div><div className="catalog-meta"><span>数值：{item.value_numeric ?? "未知"}</span><span>周期：{item.period_start ?? "未提供"} 至 {item.period_end ?? "未提供"}</span><span>时区：{item.period_timezone}</span><span>采集：{new Date(item.collected_at).toLocaleString()}</span></div>{item.source_evidence_ref && <p className="catalog-description">证据：{item.source_evidence_ref}</p>}</div>)}
+        <div className="catalog-list">{filtered.map(item => <div className="catalog-item" key={item.id}><div className="catalog-item-main"><div><h3>{item.display_name}</h3><p>{item.metric_key} · {item.source_system}</p></div><span className="status-chip">{item.authenticity_status === "merchant_reported" ? "商家报告" : item.authenticity_status}</span></div><div className="catalog-meta"><span>数值：{item.value_numeric ?? "未知"}</span><span>周期：{item.period_start ?? "未提供"} 至 {item.period_end ?? "未提供"}</span><span>时区：{item.period_timezone}</span><span>采集：{new Date(item.collected_at).toLocaleString()}</span></div>{item.source_evidence_ref && <p className="catalog-description">证据：{item.source_evidence_ref}</p>}{item.supersedes_observation_id && <p className="catalog-description">更正自：{item.supersedes_observation_id}</p>}{item.import_batch_id && <p className="catalog-description">导入批次：{item.import_batch_id}</p>}</div>)}
           {!filtered.length && <p className="muted">暂无记录。可以手工录入或导入 CSV。</p>}</div>
       </article>
       <div className="effects-grid">

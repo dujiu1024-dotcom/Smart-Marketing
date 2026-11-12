@@ -92,3 +92,12 @@ h1 { margin: 0; color: #1f3029; font-size: clamp(25px, 3vw, 32px); letter-spacin
   .form-actions button { flex: 1; }
   .auth-card { padding: 26px 21px; }
 }
+
+.side-link { width: 100%; border: 0; text-align: left; background: transparent; font: inherit; cursor: pointer; }
+.table-wrap { width: 100%; overflow-x: auto; }
+.table-wrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table-wrap th, .table-wrap td { padding: 12px 10px; border-bottom: 1px solid #edf0ee; text-align: left; vertical-align: top; white-space: nowrap; }
+.table-wrap th { color: #7c8982; font-weight: 650; background: #fafbfa; }
+.table-wrap td { color: #39483f; }
+.table-wrap td small { display: block; margin-top: 4px; color: #98a29c; }
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }

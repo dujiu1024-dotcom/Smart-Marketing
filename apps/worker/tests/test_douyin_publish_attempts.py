@@ -32,8 +32,6 @@ class AttemptSessionFactory:
 
     @contextmanager
     def begin(self):
-        from store_operator_worker import tasks
-
         yield AttemptSession(self.operation, self.attempts)
 
 

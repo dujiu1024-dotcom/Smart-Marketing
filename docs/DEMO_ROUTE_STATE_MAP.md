@@ -124,3 +124,12 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - `buy_x_get_y` 与 `gift` 的适用商品通过真实门店 Product 列表选择，并将对应 Product ID 写入 `terms_json.eligible_product_ids`。
 - `discount_percent`、`discount_amount`、`fixed_price`、`threshold_discount` 按各自字段校验金额、币种和折扣范围；不接受仅有自然语言标题而缺少规则数值的优惠。
 - 归档通过 Offer 的 `status=archived` 与 If-Match 版本更新完成，不物理删除业务记录。
+
+
+## 11. 第四个生产 Web 页面映射（2026-11-12）
+
+- Demo `#store:brand` 已接入真实品牌规范工作区。
+- 页面覆盖品牌故事/定位/差异化/价值、语气/常用表达/禁用表达/CTA、Logo 资产引用/色彩/字体/视觉风格。
+- BrandGuideline 为门店单例记录；GET 404 时进入创建态，POST 创建，PATCH 使用 If-Match 更新，事实确认单独调用 confirm-facts。
+- 首次创建幂等键在当前 Tab 的 sessionStorage 中按门店持久化，避免网络重试或重复点击产生多个新建请求；商家修改未保存时禁止确认旧版本。
+- Logo 暂以资产 ID 引用，待素材库页面接入后提供可选资产选择器；当前不虚构上传或选图能力。

@@ -337,3 +337,16 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 未完成 | 删除/归档的完整 UX、商品与活动关联、完整浏览器视觉/移动端验收 | 不据此关闭 Issue #6 |
 
 本页通过真实 API 读写商品资料；事实状态和版本由服务端返回。CI 验收覆盖 Web、API、Worker、Contracts、E2E、Infrastructure；实际运行结果以该 PR 对应最新 CI 为准。
+
+
+## 2026-11-12 #6 活动与优惠生产 Web 接入（PR pending）
+
+| 能力 | 当前状态 | 边界 |
+|---|---|---|
+| 活动列表 | 接入 GET /api/v1/store/offers，按当前门店查询 | 不使用 Demo seed |
+| 活动新增/编辑 | 独立二级路由 #store-editor:offer:new / :id | POST/PATCH 使用 Idempotency-Key / If-Match |
+| 结构化优惠规则 | 覆盖折扣比例、立减、固定价、买 X 赠 Y、赠品、满额优惠 | 按冻结领域契约构造 terms_json；适用商品引用真实商品 ID |
+| 适用条件 | JSON 对象校验；有效期必须提供明确时区偏移并归一化 UTC | 不猜测门店时区，不将浏览器本地时区当作门店时区 |
+| 事实确认/删除 | 版本绑定的 confirm-facts 与 If-Match 删除 | 未保存修改时禁止确认 |
+| 浏览器测试 | 新增 OfferWorkspace 列表/创建/确认保护 Vitest | CI 与真实门店浏览器验收待执行 |
+| 其余资料模块 | 品牌规范、客群、知识库、素材库仍未接入 | 不得宣称 #6 完成 |

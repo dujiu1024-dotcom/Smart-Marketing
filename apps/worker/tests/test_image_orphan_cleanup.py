@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import importlib
+from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+
+
+@pytest.fixture
+def worker_tasks(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://ci:ci@localhost:5432/ci")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    return importlib.import_module("store_operator_worker.tasks")
+
+
+class FakeResult:
+    def __init__(self, values):
+        self.values = values
+
+    def all(self):
+        return self.values
+
+
+class FakeDatabase:
+    def __init__(self, invocations, protected: bool = False):
+        self.invocations = invocations
+        self.protected = protected
+
+    def scalars(self, statement):
+        return FakeResult(self.invocations)
+
+    def scalar(self, statement):
+        return object() if self.protected else None
+
+
+class FakeSessionContext:
+    def __init__(self, database):
+        self.database = database
+
+    def __enter__(self):
+        return self.database
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+
+class FakeSessionFactory:
+    def __init__(self, database):
+        self.database = database
+
+    def begin(self):
+        return FakeSessionContext(self.database)
+
+
+def test_orphan_image_cleanup_deletes_only_unreferenced_store_scoped_objects(
+    monkeypatch: pytest.MonkeyPatch,
+    worker_tasks,
+) -> None:
+    store_id = uuid4()
+    invocation = SimpleNamespace(
+        id=uuid4(),
+        store_id=store_id,
+        response_ref_json={
+            "schema_version": 1,
+            "object_key": f"stores/{store_id}/generated/image.png",
+        },
+    )
+    database = FakeDatabase([invocation])
+    deleted: list[str] = []
+    monkeypatch.setattr(worker_tasks, "SessionLocal", FakeSessionFactory(database))
+    monkeypatch.setattr(
+        worker_tasks,
+        "delete_object",
+        lambda *, object_key: deleted.append(object_key),
+    )
+
+    result = worker_tasks.cleanup_orphaned_ai_image_objects.run()
+
+    assert result == 1
+    assert deleted == [invocation.response_ref_json["object_key"]]
+    assert invocation.response_ref_json["orphan_cleanup_result"] == "deleted"
+    assert invocation.response_ref_json["orphan_cleanup_completed_at"]
+
+
+def test_orphan_image_cleanup_protects_registered_or_referenced_objects(
+    monkeypatch: pytest.MonkeyPatch,
+    worker_tasks,
+) -> None:
+    store_id = uuid4()
+    invocation = SimpleNamespace(
+        id=uuid4(),
+        store_id=store_id,
+        response_ref_json={
+            "schema_version": 1,
+            "object_key": f"stores/{store_id}/generated/registered.png",
+        },
+    )
+    database = FakeDatabase([invocation], protected=True)
+    deleted: list[str] = []
+    monkeypatch.setattr(worker_tasks, "SessionLocal", FakeSessionFactory(database))
+    monkeypatch.setattr(
+        worker_tasks,
+        "delete_object",
+        lambda *, object_key: deleted.append(object_key),
+    )
+
+    result = worker_tasks.cleanup_orphaned_ai_image_objects.run()
+
+    assert result == 0
+    assert deleted == []
+    assert invocation.response_ref_json["orphan_cleanup_result"] == "protected_referenced"
+
+
+@pytest.mark.parametrize(
+    "key_kind",
+    ["cross_store", "traversal", "dot_segment", "empty_segment"],
+)
+def test_orphan_image_cleanup_never_deletes_invalid_object_keys(
+    monkeypatch: pytest.MonkeyPatch,
+    worker_tasks,
+    key_kind: str,
+) -> None:
+    store_id = uuid4()
+    if key_kind == "cross_store":
+        object_key = f"stores/{uuid4()}/generated/image.png"
+    elif key_kind == "traversal":
+        object_key = f"stores/{store_id}/../other-store/image.png"
+    elif key_kind == "dot_segment":
+        object_key = f"stores/{store_id}/./generated/image.png"
+    else:
+        object_key = f"stores/{store_id}//generated/image.png"
+    invocation = SimpleNamespace(
+        id=uuid4(),
+        store_id=store_id,
+        response_ref_json={
+            "schema_version": 1,
+            "object_key": object_key,
+        },
+    )
+    database = FakeDatabase([invocation])
+    deleted: list[str] = []
+    monkeypatch.setattr(worker_tasks, "SessionLocal", FakeSessionFactory(database))
+    monkeypatch.setattr(
+        worker_tasks,
+        "delete_object",
+        lambda *, object_key: deleted.append(object_key),
+    )
+
+    result = worker_tasks.cleanup_orphaned_ai_image_objects.run()
+
+    assert result == 0
+    assert deleted == []
+    assert invocation.response_ref_json["orphan_cleanup_result"] == "skipped_invalid_key"

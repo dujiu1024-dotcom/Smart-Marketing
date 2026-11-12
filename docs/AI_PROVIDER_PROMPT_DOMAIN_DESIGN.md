@@ -1,6 +1,7 @@
 # AI Provider 与 Prompt 版本领域设计（Issue #10）
 
-> 状态：设计提案，等待 #9 AI Gateway、#10 Provider 实现、#5 Identity、#6/#7/#8 内容上下文联合评审  
+> 状态：历史设计基线；Provider、Prompt Runtime 与 Worker 生产链路已按 Issue #136 分批实现。当前运行配置、安全门禁和生命周期说明见 [ISSUE_136_AI_PROVIDER_RUNTIME.md](./ISSUE_136_AI_PROVIDER_RUNTIME.md)。  
+> 本文保留原始设计讨论，不作为当前实现状态的判断依据。  
 > 日期：2026-11-11  
 > 产品基线：PRODUCT_DESIGN.md v1.8 / UX_AUDIT_AND_REDESIGN.md v1.8  
 > Demo 基线：`#admin:capabilities`（导航标签“AI 能力配置”，页面标题“AI 能力与提示词配置”）与 `#admin:prompt-detail`

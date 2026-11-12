@@ -13,6 +13,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 import httpx
+from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
 from sqlalchemy import create_engine, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
@@ -40,11 +41,13 @@ from store_operator.jobs.service import (  # type: ignore[import-untyped]
     recover_expired_jobs,
 )
 from store_operator.models import (  # type: ignore[import-untyped]
+    AIInvocation,
     Artifact,
     ArtifactVersion,
     ChannelAccount,
     ChannelContent,
     ChannelContentArtifactRef,
+    Job,
     MediaAsset,
     OutboxEvent,
     PublishConfirmation,
@@ -640,6 +643,105 @@ def scan_quarantined_assets(batch_size: int = 10) -> int:
             processed += 1
 
     return processed
+
+
+@celery_app.task(
+    name="media.cleanup_orphaned_ai_image_objects", ignore_result=True
+)  # type: ignore[untyped-decorator]
+def cleanup_orphaned_ai_image_objects(
+    batch_size: int = 25,
+    grace_seconds: int = 3600,
+) -> int:
+    """Delete aged image-provider objects only after their Job is terminal and unreferenced."""
+    safe_batch_size = max(1, min(batch_size, 100))
+    safe_grace_seconds = max(3600, min(grace_seconds, 7 * 24 * 3600))
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(seconds=safe_grace_seconds)
+    deleted = 0
+    deleted_keys: set[str] = set()
+
+    with SessionLocal.begin() as db:
+        invocations = db.scalars(
+            select(AIInvocation)
+            .join(Job, Job.id == AIInvocation.job_id)
+            .where(
+                AIInvocation.capability == "image",
+                AIInvocation.status == "succeeded",
+                AIInvocation.store_id.is_not(None),
+                AIInvocation.created_at <= cutoff,
+                Job.status.in_(("failed", "cancelled", "needs_human")),
+            )
+            .order_by(AIInvocation.created_at, AIInvocation.id)
+            .limit(safe_batch_size)
+            .with_for_update(of=AIInvocation, skip_locked=True)
+        ).all()
+
+        for invocation in invocations:
+            response_ref = dict(invocation.response_ref_json or {})
+            if response_ref.get("orphan_cleanup_completed_at"):
+                continue
+            object_key = response_ref.get("object_key")
+            store_id = invocation.store_id
+            if not isinstance(object_key, str) or store_id is None:
+                continue
+
+            key_parts = object_key.split("/")
+            if (
+                object_key.startswith("/")
+                or "\\" in object_key
+                or len(key_parts) < 3
+                or key_parts[0] != "stores"
+                or key_parts[1] != str(store_id)
+                or any(part in {"", ".", ".."} for part in key_parts)
+            ):
+                response_ref["orphan_cleanup_completed_at"] = now.isoformat()
+                response_ref["orphan_cleanup_result"] = "skipped_invalid_key"
+                invocation.response_ref_json = response_ref
+                continue
+
+            if object_key not in deleted_keys:
+                registered_asset = db.scalar(
+                    select(MediaAsset.id).where(
+                        MediaAsset.store_id == store_id,
+                        MediaAsset.object_key == object_key,
+                    )
+                )
+                referenced_version = db.scalar(
+                    select(ArtifactVersion.id).where(
+                        ArtifactVersion.store_id == store_id,
+                        or_(
+                            ArtifactVersion.content_ref == object_key,
+                            ArtifactVersion.source_refs_json.contains(
+                                [{
+                                    "type": "ai_invocation",
+                                    "id": str(invocation.id),
+                                }]
+                            ),
+                        )
+                    )
+                )
+                if registered_asset is not None or referenced_version is not None:
+                    response_ref["orphan_cleanup_completed_at"] = now.isoformat()
+                    response_ref["orphan_cleanup_result"] = "protected_referenced"
+                    invocation.response_ref_json = response_ref
+                    continue
+
+                try:
+                    delete_object(object_key=object_key)
+                except (BotoCoreError, ObjectStorageNotConfigured, RuntimeError, OSError) as exc:
+                    logger.warning(
+                        "Orphan AI image cleanup deferred (%s)",
+                        type(exc).__name__,
+                    )
+                    continue
+                deleted_keys.add(object_key)
+                deleted += 1
+
+            response_ref["orphan_cleanup_completed_at"] = now.isoformat()
+            response_ref["orphan_cleanup_result"] = "deleted"
+            invocation.response_ref_json = response_ref
+
+    return deleted
 
 
 @register_job_handler("content.quality_check")

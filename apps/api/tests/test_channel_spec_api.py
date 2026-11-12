@@ -237,6 +237,7 @@ def test_channel_account_capabilities_are_store_scoped(
     identity_client, db_session: Session, monkeypatch
 ) -> None:
     import store_operator.auth.router as auth_router
+    import store_operator.channel_douyin_router as douyin_router
 
     monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
     user = User(
@@ -328,8 +329,6 @@ def test_channel_account_capabilities_are_store_scoped(
     assert accounts_in_other_store.status_code == 200, accounts_in_other_store.text
     assert str(account.id) not in accounts_in_other_store.text
     assert "store-a-open-id" not in accounts_in_other_store.text
-
-    import store_operator.channel_douyin_router as douyin_router
 
     monkeypatch.setattr(douyin_router, "_require_oauth_configuration", lambda: (None, None))
     hidden_refresh = identity_client.post(

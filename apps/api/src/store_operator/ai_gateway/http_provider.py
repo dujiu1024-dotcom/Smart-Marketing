@@ -94,6 +94,15 @@ class HttpJsonTransport:
         self._circuit_breaker.before_call()
         client = self._client or httpx.AsyncClient(timeout=self._timeout)
         close_client = self._client is None
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+        call_context = getattr(request, "context", None)
+        idempotency_key = getattr(call_context, "idempotency_key", None)
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
         try:
             response = await client.post(
                 f"{self._base_url}{path}",
@@ -102,11 +111,7 @@ class HttpJsonTransport:
                     "operation": operation,
                     "request": request.model_dump(mode="json"),
                 },
-                headers={
-                    "Authorization": f"Bearer {self._api_key}",
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                },
+                headers=headers,
                 timeout=self._timeout,
             )
         except httpx.TimeoutException as exc:

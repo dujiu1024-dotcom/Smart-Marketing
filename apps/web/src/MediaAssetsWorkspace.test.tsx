@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import MediaAssetsWorkspace from "./MediaAssetsWorkspace";
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const api = vi.hoisted(() => ({
   getMediaAssets: vi.fn(), createAssetUploadIntent: vi.fn(), putAssetFile: vi.fn(),
   completeAssetUpload: vi.fn(), confirmMediaAssetUsageRights: vi.fn(), archiveMediaAsset: vi.fn(),
@@ -63,6 +63,32 @@ describe("media assets workspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: "归档" }));
     await waitFor(() => expect(api.archiveMediaAsset).toHaveBeenCalledWith("store-1", asset, expect.any(String)));
     expect(await screen.findByText("已归档")).toBeInTheDocument();
+  });
+  it("uses upload-intent, private PUT and complete before refreshing the asset list", async () => {
+    const file = new File(["image"], "new-image.png", { type: "image/png" });
+    Object.defineProperty(file, "arrayBuffer", {
+      value: vi.fn().mockResolvedValue(new TextEncoder().encode("image").buffer),
+    });
+    vi.stubGlobal("crypto", {
+      subtle: { digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer) },
+      randomUUID: vi.fn().mockReturnValue("stable-upload-key"),
+    });
+    api.createAssetUploadIntent.mockResolvedValue({
+      id: "intent-1", upload_url: "https://private.example/upload", method: "PUT",
+      required_headers: { "Content-Type": "image/png", "If-None-Match": "*", "x-amz-meta-sha256": "0".repeat(64) },
+      expires_at: "2026-11-12T03:00:00Z",
+    });
+    api.completeAssetUpload.mockResolvedValue({ asset: { ...asset, id: "asset-2", status: "scanning" }, status: "scanning" });
+    render(<MediaAssetsWorkspace storeId="store-1" />);
+    const input = screen.getByLabelText("上传图片") as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(api.createAssetUploadIntent).toHaveBeenCalledWith(
+      "store-1",
+      expect.objectContaining({ expected_mime_type: "image/png", expected_byte_size: 5, expected_sha256: "0".repeat(64) }),
+      "stable-upload-key",
+    ));
+    await waitFor(() => expect(api.putAssetFile).toHaveBeenCalledWith(expect.objectContaining({ id: "intent-1" }), file));
+    await waitFor(() => expect(api.completeAssetUpload).toHaveBeenCalledWith("store-1", "intent-1"));
   });
   it("rejects unsupported files before creating an upload intent", async () => {
     render(<MediaAssetsWorkspace storeId="store-1" />);

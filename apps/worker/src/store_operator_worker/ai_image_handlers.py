@@ -384,9 +384,10 @@ def _ai_invocation_source_refs(
     ).all()
     by_capability_and_prompt: dict[tuple[str, UUID], AIInvocation] = {}
     for invocation in invocations:
+        if invocation.prompt_version_id is None:
+            continue
         key = (invocation.capability, invocation.prompt_version_id)
-        if invocation.prompt_version_id is not None:
-            by_capability_and_prompt.setdefault(key, invocation)
+        by_capability_and_prompt.setdefault(key, invocation)
 
     source_refs: list[dict[str, str]] = []
     for prompt_version_id, capability in prompt_capabilities:

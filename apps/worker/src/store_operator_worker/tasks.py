@@ -1379,9 +1379,9 @@ def execute_douyin_image_text_publish(
                     open_id=account_open_id,
                     item_id=platform_item_id,
                 )
-            except DouyinApiError as exc:
+            except (DouyinApiError, httpx.HTTPError) as exc:
                 _finish_douyin_publish_attempt(
-                    attempt_id, normalized_status="failed", retryable=True, error_code=exc.code
+                    attempt_id, normalized_status="failed", retryable=True, error_code=exc.code if isinstance(exc, DouyinApiError) else "HTTP_TRANSPORT_ERROR"
                 )
                 raise
             _finish_douyin_publish_attempt(

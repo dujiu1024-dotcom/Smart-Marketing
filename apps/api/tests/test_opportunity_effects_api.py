@@ -725,9 +725,24 @@ def test_attribution_reversal_preserves_snapshot_and_allows_replacement(
     assert first.status_code == 200, first.text
     first_item = first.json()["item"]
     original_snapshot = first_item["snapshot"]
+    assert first_item["attribution_version"] == 1
+
+    replay = identity_client.post("/api/v1/effects/attributions", headers=headers, json=payload)
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["replayed"] is True
+    assert replay.json()["item"]["id"] == first_item["id"]
+
+    changed_payload = {**payload, "evidence_strength": "medium", "allocation_percent": "80"}
+    changed = identity_client.post(
+        "/api/v1/effects/attributions", headers=headers, json=changed_payload
+    )
+    assert changed.status_code == 200, changed.text
+    changed_item = changed.json()["item"]
+    assert changed_item["attribution_version"] == 2
+    assert changed_item["supersedes_attribution_id"] == first_item["id"]
 
     reversed_response = identity_client.post(
-        f"/api/v1/effects/attributions/{first_item['id']}/reversal",
+        f"/api/v1/effects/attributions/{changed_item['id']}/reversal",
         headers=headers,
         json={"reason": "平台订单归属核对后发现关联错误"},
     )
@@ -735,13 +750,17 @@ def test_attribution_reversal_preserves_snapshot_and_allows_replacement(
     reversed_item = reversed_response.json()["item"]
     assert reversed_item["status"] == "rejected"
     assert reversed_item["reversal_reason"] == "平台订单归属核对后发现关联错误"
-    assert reversed_item["snapshot"] == original_snapshot
+    assert reversed_item["snapshot"] == changed_item["snapshot"]
+    assert reversed_item["snapshot"] != original_snapshot
 
     replacement = identity_client.post(
-        "/api/v1/effects/attributions", headers=headers, json=payload
+        "/api/v1/effects/attributions", headers=headers, json=changed_payload
     )
     assert replacement.status_code == 200, replacement.text
-    assert replacement.json()["item"]["status"] == "active"
+    replacement_item = replacement.json()["item"]
+    assert replacement_item["status"] == "active"
+    assert replacement_item["attribution_version"] == 3
+    assert replacement_item["supersedes_attribution_id"] == changed_item["id"]
 
 
 def test_metric_observation_cannot_reference_another_stores_published_work(

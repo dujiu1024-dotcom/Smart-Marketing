@@ -207,8 +207,10 @@ def upgrade() -> None:
         ["store_id", "metric_key", "period_end"])
 
     seeds = [
-        ("manual", "views", "content_performance", "播放/浏览", "count", "作品在统计周期内的播放或浏览次数"),
-        ("manual", "impressions", "content_performance", "曝光", "count", "作品在统计周期内的曝光次数"),
+        ("manual", "views", "content_performance", "播放/浏览", "count",
+         "作品在统计周期内的播放或浏览次数"),
+        ("manual", "impressions", "content_performance", "曝光", "count",
+         "作品在统计周期内的曝光次数"),
         ("manual", "reads", "content_performance", "阅读", "count", "作品在统计周期内的阅读次数"),
         ("manual", "likes", "content_performance", "点赞", "作品在统计周期内的点赞次数"),
         ("manual", "comments", "content_performance", "评论", "作品在统计周期内的评论次数"),

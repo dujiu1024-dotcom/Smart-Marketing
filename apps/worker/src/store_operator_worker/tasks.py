@@ -156,9 +156,10 @@ def relay_outbox(batch_size: int = 50) -> int:
             job_id = payload.get("job_id")
             if not isinstance(job_id, str):
                 raise TypeError("Outbox job_id is invalid")
+            parsed_job_id = UUID(job_id)
             celery_app.send_task(
                 "jobs.execute",
-                args=[job_id],
+                args=[str(parsed_job_id)],
                 task_id=str(event_id),
                 queue="default",
             )

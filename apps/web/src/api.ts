@@ -582,6 +582,7 @@ export interface MarketingTaskOptions {
   includes_image: boolean | null;
   includes_video_script: boolean;
   opportunity_applicable: boolean | null;
+  opportunity_snapshot?: Record<string, unknown> | null;
   selected_channel_keys: string[];
   requires_external_delivery: boolean;
 }
@@ -623,6 +624,7 @@ export interface MarketingTask extends MarketingTaskSummary {
 export interface MarketingTaskCreateInput {
   task_type: MarketingTaskType;
   title: string;
+  opportunity_id?: string | null;
   requirement_draft: Record<string, unknown>;
   task_options: MarketingTaskOptions;
 }
@@ -988,4 +990,229 @@ export interface ChannelCapabilitySnapshotRecord {
 }
 export async function listDouyinAccountCapabilities(storeId: string, accountId: string): Promise<ChannelCapabilitySnapshotRecord[]> {
   return request(`/channels/douyin/accounts/${encodeURIComponent(accountId)}/capabilities`, {}, storeId);
+}
+
+
+export interface OpportunityItem {
+  id: string;
+  title: string;
+  summary: string | null;
+  source_url: string;
+  published_at: string | null;
+  discovered_at: string;
+  expires_at: string | null;
+  region: string | null;
+  heat_value: string | null;
+  heat_unit: string | null;
+  evidence_status: string;
+  relevance_score: string | null;
+  match_method: string;
+  matching_algorithm_version: number;
+  reason_summary: string | null;
+  suggested_scenario: string | null;
+  content_angle: string | null;
+  risk_flags: string[];
+  eligibility_status: string;
+  decision: string | null;
+}
+export interface OpportunityList {
+  items: OpportunityItem[];
+  total: number;
+  source_status: "available" | "unavailable";
+  empty_reason: string | null;
+}
+export interface MetricDefinitionRecord {
+  id: string;
+  source_system: string;
+  metric_key: string;
+  metric_tier: "content_performance" | "intent" | "business_outcome";
+  display_name: string;
+  unit: string | null;
+  definition: string;
+  definition_version: number;
+}
+export interface MetricObservationRecord {
+  id: string;
+  metric_key: string;
+  metric_tier: "content_performance" | "intent" | "business_outcome";
+  display_name: string;
+  value_numeric: string | null;
+  unit: string | null;
+  currency: string | null;
+  source_system: string;
+  source_record_id: string | null;
+  source_evidence_ref: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  period_timezone: string;
+  collected_at: string;
+  definition_version: number;
+  integrity_status: string;
+  authenticity_status: string;
+  sync_status: string;
+  supersedes_observation_id: string | null;
+  import_batch_id: string | null;
+  published_work_id: string | null;
+  marketing_task_id: string | null;
+  observation_window_status: string;
+}
+export interface DataSourceCapabilitySnapshotRecord {
+  id: string; channel_key: string; capability_key: string; status: string;
+  required_scopes: string[]; granted_scopes: string[]; evidence_ref: string | null;
+  snapshot_version: number; checked_at: string; reason: string | null;
+}
+export interface PublishReadbackCandidate {
+  publish_operation_id: string; marketing_task_id: string; channel_key: string;
+  channel_account_id: string; channel_provider: string; external_work_id: string;
+  published_at: string | null; readback_at: string;
+}
+export interface PublishedWorkRecord {
+  id: string; task_id: string | null; publish_operation_id: string | null;
+  channel_account_id: string | null; channel_key: string; external_work_id: string;
+  title: string | null; permalink: string | null; published_at: string | null;
+  ownership_status: string; verified_at: string | null; source_snapshot: Record<string, unknown>;
+}
+export interface BusinessOutcomeEvidenceRecord {
+  id: string; outcome_type: string; value_numeric: string; currency: string | null;
+  source_system: string; source_record_id: string | null; source_evidence_ref: string | null;
+  occurred_at: string; authenticity_status: string; integrity_status: string;
+}
+export interface AttributionEvidenceRecord {
+  id: string; marketing_task_id: string; published_work_id: string; outcome_evidence_id: string;
+  attribution_version: number; supersedes_attribution_id: string | null;
+  attribution_method: string; evidence_strength: string; allocation_percent: string;
+  status: string; snapshot: Record<string, unknown>; reversal_reason: string | null; reversed_at: string | null;
+}
+export interface EffectsOverview {
+  items: Array<{
+    metric_key: string; display_name: string; metric_tier: string; value: string | null;
+    status: "available" | "unavailable" | "accumulating" | "window_unknown"; reason: string | null; source_system: string;
+    period_end: string | null; period_timezone: string; collected_at: string;
+    authenticity_status: string; integrity_status: string;
+  }>;
+  trends: Array<{
+    metric_key: string; display_name: string; source_system: string; channel_key: string | null; definition_version: number;
+    points: Array<{
+      period_start: string; period_end: string; value: string; sample_count: number;
+      timezone: string; aggregation_rule: string; display_name: string;
+    }>;
+    comparison: { status: string; change_percent: string | null };
+  }>;
+  conversion_rates: Array<{
+    metric_key: string; display_name: string; numerator_key: string; denominator_key: string;
+    source_system: string; channel_key: string | null;
+    numerator_definition_version: number; denominator_definition_version: number;
+    period_start: string; period_end: string; timezone: string;
+    numerator_value: string; denominator_value: string;
+    value_percent: string | null; status: string;
+  }>;
+  content_performance: Array<{
+    published_work_id: string; marketing_task_id: string | null; channel_key: string;
+    external_work_id: string; metric_key: string; source_system: string; definition_version: number; display_name: string;
+    points: Array<{ period_start: string; period_end: string; value: string; sample_count: number; timezone: string }>;
+    comparison: { status: string; change_percent: string | null };
+  }>;
+  insights: Array<{
+    metric_key: string; display_name: string; source_system: string; channel_key: string | null;
+    period_end: string; sample_count: number; comparison_status: string;
+    observation: string; next_action: string;
+  }>;
+  data_quality: {
+    total_observations: number; verified_observations: number; accumulating_observations: number;
+    window_unknown_observations: number; delayed_observations: number;
+    incomplete_or_anomalous_observations: number; status: string; reason: string | null;
+  };
+  data_status: "available" | "unavailable";
+  business_outcomes: { roi: number | null; sales_growth: number | null; store_visit_growth: number | null; reason: string };
+}
+export function getOpportunities(storeId: string): Promise<OpportunityList> {
+  return request<OpportunityList>("/opportunities", {}, storeId);
+}
+export function getOpportunity(storeId: string, opportunityId: string): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>(`/opportunities/${encodeURIComponent(opportunityId)}`, {}, storeId);
+}
+export function decideOpportunity(storeId: string, opportunityId: string, decision: "adopt" | "ignore" | "snooze", reason: string, idempotencyKey: string): Promise<{ id: string; decision: string; replayed: boolean }> {
+  return request("/opportunities/" + encodeURIComponent(opportunityId) + "/decisions", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ decision, reason: reason || null }),
+  }, storeId);
+}
+export function getEffectsOverview(storeId: string): Promise<EffectsOverview> {
+  return request<EffectsOverview>("/effects/overview", {}, storeId);
+}
+export function getMetricDefinitions(): Promise<{ items: MetricDefinitionRecord[] }> {
+  return request<{ items: MetricDefinitionRecord[] }>("/effects/definitions");
+}
+export function getMetricObservations(storeId: string): Promise<{ items: MetricObservationRecord[] }> {
+  return request<{ items: MetricObservationRecord[] }>("/effects/observations", {}, storeId);
+}
+export function createMetricObservation(storeId: string, payload: {
+  metric_key: string; value_numeric: string | null; currency: string | null; period_start: string | null;
+  period_end: string | null; period_timezone: string; source_record_id: string | null;
+  source_evidence_ref: string | null;
+  published_work_id?: string | null;
+  marketing_task_id?: string | null;
+}): Promise<{ item: MetricObservationRecord; message: string }> {
+  return request("/effects/observations", { method: "POST", body: JSON.stringify(payload) }, storeId);
+}
+export function importMetricCsv(storeId: string, csvText: string): Promise<{
+  created: number; duplicates_skipped: number; import_batch_id: string;
+  content_sha256: string; authenticity_status: string; message: string;
+}> {
+  return request("/effects/import", { method: "POST", body: JSON.stringify({ csv_text: csvText }) }, storeId);
+}
+export function importMetricXlsx(storeId: string, fileName: string, fileBase64: string): Promise<{
+  created: number; duplicates_skipped: number; import_batch_id: string;
+  content_sha256: string; authenticity_status: string; message: string;
+}> {
+  return request("/effects/import-xlsx", {
+    method: "POST", body: JSON.stringify({ file_name: fileName, file_base64: fileBase64 }),
+  }, storeId);
+}
+
+export function getDataSourceCapabilities(storeId: string): Promise<{ items: DataSourceCapabilitySnapshotRecord[]; total: number }> {
+  return request("/effects/data-source-capabilities", {}, storeId);
+}
+export function checkDataSourceCapabilities(storeId: string): Promise<{ items: DataSourceCapabilitySnapshotRecord[]; total: number }> {
+  return request("/effects/data-source-capabilities/check", { method: "POST" }, storeId);
+}
+export function getPublishReadbacks(storeId: string): Promise<{ items: PublishReadbackCandidate[]; total: number }> {
+  return request("/effects/publish-readbacks", {}, storeId);
+}
+export function getPublishedWorks(storeId: string): Promise<{ items: PublishedWorkRecord[]; total: number; verified_count: number }> {
+  return request("/effects/published-works", {}, storeId);
+}
+export function getBusinessOutcomes(storeId: string): Promise<{ items: BusinessOutcomeEvidenceRecord[]; total: number }> {
+  return request("/effects/business-outcomes", {}, storeId);
+}
+export function createBusinessOutcome(storeId: string, payload: {
+  outcome_type: string; value_numeric: string; currency?: string | null;
+  source_record_id?: string | null; source_evidence_ref: string; occurred_at: string;
+}): Promise<{ item: BusinessOutcomeEvidenceRecord; replayed: boolean; message?: string }> {
+  return request("/effects/business-outcomes", { method: "POST", body: JSON.stringify(payload) }, storeId);
+}
+export function getAttributions(storeId: string): Promise<{ items: AttributionEvidenceRecord[]; total: number }> {
+  return request("/effects/attributions", {}, storeId);
+}
+export function reverseAttribution(storeId: string, attributionId: string, reason: string): Promise<{ item: AttributionEvidenceRecord; message: string }> {
+  return request(
+    `/effects/attributions/${encodeURIComponent(attributionId)}/reversal`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+    storeId,
+  );
+}
+export function registerPublishedWorkFromReadback(storeId: string, operationId: string): Promise<{ item: PublishedWorkRecord; replayed: boolean }> {
+  return request(
+    `/effects/published-works/from-publish-operation/${encodeURIComponent(operationId)}`,
+    { method: "POST" },
+    storeId,
+  );
+}
+export function requestOpportunityCollection(storeId: string, idempotencyKey: string): Promise<{
+  status: string; job_id: string | null; source_count?: number; message?: string;
+}> {
+  return request("/opportunities/collect", {
+    method: "POST", headers: { "Idempotency-Key": idempotencyKey },
+  }, storeId);
 }

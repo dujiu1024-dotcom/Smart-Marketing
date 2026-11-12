@@ -24,7 +24,7 @@ const task = {
   current_strategy_snapshot_id: null, created_at: "2026-11-12T01:00:00Z",
   updated_at: "2026-11-12T01:00:00Z", pending_steps_count: 8, blocked_steps_count: 0,
   requirement_draft: { goal: "提高周末到店转化", target_audience: "附近白领" },
-  strategy_draft: {}, task_options: { includes_copy: true, includes_image: true, includes_video_script: false, opportunity_applicable: false, selected_channel_keys: ["douyin"], requires_external_delivery: false },
+  strategy_draft: {}, task_options: { includes_copy: true, includes_image: true, opportunity_applicable: false, selected_channel_keys: ["douyin"], requires_external_delivery: false },
   steps: [
     "requirement_understanding", "context_snapshot", "opportunity_decision", "strategy_confirmation",
     "copy_production_review", "image_production_review", "channel_adaptation", "quality_check",
@@ -94,6 +94,33 @@ describe("marketing task workspace", () => {
         title: "周末新品推广",
         requirement_draft: expect.objectContaining({ goal: "提高周末到店转化", target_audience: "附近白领" }),
         task_options: expect.objectContaining({ includes_copy: true, includes_image: true, includes_video_script: true, selected_channel_keys: ["douyin"] }),
+      }),
+      expect.any(String),
+    ));
+  });
+
+  it("prefills task creation from an explicitly adopted opportunity handoff", async () => {
+    const opportunityId = "11111111-1111-4111-8111-111111111111";
+    sessionStorage.setItem(
+      `store-operator.opportunity-handoff.${storeId}`,
+      JSON.stringify({
+        opportunity_id: opportunityId,
+        title: "Local spring drinks",
+        summary: "A reviewed source item",
+        suggested_scenario: "Promote seasonal drinks",
+        content_angle: "Explain the seasonal ingredients",
+      }),
+    );
+    window.location.hash = "#create";
+    render(<MarketingTaskWorkspace storeId={storeId} />);
+    expect(await screen.findByDisplayValue("热点机会：Local spring drinks")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Promote seasonal drinks")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "创建营销任务" }));
+    await waitFor(() => expect(api.createMarketingTask).toHaveBeenCalledWith(
+      storeId,
+      expect.objectContaining({
+        opportunity_id: opportunityId,
+        task_options: expect.objectContaining({ opportunity_applicable: true }),
       }),
       expect.any(String),
     ));

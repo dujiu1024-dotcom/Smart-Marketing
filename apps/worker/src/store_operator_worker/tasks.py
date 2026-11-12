@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 
 import httpx
 from botocore.exceptions import BotoCoreError  # type: ignore[import-untyped]
-from sqlalchemy import create_engine, func, or_, select
+from sqlalchemy import and_, create_engine, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
@@ -51,6 +51,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
     MediaAsset,
     OutboxEvent,
     PublishConfirmation,
+    PublishedWork,
     PublishOperation,
     PublishOperationAttempt,
     PublishPackage,
@@ -58,6 +59,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
     QualityReport,
     ReviewRecord,
     UploadIntent,
+    WorkOwnershipEvidence,
 )
 from store_operator.object_storage import (  # type: ignore[import-untyped]
     ObjectStorageNotConfigured,
@@ -75,6 +77,7 @@ from store_operator_worker.handlers import (
     register_job_handler,
     resolve_job_handler,
 )
+from store_operator_worker.hot_topics import register_hot_topic_handlers
 from store_operator_worker.media_scanner import (
     MalwareDetected,
     image_dimensions,
@@ -91,6 +94,8 @@ engine = create_engine(database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(
     bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
 )
+
+register_hot_topic_handlers(SessionLocal)
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
 LEASE_SECONDS = int(os.environ.get("WORKER_LEASE_SECONDS", "90"))
 if LEASE_SECONDS < 3:
@@ -278,12 +283,6 @@ def execute_job(job_id: str) -> dict[str, str]:
                 error_summary="No domain handler is registered for this job type.",
                 retryable=False,
             )
-        emit_operational_alert(
-            event="job.handler_missing",
-            severity="critical",
-            correlation_id=str(claimed_job_id),
-            attributes={"job_type": job_type},
-        )
         return {"status": "failed", "reason": "handler_not_registered"}
 
     stop_heartbeat = Event()
@@ -413,12 +412,6 @@ def execute_job(job_id: str) -> dict[str, str]:
                 retryable=False,
                 side_effect_state=SideEffectState.UNKNOWN,
             )
-        emit_operational_alert(
-            event="job.timeout",
-            severity="critical",
-            correlation_id=str(claimed_job_id),
-            attributes={"job_type": job_type, "attempt_id": str(attempt_id)},
-        )
         return {"status": "needs_human", "reason": "timeout"}
     except JobExecutionError as exc:
         with SessionLocal.begin() as db:
@@ -433,21 +426,6 @@ def execute_job(job_id: str) -> dict[str, str]:
                 side_effect_state=exc.side_effect_state,
                 retry_delay_seconds=exc.retry_delay_seconds,
             )
-        event = (
-            "channel.delivery.failure"
-            if job_type.startswith(("channel.", "douyin.")) or "publish" in job_type
-            else "job.execution.failure"
-        )
-        emit_operational_alert(
-            event=event,
-            severity="error",
-            correlation_id=str(claimed_job_id),
-            attributes={
-                "job_type": job_type,
-                "error_code": exc.code,
-                "side_effect_state": str(exc.side_effect_state),
-            },
-        )
         return {"status": "failed", "reason": exc.code}
     except ProviderError as exc:
         with SessionLocal.begin() as db:
@@ -466,16 +444,6 @@ def execute_job(job_id: str) -> dict[str, str]:
                     else 30
                 ),
             )
-        emit_operational_alert(
-            event="provider.failure",
-            severity="error",
-            correlation_id=str(claimed_job_id),
-            attributes={
-                "job_type": job_type,
-                "error_code": exc.code.value,
-                "side_effect_state": str(exc.side_effect_state),
-            },
-        )
         return {"status": "failed", "reason": exc.code.value}
     except Exception as exc:  # noqa: BLE001 - final sanitized execution boundary
         logger.error(
@@ -508,16 +476,6 @@ def execute_job(job_id: str) -> dict[str, str]:
                     "error_type": type(persist_exc).__name__,
                 },
             )
-        emit_operational_alert(
-            event="worker.unexpected_failure",
-            severity="critical",
-            correlation_id=str(claimed_job_id),
-            attributes={
-                "job_type": job_type,
-                "attempt_id": str(attempt_id),
-                "error_type": type(exc).__name__,
-            },
-        )
         return {"status": "needs_human", "reason": "unexpected_error"}
     finally:
         stop_heartbeat.set()
@@ -530,15 +488,7 @@ def execute_job(job_id: str) -> dict[str, str]:
 def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     with SessionLocal.begin() as db:
-        recovered = int(recover_expired_jobs(db, batch_size=batch_size))
-    if recovered:
-        emit_operational_alert(
-            event="worker.expired_leases_recovered",
-            severity="warning",
-            correlation_id=WORKER_ID,
-            attributes={"recovered_jobs": recovered},
-        )
-    return recovered
+        return int(recover_expired_jobs(db, batch_size=batch_size))
 
 
 @celery_app.task(
@@ -972,6 +922,142 @@ def _set_douyin_publish_state(
         elif schedule_readback:
             operation.last_readback_at = datetime.now(UTC)
             operation.next_attempt_at = datetime.now(UTC) + timedelta(seconds=30)
+
+
+
+def _register_douyin_verified_work(
+    operation_id: UUID,
+    store_id: UUID,
+    *,
+    platform_item_id: str,
+    readback: dict[str, Any],
+) -> UUID:
+    now = datetime.now(UTC)
+    with SessionLocal.begin() as db:
+        row = db.execute(
+            select(PublishOperation, PublishPackage, PublishPackageItem, ChannelAccount)
+            .join(
+                PublishPackage,
+                and_(
+                    PublishPackage.store_id == PublishOperation.store_id,
+                    PublishPackage.id == PublishOperation.publish_package_id,
+                ),
+            )
+            .join(
+                PublishPackageItem,
+                and_(
+                    PublishPackageItem.store_id == PublishOperation.store_id,
+                    PublishPackageItem.id == PublishOperation.publish_package_item_id,
+                ),
+            )
+            .join(
+                ChannelAccount,
+                and_(
+                    ChannelAccount.store_id == PublishOperation.store_id,
+                    ChannelAccount.id == PublishOperation.channel_account_id,
+                ),
+            )
+            .where(
+                PublishOperation.id == operation_id,
+                PublishOperation.store_id == store_id,
+            )
+            .with_for_update()
+        ).first()
+        if row is None:
+            raise JobExecutionError(
+                "DOUYIN_PUBLISH_OPERATION_NOT_FOUND",
+                "The verified publish operation could not be found.",
+                retryable=False,
+            )
+        operation, package, package_item, account = row
+        if (
+            operation.platform_item_id != platform_item_id
+            or package_item.publish_package_id != package.id
+            or package_item.channel_key != "douyin"
+            or package_item.channel_account_id != account.id
+            or account.provider != "douyin"
+        ):
+            raise JobExecutionError(
+                "DOUYIN_READBACK_RELATIONSHIP_MISMATCH",
+                "Verified platform readback does not match the frozen publish operation.",
+                retryable=False,
+            )
+        title = readback.get("title")
+        permalink = readback.get("share_url") or readback.get("share_link")
+        work = db.scalar(
+            select(PublishedWork).where(
+                PublishedWork.store_id == store_id,
+                PublishedWork.publish_operation_id == operation.id,
+            )
+        )
+        if work is None:
+            work = PublishedWork(
+                id=uuid4(),
+                store_id=store_id,
+                task_id=package.task_id,
+                publish_operation_id=operation.id,
+                channel_account_id=account.id,
+                channel_key=package_item.channel_key,
+                external_work_id=platform_item_id,
+                title=title[:300] if isinstance(title, str) else None,
+                permalink=permalink[:2048] if isinstance(permalink, str) else None,
+                published_at=operation.published_at or now,
+                ownership_status="verified_system_publish",
+                verified_at=now,
+                source_snapshot_json={
+                    "provider": "douyin",
+                    "publish_operation_id": str(operation.id),
+                    "platform_item_id": platform_item_id,
+                    "readback_verified": True,
+                    "readback_at": now.isoformat(),
+                },
+            )
+            db.add(work)
+            db.flush()
+        if work.ownership_status != "verified_system_publish" or work.verified_at is None:
+            raise JobExecutionError(
+                "DOUYIN_WORK_OWNERSHIP_CONFLICT",
+                "An existing published-work record is not eligible for automatic reverification.",
+                retryable=False,
+            )
+        evidence = db.scalar(
+            select(WorkOwnershipEvidence.id).where(
+                WorkOwnershipEvidence.store_id == store_id,
+                WorkOwnershipEvidence.published_work_id == work.id,
+                WorkOwnershipEvidence.evidence_type == "system_publish_readback",
+                WorkOwnershipEvidence.evidence_status == "verified",
+            )
+        )
+        if evidence is None:
+            db.add(
+                WorkOwnershipEvidence(
+                    id=uuid4(),
+                    store_id=store_id,
+                    published_work_id=work.id,
+                    evidence_type="system_publish_readback",
+                    evidence_status="verified",
+                    source_system="douyin",
+                    evidence_ref=(
+                        permalink[:2048]
+                        if isinstance(permalink, str)
+                        else f"douyin://publish-operation/{operation.id}/readback"
+                    ),
+                    evidence_payload_json={
+                        "publish_operation_id": str(operation.id),
+                        "platform_item_id": platform_item_id,
+                        "readback_verified": True,
+                        "readback_at": now.isoformat(),
+                    },
+                    verified_at=now,
+                )
+            )
+        operation.status = "published"
+        operation.published_at = operation.published_at or now
+        operation.last_readback_at = now
+        operation.next_attempt_at = None
+        operation.last_error_code = None
+        operation.last_error_summary = None
+        return cast(UUID, work.id)
 
 
 def _begin_douyin_publish_attempt(
@@ -1689,15 +1775,16 @@ def execute_douyin_image_text_publish(
             retry_delay_seconds=30,
         )
 
-    _set_douyin_publish_state(
+    published_work_id = _register_douyin_verified_work(
         operation_id,
         store_id,
-        status="processing",
-        readback=True,
+        platform_item_id=platform_item_id,
+        readback=readback,
     )
     return {
-        "status": "processing",
+        "status": "published",
         "publish_operation_id": str(operation_id),
+        "published_work_id": str(published_work_id),
         "platform_item_id": platform_item_id,
         "readback_verified": True,
         "platform_review_state": "pending_or_not_public",

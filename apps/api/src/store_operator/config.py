@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     douyin_redirect_uri: str | None = None
     channel_secret_store_region: str | None = None
     channel_secret_store_prefix: str = "ai-store-operator/channel-accounts"
+    hot_topic_allowed_hosts: str = ""
 
     @model_validator(mode="after")
     def validate_auth_settings(self) -> "Settings":

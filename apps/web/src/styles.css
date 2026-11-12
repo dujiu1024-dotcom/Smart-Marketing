@@ -221,3 +221,27 @@ h1 { margin: 0; color: #1f3029; font-size: clamp(25px, 3vw, 32px); letter-spacin
 
 .channel-capability-list { display: grid; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #edf0ed; }
 .channel-capability-list strong { font-size: 12px; color: #4b6354; }
+
+
+.opportunity-workspace, .effects-workspace { display: flex; flex-direction: column; gap: 16px; }
+.opportunity-source a { color: #356c50; font-size: 13px; }
+.opportunity-link { display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; min-height: 40px; border-radius: 8px; color: #fff; text-decoration: none; }
+.effects-status { display: flex; flex-direction: column; gap: 5px; padding: 16px 18px; border: 1px solid #e5eae6; border-radius: 10px; background: #fff; color: #53635b; font-size: 13px; }
+.effects-status strong { color: #26372f; font-size: 14px; }
+.effects-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.effects-metric-list { display: grid; gap: 12px; margin-top: 16px; }
+.effects-metric { display: grid; gap: 5px; padding: 12px 0; border-top: 1px solid #edf0ed; }
+.effects-metric span { color: #637169; font-size: 12px; }
+.effects-metric strong { color: #26372f; font-size: 22px; }
+.effects-metric small { color: #89938d; font-size: 11px; line-height: 1.6; }
+.effects-outcomes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.effects-outcomes > div { display: grid; gap: 7px; padding: 14px; border: 1px solid #e8ece9; border-radius: 9px; }
+.effects-outcomes span { color: #77837c; font-size: 12px; }
+.effects-outcomes strong { color: #64736b; font-size: 15px; }
+.opportunity-workspace .form-card > h2, .effects-workspace .form-card > h2 { margin: 0 0 12px; color: #26372f; font-size: 16px; }
+.opportunity-workspace .form-card > p, .effects-workspace .form-card > p { color: #65736b; font-size: 13px; line-height: 1.7; }
+.opportunity-workspace .form-actions { justify-content: flex-end; margin-top: 16px; }
+@media (max-width: 640px) {
+  .effects-grid { grid-template-columns: 1fr; }
+  .effects-outcomes { grid-template-columns: 1fr; }
+}

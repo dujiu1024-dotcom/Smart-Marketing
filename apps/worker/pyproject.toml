@@ -2,7 +2,7 @@
 name = "store-operator-worker"
 version = "0.1.0"
 requires-python = ">=3.13,<3.14"
-dependencies = ["celery[redis]>=5.7,<5.8"]
+dependencies = ["celery[redis]>=5.7,<5.8", "httpcore>=1,<2", "httpx>=0.28,<1"]
 
 [tool.ruff]
 line-length = 100

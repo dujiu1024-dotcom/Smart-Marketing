@@ -44,6 +44,7 @@ const statusLabels: Record<string, string> = {
 const errorText = (error: unknown) => error instanceof Error ? error.message : "请求失败，请稍后重试。";
 const selectedTaskKey = (storeId: string) => `store-operator.current-task-id.${storeId}`;
 const createTaskKey = (storeId: string) => `store-operator.task-create.${storeId}`;
+const opportunityHandoffKey = (storeId: string) => `store-operator.opportunity-handoff.${storeId}`;
 const readText = (record: Record<string, unknown>, key: string) => typeof record[key] === "string" ? String(record[key]) : "";
 function safeJson(value: Record<string, unknown>): string { return JSON.stringify(value, null, 2); }
 interface FactOption extends BusinessFactReference { label: string; }
@@ -102,6 +103,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState("all");
   const [taskType, setTaskType] = useState<MarketingTaskType>("full_marketing");
+  const [opportunityId, setOpportunityId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [goal, setGoal] = useState("");
   const [targetAudience, setTargetAudience] = useState("");
@@ -211,6 +213,26 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       if (taskId) void loadContent(taskId);
     }
     if (route === "#create") {
+      const handoffRaw = sessionStorage.getItem(opportunityHandoffKey(storeId));
+      if (handoffRaw) {
+        try {
+          const handoff = JSON.parse(handoffRaw) as {
+            opportunity_id?: string; title?: string; summary?: string;
+            suggested_scenario?: string; content_angle?: string;
+          };
+          if (handoff.opportunity_id) {
+            setOpportunityId(handoff.opportunity_id);
+            setTitle(handoff.title ? `热点机会：${handoff.title}`.slice(0, 200) : "基于热点机会制作内容");
+            setGoal(handoff.suggested_scenario || "结合已采纳的热点机会制作门店营销内容");
+            setCoreMessage([handoff.summary, handoff.content_angle].filter(Boolean).join("\\n"));
+          }
+        } catch {
+          sessionStorage.removeItem(opportunityHandoffKey(storeId));
+          setOpportunityId(null);
+        }
+      } else {
+        setOpportunityId(null);
+      }
       const key = createTaskKey(storeId);
       createKey.current = sessionStorage.getItem(key) ?? crypto.randomUUID();
       sessionStorage.setItem(key, createKey.current);
@@ -234,12 +256,13 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       const input: MarketingTaskCreateInput = {
         task_type: taskType,
         title: title.trim(),
+        opportunity_id: opportunityId,
         requirement_draft: requirementPayload({ goal, target_audience: targetAudience, core_message: coreMessage, constraints }),
         task_options: {
           includes_copy: taskType === "merchant_content" ? includesCopy : scope.includes_copy,
           includes_image: taskType === "merchant_content" ? includesImage : scope.includes_image,
           includes_video_script: includesVideoScript,
-          opportunity_applicable: false,
+          opportunity_applicable: Boolean(opportunityId),
           selected_channel_keys: channelSelected ? ["douyin"] : [],
           requires_external_delivery: externalDelivery && channelSelected,
         },
@@ -247,6 +270,8 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       if (!input.requirement_draft.goal) throw new Error("请先填写营销目标。");
       const created = await createMarketingTask(storeId, input, createKey.current || crypto.randomUUID());
       sessionStorage.removeItem(createTaskKey(storeId));
+      sessionStorage.removeItem(opportunityHandoffKey(storeId));
+      setOpportunityId(null);
       openTask(created.id);
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
@@ -497,13 +522,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     {error && <div className="alert error" role="alert">{error}</div>}
     <form className="profile-form" onSubmit={createTask}>
       <section className="form-card"><div className="section-title"><div><h2>营销需求</h2><p>不需要先选择热点；普通按需制作可直接开始。</p></div></div><div className="form-grid">
-        <label className="field"><span>任务类型</span><select value={taskType} onChange={event => {
-          const nextType = event.target.value as MarketingTaskType;
-          setTaskType(nextType);
-          if (nextType === "image_only" || nextType === "image_optimization") {
-            setIncludesVideoScript(false);
-          }
-        }}><option value="full_marketing">完整营销执行</option><option value="copy_only">仅制作文案</option><option value="image_only">仅制作图片</option><option value="image_optimization">图片优化</option><option value="merchant_content">商家已有素材制作</option></select></label>
+        <label className="field"><span>任务类型</span><select value={taskType} onChange={event => { const nextType = event.target.value as MarketingTaskType; setTaskType(nextType); if (nextType === "image_only" || nextType === "image_optimization") setIncludesVideoScript(false); }}><option value="full_marketing">完整营销执行</option><option value="copy_only">仅制作文案</option><option value="image_only">仅制作图片</option><option value="image_optimization">图片优化</option><option value="merchant_content">商家已有素材制作</option></select></label>
         <Field label="任务名称 *" value={title} onChange={setTitle} placeholder="例如：周末新品推广" />
         <Field label="经营目标 *" value={goal} onChange={setGoal} rows={3} placeholder="例如：提高周末下午茶时段的到店转化。" />
         <Field label="目标客群" value={targetAudience} onChange={setTargetAudience} placeholder="例如：附近写字楼白领" />
@@ -511,10 +530,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
         <Field label="限制条件" value={constraints} onChange={setConstraints} rows={3} placeholder="例如：不使用未经确认的价格，不承诺库存。" />
       </div></section>
       <section className="form-card"><div className="section-title"><div><h2>内容与交付范围</h2><p>渠道适配和对外交付按实际需求选择。</p></div></div>
-        {taskType === "merchant_content" && <div className="task-checkboxes"><label><input type="checkbox" checked={includesCopy} onChange={event => {
-          setIncludesCopy(event.target.checked);
-          if (!event.target.checked) setIncludesVideoScript(false);
-        }} />包含文案</label><label><input type="checkbox" checked={includesImage} onChange={event => setIncludesImage(event.target.checked)} />包含图片</label></div>}
+        {taskType === "merchant_content" && <div className="task-checkboxes"><label><input type="checkbox" checked={includesCopy} onChange={event => { setIncludesCopy(event.target.checked); if (!event.target.checked) setIncludesVideoScript(false); }} />包含文案</label><label><input type="checkbox" checked={includesImage} onChange={event => setIncludesImage(event.target.checked)} />包含图片</label></div>}
         {(taskType !== "image_only" && taskType !== "image_optimization" && (taskType !== "merchant_content" || includesCopy)) && <div className="task-checkboxes"><label><input type="checkbox" checked={includesVideoScript} onChange={event => setIncludesVideoScript(event.target.checked)} />同时生成视频脚本文本（仅脚本，不生成视频）</label></div>}
         <div className="task-checkboxes"><label><input type="checkbox" checked={channelSelected} onChange={event => { setChannelSelected(event.target.checked); if (!event.target.checked) setExternalDelivery(false); }} />适配抖音</label><label><input type="checkbox" checked={externalDelivery} disabled={!channelSelected} onChange={event => setExternalDelivery(event.target.checked)} />需要对外发布/交付</label></div>
         {taskType === "merchant_content" && !includesCopy && !includesImage && <div className="alert error">商家已有素材任务至少需要选择文案或图片。</div>}
@@ -560,9 +576,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           const content = current?.content_json || {};
           const body = typeof content.body === "string" ? content.body : "";
           const titleText = typeof content.title === "string" ? content.title : "";
-          const videoScript = content.video_script && typeof content.video_script === "object" && !Array.isArray(content.video_script)
-            ? content.video_script as Record<string, unknown>
-            : null;
+          const videoScript = content.video_script && typeof content.video_script === "object" && !Array.isArray(content.video_script) ? content.video_script as Record<string, unknown> : null;
           const storyboard = Array.isArray(videoScript?.storyboard) ? videoScript.storyboard : [];
           const asset = current?.source_refs.find(ref => ref.type === "media_asset");
           const reviews = current?.reviews || [];
@@ -571,15 +585,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           return <article className="task-content-artifact" key={artifact.id}>
             <div className="task-step-title"><strong>{artifact.artifact_type === "copy" ? "文案产物" : "图片产物"}</strong><span className="status-chip">{current ? `当前版本 V${current.version_no} · ${latestReview ? reviewLabels[latestReview.decision] : "待审核"}` : "无当前版本"}</span></div>
             {current && artifact.artifact_type === "copy" && <div className="task-readonly-grid"><div><strong>{titleText || "未填写标题"}</strong><span>{body}</span></div></div>}
-            {current && videoScript && <div className="task-readonly-grid video-script-preview">
-              <div><strong>视频脚本（仅文本）</strong>
-                <span>主题：{String(videoScript.theme || "未填写")}</span>
-                <span>口播脚本：{String(videoScript.spoken_script || "未填写")}</span>
-                <span>分镜：</span>
-                {storyboard.map((shot, index) => <span key={index}>{typeof shot === "string" ? shot : JSON.stringify(shot)}</span>)}
-                <span>拍摄指导：{String(videoScript.shooting_guidance || "未填写")}</span>
-              </div>
-            </div>}
+            {current && videoScript && <div className="task-readonly-grid video-script-preview"><div><strong>视频脚本（仅文本）</strong><span>主题：{String(videoScript.theme || "未填写")}</span><span>口播脚本：{String(videoScript.spoken_script || "未填写")}</span><span>分镜：</span>{storyboard.map((shot, index) => <span key={index}>{typeof shot === "string" ? shot : JSON.stringify(shot)}</span>)}<span>拍摄指导：{String(videoScript.shooting_guidance || "未填写")}</span></div></div>}
             {current && artifact.artifact_type === "image" && <p className="muted">已关联素材引用：{asset && typeof asset.id === "string" ? asset.id : current.content_hash}</p>}
             <p className="muted">版本历史：{artifact.versions.map(version => `V${version.version_no}`).join(" · ")}</p>
             {latestReview && <p className="muted">最近审核：{reviewLabels[latestReview.decision]} · {new Date(latestReview.created_at).toLocaleString()}{latestReview.comment ? ` · ${latestReview.comment}` : ""}</p>}

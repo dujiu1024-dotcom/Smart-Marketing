@@ -82,7 +82,7 @@
 
 建议字段：
 - id、store_id、hot_topic_id
-- store_context_fingerprint、matching_version、prompt_version_id（nullable）
+- store_context_fingerprint、matching_version、matching_algorithm_version、prompt_version_id（nullable）
 - relevance_score（nullable）、match_method（rules/semantic/hybrid/manual）
 - matched_product_ids、matched_offer_ids、matched_audience_profile_ids
 - suggested_scenario、content_angle、reason_summary
@@ -140,7 +140,7 @@
 2. 确定性特征：业态、商品、活动时间窗、客群、季节/节日、地域和门店经营目标。
 3. AI 语义排序：仅对规则通过的候选调用 #10 Provider；输出结构化 JSON、理由和引用的事实 ID，不得创造价格、库存、优惠、门店地址或经营结论。
 4. 结果校验：模型输出必须引用输入中存在的事实 ID；超出 Schema、引用不存在事实、事实冲突时降级为 unassessed/review_required。
-5. 按门店事实 fingerprint + matching_version + prompt_version 缓存；任何相关事实修订、来源更新、prompt 版本变化都使旧结果 stale。
+5. 按门店事实 fingerprint + matching_version + matching_algorithm_version + prompt_version 缓存；任何相关事实修订、来源更新、匹配算法或 prompt 版本变化都使旧结果 stale。
 6. 未配置真实 Provider 时只允许确定性规则结果，并明确展示“规则匹配”；不得用随机分数或静态演示样例伪装 AI 匹配。
 
 relevance_score 为 NULL 表示尚未计算；0 仅表示真实计算后得出的零分。列表排序优先级为 eligibility、有效期、相关性和来源可信度，不能将不同来源的 heat_value 混合排序。
@@ -224,3 +224,17 @@ IterWave 仓库声明 Apache-2.0；复制或改写任何代码前仍须核查具
 ## 12. 验收纪律
 
 本 PR 若仅提交本设计文档，不代表 Issue #11 的生产功能完成。自动化测试、来源合规核验、真实采集、跨店安全、AI 匹配和浏览器 E2E 均须在实现 PR 中逐项记录实际命令与证据；未执行必须明确标注“未执行”。
+
+
+## 13. Issue #137 implementation status (2026-11-12)
+
+A first executable slice has been added on branch `feat/issue-137-hotspots-effects`:
+
+- PostgreSQL migration `0018_opportunity_effects` and ORM models for sources, normalized topics, store matches, decisions and metric definitions/observations.
+- Store-scoped opportunity list/detail/decision APIs; adoption is blocked for expired, stale, ineligible or review-required matches.
+- Admin-only RSS source registration and explicit enablement. Feed and terms URLs must be HTTPS and use a host in `HOT_TOPIC_ALLOWED_HOSTS`; the Worker additionally rejects hosts resolving to non-public IP addresses and does not follow redirects.
+- Collection/matching is enqueued through the existing #9 Job/Outbox runtime. The Worker normalizes RSS/Atom entries (including RFC 822 RSS and ISO 8601 Atom timestamps), retains source URL and publication time, deduplicates per source, expires stale entries, and applies explainable rule matching against confirmed store profile, industry, service region, product, offer, audience and brand guideline facts.
+- Prohibited brand phrases and explicit topic/store region mismatches are surfaced as review risks. Matching scores describe text relevance only. They are not external heat scores, sales predictions or performance outcomes.
+- After an explicit merchant adoption, the detail view offers a merchant-triggered “基于此机会制作内容” action. The existing marketing-task creation API validates store scope, eligibility, expiry and the latest adoption decision, then persists a server-generated opportunity evidence snapshot in task options. Requirement edits preserve this snapshot; no task is created automatically.
+
+**Current limits:** no source is pre-enabled or seeded; operators must complete source terms review, host allowlisting and administrator enablement. No real feed has been connected or tested in production. Semantic AI matching, source-level heat normalization, verified geographic evidence adapters and broader ranking calibration remain out of this slice.

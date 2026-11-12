@@ -360,13 +360,40 @@ Job 命令需包含 source/channel account ID、时间窗口、cursor、schema v
 
 ## 12. 当前未完成项与冻结门禁
 
-- [ ] 产品确认归属状态的展示文案和人工确认的信任等级。
-- [ ] #12 核验抖音官方指标读取能力、所需 scope、应用资质和测试账号；发布 Adapter 不等于指标 API 已支持。
-- [ ] #6 明确允许导入的经营结果数据来源及证据/隐私要求；不新增 POS/CRM 集成。
-- [ ] #5/#6/#7/#8/#9/#10/#12 联合确认跨域 FK、Job command 和权限/撤销语义。
-- [ ] 正式 Pydantic/OpenAPI、SQLAlchemy/Alembic、JSON Schema 和 PostgreSQL 约束测试。
-- [ ] EFF-01..EFF-30 自动化测试；跨店、幂等、并发、Job 恢复和来源 API 集成测试。
+- [x] 核心 ORM、Alembic 迁移、门店级 API、Worker 发布读回登记和 Effects 工作区已落地；PR #139 持续验收中。
+- [x] 机会采纳到营销任务的显式制作入口、服务端机会快照、任务幂等和门店隔离已实现。
+- [x] 指标周期聚合、环比、同源同渠道转化率、作品级趋势、观察窗口积累状态、归因撤销和审计已实现。
+- [ ] PostgreSQL 迁移升级/回滚、完整 API 契约生成和全部 CI 检查通过；当前 PR 尚未获得最新完整 CI 结果。
+- [ ] EFF-01..EFF-30 全量自动化覆盖；目前已补跨店、幂等、归因撤销、作品级统计、零基线、周期缺失和观察窗口等测试，仍需补并发、Job 恢复及来源 API 集成场景。
 - [ ] Demo 全流程浏览器验收、真实空状态/数据缺失/观察中/失败态截图。
-- [ ] 数据源官方文档、授权范围、数据条款、采集日期和测试证据入库。
+- [ ] #12 抖音真实账号验收：确认授权 Scope、video.list 读回行为及是否存在可用的官方指标读取接口；代码明确将内容指标读取标为 unsupported，不能用发布授权推定可读指标。
+- [ ] 经营结果官方数据源尚未接入；手工录入和 CSV 只保留为商家报告，不得作为已核验经营结果或正式归因。
+- [ ] 数据源官方文档、授权范围、数据条款、采集日期和真机测试证据入库。
 
-**状态声明：** 本文件只完成领域设计准备。没有新增生产 API、ORM、迁移、Worker、平台指标同步或经营数据源；没有执行 EFF-01..EFF-30；没有证明任何真实经营效果。Issue #13 应继续 Open，直至真实来源和实现验收具备证据。
+**状态声明：** 本文档对应的核心代码切片已实现，但 Issue #137 尚未达到关闭条件。没有真实抖音指标数据或已核验经营结果；CI、EFF-01..EFF-30 全量覆盖和浏览器验收仍待完成。真实数据源能力属于待真机/官方能力验证事项，不得伪装成已接入。
+
+## 13. Issue #137 implementation status (2026-11-12)
+
+The first complete code slice for opportunity handoff, published-work ownership and effects evidence is implemented; external data-source verification and full acceptance remain:
+
+- Metric definition dictionary and append-oriented metric observation storage are introduced by migration `0018_opportunity_effects`.
+- Store-scoped APIs expose observations, a metric overview, period aggregation, period-over-period comparison and data-quality counts. Trend aggregation requires complete, current, verified observations with explicit period boundaries and uses the metric dictionary aggregation rule.
+- Manual observation entry and CSV-text import preserve period, IANA timezone, source reference and deduplication key. These records are always marked `merchant_reported`.
+- Manual observation corrections append a new observation with `supersedes_observation_id`; the original record is never overwritten, and a database uniqueness constraint permits only one direct successor per observation.
+- Attribution reversals are append-preserving status transitions: the original attribution snapshot is immutable, while reversal reason, actor and timestamp are recorded and audited. Only one active attribution per store/outcome/task is allowed; a reversed record may be replaced without deleting history.
+- Attribution input changes create a new monotonically versioned snapshot and mark the prior active version `superseded`; exact input replays return the existing version. Each version links to the prior record within the same store.
+- CSV imports create store-scoped import batches with the importing user, row counts and SHA-256 content hash. Replaying identical file content returns the original batch and does not create duplicate observations; new observations retain their batch ID.
+- The overview only surfaces values marked `official_api` or `verified_import` with complete/current integrity as available. Merchant-reported and demo-sample values do not become verified results. ROI, sales growth and store-visit growth remain unavailable unless the required real evidence and cost basis exist.
+- The opportunity workspace exposes an explicit merchant-triggered handoff to marketing-task creation. The server validates the adopted opportunity and store scope, snapshots the opportunity evidence into the task, and preserves idempotent task creation.
+- The Douyin publish worker now changes an operation to `published` only after successful platform readback, then idempotently creates `PublishedWork` and verified `WorkOwnershipEvidence` in the same transaction. The effects workspace registration endpoint remains a reconciliation path for older or externally completed operations; merchant claims remain unverified.
+- The effects workspace can snapshot Douyin capability boundaries: `video.list` may support published-work ownership readback, but content-metric reads and business-outcome reads remain explicitly `unsupported` until a verified adapter and scope exist. Capability snapshots are versioned and include granted scopes and assessment reasons.
+- `BusinessOutcomeEvidence`, `AttributionEvidence` and `DataSourceCapabilitySnapshot` now have store-scoped models and APIs. Manual business outcomes are always `merchant_reported`; formal attribution requires a verified work, verified ownership evidence, a complete official/verified outcome, a matching task, strong/medium evidence and allocation not exceeding 100%.
+- Metric observations may link to verified published works and their originating marketing task. Composite foreign keys enforce store scope.
+- The overview aggregates verified metric observations by identical period according to the metric dictionary, and computes period-over-period change only for adjacent equal-duration windows. Zero baselines and insufficient samples are explicitly reported.
+- Observation windows whose `period_end` is in the future are labeled `accumulating` and excluded from trend, conversion and work-performance conclusions. Missing period boundaries are labeled `window_unknown`; the workspace surfaces both counts separately.
+- Metric trends are partitioned by source system and channel. Conversion rates (clicks/views, consultations/views, booking intents/consultations and orders/booking intents) are calculated only from verified numerator/denominator observations sharing the same source, channel, period and timezone; zero denominators are not converted to a fabricated zero rate.
+- Verified content-performance observations are additionally grouped by verified published work and its marketing task. Work-level comparisons require a matching task association and a verified ownership-evidence record; merchant claims and unverified works are excluded.
+- The overview emits evidence-bounded insights and next-step suggestions only from verified metric trends; suggestions are operational checks, not causal claims. With no verified metrics, the workspace shows an explicit empty state.
+- The UI adds an independent `#effects` workspace and distinguishes content performance, intent and business outcomes, with verified trends, conversion rates, per-work performance comparisons, evidence-bounded insights, data-quality counts, automatic readback registration and reconciliation, capability snapshots and evidence/attribution status.
+
+**Current limits:** official channel metric-read adapters and verified business-outcome import adapters are not yet implemented, so no production outcome can be formally attributed yet. Per-source expected-latency SLAs, late-arrival reconciliation and the full EFF-01..EFF-30 suite remain. Douyin publishing/readback does not imply metric-read permission. No production metric source or business outcome is claimed.

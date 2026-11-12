@@ -56,12 +56,14 @@ from store_operator.models import (  # type: ignore[import-untyped]
     PublishPackageItem,
     QualityReport,
     ReviewRecord,
+    UploadIntent,
 )
 from store_operator.object_storage import (  # type: ignore[import-untyped]
     ObjectStorageNotConfigured,
     download_object_bytes,
 )
 
+from store_operator_worker.asset_scanner import AssetScannerUnavailable, scan_bytes
 from store_operator_worker.celery_app import celery_app
 from store_operator_worker.handlers import (
     JobCancelled,
@@ -437,6 +439,155 @@ def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
     with SessionLocal.begin() as db:
         return int(recover_expired_jobs(db, batch_size=batch_size))
+
+
+
+@register_job_handler("store.asset.scan")
+def execute_asset_scan(
+    context: JobExecutionContext,
+    payload_ref: dict[str, object],
+) -> dict[str, object]:
+    """Scan one quarantined private asset and publish a ready/rejected state."""
+    context.check_control()
+    if context.store_id is None or payload_ref.get("schema_version") != 1:
+        raise JobExecutionError(
+            "ASSET_SCAN_PAYLOAD_INVALID",
+            "Asset scan payload is invalid.",
+            retryable=False,
+        )
+    asset_id_value = payload_ref.get("asset_id")
+    intent_id_value = payload_ref.get("upload_intent_id")
+    if not isinstance(asset_id_value, str) or not isinstance(intent_id_value, str):
+        raise JobExecutionError(
+            "ASSET_SCAN_PAYLOAD_INVALID",
+            "Asset scan payload is invalid.",
+            retryable=False,
+        )
+    try:
+        asset_id = UUID(asset_id_value)
+        intent_id = UUID(intent_id_value)
+    except ValueError as exc:
+        raise JobExecutionError(
+            "ASSET_SCAN_PAYLOAD_INVALID",
+            "Asset scan payload is invalid.",
+            retryable=False,
+        ) from exc
+
+    with SessionLocal.begin() as db:
+        asset = db.scalar(
+            select(MediaAsset)
+            .where(
+                MediaAsset.id == asset_id,
+                MediaAsset.store_id == context.store_id,
+            )
+            .with_for_update()
+        )
+        intent = db.scalar(
+            select(UploadIntent)
+            .where(
+                UploadIntent.id == intent_id,
+                UploadIntent.store_id == context.store_id,
+            )
+            .with_for_update()
+        )
+        if asset is None or intent is None or intent.object_key != asset.object_key:
+            raise JobExecutionError(
+                "ASSET_SCAN_TARGET_NOT_FOUND",
+                "The uploaded asset is not available for security scanning.",
+                retryable=False,
+            )
+        if asset.status in {"ready", "rejected"}:
+            return {"asset_id": str(asset.id), "status": asset.status}
+        if asset.status != "quarantined" or intent.status != "scanning":
+            raise JobExecutionError(
+                "ASSET_SCAN_STATE_INVALID",
+                "The uploaded asset is not in a scannable state.",
+                retryable=False,
+            )
+        object_key = asset.object_key
+        expected_sha256 = asset.sha256
+        expected_size = asset.byte_size
+
+    if not settings.asset_scanner_host:
+        raise JobExecutionError(
+            "ASSET_SCANNER_NOT_CONFIGURED",
+            "The file security scanner is not configured.",
+            retryable=True,
+            retry_delay_seconds=60,
+        )
+    try:
+        content = download_object_bytes(
+            object_key=object_key,
+            max_bytes=25_000_000,
+        )
+    except (ObjectStorageNotConfigured, OSError, ValueError, Exception) as exc:
+        raise JobExecutionError(
+            "ASSET_STORAGE_READ_FAILED",
+            "The uploaded asset could not be read for security scanning.",
+            retryable=True,
+            retry_delay_seconds=60,
+        ) from exc
+    if len(content) != expected_size or hashlib.sha256(content).hexdigest() != expected_sha256:
+        verdict_clean = False
+        rejection_reason = "Stored asset integrity verification failed"
+    else:
+        try:
+            result = scan_bytes(
+                content,
+                host=settings.asset_scanner_host,
+                port=settings.asset_scanner_port,
+                timeout_seconds=settings.asset_scanner_timeout_seconds,
+            )
+        except AssetScannerUnavailable as exc:
+            raise JobExecutionError(
+                "ASSET_SCANNER_UNAVAILABLE",
+                "The file security scanner is temporarily unavailable.",
+                retryable=True,
+                retry_delay_seconds=60,
+            ) from exc
+        verdict_clean = result.clean
+        rejection_reason = (
+            None if result.clean else "Malware detected by the file security scanner"
+        )
+
+    context.check_control()
+    context.update_progress(current=1, total=1)
+    with SessionLocal.begin() as db:
+        asset = db.scalar(
+            select(MediaAsset)
+            .where(
+                MediaAsset.id == asset_id,
+                MediaAsset.store_id == context.store_id,
+            )
+            .with_for_update()
+        )
+        intent = db.scalar(
+            select(UploadIntent)
+            .where(
+                UploadIntent.id == intent_id,
+                UploadIntent.store_id == context.store_id,
+            )
+            .with_for_update()
+        )
+        if asset is None or intent is None or asset.object_key != object_key:
+            raise JobExecutionError(
+                "ASSET_SCAN_TARGET_NOT_FOUND",
+                "The uploaded asset changed during security scanning.",
+                retryable=False,
+            )
+        if asset.status in {"ready", "rejected"}:
+            return {"asset_id": str(asset.id), "status": asset.status}
+        if asset.status != "quarantined" or intent.status != "scanning":
+            raise JobExecutionError(
+                "ASSET_SCAN_STATE_INVALID",
+                "The uploaded asset state changed during security scanning.",
+                retryable=False,
+            )
+        asset.status = "ready" if verdict_clean else "rejected"
+        asset.version_no += 1
+        intent.status = "completed" if verdict_clean else "rejected"
+        intent.rejection_reason = rejection_reason
+        return {"asset_id": str(asset.id), "status": asset.status}
 
 
 @register_job_handler("content.quality_check")

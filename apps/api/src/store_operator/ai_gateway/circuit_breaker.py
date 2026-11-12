@@ -72,3 +72,10 @@ class CircuitBreaker:
             if self._opened_at is not None or self._failures >= self._failure_threshold:
                 self._opened_at = self._clock()
                 self._half_open_probe = False
+
+    def record_rejected(self) -> None:
+        """Release a half-open probe without counting caller/configuration errors."""
+        with self._lock:
+            if self._half_open_probe:
+                self._opened_at = self._clock()
+                self._half_open_probe = False

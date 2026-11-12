@@ -323,15 +323,21 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
     if payload.metric_key == "revenue" and payload.value_numeric is not None and payload.currency is None:  # noqa: E501
         raise ApiError(422, "CURRENCY_REQUIRED",
             "Revenue observations require an ISO 4217 currency")
-    material = "|".join([str(store_id), source_system, payload.metric_key,
-        payload.period_start.isoformat() if payload.period_start else "",
-        payload.period_end.isoformat() if payload.period_end else "",
+    material = "|".join(
+        [
+            str(store_id),
+            source_system,
+            payload.metric_key,
+            payload.period_start.isoformat() if payload.period_start else "",
+            payload.period_end.isoformat() if payload.period_end else "",
             payload.source_record_id or "",
-        str(payload.value_numeric) if payload.value_numeric is not None else "NULL",
-        payload.currency or "",
-        str(supersedes_observation_id) if supersedes_observation_id else "",
-        str(payload.published_work_id) if payload.published_work_id else "",
-        str(payload.marketing_task_id) if payload.marketing_task_id else ""])
+            str(payload.value_numeric) if payload.value_numeric is not None else "NULL",
+            payload.currency or "",
+            str(supersedes_observation_id) if supersedes_observation_id else "",
+            str(payload.published_work_id) if payload.published_work_id else "",
+            str(payload.marketing_task_id) if payload.marketing_task_id else "",
+        ]
+    )
     dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
     existing = db.scalar(select(MetricObservation).where(
         MetricObservation.store_id == store_id, MetricObservation.deduplication_key == dedupe))

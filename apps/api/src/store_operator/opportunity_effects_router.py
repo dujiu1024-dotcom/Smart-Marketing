@@ -965,6 +965,125 @@ def list_published_works(
     }
 
 
+@router.post("/effects/data-source-capabilities/check")
+def check_data_source_capabilities(
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    accounts = db.scalars(
+        select(ChannelAccount).where(
+            ChannelAccount.store_id == store_id,
+            ChannelAccount.provider == "douyin",
+        )
+    ).all()
+    active_accounts = [account for account in accounts if account.status == "active"]
+    granted_scopes = sorted(
+        {scope for account in accounts for scope in (account.granted_scopes or [])}
+    )
+    has_readback_scope = any(
+        "video.list" in (account.granted_scopes or [])
+        for account in active_accounts
+    )
+    has_reauth_required = any(account.status == "reauth_required" for account in accounts)
+    capabilities = [
+        {
+            "key": "published_work_readback",
+            "required_scopes": ["video.list"],
+            "status": (
+                "available"
+                if has_readback_scope
+                else "reauth_required"
+                if has_reauth_required
+                else "unsupported"
+            ),
+            "reason": (
+                "当前授权包含作品列表读取范围，可用于核验系统发布作品归属。"
+                if has_readback_scope
+                else "没有有效账号授权作品列表读取范围；发布授权不等于作品读回授权。"
+            ),
+        },
+        {
+            "key": "content_metrics_read",
+            "required_scopes": [],
+            "status": "unsupported",
+            "reason": (
+                "当前接入仅使用 video.list 做作品归属读回；尚无经过验证的官方内容表现指标读取适配器。"
+            ),
+        },
+        {
+            "key": "business_outcome_read",
+            "required_scopes": [],
+            "status": "unsupported",
+            "reason": "当前没有经过验证的官方订单、营业额、核销或到店结果数据源。",
+        },
+    ]
+    created = []
+    for capability in capabilities:
+        latest_version = db.scalar(
+            select(func.max(DataSourceCapabilitySnapshot.snapshot_version)).where(
+                DataSourceCapabilitySnapshot.store_id == store_id,
+                DataSourceCapabilitySnapshot.channel_key == "douyin",
+                DataSourceCapabilitySnapshot.capability_key == capability["key"],
+            )
+        ) or 0
+        item = DataSourceCapabilitySnapshot(
+            id=uuid4(),
+            store_id=store_id,
+            channel_key="douyin",
+            capability_key=str(capability["key"]),
+            status=str(capability["status"]),
+            required_scopes_json=list(capability["required_scopes"]),
+            granted_scopes_json=granted_scopes,
+            evidence_ref="Douyin OAuth granted-scope snapshot",
+            snapshot_version=latest_version + 1,
+            snapshot_json={
+                "account_count": len(accounts),
+                "active_account_count": len(active_accounts),
+                "account_statuses": sorted(account.status for account in accounts),
+                "reason": capability["reason"],
+            },
+            checked_at=datetime.now(UTC),
+        )
+        db.add(item)
+        created.append(item)
+    record_audit(
+        db,
+        request,
+        action="effects.data_source_capabilities.checked",
+        target_type="data_source_capability_snapshot",
+        target_id=created[0].id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={
+            "channel_key": "douyin",
+            "snapshot_count": len(created),
+            "active_account_count": len(active_accounts),
+        },
+    )
+    db.commit()
+    return {
+        "items": [
+            {
+                "id": str(item.id),
+                "channel_key": item.channel_key,
+                "capability_key": item.capability_key,
+                "status": item.status,
+                "required_scopes": item.required_scopes_json,
+                "granted_scopes": item.granted_scopes_json,
+                "evidence_ref": item.evidence_ref,
+                "snapshot_version": item.snapshot_version,
+                "checked_at": item.checked_at.isoformat(),
+                "reason": item.snapshot_json.get("reason"),
+            }
+            for item in created
+        ],
+        "total": len(created),
+    }
+
+
 @router.get("/effects/publish-readbacks")
 def list_unregistered_publish_readbacks(
     context: Annotated[AuthContext, Depends(require_store_context)],

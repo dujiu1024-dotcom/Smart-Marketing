@@ -213,3 +213,47 @@ export async function confirmStoreProfileFacts(
 export function clearCsrfToken(): void {
   sessionStorage.removeItem(CSRF_KEY);
 }
+
+
+export interface ProductRecord {
+  id: string; store_id: string; name: string; category: string | null; sku: string | null;
+  specification: string | null; unit: string | null; price_amount: string | null; currency: string | null;
+  availability_status: "available" | "unavailable" | "seasonal" | "limited" | "unknown";
+  inventory_quantity: string | null; key_selling_points_json: string[] | null; description: string | null;
+  ingredients_or_materials: string | null; allergens_and_restrictions_json: string[] | null;
+  service_process: string | null; delivery_method: string | null; fact_status: string; current_version: number;
+}
+export type ProductInput = Omit<ProductRecord, "id" | "store_id" | "fact_status" | "current_version">;
+export interface OfferRecord {
+  id: string; store_id: string; title: string; offer_type: string; terms_json: Record<string, unknown>;
+  eligibility_rules_json: Record<string, unknown>; starts_at: string | null; ends_at: string | null;
+  stacking_policy: string | null; usage_limit: number | null;
+  status: "draft" | "active" | "paused" | "expired" | "archived"; fact_status: string; current_version: number;
+}
+export type OfferInput = Omit<OfferRecord, "id" | "store_id" | "fact_status" | "current_version">;
+type PageResult<T> = { items: T[]; total: number };
+
+export async function getProducts(storeId: string): Promise<PageResult<ProductRecord>> {
+  return request("/products?limit=200", {}, storeId);
+}
+export async function createProduct(storeId: string, input: ProductInput): Promise<ProductRecord> {
+  return request("/products", { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify(input) }, storeId);
+}
+export async function updateProduct(storeId: string, item: ProductRecord, input: ProductInput): Promise<ProductRecord> {
+  return request(`/products/${item.id}`, { method: "PATCH", headers: { "If-Match": String(item.current_version) }, body: JSON.stringify(input) }, storeId);
+}
+export async function deleteProduct(storeId: string, item: ProductRecord): Promise<void> {
+  return request(`/products/${item.id}`, { method: "DELETE", headers: { "If-Match": String(item.current_version) } }, storeId);
+}
+export async function getOffers(storeId: string): Promise<PageResult<OfferRecord>> {
+  return request("/offers?limit=200", {}, storeId);
+}
+export async function createOffer(storeId: string, input: OfferInput): Promise<OfferRecord> {
+  return request("/offers", { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify(input) }, storeId);
+}
+export async function updateOffer(storeId: string, item: OfferRecord, input: OfferInput): Promise<OfferRecord> {
+  return request(`/offers/${item.id}`, { method: "PATCH", headers: { "If-Match": String(item.current_version) }, body: JSON.stringify(input) }, storeId);
+}
+export async function deleteOffer(storeId: string, item: OfferRecord): Promise<void> {
+  return request(`/offers/${item.id}`, { method: "DELETE", headers: { "If-Match": String(item.current_version) } }, storeId);
+}

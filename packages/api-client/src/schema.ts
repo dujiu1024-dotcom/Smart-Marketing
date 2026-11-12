@@ -535,6 +535,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/effects/import-xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Manual Observations Xlsx */
+        post: operations["import_manual_observations_xlsx_api_v1_effects_import_xlsx_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/effects/observations": {
         parameters: {
             query?: never;
@@ -2598,6 +2615,13 @@ export interface components {
         MetricImportInput: {
             /** Csv Text */
             csv_text: string;
+        };
+        /** MetricXlsxImportInput */
+        MetricXlsxImportInput: {
+            /** File Base64 */
+            file_base64: string;
+            /** File Name */
+            file_name: string;
         };
         /** MetricObservationInput */
         MetricObservationInput: {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import {
   archiveMarketingTask, cancelMarketingTask, confirmMarketingTaskRequirement,
   confirmMarketingTaskStrategy, createMarketingTask, getAudienceProfiles,
-  getBrandGuideline, getKnowledgeItems, getMarketingTask, getOffers,
+  getBrandGuideline, getKnowledgeItems, getMarketingTask, listOffers,
   getProducts, getStoreProfile, listMarketingTasks, recoverMarketingTaskStep,
   skipMarketingTaskStep, updateMarketingTaskRequirement, updateMarketingTaskStrategy,
   type BusinessFactReference, type MarketingTask, type MarketingTaskCreateInput,
@@ -126,7 +126,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     setFactsLoading(true);
     const options: FactOption[] = [];
     const results = await Promise.allSettled([
-      getStoreProfile(storeId), getProducts(storeId), getOffers(storeId),
+      getStoreProfile(storeId), getProducts(storeId), listOffers(storeId),
       getBrandGuideline(storeId), getAudienceProfiles(storeId), getKnowledgeItems(storeId),
     ]);
     const [profile, products, offers, brand, audiences, knowledge] = results;

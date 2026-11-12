@@ -293,3 +293,44 @@ def test_safe_https_url_rejects_nonstandard_https_ports(monkeypatch):
         assert exc.code == "SOURCE_URL_INVALID"
     else:
         raise AssertionError("nonstandard HTTPS ports must be rejected")
+
+
+def test_collect_source_maps_timeout_to_retryable_fetch_error(monkeypatch):
+    _fake_public_dns(monkeypatch)
+
+    class _TimeoutClient(_FakeClient):
+        def stream(self, method, url):
+            raise httpx.ReadTimeout("upstream timed out")
+
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _TimeoutClient)
+    from store_operator_worker.handlers import JobExecutionError
+
+    try:
+        _collect_source(_FakeDatabase(), _fake_source(), {"feeds.example.test"})
+    except JobExecutionError as exc:
+        assert exc.code == "SOURCE_FETCH_FAILED"
+        assert exc.retryable is True
+    else:
+        raise AssertionError("feed timeout must be retryable")
+
+
+def test_collect_source_marks_reseen_expired_topic_as_expired(monkeypatch):
+    _fake_public_dns(monkeypatch)
+    payload = b"""<?xml version="1.0"?>
+    <rss version="2.0"><channel><item>
+      <guid>story-expired</guid><title>Expired seasonal topic</title>
+      <link>https://feeds.example.test/story/expired</link>
+    </item></channel></rss>"""
+    _FakeClient.response = _FakeResponse([payload])
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _FakeClient)
+    existing = SimpleNamespace(
+        last_seen_at=None,
+        expires_at=datetime.now(UTC) - timedelta(days=1),
+        evidence_status="collected",
+    )
+    db = _FakeDatabase(existing=existing)
+
+    _collect_source(db, _fake_source(), {"feeds.example.test"})
+
+    assert existing.evidence_status == "expired"
+    assert existing.last_seen_at is not None

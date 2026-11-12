@@ -450,6 +450,8 @@ def effects_overview(
 
     grouped: dict[str, list[tuple[MetricObservation, MetricDefinition]]] = {}
     for item, definition in verified_rows:
+        if item.period_start is None or item.period_end is None:
+            continue
         period_key = "|".join(
             [item.period_start.isoformat(), item.period_end.isoformat()]
         )
@@ -473,9 +475,9 @@ def effects_overview(
         elif rule == "min":
             aggregate = min(numeric_values)
         elif rule == "latest":
-            aggregate = samples[0][0].value_numeric
+            aggregate = numeric_values[0]
         else:
-            aggregate = sum(numeric_values)
+            aggregate = sum(numeric_values, Decimal("0"))
         first = samples[0][0]
         zone = ZoneInfo(first.period_timezone)
         period_start = first.period_start.astimezone(zone)

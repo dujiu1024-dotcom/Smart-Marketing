@@ -447,7 +447,7 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 | 文件类型/尺寸 | PNG/JPEG/WebP 文件头检查；单边不超过 8000px、总像素不超过 4000 万 | 不等同完整图像解码或缩略图生成 |
 | 恶意文件扫描 | ClamAV INSTREAM；明确 OK 才进入 ready，FOUND 进入 rejected | 服务不可用、超时或未知响应均 fail-closed，保持隔离等待重试 |
 | 部署 | Compose 增加内网 ClamAV 和持久化签名卷；Worker/Scheduler 指向 clamd；不发布宿主机扫描端口 | StreamMaxLength=30M 覆盖 25 MiB 上传上限；生产需等价私有扫描服务和签名更新 |
-| 未完成 | 过期 UploadIntent 清理、完整解码/缩略图、真实对象存储与 ClamAV 浏览器端到端联调 | Issue #6 继续 Open |
+| 过期 UploadIntent 清理 | PR #132 已合并；Worker 每 5 分钟清理过期意向和私有隔离对象，存储失败可重试 | 不等同完整解码/缩略图或真实浏览器上传 E2E |\n| 未完成 | 完整解码/缩略图、真实对象存储与 ClamAV 浏览器端到端联调 | Issue #6 继续 Open |
 
 
 ## 2026-11-12 #12 抖音门店账号 Web 接入（PR #129 已合并；真实 OAuth 待验收）
@@ -474,7 +474,7 @@ CI 将覆盖 Web/API/Worker/Contracts/E2E/Infrastructure；本次 GitHub 操作�
 Web 单元测试覆盖手动文案产物创建和精确版本审核请求；真实 AI 生成与完整发布浏览器链路未在本 PR 中实现。
 
 
-## 2026-11-12 #12 ChannelSpec/ChannelSpecVersion/CapabilitySnapshot 数据层（PR 待 CI）
+## 2026-11-12 #12 ChannelSpec/ChannelSpecVersion/CapabilitySnapshot 数据层（PR #131 已合并；真实能力核验待完成）
 
 | 能力 | 当前实现 | 验收边界 |
 |---|---|---|
@@ -483,3 +483,14 @@ Web 单元测试覆盖手动文案产物创建和精确版本审核请求；真�
 | ChannelCapabilitySnapshot | 门店账号级能力历史快照，复合外键约束同店账号和精确 SpecVersion | 当前仅完成数据模型/迁移，探测 Worker/API 尚未接入 |
 | ChannelContent | channel_spec_version_id 增加外键，旧记录迁移时保留原 UUID 并创建 pending legacy spec/version；创建适配快照时强制校验同渠道且 verification_status=verified | pending/deprecated 规格返回明确阻断，不允许生成渠道适配内容 |
 | API/UI | 门店渠道页面展示当前规格版本、来源与核验状态；新增门店认证后的规格目录/版本只读 API | 只读；规格维护和真实能力探测仍未完成 |
+
+
+## 2026-11-12 #8 渠道适配、质检和最终确认 Web 闭环（PR #134 已合并）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 渠道适配 | 任务详情展示 ChannelSpec 核验状态；基于已审核当前文案/图片版本创建 ChannelContent | pending/unverified 规格在 UI 和服务端均阻断 |
+| 质检 | 提交异步结构质检，展示最新报告；needs_human 可提交带理由的 accepted 决议 | 不冒充 AI 语义/视觉质检，硬失败不可接受 |
+| 发布包 | 选择最新已确认经营事实快照，冻结渠道内容、质检报告和交付模式 | 当前 UI 仅开放 manual_handoff；official_api 需真实账号和权限前置 |
+| 最终确认 | 展示不可变包指纹并确认精确版本，记录确认备注 | 确认不等于外部平台发布成功；执行仍由 #12 负责 |
+| 未完成 | 真实 AI 生成/图片编辑/视觉质检、官方规则核验、真实账号浏览器验收 | Issue #8 继续 Open |

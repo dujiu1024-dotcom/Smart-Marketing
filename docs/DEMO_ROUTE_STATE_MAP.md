@@ -147,3 +147,13 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - `sampled_at` 必须带 ISO 8601 显式时区偏移，写入 UTC；门店本地时区展示待 Store.timezone 注入。
 - 未保存的客群编辑不得确认服务器旧版本；无效/越权 ID 显示读取失败，不得回退成新增表单。
 - 创建幂等键在同一 session 草稿重试期间稳定复用。
+
+
+## 13. 门店知识库生产路由映射（PR 待验收）
+
+- Demo 门店资料 Tab「知识库」对应 `#store:knowledge`。
+- 新增/编辑页面对应 `#store-editor:knowledge:new` 和 `#store-editor:knowledge:<id>`，保持独立二级编辑页。
+- 列表、创建、编辑、删除和事实确认均调用当前门店的 Store Knowledge API；创建使用稳定 Idempotency-Key，修改/删除/确认使用 If-Match。
+- 知识记录保留内容文本/引用、SHA-256、来源及有效期；事实确认与编辑保存分离。
+- 生效/失效时间必须带显式时区偏移，客户端规范化为 UTC；不推断门店本地时区。
+- 素材上传与知识附件选择尚未接入，不能将 content_ref 描述为已上传文件。

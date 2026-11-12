@@ -392,3 +392,18 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 - 客群创建使用 sessionStorage 保持本次编辑草稿的 Idempotency-Key，网络结果不确定时重试复用相同 key。
 - `sampled_at` 必须显式提供 ISO 8601 时区偏移并归一化 UTC，不假设浏览器时区等于门店时区。
 - 客群事实确认在编辑器存在未保存修改时禁用；不存在或不属于当前门店的记录不会退化为创建表单。
+
+
+## 2026-11-12 #6 门店知识库生产 Web 接入（PR 待验收）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 知识列表 | GET /api/v1/store/knowledge | 当前门店上下文；空态与错误态明确 |
+| 知识创建 | POST /api/v1/store/knowledge | 稳定 Idempotency-Key；内容文本或内容引用至少填写一项 |
+| 知识编辑/删除 | PATCH/DELETE /api/v1/store/knowledge/{id} | If-Match 绑定 current_version；删除为显式操作 |
+| 事实确认 | POST /api/v1/store/knowledge/{id}/confirm-facts | 独立确认；未保存修改时禁止确认 |
+| 知识字段 | 标题、分类、文本/引用、SHA-256、来源、有效期 | 时间必须带显式时区偏移并归一化 UTC；失效时间晚于生效时间 |
+| 页面路由 | #store:knowledge；#store-editor:knowledge:new；#store-editor:knowledge:<id> | 与 Demo 门店资料知识库列表和独立二级编辑页对应 |
+| 未完成 | 原始文件/素材资产上传与引用选择、知识检索消费接入、门店本地时区展示、完整浏览器/移动端/可访问性验收 | 不据此关闭 Issue #6 |
+
+该实现接入现有 Store Knowledge API，不引入本地 Demo 数据；知识事实只有在商家显式确认后才可作为已确认经营上下文。

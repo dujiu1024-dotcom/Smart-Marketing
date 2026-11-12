@@ -104,5 +104,5 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 ## 9. 商品与活动生产页面（PR 待验收）
 - 在 React 门店工作台内开放商品与服务、活动与优惠两个真实业务页面。
 - 商品数据使用 GET/POST/PATCH/DELETE /api/v1/products；活动数据使用 GET/POST/PATCH/DELETE /api/v1/offers。
-- 每次请求均使用当前门店 X-Store-ID；创建携带 Idempotency-Key；修改/删除携带 If-Match 版本。
+- 每次请求均使用当前门店 X-Store-ID；创建携带 Idempotency-Key；修改/删除携带 If-Match 版本；事实确认使用 `/products/{id}/confirm-facts` 与 `/offers/{id}/confirm-facts` 并绑定当前版本。
 - 不复用 Demo localStorage 记录，不对未确认的经营事实自动标记已确认。

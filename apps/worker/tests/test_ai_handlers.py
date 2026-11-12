@@ -29,6 +29,8 @@ def _generation_context() -> tuple[SimpleNamespace, SimpleNamespace, SimpleNames
                 "task_type": {"type": "string"},
                 "requirement": {"type": "object"},
                 "business_facts": {"type": "array"},
+                "business_fact_refs": {"type": "array"},
+                "business_facts_by_key": {"type": "object"},
                 "task_options": {"type": "object"},
                 "strategy": {"type": "object"},
                 "selected_channels": {"type": "array"},

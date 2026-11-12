@@ -431,3 +431,55 @@ def test_http_text_provider_rejects_non_json_structured_output() -> None:
 
     assert caught.value.code is ProviderErrorCode.OUTPUT_INVALID
     asyncio.run(client_transport._client.aclose())
+
+
+def test_provider_circuit_breaker_opens_and_allows_one_recovery_probe() -> None:
+    from store_operator.ai_gateway.circuit_breaker import CircuitBreaker
+
+    now = [100.0]
+    breaker = CircuitBreaker(
+        failure_threshold=2,
+        reset_timeout_seconds=10,
+        clock=lambda: now[0],
+    )
+
+    breaker.before_call()
+    breaker.record_failure()
+    assert breaker.state == "closed"
+    breaker.before_call()
+    breaker.record_failure()
+    assert breaker.state == "open"
+
+    with pytest.raises(ProviderError) as open_error:
+        breaker.before_call()
+    assert open_error.value.retryable is True
+    assert open_error.value.retry_after_seconds == 10
+
+    now[0] = 110.0
+    breaker.before_call()
+    assert breaker.state == "half_open"
+    with pytest.raises(ProviderError):
+        breaker.before_call()
+
+    breaker.record_success()
+    assert breaker.state == "closed"
+
+
+def test_provider_circuit_breaker_reopens_after_failed_recovery_probe() -> None:
+    from store_operator.ai_gateway.circuit_breaker import CircuitBreaker
+
+    now = [0.0]
+    breaker = CircuitBreaker(
+        failure_threshold=1,
+        reset_timeout_seconds=5,
+        clock=lambda: now[0],
+    )
+    breaker.before_call()
+    breaker.record_failure()
+    now[0] = 5.0
+    breaker.before_call()
+    breaker.record_failure()
+
+    assert breaker.state == "open"
+    with pytest.raises(ProviderError):
+        breaker.before_call()

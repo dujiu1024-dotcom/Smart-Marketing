@@ -847,6 +847,75 @@ def list_published_works(
     }
 
 
+@router.get("/effects/publish-readbacks")
+def list_unregistered_publish_readbacks(
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    registered_ids = set(
+        db.scalars(
+            select(PublishedWork.publish_operation_id).where(
+                PublishedWork.store_id == store_id,
+                PublishedWork.publish_operation_id.is_not(None),
+            )
+        ).all()
+    )
+    rows = db.execute(
+        select(PublishOperation, PublishPackage, PublishPackageItem, ChannelAccount)
+        .join(
+            PublishPackage,
+            and_(
+                PublishPackage.store_id == PublishOperation.store_id,
+                PublishPackage.id == PublishOperation.publish_package_id,
+            ),
+        )
+        .join(
+            PublishPackageItem,
+            and_(
+                PublishPackageItem.store_id == PublishOperation.store_id,
+                PublishPackageItem.id == PublishOperation.publish_package_item_id,
+            ),
+        )
+        .join(
+            ChannelAccount,
+            and_(
+                ChannelAccount.store_id == PublishOperation.store_id,
+                ChannelAccount.id == PublishOperation.channel_account_id,
+            ),
+        )
+        .where(
+            PublishOperation.store_id == store_id,
+            PublishOperation.status == "published",
+            PublishOperation.platform_item_id.is_not(None),
+            PublishOperation.last_readback_at.is_not(None),
+        )
+        .order_by(PublishOperation.last_readback_at.desc())
+        .limit(100)
+    ).all()
+    items = []
+    for operation, package, package_item, account in rows:
+        if operation.id in registered_ids:
+            continue
+        if operation.platform_item_id is None or operation.last_readback_at is None:
+            continue
+        items.append(
+            {
+                "publish_operation_id": str(operation.id),
+                "marketing_task_id": str(package.task_id),
+                "channel_key": package_item.channel_key,
+                "channel_account_id": str(account.id),
+                "channel_provider": account.provider,
+                "external_work_id": operation.platform_item_id,
+                "published_at": operation.published_at.isoformat()
+                if operation.published_at
+                else None,
+                "readback_at": operation.last_readback_at.isoformat(),
+            }
+        )
+    return {"items": items, "total": len(items)}
+
+
 @router.post("/effects/published-works/from-publish-operation/{operation_id}")
 def register_published_work_from_readback(
     operation_id: UUID,

@@ -147,7 +147,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
     {error && <div className="alert error" role="alert">{error}</div>}
     {notice && <div className="alert success" role="status">{notice}</div>}
     {loading && !overview ? <div className="loading-card"><span className="spinner" />正在读取经营数据…</div> : <>
-      <div className="effects-status"><strong>{overview?.data_status === "available" ? "部分指标已有可核验数据" : "暂无可核验的经营数据"}</strong><span>未连接或未核验的数据源会明确显示暂无数据，不以 0 代替。</span></div>
+      <div className="effects-status"><strong>{overview?.data_status === "available" ? "部分指标已有可核验数据" : (overview?.data_quality?.accumulating_observations ?? 0) > 0 ? "指标统计窗口仍在积累" : "暂无已完成统计窗口的可核验数据"}</strong><span>未连接或未核验的数据源会明确显示暂无数据，不以 0 代替。</span></div>
       <div className="effects-grid">
         {(["content_performance", "intent", "business_outcome"] as const).map(group => <article className="form-card" key={group}>
           <p className="eyebrow">{group.toUpperCase()}</p><h2>{tierLabels[group]}</h2>
@@ -194,7 +194,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
             </svg>}
           </div>)}
         </div>}
-        <p className="footnote">数据质量：观测 {overview?.data_quality.total_observations ?? 0} 条 · 已核验 {overview?.data_quality.verified_observations ?? 0} 条 · 延迟 {overview?.data_quality.delayed_observations ?? 0} 条 · 不完整/异常 {overview?.data_quality.incomplete_or_anomalous_observations ?? 0} 条</p>
+        <p className="footnote">数据质量：观测 {overview?.data_quality.total_observations ?? 0} 条 · 已核验 {overview?.data_quality.verified_observations ?? 0} 条 · 积累中 {overview?.data_quality.accumulating_observations ?? 0} 条 · 窗口未知 {overview?.data_quality.window_unknown_observations ?? 0} 条 · 延迟 {overview?.data_quality.delayed_observations ?? 0} 条 · 不完整/异常 {overview?.data_quality.incomplete_or_anomalous_observations ?? 0} 条</p>
       </article>
       <article className="form-card">
         <div className="section-title"><div><h2>作品归属与经营结果归因</h2><p>仅系统发布读回或官方作品核验可以确立作品归属；正式归因还要求已核验经营结果。</p></div></div>
@@ -279,7 +279,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         <div className="section-title"><div><h2>指标记录</h2><p>手工录入与导入的数据均标记为商家报告，等待独立核验。</p></div>
           <label className="field"><span>指标分类</span><select value={tier} onChange={event => setTier(event.target.value as typeof tier)}><option value="all">全部</option><option value="content_performance">内容表现</option><option value="intent">互动意向</option><option value="business_outcome">经营结果</option></select></label>
         </div>
-        <div className="catalog-list">{filtered.map(item => <div className="catalog-item" key={item.id}><div className="catalog-item-main"><div><h3>{item.display_name}</h3><p>{item.metric_key} · {item.source_system}</p></div><span className="status-chip">{item.authenticity_status === "merchant_reported" ? "商家报告" : item.authenticity_status}</span></div><div className="catalog-meta"><span>数值：{item.value_numeric ?? "未知"}</span><span>周期：{item.period_start ?? "未提供"} 至 {item.period_end ?? "未提供"}</span><span>时区：{item.period_timezone}</span><span>采集：{new Date(item.collected_at).toLocaleString()}</span></div>{item.source_evidence_ref && <p className="catalog-description">证据：{item.source_evidence_ref}</p>}{item.supersedes_observation_id && <p className="catalog-description">更正自：{item.supersedes_observation_id}</p>}{item.import_batch_id && <p className="catalog-description">导入批次：{item.import_batch_id}</p>}{item.published_work_id && <p className="catalog-description">已核验作品：{item.published_work_id}</p>}{item.marketing_task_id && <p className="catalog-description">关联营销任务：{item.marketing_task_id}</p>}</div>)}
+        <div className="catalog-list">{filtered.map(item => <div className="catalog-item" key={item.id}><div className="catalog-item-main"><div><h3>{item.display_name}</h3><p>{item.metric_key} · {item.source_system}</p></div><span className="status-chip">{item.authenticity_status === "merchant_reported" ? "商家报告" : item.authenticity_status}</span></div><div className="catalog-meta"><span>数值：{item.value_numeric ?? "未知"}</span><span>周期：{item.period_start ?? "未提供"} 至 {item.period_end ?? "未提供"}</span><span>时区：{item.period_timezone}</span><span>采集：{new Date(item.collected_at).toLocaleString()}</span><span>观察窗口：{item.observation_window_status}</span></div>{item.source_evidence_ref && <p className="catalog-description">证据：{item.source_evidence_ref}</p>}{item.supersedes_observation_id && <p className="catalog-description">更正自：{item.supersedes_observation_id}</p>}{item.import_batch_id && <p className="catalog-description">导入批次：{item.import_batch_id}</p>}{item.published_work_id && <p className="catalog-description">已核验作品：{item.published_work_id}</p>}{item.marketing_task_id && <p className="catalog-description">关联营销任务：{item.marketing_task_id}</p>}</div>)}
           {!filtered.length && <p className="muted">暂无记录。可以手工录入或导入 CSV。</p>}</div>
       </article>
       <div className="effects-grid">

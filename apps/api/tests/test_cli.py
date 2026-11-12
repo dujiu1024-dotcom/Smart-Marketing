@@ -90,3 +90,20 @@ def test_dead_letter_replay_rejects_missing_confirmation_and_terminal_job(db_ses
             confirmation=str(event.id),
         )
     assert event.status == "dead"
+
+
+
+def test_dead_letter_replay_rejects_non_object_payload(db_session):
+    _, event = create_dead_letter(db_session)
+    event.payload_json = []
+    db_session.flush()
+
+    with pytest.raises(SystemExit, match="invalid payload"):
+        replay_dead_letter_outbox_event(
+            db_session,
+            event_id=event.id,
+            reason="Malformed event requires investigation",
+            confirmation=str(event.id),
+        )
+
+    assert event.status == "dead"

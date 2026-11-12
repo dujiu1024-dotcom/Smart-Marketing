@@ -500,6 +500,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/effects/observations/{observation_id}/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Correct Manual Observation */
+        post: operations["correct_manual_observation_api_v1_effects_observations__observation_id__corrections_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/effects/overview": {
         parameters: {
             query?: never;
@@ -2449,6 +2466,8 @@ export interface components {
             source_evidence_ref?: string | null;
             /** Source Record Id */
             source_record_id?: string | null;
+            /** Supersedes Observation Id */
+            supersedes_observation_id?: string | null;
             /** Value Numeric */
             value_numeric?: number | string | null;
         };
@@ -4096,6 +4115,45 @@ export interface operations {
                 "X-Store-ID"?: string | null;
             };
             path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MetricObservationInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    correct_manual_observation_api_v1_effects_observations__observation_id__corrections_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Store-ID"?: string | null;
+            };
+            path: {
+                observation_id: string;
+            };
             cookie?: never;
         };
         requestBody: {

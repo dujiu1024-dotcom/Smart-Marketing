@@ -600,7 +600,10 @@ def create_review_record(
             raise ApiError(
                 409,
                 "VISION_INSPECTION_REQUIRED",
-                "AI-generated images require a passing vision inspection and merchant review before approval",
+                (
+                    "AI-generated images require a passing vision inspection and "
+                    "merchant review before approval"
+                ),
             )
     latest = db.scalar(
         select(ReviewRecord)

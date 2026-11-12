@@ -6,8 +6,8 @@ import json
 import logging
 import os
 import socket
-from urllib.request import Request, urlopen
 from collections.abc import Mapping
+from urllib.request import Request, urlopen
 from datetime import UTC, datetime
 from typing import Any
 

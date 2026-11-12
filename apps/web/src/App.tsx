@@ -21,7 +21,8 @@ import ProductWorkspace from "./ProductWorkspace";
 import OfferWorkspace from "./OfferWorkspace";
 import BrandGuidelineWorkspace from "./BrandGuidelineWorkspace";
 import AudienceWorkspace from "./AudienceWorkspace";
-import KnowledgeWorkspace from "./KnowledgeWorkspace";\nimport MarketingTaskWorkspace from "./MarketingTaskWorkspace";
+import KnowledgeWorkspace from "./KnowledgeWorkspace";
+import MarketingTaskWorkspace from "./MarketingTaskWorkspace";
 
 interface ProfileForm {
   display_name: string;
@@ -414,8 +415,8 @@ export default function App() {
       <div className="workspace">
         <aside className="sidebar">
           <div className="side-label">门店工作台</div>
-          <div className="side-link disabled" aria-disabled="true">AI 营销 · 待接入</div>
-          <div className="side-link disabled" aria-disabled="true">营销任务 · 待接入</div>
+          <a className={route === "#ai" ? "side-link active" : "side-link"} href="#ai">AI 营销</a>
+          <a className={["#tasks", "#create", "#task"].includes(route) ? "side-link active" : "side-link"} href="#tasks">营销任务</a>
           <div className="side-label spaced">门店资料</div>
           <a className={productRoute || offerRoute || brandRoute || audienceRoute || knowledgeRoute || taskWorkspaceRoute ? "side-link" : "side-link active"} href="#store:profile">门店档案</a>
           <a className={productRoute ? "side-link active" : "side-link"} href="#store:products">商品与服务</a>

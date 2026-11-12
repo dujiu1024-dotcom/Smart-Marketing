@@ -467,6 +467,23 @@ def _complete_strategy(
     }
 
 
+def _merge_copy_revision(
+    previous_copy: dict[str, object],
+    revision_output: dict[str, object],
+    generation_output_schema: dict[str, object],
+) -> dict[str, object]:
+    copy_fields: dict[str, object] = {
+        "title": revision_output["title"],
+        "body": revision_output["body"],
+        "hashtags": previous_copy.get("hashtags", []),
+        "call_to_action": previous_copy.get("call_to_action", ""),
+    }
+    validate_structured_output(copy_fields, generation_output_schema)
+    merged = {**previous_copy, **copy_fields}
+    merged["change_summary"] = revision_output["change_summary"]
+    return merged
+
+
 def _complete_copy(
     context: JobExecutionContext,
     payload_ref: dict[str, object],
@@ -631,21 +648,11 @@ def _complete_copy(
             ),
         )
         if is_revision and previous_copy is not None:
-            copy_fields = {
-                "title": revision_output["title"],
-                "body": revision_output["body"],
-                "hashtags": previous_copy.get("hashtags", []),
-                "call_to_action": previous_copy.get("call_to_action", ""),
-            }
-            validate_structured_output(
-                copy_fields, dict(generation_contract_version.output_schema_json)
+            output = _merge_copy_revision(
+                previous_copy,
+                revision_output,
+                dict(generation_contract_version.output_schema_json),
             )
-            output: dict[str, object] = {
-                **copy_fields,
-                "change_summary": revision_output["change_summary"],
-            }
-            if "video_script" in previous_copy:
-                output["video_script"] = previous_copy["video_script"]
         else:
             output = dict(revision_output)
 

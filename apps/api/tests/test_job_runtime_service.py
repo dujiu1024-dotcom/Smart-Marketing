@@ -15,6 +15,7 @@ from store_operator.jobs import (
     create_job,
     fail_job,
     heartbeat_job,
+    recover_expired_jobs,
     request_job_cancellation,
     resolve_job,
     retry_failed_job,
@@ -556,3 +557,68 @@ def test_store_concurrency_limit_defers_without_consuming_attempt_and_requeues(
     assert second_claim is not None
     assert second_claim.job.status == "running"
     assert second_claim.attempt.attempt_no == 1
+
+
+def test_expired_lease_recovery_fences_worker_and_requires_reconciliation(
+    db_session,
+) -> None:
+    user, store = create_actor_and_store(db_session)
+    job = create_store_job(
+        db_session,
+        user,
+        store,
+        idempotency_key="lease-recovery-fault-injection",
+        timeout_seconds=30,
+    )
+    now = datetime.now(UTC)
+    claim = claim_job(
+        db_session,
+        job_id=job.id,
+        worker_id="worker-crashed",
+        lease_seconds=5,
+        now=now,
+    )
+    assert claim is not None
+    db_session.flush()
+
+    recovered_at = now + timedelta(seconds=6)
+    assert recover_expired_jobs(db_session, now=recovered_at) == 1
+    db_session.refresh(job)
+    db_session.refresh(claim.attempt)
+
+    assert job.status == "needs_human"
+    assert job.error_code == "WORKER_LEASE_EXPIRED"
+    assert job.lease_owner is None
+    assert job.lease_token is None
+    assert job.lease_expires_at is None
+    assert claim.attempt.status == "lease_expired"
+    assert claim.attempt.finished_at == recovered_at
+    assert claim.attempt.error_code == "WORKER_LEASE_EXPIRED"
+
+    event = db_session.scalar(
+        select(JobEvent).where(
+            JobEvent.job_id == job.id,
+            JobEvent.event_type == "job.lease_expired",
+        )
+    )
+    assert event is not None
+    assert event.actor_type == "system"
+    assert event.attempt_id == claim.attempt.id
+    assert event.lease_token is not None
+    assert event.data_json == {"recovery": "needs_human"}
+
+    # A second sweeper pass must not create another recovery event.
+    assert recover_expired_jobs(db_session, now=recovered_at + timedelta(minutes=1)) == 0
+    assert len(
+        db_session.scalars(
+            select(JobEvent).where(
+                JobEvent.job_id == job.id,
+                JobEvent.event_type == "job.lease_expired",
+            )
+        ).all()
+    ) == 1
+
+
+def test_expired_lease_recovery_validates_batch_size(db_session) -> None:
+    with pytest.raises(ValueError, match="batch_size"):
+        recover_expired_jobs(db_session, batch_size=0)

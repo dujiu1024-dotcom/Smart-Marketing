@@ -279,6 +279,69 @@ def _defer_for_store_capacity(
     )
     db.flush()
 
+
+def recover_expired_jobs(
+    db: Session,
+    *,
+    batch_size: int = 100,
+    now: datetime | None = None,
+) -> int:
+    """Fence expired Worker leases and move uncertain side effects to human review."""
+    if batch_size < 1 or batch_size > 1000:
+        raise ValueError("batch_size must be between 1 and 1000")
+    current_time = now or datetime.now(UTC)
+    jobs = db.scalars(
+        select(Job)
+        .where(Job.status == "running", Job.lease_expires_at < current_time)
+        .order_by(Job.lease_expires_at, Job.id)
+        .limit(batch_size)
+        .with_for_update(skip_locked=True)
+    ).all()
+    recovered = 0
+    for job in jobs:
+        token = job.lease_token
+        attempt = db.scalar(
+            select(JobAttempt)
+            .where(
+                JobAttempt.job_id == job.id,
+                JobAttempt.lease_token == token,
+                JobAttempt.status == "running",
+            )
+            .with_for_update()
+        )
+        if attempt is not None:
+            attempt.status = "lease_expired"
+            attempt.finished_at = current_time
+            attempt.error_code = "WORKER_LEASE_EXPIRED"
+            attempt.error_summary = "Worker lease expired before a terminal result."
+            attempt.duration_ms = max(
+                0, int((current_time - attempt.started_at).total_seconds() * 1000)
+            )
+        job.status = "needs_human"
+        job.error_code = "WORKER_LEASE_EXPIRED"
+        job.error_summary = (
+            "Worker lease expired; external side-effect state requires reconciliation."
+        )
+        job.finished_at = current_time
+        job.lease_owner = None
+        job.lease_token = None
+        job.lease_expires_at = None
+        job.heartbeat_at = None
+        db.add(
+            JobEvent(
+                job_id=job.id,
+                event_type="job.lease_expired",
+                actor_type="system",
+                attempt_id=attempt.id if attempt else None,
+                lease_token=token,
+                data_json={"recovery": "needs_human"},
+            )
+        )
+        recovered += 1
+    db.flush()
+    return recovered
+
+
 def claim_job(
     db: Session,
     *,

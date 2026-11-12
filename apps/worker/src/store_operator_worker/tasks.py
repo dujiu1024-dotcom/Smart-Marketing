@@ -38,6 +38,7 @@ from store_operator.jobs.service import (  # type: ignore[import-untyped]
     complete_job,
     fail_job,
     heartbeat_job,
+    recover_expired_jobs,
 )
 from store_operator.models import (  # type: ignore[import-untyped]
     Artifact,
@@ -45,9 +46,6 @@ from store_operator.models import (  # type: ignore[import-untyped]
     ChannelAccount,
     ChannelContent,
     ChannelContentArtifactRef,
-    Job,
-    JobAttempt,
-    JobEvent,
     MediaAsset,
     OutboxEvent,
     PublishConfirmation,
@@ -435,58 +433,8 @@ def execute_job(job_id: str) -> dict[str, str]:
 )  # type: ignore[untyped-decorator]
 def recover_expired_leases(batch_size: int = 100) -> int:
     """Fence expired Workers and require review because external side effects may be unknown."""
-    now = datetime.now(UTC)
-    recovered = 0
     with SessionLocal.begin() as db:
-        jobs = db.scalars(
-            select(Job)
-            .where(Job.status == "running", Job.lease_expires_at < now)
-            .order_by(Job.lease_expires_at, Job.id)
-            .limit(batch_size)
-            .with_for_update(skip_locked=True)
-        ).all()
-        for job in jobs:
-            token = job.lease_token
-            attempt = db.scalar(
-                select(JobAttempt)
-                .where(
-                    JobAttempt.job_id == job.id,
-                    JobAttempt.lease_token == token,
-                    JobAttempt.status == "running",
-                )
-                .with_for_update()
-            )
-            if attempt is not None:
-                attempt.status = "lease_expired"
-                attempt.finished_at = now
-                attempt.error_code = "WORKER_LEASE_EXPIRED"
-                attempt.error_summary = "Worker lease expired before a terminal result."
-                attempt.duration_ms = max(
-                    0, int((now - attempt.started_at).total_seconds() * 1000)
-                )
-            job.status = "needs_human"
-            job.error_code = "WORKER_LEASE_EXPIRED"
-            job.error_summary = (
-                "Worker lease expired; external side-effect state requires reconciliation."
-            )
-            job.finished_at = now
-            job.lease_owner = None
-            job.lease_token = None
-            job.lease_expires_at = None
-            job.heartbeat_at = None
-            db.add(
-                JobEvent(
-                    job_id=job.id,
-                    event_type="job.lease_expired",
-                    actor_type="system",
-                    attempt_id=attempt.id if attempt else None,
-                    lease_token=token,
-                    data_json={"recovery": "needs_human"},
-                )
-            )
-            recovered += 1
-    return recovered
-
+        return int(recover_expired_jobs(db, batch_size=batch_size))
 
 
 @register_job_handler("content.quality_check")

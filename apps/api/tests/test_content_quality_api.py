@@ -115,6 +115,15 @@ def test_channel_content_requires_approved_current_copy_and_is_idempotent(
     artifact_id = artifact.json()["id"]
     version_id = artifact.json()["current_version_id"]
     content_url = f"/api/v1/marketing-tasks/{task_id}/channel-contents"
+    spec_version = (
+        db_session.query(ChannelSpecVersion)
+        .join(ChannelSpec, ChannelSpec.id == ChannelSpecVersion.channel_spec_id)
+        .filter(ChannelSpec.channel_key == "douyin")
+        .one()
+    )
+    spec_version.verification_status = "verified"
+    spec_version.source_document_ref = "test-fixture://verified-channel-spec"
+    db_session.flush()
     content_payload = {
         "channel_key": "douyin",
         "copy_version_id": version_id,

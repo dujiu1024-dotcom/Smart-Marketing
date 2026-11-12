@@ -8170,6 +8170,70 @@
         ]
       }
     },
+    "/api/v1/marketing-tasks/{task_id}/business-facts": {
+      "get": {
+        "operationId": "list_task_business_facts_api_v1_marketing_tasks__task_id__business_facts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Task Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Store-ID",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Store-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response List Task Business Facts Api V1 Marketing Tasks  Task Id  Business Facts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Task Business Facts",
+        "tags": [
+          "marketing-tasks"
+        ]
+      }
+    },
     "/api/v1/marketing-tasks/{task_id}/cancel": {
       "post": {
         "operationId": "cancel_task_api_v1_marketing_tasks__task_id__cancel_post",

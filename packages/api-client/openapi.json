@@ -3562,20 +3562,13 @@
             "type": "string"
           },
           "source_format": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "xlsx"
-                ]
-              },
-              {
-                "type": "null"
-              }
+            "type": "string",
+            "enum": [
+              "csv",
+              "xlsx"
             ],
-            "title": "Source Format",
-            "default": "csv"
+            "default": "csv",
+            "title": "Source Format"
           }
         },
         "required": [

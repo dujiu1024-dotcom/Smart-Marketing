@@ -31,7 +31,7 @@ function toInput(form: FormState): KnowledgeItemInput {
   if (!contentText && !contentRef) throw new Error("知识内容和内容引用至少填写一项。");
   const effectiveAt = normalizeDate(form.effective_at);
   const expiresAt = normalizeDate(form.expires_at);
-  if (effectiveAt && expiresAt && new Date(expiresAt) <= new Date(effectiveAt)) throw new Error("失效时间必须晚于生效时间。");
+  if (effectiveAt && expiresAt && new Date(expiresAt).getTime() <= new Date(effectiveAt).getTime()) throw new Error("失效时间必须晚于生效时间。");
   return { title: form.title.trim(), category: form.category.trim(), content_text: contentText || null, content_ref: contentRef || null, content_hash: form.content_hash.trim() || null, source_type: form.source_type.trim() || null, source_ref: form.source_ref.trim() || null, effective_at: effectiveAt, expires_at: expiresAt };
 }
 function Field({ label, value, onChange, rows = 1, placeholder }: { label: string; value: string; onChange: (value: string) => void; rows?: number; placeholder?: string }) {

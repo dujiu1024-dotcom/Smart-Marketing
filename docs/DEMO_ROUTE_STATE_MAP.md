@@ -133,3 +133,12 @@ PR #16 的 `apps/e2e/demo_smoke.py` 对上述导航和二级页面执行 Chromiu
 - 事实确认通过 POST `/api/v1/store/brand-guideline/<id>/confirm-facts`，未保存修改时禁止确认。
 - Logo 字段仅存储已存在的 MediaAsset ID；Media Assets 页面/选择器尚未完成，因此不显示伪上传入口。
 - 品牌色彩为 JSON 对象数组，字体、核心价值、常用/禁用表达与 CTA 偏好为独立结构化列表。
+
+
+## 12. 客群与经营生产路由映射（2026-11-12）
+
+- Demo `#store:audience` 对应真实客群列表，数据来自 GET `/api/v1/store/audiences`。
+- `#store-editor:audience:new` 与 `#store-editor:audience:<id>` 对应独立客群编辑页面。
+- 客群字段保存消费场景、消费时段、购买动机、常见异议与客群类型；样本来源/样本量/采样时间/置信等级独立保留。
+- `sampled_at` 输入必须是带明确时区的 ISO 8601 时间并归一化 UTC；在 Store.timezone 未注入工作台前，不假设浏览器时区等于门店时区。
+- 事实确认使用版本绑定的 `confirm-facts`；未保存修改时不允许确认。删除使用 If-Match。

@@ -278,6 +278,7 @@ def test_publish_package_requires_accepted_quality_and_confirmed_facts(
 ) -> None:
     user = create_user(db_session)
     store = create_store(db_session, user)
+    store_b = create_store(db_session, user)
     csrf = login(identity_client, monkeypatch)
     task, fact, content = create_package_inputs(db_session, identity_client, user, store, csrf)
 
@@ -381,6 +382,31 @@ def test_publish_package_requires_accepted_quality_and_confirmed_facts(
     )
     assert packages.status_code == 200, packages.text
     assert packages.json()[0]["confirmation"]["id"] == confirmed.json()["id"]
+    assert db_session.query(PublishPackage).count() == 1
+    assert db_session.query(PublishConfirmation).count() == 1
+
+    # The same actor is a member of both stores; the request-scoped store still
+    # must not expose or mutate Store A's frozen package while scoped to Store B.
+    other_store_headers = {**headers, "X-Store-ID": str(store_b.id)}
+    hidden_list = identity_client.get(
+        f"/api/v1/marketing-tasks/{task.id}/publish-packages",
+        headers=other_store_headers,
+    )
+    assert hidden_list.status_code == 404
+
+    hidden_freeze = identity_client.post(
+        freeze_url,
+        headers={**other_store_headers, "Idempotency-Key": "package-cross-store-freeze"},
+        json=freeze_payload,
+    )
+    assert hidden_freeze.status_code == 404
+
+    hidden_confirm = identity_client.post(
+        confirm_url,
+        headers={**other_store_headers, "Idempotency-Key": "package-cross-store-confirm"},
+        json=confirm_payload,
+    )
+    assert hidden_confirm.status_code == 404
     assert db_session.query(PublishPackage).count() == 1
     assert db_session.query(PublishConfirmation).count() == 1
 

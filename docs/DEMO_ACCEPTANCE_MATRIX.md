@@ -402,5 +402,5 @@ PR #93 已合并；PR #96 补齐读回传输异常的审计闭环。Mock/单元�
 | 对象完整性 | 重新下载私有对象，校验实际大小和 SHA-256 | 对象存储不可用时失败回滚，不写入 ready |
 | 文件类型/尺寸 | PNG/JPEG/WebP 文件头校验；宽高各不超过 8000，像素数不超过 4000 万 | 仅文件头与尺寸安全检查，不等同于完整图像解码 |
 | 恶意文件扫描 | ClamAV INSTREAM 协议；明确 OK 才进入 ready，FOUND 进入 rejected | 扫描服务不可用/超时/未知响应均 fail-closed，隔离状态等待下次调度 |
-| 部署 | Compose 增加 ClamAV 服务及持久化病毒库卷，Worker/Scheduler 指向内网 clamd | 生产部署必须提供受控 ClamAV 服务；不能开放公网扫描端口 |
+| 部署 | Compose 增加 ClamAV 服务及持久化病毒库卷，Worker/Scheduler 指向内网 clamd | 生产部署必须提供受控 ClamAV 服务；StreamMaxLength=30M 覆盖 25 MiB 上传上限；不能开放公网扫描端口 |
 | 未完成 | 素材库 UI、缩略图/完整解码、过期上传意图清理、真实对象存储与 ClamAV 联合环境验收 | 不据此关闭 Issue #6 |

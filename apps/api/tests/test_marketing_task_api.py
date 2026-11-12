@@ -282,10 +282,17 @@ def test_marketing_task_detail_and_list_are_store_scoped(
     )
     assert cross_store_cancel.status_code == 404
 
+    own_cancel = identity_client.post(
+        f"/api/v1/marketing-tasks/{task_id}/cancel",
+        headers={**headers_a, "Idempotency-Key": "task-cancel-before-cross-store-archive"},
+        json={"expected_version": 1, "reason": "Cancel before testing archive isolation"},
+    )
+    assert own_cancel.status_code == 200, own_cancel.text
+
     cross_store_archive = identity_client.post(
         f"/api/v1/marketing-tasks/{task_id}/archive",
         headers={**headers_b, "Idempotency-Key": "cross-store-task-archive"},
-        json={"expected_version": 1, "reason": "Must not archive another store's task"},
+        json={"expected_version": 2, "reason": "Must not archive another store's task"},
     )
     assert cross_store_archive.status_code == 404
 
@@ -293,7 +300,7 @@ def test_marketing_task_detail_and_list_are_store_scoped(
         f"/api/v1/marketing-tasks/{task_id}", headers=headers_a
     )
     assert still_owned.status_code == 200
-    assert still_owned.json()["lifecycle_status"] not in {"cancelled", "archived"}
+    assert still_owned.json()["lifecycle_status"] == "cancelled"
 
 
 def test_merchant_content_requires_explicit_content_scope(

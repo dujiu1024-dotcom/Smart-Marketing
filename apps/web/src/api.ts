@@ -1094,6 +1094,12 @@ export interface EffectsOverview {
     }>;
     comparison: { status: string; change_percent: string | null };
   }>;
+  content_performance: Array<{
+    published_work_id: string; marketing_task_id: string | null; channel_key: string;
+    external_work_id: string; metric_key: string; display_name: string;
+    points: Array<{ period_start: string; period_end: string; value: string; sample_count: number; timezone: string }>;
+    comparison: { status: string; change_percent: string | null };
+  }>;
   data_quality: {
     total_observations: number; verified_observations: number; delayed_observations: number;
     incomplete_or_anomalous_observations: number; status: string; reason: string | null;

@@ -483,3 +483,14 @@ Web 单元测试覆盖手动文案产物创建和精确版本审核请求；真�
 | ChannelCapabilitySnapshot | 门店账号级能力历史快照，复合外键约束同店账号和精确 SpecVersion | 当前仅完成数据模型/迁移，探测 Worker/API 尚未接入 |
 | ChannelContent | channel_spec_version_id 增加外键，旧记录迁移时保留原 UUID 并创建 pending legacy spec/version；创建适配快照时强制校验同渠道且 verification_status=verified | pending/deprecated 规格返回明确阻断，不允许生成渠道适配内容 |
 | API/UI | 门店渠道页面展示当前规格版本、来源与核验状态；新增门店认证后的规格目录/版本只读 API | 只读；规格维护和真实能力探测仍未完成 |
+
+
+## 2026-11-12 #8 发布包冻结与最终确认（PR 待 CI）
+
+| 能力 | 当前实现 | 验收边界 |
+|---|---|---|
+| 发布包冻结 | `POST /api/v1/marketing-tasks/{task_id}/publish-packages`，一次冻结多个渠道内容、质检报告、渠道账号/交付方式和计划发布时间 | 要求需求/策略快照、当前文案/图片版本、最新质检报告及已确认经营事实 |
+| 渠道门禁 | official_api 要求 active 同店账号、当前已核验且支持发布的 ChannelSpecVersion，以及未过期的 publish_image_text 能力快照 | 未核验或不支持的渠道不能进入官方发布路径；manual_handoff 不绑定账号 |
+| 质检门禁 | pass 可继续；needs_human 必须有当前 fingerprint 的 accepted 决议；fail 或旧报告阻断 | 质检报告、内容指纹和发布包项目指纹精确关联 |
+| 发布确认 | `POST /api/v1/marketing-tasks/publish-packages/{package_id}/confirm`，确认不可变 package fingerprint 并追加审计 | 同一 package fingerprint 仅允许一次确认；发布执行仍由 #12 的 PublishOperation 负责 |
+| 未完成 | Web 发布包预览/确认界面、真实官方账号能力探测与真实发布联调 | API 合并不代表发布链路浏览器验收或真实渠道验收完成 |

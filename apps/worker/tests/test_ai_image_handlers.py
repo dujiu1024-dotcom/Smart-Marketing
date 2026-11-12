@@ -130,7 +130,7 @@ def test_vision_inspection_fails_closed_for_high_or_unknown_severity(
     result = ai_image_handlers._vision_report(
         context=SimpleNamespace(attempt_id=uuid4()),
         task=SimpleNamespace(store_id=uuid4()),
-        job=SimpleNamespace(id=uuid4()),
+        job=SimpleNamespace(id=uuid4(), idempotency_key="vision-test-job-key"),
         version=SimpleNamespace(output_schema_json={}),
         variables={},
         asset_object_key="stores/store-1/generated/image.png",

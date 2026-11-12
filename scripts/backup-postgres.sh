@@ -13,7 +13,8 @@ umask 077
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
-docker compose --project-directory "$ROOT_DIR" -f "$COMPOSE_FILE" exec -T postgres \
+cd "$ROOT_DIR"
+docker compose -f "$COMPOSE_FILE" exec -T postgres \
   pg_dump --format=custom --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   > "$BACKUP_FILE"
 

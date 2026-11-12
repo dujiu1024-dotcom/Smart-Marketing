@@ -150,6 +150,17 @@ class AttributionInput(BaseModel):
         return value
 
 
+class AttributionReversalInput(BaseModel):
+    reason: str = Field(min_length=8, max_length=500)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def normalize_reason(cls, value: object) -> str:
+        if not isinstance(value, str) or len(value.strip()) < 8:
+            raise ValueError("reason must contain at least 8 non-whitespace characters")
+        return value.strip()
+
+
 class MetricImportInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     csv_text: str = Field(min_length=1, max_length=5_000_000)
@@ -219,6 +230,8 @@ def _attribution_read(item: AttributionEvidence) -> dict[str, object]:
         "allocation_percent": str(item.allocation_percent),
         "status": item.status,
         "snapshot": item.attribution_snapshot_json,
+        "reversal_reason": item.reversal_reason,
+        "reversed_at": item.reversed_at.isoformat() if item.reversed_at else None,
     }
 
 
@@ -1243,6 +1256,53 @@ def list_attributions(
         .order_by(AttributionEvidence.created_at.desc())
     ).all()
     return {"items": [_attribution_read(item) for item in rows], "total": len(rows)}
+
+
+@router.post("/effects/attributions/{attribution_id}/reversal")
+def reverse_attribution(
+    attribution_id: UUID,
+    payload: AttributionReversalInput,
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    store_id = _store_id(context)
+    item = db.scalar(
+        select(AttributionEvidence)
+        .where(
+            AttributionEvidence.id == attribution_id,
+            AttributionEvidence.store_id == store_id,
+        )
+        .with_for_update()
+    )
+    if item is None:
+        raise ApiError(404, "ATTRIBUTION_NOT_FOUND", "Attribution evidence not found")
+    if item.status != "active":
+        raise ApiError(
+            409,
+            "ATTRIBUTION_NOT_ACTIVE",
+            "Only active attribution evidence can be reversed",
+        )
+    item.status = "rejected"
+    item.reversal_reason = payload.reason
+    item.reversed_at = datetime.now(UTC)
+    item.reversed_by_user_id = auth.user.id
+    record_audit(
+        db,
+        request,
+        action="effects.attribution.reversed",
+        target_type="attribution_evidence",
+        target_id=item.id,
+        actor_user_id=auth.user.id,
+        store_id=store_id,
+        metadata={"reason": payload.reason},
+    )
+    db.commit()
+    return {
+        "item": _attribution_read(item),
+        "message": "归因已撤销；原始证据和归因快照保留，可在核对后重新建立归因。",
+    }
 
 
 @router.post("/effects/attributions")

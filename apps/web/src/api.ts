@@ -1006,6 +1006,7 @@ export interface OpportunityItem {
   evidence_status: string;
   relevance_score: string | null;
   match_method: string;
+  matching_algorithm_version: number;
   reason_summary: string | null;
   suggested_scenario: string | null;
   content_angle: string | null;

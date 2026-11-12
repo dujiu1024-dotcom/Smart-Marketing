@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     auth_login_max_attempts: int = 10
     auth_login_window_seconds: int = 900
     object_storage_endpoint_url: str | None = None
+    object_storage_public_endpoint_url: str | None = None
     object_storage_region: str = "us-east-1"
     object_storage_bucket: str | None = None
     object_storage_access_key_id: str | None = None

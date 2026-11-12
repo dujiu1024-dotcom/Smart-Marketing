@@ -296,13 +296,14 @@ def _vision_report(
         str(finding.get("severity", "medium")).strip().lower()
         for finding in response.findings
     ]
-    overall_severity = max(
-        severities,
-        key=lambda value: severity_rank.get(value, 2),
-        default="none" if response.passed else "high",
-    )
-    if overall_severity not in severity_rank:
-        overall_severity = "medium"
+    if any(severity not in severity_rank for severity in severities):
+        overall_severity = "high"
+    else:
+        overall_severity = max(
+            severities,
+            key=lambda value: severity_rank[value],
+            default="none" if response.passed else "high",
+        )
     suggestions = [
         suggestion
         for finding in response.findings
@@ -362,6 +363,9 @@ def _complete_image(
             "AI_IMAGE_REVISION_INVALID",
             "Image revision instruction is invalid.",
         )
+    revision_instruction = revision_instruction.strip() or (
+        "Create a new promotional image that follows the confirmed marketing strategy."
+    )
 
     with _session_factory()() as db:
         job = db.get(Job, context.job_id)
@@ -460,8 +464,16 @@ def _complete_image(
     finally:
         asyncio.run(text_client.aclose())
 
-    visual_prompt = str(image_prompt_output.get("prompt", "")).strip()
-    negative_prompt = str(image_prompt_output.get("negative_prompt", "")).strip()
+    visual_prompt_value = image_prompt_output.get("prompt")
+    negative_prompt_value = image_prompt_output.get("negative_prompt")
+    visual_prompt = (
+        visual_prompt_value.strip() if isinstance(visual_prompt_value, str) else ""
+    )
+    negative_prompt = (
+        negative_prompt_value.strip()
+        if isinstance(negative_prompt_value, str)
+        else ""
+    )
     aspect_ratio = image_prompt_output.get("aspect_ratio", "1:1")
     if not visual_prompt:
         raise _safe_error(

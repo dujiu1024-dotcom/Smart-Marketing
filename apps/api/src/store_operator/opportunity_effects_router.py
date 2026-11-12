@@ -3,7 +3,11 @@ import csv
 import hashlib
 import io
 import math
-from datetime import UTC, date, datetime
+import posixpath
+import re
+import zipfile
+import xml.etree.ElementTree as ET
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, cast
 from urllib.parse import urlsplit
@@ -11,7 +15,6 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Header, Query, Request
-from openpyxl import load_workbook
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import and_, exists, func, select
 from sqlalchemy.exc import IntegrityError
@@ -2024,59 +2027,122 @@ def import_manual_observations_xlsx(payload: MetricXlsxImportInput, request: Req
     if not raw or len(raw) > 5_000_000:
         raise ApiError(413, "XLSX_FILE_SIZE_INVALID", "Workbook must be between 1 byte and 5 MB")
     try:
-        workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-        sheet = workbook.active
-        if sheet is None or sheet.max_row is None or sheet.max_column is None:
-            raise ValueError("Workbook has no active worksheet")
-        if sheet.max_row > 10001 or sheet.max_column > 50:
-            raise ValueError("Workbook exceeds the 10,000-row or 50-column limit")
-        rows = sheet.iter_rows(values_only=True)
-        headers = next(rows, None)
-        if not headers:
-            raise ValueError("Worksheet is empty")
-        normalized_headers = [str(value).strip() if value is not None else "" for value in headers]
-        if len(set(normalized_headers)) != len(normalized_headers) or any(not value for value in normalized_headers):
-            raise ValueError("Worksheet headers must be non-empty and unique")
-        required = {"metric_key", "value_numeric", "period_timezone"}
-        if not required.issubset(set(normalized_headers)):
-            raise ValueError("Worksheet must include metric_key, value_numeric, period_timezone")
-        output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=normalized_headers, lineterminator="\n")
-        writer.writeheader()
-        for row_number, values in enumerate(rows, start=2):
-            if row_number > 10001:
-                raise ValueError("Worksheet exceeds the 10,000-row limit")
-            mapped = {}
-            row_values = list(values)
-            for index, key in enumerate(normalized_headers):
-                value = row_values[index] if index < len(row_values) else None
-                if isinstance(value, date) and key in {"period_start", "period_end"}:
-                    timezone_index = normalized_headers.index("period_timezone")
-                    timezone_value = row_values[timezone_index] if timezone_index < len(row_values) else None
-                    timezone_name = str(timezone_value or "").strip()
-                    try:
-                        zone = ZoneInfo(timezone_name)
-                    except (ZoneInfoNotFoundError, ValueError) as exc:
-                        raise ValueError(f"Row {row_number}: period_timezone must be a valid IANA timezone") from exc
-                    if isinstance(value, datetime):
-                        value = value.replace(tzinfo=zone) if value.tzinfo is None else value
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            members = archive.infolist()
+            if len(members) > 100 or sum(item.file_size for item in members) > 20_000_000:
+                raise ValueError("Workbook expands beyond the safe archive limits")
+            workbook_xml = ET.fromstring(archive.read("xl/workbook.xml"))
+            rels_xml = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+            ns = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+                  "rel": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+                  "pkg": "http://schemas.openxmlformats.org/package/2006/relationships"}
+            first_sheet = workbook_xml.find("main:sheets/main:sheet", ns)
+            if first_sheet is None:
+                raise ValueError("Workbook has no worksheets")
+            relationship_id = first_sheet.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+            relationship = next((item for item in rels_xml.findall("pkg:Relationship", ns)
+                if item.attrib.get("Id") == relationship_id), None)
+            if relationship is None:
+                raise ValueError("Worksheet relationship is missing")
+            sheet_path = relationship.attrib.get("Target", "")
+            sheet_path = (sheet_path.lstrip("/") if sheet_path.startswith("/")
+                else posixpath.normpath(posixpath.join("xl", sheet_path)))
+            if sheet_path not in archive.namelist() or not sheet_path.startswith("xl/worksheets/"):
+                raise ValueError("Worksheet path is invalid")
+            shared_strings = []
+            if "xl/sharedStrings.xml" in archive.namelist():
+                shared_xml = ET.fromstring(archive.read("xl/sharedStrings.xml"))
+                shared_strings = ["".join(node.itertext()) for node in shared_xml.findall("main:si", ns)]
+            date_style_ids = set()
+            if "xl/styles.xml" in archive.namelist():
+                styles_xml = ET.fromstring(archive.read("xl/styles.xml"))
+                custom_formats = {int(item.attrib["numFmtId"]): item.attrib.get("formatCode", "")
+                    for item in styles_xml.findall("main:numFmts/main:numFmt", ns)}
+                built_in_dates = set(range(14, 23)) | set(range(27, 37)) | {45, 46, 47} | set(range(50, 59))
+                xfs = styles_xml.find("main:cellXfs", ns)
+                if xfs is not None:
+                    for style_index, xf in enumerate(list(xfs)):
+                        format_id = int(xf.attrib.get("numFmtId", "0"))
+                        format_code = custom_formats.get(format_id, "")
+                        if format_id in built_in_dates or re.search(r"(?i)[ymdhis]", re.sub(r'"[^"]*"|\\\\.', "", format_code)):
+                            date_style_ids.add(style_index)
+            sheet_xml = ET.fromstring(archive.read(sheet_path))
+            sheet_data = sheet_xml.find("main:sheetData", ns)
+            if sheet_data is None:
+                raise ValueError("Worksheet has no data")
+            parsed_rows = []
+            for row_index, row_node in enumerate(sheet_data.findall("main:row", ns), start=1):
+                if row_index > 10001:
+                    raise ValueError("Worksheet exceeds the 10,000-row limit")
+                cells = []
+                for cell in row_node.findall("main:c", ns):
+                    reference = cell.attrib.get("r", "")
+                    column_letters = re.match(r"[A-Z]+", reference.upper())
+                    if not column_letters:
+                        continue
+                    column_index = 0
+                    for character in column_letters.group(0):
+                        column_index = column_index * 26 + ord(character) - 64
+                    if column_index > 50:
+                        raise ValueError("Worksheet exceeds the 50-column limit")
+                    while len(cells) < column_index:
+                        cells.append(None)
+                    cell_type = cell.attrib.get("t")
+                    value_node = cell.find("main:v", ns)
+                    value = value_node.text if value_node is not None else None
+                    if cell_type == "s" and value is not None:
+                        value = shared_strings[int(value)]
+                    elif cell_type == "inlineStr":
+                        inline = cell.find("main:is", ns)
+                        value = "".join(inline.itertext()) if inline is not None else ""
+                    elif cell_type == "b" and value is not None:
+                        value = "true" if value == "1" else "false"
+                    elif cell_type == "d" and value:
+                        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                    elif value is not None and int(cell.attrib.get("s", "0")) in date_style_ids:
+                        value = datetime(1899, 12, 30) + timedelta(days=float(value))
+                    cells[column_index - 1] = value
+                parsed_rows.append(cells)
+            if not parsed_rows:
+                raise ValueError("Worksheet is empty")
+            headers = parsed_rows[0]
+            normalized_headers = [str(value).strip() if value is not None else "" for value in headers]
+            if not normalized_headers or any(not value for value in normalized_headers) or len(set(normalized_headers)) != len(normalized_headers):
+                raise ValueError("Worksheet headers must be non-empty and unique")
+            required = {"metric_key", "value_numeric", "period_timezone"}
+            if not required.issubset(set(normalized_headers)):
+                raise ValueError("Worksheet must include metric_key, value_numeric, period_timezone")
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=normalized_headers, lineterminator="\\n")
+            writer.writeheader()
+            for row_number, row_values in enumerate(parsed_rows[1:], start=2):
+                mapped = {}
+                for index, key in enumerate(normalized_headers):
+                    value = row_values[index] if index < len(row_values) else None
+                    if isinstance(value, date) and key in {"period_start", "period_end"}:
+                        timezone_index = normalized_headers.index("period_timezone")
+                        timezone_value = row_values[timezone_index] if timezone_index < len(row_values) else None
+                        timezone_name = str(timezone_value or "").strip()
+                        try:
+                            zone = ZoneInfo(timezone_name)
+                        except (ZoneInfoNotFoundError, ValueError) as exc:
+                            raise ValueError(f"Row {row_number}: period_timezone must be a valid IANA timezone") from exc
+                        if isinstance(value, datetime):
+                            value = value.replace(tzinfo=zone) if value.tzinfo is None else value
+                        else:
+                            value = datetime.combine(value, datetime.min.time(), tzinfo=zone)
+                        value = value.isoformat()
+                    elif value is None:
+                        value = ""
+                    elif isinstance(value, float) and not math.isfinite(value):
+                        raise ValueError(f"Row {row_number}: non-finite numeric cell")
                     else:
-                        value = datetime.combine(value, datetime.min.time(), tzinfo=zone)
-                    value = value.isoformat()
-                elif value is None:
-                    value = ""
-                elif isinstance(value, bool):
-                    value = "true" if value else "false"
-                elif isinstance(value, float) and not math.isfinite(value):
-                    raise ValueError(f"Row {row_number}: non-finite numeric cell")
-                else:
-                    value = str(value)
-                mapped[key] = value
-            writer.writerow(mapped)
-        workbook.close()
+                        value = str(value)
+                    mapped[key] = value
+                writer.writerow(mapped)
     except ApiError:
         raise
-    except Exception as exc:
+    except (KeyError, ValueError, TypeError, zipfile.BadZipFile, ET.ParseError, OverflowError) as exc:
         raise ApiError(422, "XLSX_INVALID", f"Workbook could not be read: {str(exc)[:200]}") from exc
     csv_payload = MetricImportInput(csv_text=output.getvalue(), source_format="xlsx")
     return import_manual_observations(csv_payload, request, auth, context, db)

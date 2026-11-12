@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
-  ApiError,
   confirmProductFacts,
   createProduct,
   getProducts,
@@ -181,17 +180,15 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
     }
   }
 
-  async function confirmFacts() {
-    if (!selected) return;
+  async function confirmProduct(product: Product) {
     setSaving(true);
     setError("");
     setNotice("");
     try {
-      const confirmed = await confirmProductFacts(storeId, selected);
+      const confirmed = await confirmProductFacts(storeId, product);
       setItems((current) => current.map((item) => item.id === confirmed.id ? confirmed : item));
-      setSelected(confirmed);
-      setForm(fromProduct(confirmed));
-      setNotice(`商品事实 V${confirmed.current_version} 已确认。`);
+      setSelected((current) => current?.id === confirmed.id ? confirmed : current);
+      setNotice(`${confirmed.name} 的事实版本 V${confirmed.current_version} 已确认。`);
     } catch (reason) {
       setError(message(reason));
     } finally {
@@ -237,7 +234,7 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
           </section>
           <div className="form-footer">
             <p>{selected ? `当前版本 V${selected.current_version} · ${selected.fact_status === "confirmed" ? "已确认" : "待确认"}` : "创建后需要核对并确认经营事实。"}</p>
-            <div className="form-actions"><button className="secondary" type="button" onClick={() => { window.location.hash = "#store:products"; }}>取消</button><button className="primary" type="submit" disabled={saving || !form.name.trim()}>{saving ? "保存中…" : "保存商品"}</button></div>
+            <div className="form-actions">{selected && selected.fact_status !== "confirmed" && <button className="secondary" type="button" disabled={saving} onClick={() => void confirmProduct(selected)}>确认事实</button>}<button className="secondary" type="button" onClick={() => { window.location.hash = "#store:products"; }}>取消</button><button className="primary" type="submit" disabled={saving || !form.name.trim()}>{saving ? "保存中…" : "保存商品"}</button></div>
           </div>
         </form>
       ) : loading ? (
@@ -251,7 +248,7 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
             <article className="catalog-item" key={product.id}>
               <div className="catalog-item-main"><div><h2>{product.name}</h2><p>{[product.category, product.specification, product.sku].filter(Boolean).join(" · ") || "未填写分类与规格"}</p></div><span className={product.fact_status === "confirmed" ? "status-chip confirmed" : "status-chip"}>{product.fact_status === "confirmed" ? "事实已确认" : "待确认"}</span></div>
               <div className="catalog-meta"><span>{product.price_amount === null ? "价格未填写" : `${product.currency} ${product.price_amount}`}</span><span>{({ available: "在售", unavailable: "停售", seasonal: "季节供应", limited: "限量供应", unknown: "供应状态未知" })[product.availability_status]}</span><span>V{product.current_version}</span></div>
-              <div className="catalog-actions"><button className="secondary" onClick={() => { window.location.hash = `#store-editor:product:${product.id}`; }}>编辑</button>{product.fact_status !== "confirmed" && <button className="secondary" onClick={() => { setSelected(product); void confirmProductFacts(storeId, product).then((saved) => { setItems((current) => current.map((item) => item.id === saved.id ? saved : item)); setNotice(`${saved.name} 已完成事实确认。`); }).catch((reason: unknown) => setError(message(reason))); }}>确认事实</button>}</div>
+              <div className="catalog-actions"><button className="secondary" onClick={() => { window.location.hash = `#store-editor:product:${product.id}`; }}>编辑</button>{product.fact_status !== "confirmed" && <button className="secondary" disabled={saving} onClick={() => void confirmProduct(product)}>确认事实</button>}</div>
             </article>
           ))}
         </section>

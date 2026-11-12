@@ -108,6 +108,7 @@ class StoreOpportunity(Base):
         ForeignKey("hot_topics.id", ondelete="RESTRICT"), nullable=False)
     store_context_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     matching_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    matching_algorithm_version: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
     relevance_score: Mapped[Decimal | None] = mapped_column(Numeric(6, 3))
     match_method: Mapped[str] = mapped_column(String(16), default="rules", nullable=False)
     matched_product_ids_json: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)

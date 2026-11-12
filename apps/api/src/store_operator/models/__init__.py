@@ -3,6 +3,7 @@ from store_operator.models.channel_delivery import (
     ChannelAccount,
     OAuthAuthorizationAttempt,
     PublishOperation,
+    PublishOperationAttempt,
 )
 from store_operator.models.content_delivery import (
     Artifact,
@@ -62,6 +63,7 @@ __all__ = [
     "ChannelAccount",
     "OAuthAuthorizationAttempt",
     "PublishOperation",
+    "PublishOperationAttempt",
     "ArtifactVersion",
     "ReviewRecord",
     "ChannelContent",

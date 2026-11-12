@@ -51,6 +51,7 @@ class DouyinTokenSet:
 class DouyinPublishReceipt:
     item_id: str
     normalized_status: str = "processing"
+    external_request_id: str | None = None
     # Douyin performs review after content creation. The item is not necessarily
     # publicly visible when this receipt is returned.
     public_url: str | None = None
@@ -203,7 +204,9 @@ class DouyinOAuthClient:
             headers={"access-token": access_token},
             files={"image": (filename, content, content_type)},
         )
-        data = self._data(self._decode_response(response))
+        payload = self._decode_response(response)
+        data = self._data(payload)
+        extra = payload.get("extra")
         image = data.get("image")
         if not isinstance(image, dict) or not image.get("image_id"):
             raise DouyinApiError("MISSING_IMAGE_ID", "Douyin image upload response is incomplete")
@@ -211,6 +214,11 @@ class DouyinOAuthClient:
             "image_id": str(image["image_id"]),
             "width": image.get("width"),
             "height": image.get("height"),
+            "external_request_id": (
+                str(extra.get("logid"))
+                if isinstance(extra, dict) and extra.get("logid")
+                else None
+            ),
         }
 
     async def publish_images(
@@ -234,10 +242,19 @@ class DouyinOAuthClient:
             headers={"access-token": access_token, "Content-Type": "application/json"},
             json={"image_list": image_ids, "text": text},
         )
-        data = self._data(self._decode_response(response))
+        payload = self._decode_response(response)
+        data = self._data(payload)
+        extra = payload.get("extra")
         if not data.get("item_id"):
             raise DouyinApiError("MISSING_ITEM_ID", "Douyin image-text response is incomplete")
-        return DouyinPublishReceipt(item_id=str(data["item_id"]))
+        return DouyinPublishReceipt(
+            item_id=str(data["item_id"]),
+            external_request_id=(
+                str(extra.get("logid"))
+                if isinstance(extra, dict) and extra.get("logid")
+                else None
+            ),
+        )
 
     async def publish_video(
         self,

@@ -110,6 +110,12 @@ def test_store_profile_and_product_api_are_tenant_scoped_and_versioned(
     assert updated_profile.status_code == 200, updated_profile.text
     assert updated_profile.json()["current_version"] == 2
     assert updated_profile.json()["city"] == "Osaka"
+    hidden_profile_update = identity_client.patch(
+        "/api/v1/store/profile",
+        headers={**headers_a, "X-Store-ID": str(store_b.id), "If-Match": '"2"'},
+        json={"city": "Cross-store write"},
+    )
+    assert hidden_profile_update.status_code == 404
 
     stale_profile = identity_client.patch(
         "/api/v1/store/profile",

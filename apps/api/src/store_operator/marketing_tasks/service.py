@@ -1398,7 +1398,10 @@ def recover_marketing_task(
             raise ApiError(
                 409,
                 "IMAGE_RECOVERY_SNAPSHOTS_REQUIRED",
-                "Confirmed requirement and strategy snapshots are required to retry image generation",
+                (
+                    "Confirmed requirement and strategy snapshots are required "
+                    "to retry image generation"
+                ),
             )
         requirement_snapshot = db.scalar(
             select(RequirementSnapshot).where(

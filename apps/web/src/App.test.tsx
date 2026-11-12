@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   getStoreProfile: vi.fn(),
   createStoreProfile: vi.fn(),
   updateStoreProfile: vi.fn(),
+  confirmStoreProfileFacts: vi.fn(),
   clearCsrfToken: vi.fn(),
 }));
 
@@ -53,6 +54,7 @@ describe("store profile workspace", () => {
     api.setActiveStore.mockResolvedValue(undefined);
     api.getStoreProfile.mockResolvedValue(profile);
     api.updateStoreProfile.mockResolvedValue({ ...profile, display_name: "拾光茶研社（万象城店）", current_version: 2 });
+    api.confirmStoreProfileFacts.mockResolvedValue({ ...profile, fact_status: "confirmed", current_version: 2 });
   });
 
   it("requires authentication and labels unconnected store modules", async () => {
@@ -85,3 +87,19 @@ describe("store profile workspace", () => {
     expect(await screen.findByText(/门店档案已保存为 V2/)).toBeInTheDocument();
   });
 });
+
+
+  it("requires an explicit action to confirm store facts", async () => {
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("邮箱 *"), { target: { value: user.email } });
+    fireEvent.change(screen.getByLabelText("密码 *"), { target: { value: "correct-password" } });
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+
+    expect(await screen.findByText("V1 · 待确认")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认资料" }));
+
+    await waitFor(() => {
+      expect(api.confirmStoreProfileFacts).toHaveBeenCalledWith(store.id, profile);
+    });
+    expect(await screen.findByText("V2 · 已确认")).toBeInTheDocument();
+  });

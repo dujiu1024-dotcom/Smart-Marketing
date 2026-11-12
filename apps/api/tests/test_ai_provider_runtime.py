@@ -337,7 +337,7 @@ def test_provider_environment_config_parses_only_declared_capabilities() -> None
 
     config = HttpProviderEnvironmentConfig.from_environment(
         {
-            "AI_PROVIDER_PROVIDER_ID": "primary",
+            "AI_PROVIDER_ID": "primary",
             "AI_PROVIDER_DISPLAY_NAME": "Primary AI",
             "AI_PROVIDER_BASE_URL": "https://ai.example",
             "AI_PROVIDER_SECRET_REF": "env://AI_PRIMARY_KEY",
@@ -363,7 +363,7 @@ def test_configured_registry_resolves_capability_specific_adapters_and_models() 
 
     config = HttpProviderEnvironmentConfig.from_environment(
         {
-            "AI_PROVIDER_PROVIDER_ID": "primary",
+            "AI_PROVIDER_ID": "primary",
             "AI_PROVIDER_DISPLAY_NAME": "Primary AI",
             "AI_PROVIDER_BASE_URL": "https://ai.example",
             "AI_PROVIDER_SECRET_REF": "env://AI_PRIMARY_KEY",

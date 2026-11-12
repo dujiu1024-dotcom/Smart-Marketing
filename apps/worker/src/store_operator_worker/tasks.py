@@ -49,6 +49,7 @@ from store_operator.models import (  # type: ignore[import-untyped]
     ChannelContentArtifactRef,
     MediaAsset,
     OutboxEvent,
+    UploadIntent,
     PublishConfirmation,
     PublishOperation,
     PublishOperationAttempt,
@@ -63,7 +64,7 @@ from store_operator.object_storage import (  # type: ignore[import-untyped]
 )
 
 from store_operator_worker.celery_app import celery_app
-from store_operator_worker.handlers import (
+from store_operator_worker.media_scanner import (\n    ClamAvError,\n    MalwareDetected,\n    image_dimensions,\n    scan_with_clamd,\n    validate_image_dimensions,\n)\nfrom store_operator_worker.handlers import (
     JobCancelled,
     JobExecutionContext,
     JobExecutionError,
@@ -439,7 +440,77 @@ def recover_expired_leases(batch_size: int = 100) -> int:
         return int(recover_expired_jobs(db, batch_size=batch_size))
 
 
-@register_job_handler("content.quality_check")
+
+
+@celery_app.task(
+    name="media.scan_quarantined_assets", ignore_result=True
+)  # type: ignore[untyped-decorator]
+def scan_quarantined_assets(batch_size: int = 10) -> int:
+    """Fail-closed scan of quarantined uploads; DB row locks make retries crash-safe."""
+    processed = 0
+    safe_batch_size = max(1, min(batch_size, 50))
+    for _ in range(safe_batch_size):
+        with SessionLocal.begin() as db:
+            asset = db.scalar(
+                select(MediaAsset)
+                .where(MediaAsset.status.in_({"quarantined", "scanning"}))
+                .order_by(MediaAsset.created_at, MediaAsset.id)
+                .limit(1)
+                .with_for_update(skip_locked=True)
+            )
+            if asset is None:
+                break
+
+            intent = db.scalar(
+                select(UploadIntent)
+                .where(
+                    UploadIntent.store_id == asset.store_id,
+                    UploadIntent.object_key == asset.object_key,
+                )
+                .with_for_update()
+            )
+            asset.status = "scanning"
+            rejection_reason: str | None = None
+            if intent is None or intent.status != "scanning":
+                rejection_reason = "Upload intent is missing or no longer scanning"
+            else:
+                content = download_object_bytes(
+                    object_key=asset.object_key,
+                    max_bytes=25 * 1024 * 1024,
+                )
+                if len(content) != asset.byte_size or hashlib.sha256(content).hexdigest() != asset.sha256:
+                    rejection_reason = "Uploaded media failed integrity verification"
+                else:
+                    try:
+                        width, height = image_dimensions(content, asset.mime_type)
+                        validate_image_dimensions(width, height)
+                    except ValueError:
+                        rejection_reason = "Uploaded media is not a supported safe image"
+                    if rejection_reason is None:
+                        try:
+                            scan_with_clamd(
+                                content,
+                                host=os.environ.get("CLAMD_HOST", "clamav"),
+                                port=int(os.environ.get("CLAMD_PORT", "3310")),
+                            )
+                        except MalwareDetected:
+                            rejection_reason = "Uploaded media was rejected by malware scanning"
+
+            if rejection_reason is not None:
+                asset.status = "rejected"
+                if intent is not None:
+                    intent.status = "rejected"
+                    intent.rejection_reason = rejection_reason[:240]
+            else:
+                asset.width = width
+                asset.height = height
+                asset.status = "ready"
+                intent.status = "completed"
+                intent.completed_at = datetime.now(UTC)
+            processed += 1
+
+    return processed
+\n\n@register_job_handler("content.quality_check")
 def execute_content_quality_check(
     context: JobExecutionContext,
     payload_ref: dict[str, object],

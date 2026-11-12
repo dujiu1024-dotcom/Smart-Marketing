@@ -927,6 +927,7 @@ def list_data_source_capabilities(
                 "evidence_ref": item.evidence_ref,
                 "snapshot_version": item.snapshot_version,
                 "checked_at": item.checked_at.isoformat(),
+                "reason": item.snapshot_json.get("reason"),
             }
             for item in latest.values()
         ],

@@ -75,8 +75,21 @@ describe("store brand guideline workspace", () => {
       expect(api.createBrandGuideline).toHaveBeenCalledWith(
         storeId,
         expect.objectContaining({ positioning: "城市轻茶饮" }),
+        expect.any(String),
       );
     });
+  });
+
+  it("does not confirm a stale brand guideline while edits are unsaved", async () => {
+    render(<BrandGuidelineWorkspace storeId={storeId} />);
+    await screen.findByDisplayValue("城市轻茶饮");
+    fireEvent.change(screen.getByLabelText("品牌定位"), { target: { value: "未保存的新定位" } });
+
+    const confirm = screen.getByRole("button", { name: "确认资料" });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(api.confirmBrandGuidelineFacts).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("品牌定位")).toHaveValue("未保存的新定位");
   });
 
   it("confirms brand guideline facts separately", async () => {

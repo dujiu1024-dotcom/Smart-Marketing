@@ -141,8 +141,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["store_id", "outcome_evidence_id"],
             ["business_outcome_evidence.store_id", "business_outcome_evidence.id"],
                 name="fk_attribution_evidence_outcome_same_store", ondelete="RESTRICT"),
-        sa.CheckConstraint("attribution_method IN ('direct_code', 'platform_reported', 'temporal_association', 'manual_claim')", name="ck_attribution_evidence_attribution_method"),  # noqa: E501
-        sa.CheckConstraint("evidence_strength IN ('strong', 'medium', 'weak')",
+        sa.CheckConstraint("attribution_method IN ('direct_code', 'platform_reported')", name="ck_attribution_evidence_attribution_method"),  # noqa: E501
+        sa.CheckConstraint("evidence_strength IN ('strong', 'medium')",
             name="ck_attribution_evidence_evidence_strength"),
         sa.CheckConstraint("status IN ('active', 'superseded', 'rejected')",
             name="ck_attribution_evidence_status"),

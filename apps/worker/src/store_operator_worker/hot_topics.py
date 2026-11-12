@@ -34,6 +34,7 @@ from store_operator_worker.handlers import (
 )
 
 MAX_FEED_BYTES = 2_000_000
+MATCHING_ALGORITHM_VERSION = 2
 MAX_FEED_ITEMS = 200
 HTTP_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 USER_AGENT = "AI-Store-Operator-HotTopicCollector/1.0"
@@ -324,7 +325,7 @@ def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], contex
     ))
     if profile is None or (not products and not offers and not audiences):
         return 0
-    context_parts = [str(profile.current_version)]
+    context_parts = [str(profile.current_version), f"matcher:{MATCHING_ALGORITHM_VERSION}"]
     if brand is not None:
         context_parts.append(f"brand:{brand.id}:{brand.current_version}")
     context_parts.extend(f"p:{item.id}:{item.current_version}" for item in products)
@@ -407,6 +408,7 @@ def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], contex
         best_offer = max(offer_scores, key=lambda pair: pair[0])[1] if offer_scores else None
         db.add(StoreOpportunity(id=uuid4(), store_id=store_id, hot_topic_id=topic.id,
             store_context_fingerprint=context_fingerprint, matching_version=version,
+            matching_algorithm_version=MATCHING_ALGORITHM_VERSION,
             relevance_score=round(score * 100, 3), match_method="rules",
             matched_product_ids_json=product_ids, matched_offer_ids_json=offer_ids,
             matched_audience_profile_ids_json=audience_ids, suggested_scenario=(best_offer.title if best_offer else None),

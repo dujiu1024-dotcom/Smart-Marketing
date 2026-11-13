@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     channel_secret_store_region: str | None = None
     channel_secret_store_prefix: str = "ai-store-operator/channel-accounts"
     hot_topic_allowed_hosts: str = ""
+    # 商户授权采集器（D-01 路径 A）：采集器持有商家本人已登录浏览器 profile，
+    # 本服务只通过内部 HTTP 契约读取其归一化快照，不接触登录凭据。
+    metric_sync_enabled: bool = False
+    metric_collector_base_url: str | None = None
+    metric_collector_token: str | None = None
+    metric_collector_timeout_seconds: float = 30.0
 
     @model_validator(mode="after")
     def validate_auth_settings(self) -> "Settings":
@@ -52,6 +58,8 @@ class Settings(BaseSettings):
             raise ValueError("REQUEST_TIMEOUT_SECONDS must be positive")
         if self.auth_login_max_attempts <= 0 or self.auth_login_window_seconds <= 0:
             raise ValueError("Login rate-limit settings must be positive")
+        if self.metric_collector_timeout_seconds <= 0:
+            raise ValueError("METRIC_COLLECTOR_TIMEOUT_SECONDS must be positive")
         if (
             self.object_storage_upload_ttl_seconds <= 0
             or self.object_storage_download_ttl_seconds <= 0

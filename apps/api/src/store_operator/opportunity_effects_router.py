@@ -24,6 +24,7 @@ from store_operator.auth.audit import record_audit
 from store_operator.auth.context import AuthContext
 from store_operator.auth.dependencies import (
     AuthenticatedSession,
+    require_admin_csrf,
     require_csrf,
     require_platform_admin,
     require_store_context,
@@ -31,6 +32,7 @@ from store_operator.auth.dependencies import (
 from store_operator.auth.errors import ApiError
 from store_operator.config import settings
 from store_operator.db import get_db
+from store_operator.effects.metric_ingest import compute_dedupe_key
 from store_operator.jobs.service import JobIdempotencyConflict, create_job
 from store_operator.models.channel_delivery import ChannelAccount, PublishOperation
 from store_operator.models.content_delivery import PublishPackage, PublishPackageItem
@@ -221,6 +223,10 @@ def _observation_read(item: MetricObservation, definition: MetricDefinition) -> 
         "import_batch_id": str(item.import_batch_id) if item.import_batch_id else None,
         "published_work_id": str(item.published_work_id) if item.published_work_id else None,
         "marketing_task_id": str(item.marketing_task_id) if item.marketing_task_id else None,
+        "channel_account_id": (
+            str(item.channel_account_id) if item.channel_account_id else None
+        ),
+        "observation_scope": item.observation_scope,
     }
 
 def _published_work_read(item: PublishedWork) -> dict[str, object]:
@@ -348,22 +354,19 @@ def _create_observation(db: Session, *, store_id: UUID, payload: MetricObservati
     if payload.metric_key == "revenue" and payload.value_numeric is not None and payload.currency is None:  # noqa: E501
         raise ApiError(422, "CURRENCY_REQUIRED",
             "Revenue observations require an ISO 4217 currency")
-    material = "|".join(
-        [
-            str(store_id),
-            source_system,
-            payload.metric_key,
-            payload.period_start.isoformat() if payload.period_start else "",
-            payload.period_end.isoformat() if payload.period_end else "",
-            payload.source_record_id or "",
-            str(payload.value_numeric) if payload.value_numeric is not None else "NULL",
-            payload.currency or "",
-            str(supersedes_observation_id) if supersedes_observation_id else "",
-            str(payload.published_work_id) if payload.published_work_id else "",
-            str(payload.marketing_task_id) if payload.marketing_task_id else "",
-        ]
+    dedupe = compute_dedupe_key(
+        store_id=store_id,
+        source_system=source_system,
+        metric_key=payload.metric_key,
+        period_start=payload.period_start,
+        period_end=payload.period_end,
+        source_record_id=payload.source_record_id,
+        value_numeric=payload.value_numeric,
+        currency=payload.currency,
+        supersedes_observation_id=supersedes_observation_id,
+        published_work_id=payload.published_work_id,
+        marketing_task_id=payload.marketing_task_id,
     )
-    dedupe = hashlib.sha256(material.encode("utf-8")).hexdigest()
     existing = db.scalar(select(MetricObservation).where(
         MetricObservation.store_id == store_id, MetricObservation.deduplication_key == dedupe))
     if existing is not None:
@@ -390,9 +393,19 @@ class HotTopicSourceInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source_key: str = Field(min_length=1, max_length=100)
     display_name: str = Field(min_length=1, max_length=160)
+    source_type: str = Field(default="rss", pattern="^(rss|public_feed)$")
     source_url: str = Field(min_length=1, max_length=2048)
     terms_url: str = Field(min_length=1, max_length=2048)
     permitted_use: str = Field(min_length=10, max_length=2000)
+    attribution_template: str | None = Field(default=None, max_length=500)
+
+
+class HotTopicSourceUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    display_name: str | None = Field(default=None, min_length=1, max_length=160)
+    source_url: str | None = Field(default=None, min_length=1, max_length=2048)
+    terms_url: str | None = Field(default=None, min_length=1, max_length=2048)
+    permitted_use: str | None = Field(default=None, min_length=10, max_length=2000)
     attribution_template: str | None = Field(default=None, max_length=500)
 
 def _validate_feed_url(value: str) -> str:
@@ -405,6 +418,38 @@ def _validate_feed_url(value: str) -> str:
     return value
 
 
+# 复用 Easel 的热榜端点清单（skills/shared/hotlist-apis.md，60s API）。
+# 仅作为后台登记表单的可选预设，仍需通过条款 URL、域名白名单与启用准入。
+PUBLIC_FEED_PRESETS: tuple[dict[str, str], ...] = (
+    {"key": "weibo", "display_name": "微博热搜", "source_url": "https://60s.viki.moe/v2/weibo"},
+    {"key": "zhihu", "display_name": "知乎热榜", "source_url": "https://60s.viki.moe/v2/zhihu"},
+    {"key": "douyin", "display_name": "抖音热点", "source_url": "https://60s.viki.moe/v2/douyin"},
+    {"key": "baidu", "display_name": "百度热搜", "source_url": "https://60s.viki.moe/v2/baidu"},
+    {"key": "bili", "display_name": "B 站热榜", "source_url": "https://60s.viki.moe/v2/bili"},
+    {"key": "toutiao", "display_name": "头条热榜", "source_url": "https://60s.viki.moe/v2/toutiao"},
+    {"key": "rednote", "display_name": "小红书热点", "source_url": "https://60s.viki.moe/v2/rednote"},
+    {"key": "ai-news", "display_name": "AI 资讯", "source_url": "https://60s.viki.moe/v2/ai-news"},
+    {"key": "it-news", "display_name": "IT 资讯", "source_url": "https://60s.viki.moe/v2/it-news"},
+)
+
+
+@router.get("/admin/opportunity-sources/presets")
+def list_hot_topic_source_presets(
+    admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+) -> dict[str, object]:
+    allowed_hosts = sorted(
+        {
+            host.strip().lower()
+            for host in settings.hot_topic_allowed_hosts.split(",")
+            if host.strip()
+        }
+    )
+    return {
+        "items": [dict(item) for item in PUBLIC_FEED_PRESETS],
+        "allowed_hosts": allowed_hosts,
+    }
+
+
 @router.get("/admin/opportunity-sources")
 def list_hot_topic_sources(
     admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
@@ -414,6 +459,8 @@ def list_hot_topic_sources(
     return {"items": [{"id": str(item.id), "source_key": item.source_key,
         "display_name": item.display_name, "source_type": item.source_type,
         "source_url": item.source_url, "terms_url": item.terms_url, "enabled": item.enabled,
+        "permitted_use": item.permitted_use,
+        "attribution_template": item.attribution_template,
         "health_status": item.health_status,
         "last_success_at": item.last_success_at.isoformat() if item.last_success_at else None,
         "last_failure_at": item.last_failure_at.isoformat() if item.last_failure_at else None}
@@ -421,11 +468,11 @@ def list_hot_topic_sources(
 
 @router.post("/admin/opportunity-sources")
 def create_hot_topic_source(payload: HotTopicSourceInput,
-    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    auth: Annotated[AuthenticatedSession, Depends(require_admin_csrf)],
     admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
     source = HotTopicSource(id=uuid4(), source_key=payload.source_key.strip(),
-        display_name=payload.display_name.strip(), source_type="rss",
+        display_name=payload.display_name.strip(), source_type=payload.source_type,
         source_url=_validate_feed_url(payload.source_url),
             terms_url=_validate_feed_url(payload.terms_url),
         permitted_use=payload.permitted_use.strip(),
@@ -438,11 +485,43 @@ def create_hot_topic_source(payload: HotTopicSourceInput,
         db.rollback()
         raise ApiError(409, "SOURCE_KEY_CONFLICT", "Source key already exists") from exc
     return {"id": str(source.id), "source_key": source.source_key, "enabled": False,
+        "source_type": source.source_type,
         "message": "来源已登记但默认禁用。完成条款审查和网络出口配置后，管理员再启用。"}
+
+
+@router.patch("/admin/opportunity-sources/{source_id}")
+def update_hot_topic_source(source_id: UUID, payload: HotTopicSourceUpdate,
+    auth: Annotated[AuthenticatedSession, Depends(require_admin_csrf)],
+    admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+    db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+    source = db.scalar(select(HotTopicSource).where(
+        HotTopicSource.id == source_id).with_for_update())
+    if source is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Source not found")
+    if source.enabled:
+        raise ApiError(409, "SOURCE_ENABLED_LOCKED",
+            "请先停用来源再修改地址或条款，避免运行中的采集配置被替换")
+    if payload.display_name is not None:
+        source.display_name = payload.display_name.strip()
+    if payload.source_url is not None:
+        source.source_url = _validate_feed_url(payload.source_url)
+    if payload.terms_url is not None:
+        source.terms_url = _validate_feed_url(payload.terms_url)
+    if payload.permitted_use is not None:
+        source.permitted_use = payload.permitted_use.strip()
+    if payload.attribution_template is not None:
+        source.attribution_template = payload.attribution_template
+    source.health_status = "unknown"
+    db.commit()
+    return {"id": str(source.id), "display_name": source.display_name,
+        "source_type": source.source_type, "source_url": source.source_url,
+        "terms_url": source.terms_url, "permitted_use": source.permitted_use,
+        "attribution_template": source.attribution_template,
+        "enabled": source.enabled, "health_status": source.health_status}
 
 @router.post("/admin/opportunity-sources/{source_id}/enable")
 def enable_hot_topic_source(source_id: UUID,
-    auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
+    auth: Annotated[AuthenticatedSession, Depends(require_admin_csrf)],
     admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
     db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
     source = db.scalar(select(HotTopicSource).where(HotTopicSource.id == source_id).with_for_update())  # noqa: E501
@@ -458,6 +537,18 @@ def enable_hot_topic_source(source_id: UUID,
     db.commit()
     return {"id": str(source.id), "enabled": True, "health_status": source.health_status}
 
+@router.post("/admin/opportunity-sources/{source_id}/disable")
+def disable_hot_topic_source(source_id: UUID,
+    auth: Annotated[AuthenticatedSession, Depends(require_admin_csrf)],
+    admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+    db: Annotated[Session, Depends(get_db)]) -> dict[str, object]:
+    source = db.scalar(select(HotTopicSource).where(HotTopicSource.id == source_id).with_for_update())  # noqa: E501
+    if source is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Source not found")
+    source.enabled = False
+    db.commit()
+    return {"id": str(source.id), "enabled": False, "health_status": source.health_status}
+
 @router.post("/opportunities/collect")
 def request_opportunity_collection(request: Request,
     auth: Annotated[AuthenticatedSession, Depends(require_csrf)],
@@ -466,7 +557,8 @@ def request_opportunity_collection(request: Request,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")]) -> dict[str, object]:
     store_id = _store_id(context)
     sources = db.scalars(select(HotTopicSource).where(HotTopicSource.enabled.is_(True),
-        HotTopicSource.source_type == "rss", HotTopicSource.terms_url.is_not(None),
+        HotTopicSource.source_type.in_(("rss", "public_feed")),
+        HotTopicSource.terms_url.is_not(None),
         HotTopicSource.permitted_use.is_not(None))).all()
     if not sources:
         return {"status": "unavailable", "job_id": None,
@@ -623,6 +715,8 @@ def list_metric_definitions(db: Annotated[Session, Depends(get_db)]) -> dict[str
 @router.get("/effects/observations")
 def list_metric_observations(context: Annotated[AuthContext, Depends(require_store_context)],
     db: Annotated[Session, Depends(get_db)], metric_tier: str | None = None,
+    channel_account_id: UUID | None = None, observation_scope: str | None = None,
+    authenticity_status: str | None = None,
     limit: int = Query(default=100, ge=1, le=500)) -> dict[str, object]:
     store_id = _store_id(context)
     statement = select(MetricObservation, MetricDefinition).join(
@@ -631,6 +725,31 @@ def list_metric_observations(context: Annotated[AuthContext, Depends(require_sto
         if metric_tier not in {"content_performance", "intent", "business_outcome"}:
             raise ApiError(422, "INVALID_METRIC_TIER", "Unknown metric tier")
         statement = statement.where(MetricObservation.metric_tier == metric_tier)
+    if channel_account_id is not None:
+        owned = db.scalar(select(ChannelAccount.id).where(
+            ChannelAccount.id == channel_account_id,
+            ChannelAccount.store_id == store_id))
+        if owned is None:
+            raise ApiError(404, "RESOURCE_NOT_FOUND", "Channel account not found")
+        statement = statement.where(
+            MetricObservation.channel_account_id == channel_account_id
+        )
+    if observation_scope:
+        if observation_scope not in {"work", "account", "store"}:
+            raise ApiError(422, "INVALID_OBSERVATION_SCOPE", "Unknown observation scope")
+        statement = statement.where(MetricObservation.observation_scope == observation_scope)
+    if authenticity_status:
+        if authenticity_status not in {
+            "official_api",
+            "verified_import",
+            "merchant_reported",
+            "merchant_authorized_scrape",
+            "demo_sample",
+        }:
+            raise ApiError(422, "INVALID_AUTHENTICITY_STATUS", "Unknown authenticity status")
+        statement = statement.where(
+            MetricObservation.authenticity_status == authenticity_status
+        )
     rows = db.execute(statement.order_by(MetricObservation.period_end.desc().nullslast(),
         MetricObservation.collected_at.desc()).limit(limit)).all()
     return {"items": [_observation_read(item, definition) for item, definition in rows]}

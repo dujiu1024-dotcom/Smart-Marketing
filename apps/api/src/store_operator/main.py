@@ -24,6 +24,7 @@ from store_operator.application.system_info import get_system_info
 from store_operator.auth.dependencies import (
     ADMIN_SESSION_COOKIE_NAME,
     SESSION_COOKIE_NAME,
+    SESSION_COOKIE_SECURE,
 )
 from store_operator.auth.errors import ApiError
 from store_operator.auth.router import router as auth_router
@@ -36,6 +37,7 @@ from store_operator.content_quality_router import router as content_quality_rout
 from store_operator.db import engine, redis_client
 from store_operator.jobs.router import router as jobs_router
 from store_operator.marketing_tasks.router import router as marketing_tasks_router
+from store_operator.metric_sync_router import router as metric_sync_router
 from store_operator.observability import configure_logging
 from store_operator.opportunity_effects_router import router as opportunity_effects_router
 from store_operator.prompt_management_router import router as prompt_management_router
@@ -180,7 +182,11 @@ async def http_exception_handler(
     )
     if getattr(request.state, "clear_session_cookie", False):
         response.delete_cookie(
-            SESSION_COOKIE_NAME, path="/", secure=True, httponly=True, samesite="lax"
+            SESSION_COOKIE_NAME,
+            path="/",
+            secure=SESSION_COOKIE_SECURE,
+            httponly=True,
+            samesite="lax",
         )
     if getattr(request.state, "clear_admin_session_cookie", False):
         response.delete_cookie(
@@ -238,6 +244,7 @@ app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(prompt_management_router, prefix="/api/v1")
 app.include_router(opportunity_effects_router, prefix="/api/v1")
+app.include_router(metric_sync_router, prefix="/api/v1")
 
 
 @app.get("/health/live", tags=["health"])

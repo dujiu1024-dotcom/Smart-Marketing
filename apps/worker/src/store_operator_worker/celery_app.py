@@ -43,6 +43,11 @@ celery_app.conf.update(
             "task": "jobs.recover_expired_leases",
             "schedule": 30.0,
         },
+        # 每日 03:15（Asia/Shanghai）执行热点池保留策略。
+        "purge-stale-hot-topics-daily": {
+            "task": "hot_topics.purge_retention",
+            "schedule": crontab(minute=15, hour=3),
+        },
         # 每天 08:00 / 18:00 采集热点并按门店做增量匹配。
         "collect-hot-topics-morning": {
             "task": "hot_topics.scheduled_collect",
@@ -65,6 +70,7 @@ configure_worker_logging()
 from store_operator_worker import ai_handlers as _ai_handlers  # noqa: F401
 from store_operator_worker import ai_image_handlers as _ai_image_handlers  # noqa: F401
 from store_operator_worker import hot_topics_schedule as _hot_topics_schedule  # noqa: F401
+from store_operator_worker import retention as _retention  # noqa: F401
 from store_operator_worker import tasks as _tasks  # noqa: F401
 
 

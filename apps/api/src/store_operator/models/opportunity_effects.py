@@ -162,6 +162,40 @@ class HotTopicMatchState(Base):
     match_version: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
+class HotTopicAICreativeCache(Base):
+    """大模型创意缓存：同一热点 + 门店上下文 + prompt 版本只调用一次。"""
+
+    __tablename__ = "hot_topic_ai_creative_cache"
+    __table_args__ = (
+        UniqueConstraint(
+            "hot_topic_id",
+            "store_context_hash",
+            "prompt_version",
+            name="uq_hot_topic_ai_creative_cache_key",
+        ),
+        Index("ix_hot_topic_ai_creative_cache_store", "store_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    hot_topic_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("hot_topics.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("stores.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    store_context_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    topic_content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    payload_json: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class StoreOpportunity(Base):
     __tablename__ = "store_opportunities"
     __table_args__ = (
@@ -171,6 +205,7 @@ class StoreOpportunity(Base):
         CheckConstraint("eligibility_status IN ('eligible', 'review_required', 'ineligible', 'unassessed')", name="eligibility_status"),  # noqa: E501
         CheckConstraint("match_method IN ('rules', 'semantic', 'hybrid', 'manual')",
             name="match_method"),
+        CheckConstraint("match_source IN ('rules', 'ai_creative')", name="match_source"),
         Index("ix_store_opportunities_store_expiry", "store_id", "expires_at"),
     )
 
@@ -192,6 +227,13 @@ class StoreOpportunity(Base):
     content_angle: Mapped[str | None] = mapped_column(Text)
     reason_summary: Mapped[str | None] = mapped_column(Text)
     risk_flags_json: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    # 机会来源：规则命中或大模型跨品类创意。
+    match_source: Mapped[str] = mapped_column(
+        String(16), default="rules", server_default="rules", nullable=False
+    )
+    ai_creative_json: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    ai_confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3))
+    ai_prompt_version: Mapped[str | None] = mapped_column(String(40))
     eligibility_status: Mapped[str] = mapped_column(String(24), default="unassessed",
         nullable=False)
     matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

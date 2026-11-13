@@ -395,6 +395,7 @@ class HotTopicSourceInput(BaseModel):
     display_name: str = Field(min_length=1, max_length=160)
     source_type: str = Field(default="rss", pattern="^(rss|public_feed)$")
     source_url: str = Field(min_length=1, max_length=2048)
+    fallback_url: str | None = Field(default=None, max_length=2048)
     terms_url: str = Field(min_length=1, max_length=2048)
     permitted_use: str = Field(min_length=10, max_length=2000)
     attribution_template: str | None = Field(default=None, max_length=500)
@@ -404,6 +405,7 @@ class HotTopicSourceUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     display_name: str | None = Field(default=None, min_length=1, max_length=160)
     source_url: str | None = Field(default=None, min_length=1, max_length=2048)
+    fallback_url: str | None = Field(default=None, max_length=2048)
     terms_url: str | None = Field(default=None, min_length=1, max_length=2048)
     permitted_use: str | None = Field(default=None, min_length=10, max_length=2000)
     attribution_template: str | None = Field(default=None, max_length=500)
@@ -420,16 +422,31 @@ def _validate_feed_url(value: str) -> str:
 
 # 复用 Easel 的热榜端点清单（skills/shared/hotlist-apis.md，60s API）。
 # 仅作为后台登记表单的可选预设，仍需通过条款 URL、域名白名单与启用准入。
-PUBLIC_FEED_PRESETS: tuple[dict[str, str], ...] = (
-    {"key": "weibo", "display_name": "微博热搜", "source_url": "https://60s.viki.moe/v2/weibo"},
-    {"key": "zhihu", "display_name": "知乎热榜", "source_url": "https://60s.viki.moe/v2/zhihu"},
-    {"key": "douyin", "display_name": "抖音热点", "source_url": "https://60s.viki.moe/v2/douyin"},
-    {"key": "baidu", "display_name": "百度热搜", "source_url": "https://60s.viki.moe/v2/baidu"},
-    {"key": "bili", "display_name": "B 站热榜", "source_url": "https://60s.viki.moe/v2/bili"},
-    {"key": "toutiao", "display_name": "头条热榜", "source_url": "https://60s.viki.moe/v2/toutiao"},
-    {"key": "rednote", "display_name": "小红书热点", "source_url": "https://60s.viki.moe/v2/rednote"},
-    {"key": "ai-news", "display_name": "AI 资讯", "source_url": "https://60s.viki.moe/v2/ai-news"},
-    {"key": "it-news", "display_name": "IT 资讯", "source_url": "https://60s.viki.moe/v2/it-news"},
+PUBLIC_FEED_PRESETS: tuple[dict[str, str | None], ...] = (
+    {"key": "weibo", "display_name": "微博热搜",
+     "source_url": "https://v2.xxapi.cn/api/weibohot",
+     "fallback_url": "https://60s.viki.moe/v2/weibo"},
+    {"key": "douyin", "display_name": "抖音热点",
+     "source_url": "https://v2.xxapi.cn/api/douyinhot",
+     "fallback_url": "https://60s.viki.moe/v2/douyin"},
+    {"key": "zhihu", "display_name": "知乎热榜",
+     "source_url": "https://api.zhihu.com/topstory/hot-list?limit=50",
+     "fallback_url": "https://api.zhihu.com/topstory/hot-lists/total?limit=50"},
+    {"key": "toutiao", "display_name": "头条热榜",
+     "source_url": "https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc",
+     "fallback_url": None},
+    {"key": "baidu", "display_name": "百度热搜",
+     "source_url": "https://v2.xxapi.cn/api/baiduhot",
+     "fallback_url": "https://60s.viki.moe/v2/baidu/hot"},
+    {"key": "bili", "display_name": "B 站热榜",
+     "source_url": "https://v2.xxapi.cn/api/bilibilihot",
+     "fallback_url": "https://60s.viki.moe/v2/bili"},
+    {"key": "rednote", "display_name": "小红书热点",
+     "source_url": "https://60s.viki.moe/v2/rednote", "fallback_url": None},
+    {"key": "ai-news", "display_name": "AI 资讯",
+     "source_url": "https://60s.viki.moe/v2/ai-news", "fallback_url": None},
+    {"key": "it-news", "display_name": "IT 资讯",
+     "source_url": "https://60s.viki.moe/v2/it-news", "fallback_url": None},
 )
 
 
@@ -458,12 +475,15 @@ def list_hot_topic_sources(
     sources = db.scalars(select(HotTopicSource).order_by(HotTopicSource.created_at.desc())).all()
     return {"items": [{"id": str(item.id), "source_key": item.source_key,
         "display_name": item.display_name, "source_type": item.source_type,
-        "source_url": item.source_url, "terms_url": item.terms_url, "enabled": item.enabled,
+        "source_url": item.source_url, "fallback_url": item.fallback_url,
+        "terms_url": item.terms_url, "enabled": item.enabled,
         "permitted_use": item.permitted_use,
         "attribution_template": item.attribution_template,
         "health_status": item.health_status,
         "last_success_at": item.last_success_at.isoformat() if item.last_success_at else None,
-        "last_failure_at": item.last_failure_at.isoformat() if item.last_failure_at else None}
+        "last_failure_at": item.last_failure_at.isoformat() if item.last_failure_at else None,
+        "last_error_code": item.last_error_code,
+        "last_error_summary": item.last_error_summary}
         for item in sources]}
 
 @router.post("/admin/opportunity-sources")
@@ -474,9 +494,14 @@ def create_hot_topic_source(payload: HotTopicSourceInput,
     source = HotTopicSource(id=uuid4(), source_key=payload.source_key.strip(),
         display_name=payload.display_name.strip(), source_type=payload.source_type,
         source_url=_validate_feed_url(payload.source_url),
-            terms_url=_validate_feed_url(payload.terms_url),
+        fallback_url=(
+            _validate_feed_url(payload.fallback_url.strip())
+            if payload.fallback_url and payload.fallback_url.strip()
+            else None
+        ),
+        terms_url=_validate_feed_url(payload.terms_url),
         permitted_use=payload.permitted_use.strip(),
-            attribution_template=payload.attribution_template,
+        attribution_template=payload.attribution_template,
         enabled=False, health_status="unknown")
     db.add(source)
     try:
@@ -505,6 +530,13 @@ def update_hot_topic_source(source_id: UUID, payload: HotTopicSourceUpdate,
         source.display_name = payload.display_name.strip()
     if payload.source_url is not None:
         source.source_url = _validate_feed_url(payload.source_url)
+    if payload.fallback_url is not None:
+        # 空字符串表示清空备用地址。
+        source.fallback_url = (
+            _validate_feed_url(payload.fallback_url.strip())
+            if payload.fallback_url.strip()
+            else None
+        )
     if payload.terms_url is not None:
         source.terms_url = _validate_feed_url(payload.terms_url)
     if payload.permitted_use is not None:
@@ -515,9 +547,12 @@ def update_hot_topic_source(source_id: UUID, payload: HotTopicSourceUpdate,
     db.commit()
     return {"id": str(source.id), "display_name": source.display_name,
         "source_type": source.source_type, "source_url": source.source_url,
+        "fallback_url": source.fallback_url,
         "terms_url": source.terms_url, "permitted_use": source.permitted_use,
         "attribution_template": source.attribution_template,
-        "enabled": source.enabled, "health_status": source.health_status}
+        "enabled": source.enabled, "health_status": source.health_status,
+        "last_error_code": source.last_error_code,
+        "last_error_summary": source.last_error_summary}
 
 @router.post("/admin/opportunity-sources/{source_id}/enable")
 def enable_hot_topic_source(source_id: UUID,
@@ -528,6 +563,8 @@ def enable_hot_topic_source(source_id: UUID,
     if source is None:
         raise ApiError(404, "RESOURCE_NOT_FOUND", "Source not found")
     _validate_feed_url(source.source_url)
+    if source.fallback_url:
+        _validate_feed_url(source.fallback_url)
     _validate_feed_url(source.terms_url or "")
     if not source.permitted_use:
         raise ApiError(409, "SOURCE_TERMS_REQUIRED",
@@ -581,7 +618,7 @@ def request_opportunity_collection(request: Request,
 
 @router.get("/opportunities")
 def list_opportunities(context: Annotated[AuthContext, Depends(require_store_context)],
-    db: Annotated[Session, Depends(get_db)], limit: int = Query(default=50, ge=1, le=200),
+    db: Annotated[Session, Depends(get_db)], limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0), query: str | None = None,
     status_filter: str | None = Query(default=None, alias="status")) -> dict[str, object]:
     store_id = _store_id(context)
@@ -616,6 +653,10 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
             "relevance_score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,  # noqa: E501
             "match_method": opportunity.match_method,
             "matching_algorithm_version": opportunity.matching_algorithm_version,
+            "match_source": opportunity.match_source,
+            "ai_creative": opportunity.ai_creative_json,
+            "ai_confidence": (str(opportunity.ai_confidence)
+                if opportunity.ai_confidence is not None else None),
             "reason_summary": opportunity.reason_summary,
             "suggested_scenario": opportunity.suggested_scenario,
                 "content_angle": opportunity.content_angle,
@@ -623,6 +664,8 @@ def list_opportunities(context: Annotated[AuthContext, Depends(require_store_con
                 "eligibility_status": opportunity.eligibility_status,
             "decision": decision.decision if decision else None})
     return {"items": items, "total": total,
+        "page": offset // limit + 1, "page_size": limit,
+        "total_pages": (total + limit - 1) // limit,
         "source_status": "available" if total else "unavailable",
         "empty_reason": None if items else (
             "当前没有已核验来源生成的有效机会；请勿将演示样例视为实时热点。按需制作仍可直接使用。"
@@ -648,6 +691,11 @@ def get_opportunity(opportunity_id: UUID, context: Annotated[AuthContext,
         "match": {"score": str(opportunity.relevance_score) if opportunity.relevance_score is not None else None,  # noqa: E501
             "method": opportunity.match_method,
             "algorithm_version": opportunity.matching_algorithm_version,
+            "source": opportunity.match_source,
+            "ai_creative": opportunity.ai_creative_json,
+            "ai_confidence": (str(opportunity.ai_confidence)
+                if opportunity.ai_confidence is not None else None),
+            "ai_prompt_version": opportunity.ai_prompt_version,
             "reason": opportunity.reason_summary,
             "products": opportunity.matched_product_ids_json,
                 "offers": opportunity.matched_offer_ids_json,
@@ -682,10 +730,10 @@ def decide_opportunity(opportunity_id: UUID, payload: DecisionInput, request: Re
     if row is None:
         raise ApiError(404, "RESOURCE_NOT_FOUND", "Resource not found")
     opportunity, topic = row
-    if payload.decision == "adopt" and (topic.evidence_status != "collected" or opportunity.eligibility_status != "eligible" or  # noqa: E501
+    if payload.decision == "adopt" and (topic.evidence_status != "collected" or opportunity.eligibility_status not in {"eligible", "review_required"} or  # noqa: E501
         opportunity.stale_at is not None or (opportunity.expires_at and opportunity.expires_at <= datetime.now(UTC))):  # noqa: E501
         raise ApiError(409, "OPPORTUNITY_NOT_ADOPTABLE",
-            "Opportunity is expired, stale or requires review")
+            "Opportunity is expired, stale or not adoptable")
     item = OpportunityDecision(id=uuid4(), store_id=store_id, opportunity_id=opportunity_id,
         actor_user_id=auth.user.id, decision=payload.decision, reason=payload.reason,
             idempotency_key=key)

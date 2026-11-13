@@ -36,6 +36,13 @@ from store_operator.models import (  # type: ignore[import-untyped]
     StoreProfile,
 )
 
+from store_operator_worker.hot_topic_creative import (
+    CreativeCandidate,
+    CreativeProposal,
+    ai_rematch,
+    create_ai_opportunity,
+)
+
 # 匹配算法版本变化会写入门店上下文哈希，触发该店全量回填重算。
 MATCHING_ALGORITHM_VERSION = 5
 
@@ -49,6 +56,10 @@ BRAND_WEIGHT = 0.10
 
 ELIGIBLE_THRESHOLD = 0.45
 REVIEW_THRESHOLD = 0.30
+
+# AI 创意重算：每店每轮最多送 8 条；低分热点只有在热度前 N 名时才送模型。
+MAX_AI_CANDIDATES_PER_STORE = 8
+AI_HIGH_HEAT_TOP = 20
 
 DEFAULT_MAX_OPPORTUNITIES_PER_STORE = 5
 TOPIC_BATCH_SIZE = 200
@@ -141,6 +152,7 @@ class Evaluation:
     best_product_name: str | None
     best_offer_title: str | None
     reason: str
+    category_specific: bool = False
 
     @property
     def heat(self) -> Decimal:
@@ -156,6 +168,9 @@ class MatchOutcome:
     duplicate_events: int = 0
     deferred_by_cap: int = 0
     store_context_changed: bool = False
+    rule_created: int = 0
+    ai_created: int = 0
+    ai: dict[str, object] = field(default_factory=dict)
     items: list[dict[str, object]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, object]:
@@ -163,10 +178,13 @@ class MatchOutcome:
             "store_id": self.store_id,
             "evaluated": self.evaluated,
             "opportunities_created": self.created,
+            "rule_opportunities_created": self.rule_created,
+            "ai_opportunities_created": self.ai_created,
             "skipped_below_threshold": self.skipped,
             "duplicate_events": self.duplicate_events,
             "deferred_by_cap": self.deferred_by_cap,
             "store_context_changed": self.store_context_changed,
+            "ai_creative": self.ai,
             "items": self.items,
         }
 
@@ -554,7 +572,7 @@ def evaluate_topic(topic: HotTopic, ctx: StoreContext, idf: dict[str, float]) ->
     )
     # 至少要命中一个内容词，否则纯品类/地域重合不算匹配（仍保留为 AI 候选信号）。
     if not entity_hits:
-        return None
+        entity_score = 0.0
     audience_hits, audience_ids, audience_score = _match_audience_hits(text, ctx, idf)
 
     topic_regions = _extract_topic_regions(topic)
@@ -592,7 +610,7 @@ def evaluate_topic(topic: HotTopic, ctx: StoreContext, idf: dict[str, float]) ->
 
     reasons: list[str] = []
     if not ctx.categories:
-        reasons.append("门店行业标签未能从业态/商品推断，只能人工复核")
+        reasons.append("门店行业标签未能从业态/商品推断，交由 AI 创意重算判断")
     if not category_hits:
         reasons.append("未命中门店品类")
     elif not specific_hits:
@@ -604,19 +622,16 @@ def evaluate_topic(topic: HotTopic, ctx: StoreContext, idf: dict[str, float]) ->
     if score < ELIGIBLE_THRESHOLD:
         reasons.append(f"加权得分低于可采纳阈值 {ELIGIBLE_THRESHOLD:.2f}")
 
-    if (
-        ctx.categories
-        and specific_hits
-        and not reasons
-        and score >= ELIGIBLE_THRESHOLD
-    ):
+    # 规则层不再设置人工闸门：达不到可采纳条件的一律标记 weak，
+    # 交给大模型创意重算（见 hot_topic_creative）决定是否可用。
+    if not ctx.categories or not specific_hits or not entity_hits:
+        status = "weak"
+    elif not reasons and score >= ELIGIBLE_THRESHOLD:
         status = "eligible"
     elif score >= REVIEW_THRESHOLD:
         status = "review_required"
     else:
-        return None
-    if not ctx.categories or not specific_hits:
-        status = "review_required"
+        status = "weak"
 
     category_desc = "、".join(
         f"{category}（{keyword}）" for category, keyword in category_hits.items()
@@ -654,7 +669,50 @@ def evaluate_topic(topic: HotTopic, ctx: StoreContext, idf: dict[str, float]) ->
         best_product_name=best_product,
         best_offer_title=best_offer,
         reason=reason,
+        category_specific=bool(specific_hits),
     )
+
+
+def select_ai_candidates(
+    evaluations: list[Evaluation],
+    high_heat_ids: set[UUID],
+) -> list[CreativeCandidate]:
+    """挑出值得送大模型的低分/跨品类热点，按优先级与分数排序。"""
+    scored: list[tuple[int, float, Decimal, CreativeCandidate]] = []
+    for evaluation in evaluations:
+        if evaluation.status == "eligible":
+            continue
+        if "brand_prohibited_phrase" in evaluation.risk_flags:
+            continue
+        if evaluation.status == "review_required":
+            priority = 0
+        elif not evaluation.category_specific and (
+            evaluation.entity_hits or evaluation.region_state == "matched"
+        ):
+            priority = 1
+        elif evaluation.topic.id in high_heat_ids:
+            priority = 2
+        else:
+            continue
+        scored.append(
+            (
+                priority,
+                evaluation.score,
+                evaluation.heat,
+                CreativeCandidate(
+                    topic=evaluation.topic,
+                    rule_score=evaluation.score,
+                    rule_status=evaluation.status,
+                    category_hits=evaluation.category_hits,
+                    entity_hits=evaluation.entity_hits,
+                    audience_hits=evaluation.audience_hits,
+                    region_state=evaluation.region_state,
+                    category_specific=evaluation.category_specific,
+                ),
+            )
+        )
+    scored.sort(key=lambda item: (item[0], -item[1], -item[2]))
+    return [item[3] for item in scored[:MAX_AI_CANDIDATES_PER_STORE]]
 
 
 def _valid_topic_conditions(now: datetime) -> list[object]:
@@ -842,13 +900,87 @@ def match_store(
                 duplicate_topic_ids.append(evaluation.topic.id)
 
     limit = max_opportunities or _max_opportunities_per_store()
-    ranked = sorted(
-        evaluations.values(), key=lambda item: (item.score, item.heat), reverse=True
+    high_heat_ids = {
+        row[0]
+        for row in db.execute(
+            select(HotTopic.id)
+            .where(*_valid_topic_conditions(now))
+            .order_by(HotTopic.heat_value.desc().nullslast(), HotTopic.id)
+            .limit(AI_HIGH_HEAT_TOP)
+        ).all()
+    }
+    candidates = select_ai_candidates(list(evaluations.values()), high_heat_ids)
+    ai_proposals, ai_outcome = ai_rematch(
+        db,
+        store_id=store_id,
+        ctx=ctx,
+        candidates=candidates,
+        now=now,
+        job_id=job_id,
+        attempt_id=attempt_id,
     )
-    selected = ranked[:limit]
-    deferred = ranked[limit:]
+    outcome.ai = ai_outcome.as_dict()
 
-    for evaluation in selected:
+    ai_by_topic = {proposal.topic.id: proposal for proposal in ai_proposals}
+    merged: list[tuple[float, Decimal, Evaluation | CreativeProposal]] = []
+    for evaluation in evaluations.values():
+        if evaluation.status == "eligible":
+            merged.append(
+                (round(evaluation.score * 100, 3), evaluation.heat, evaluation)
+            )
+        elif (
+            evaluation.status == "review_required"
+            and evaluation.topic.id not in ai_by_topic
+            and evaluation.topic.id not in ai_outcome.excluded_topic_ids
+        ):
+            # 模型失败/未配置时降级回规则结果；模型明确排除的不回退。
+            merged.append(
+                (round(evaluation.score * 100, 3), evaluation.heat, evaluation)
+            )
+    for proposal in ai_proposals:
+        merged.append(
+            (proposal.score, proposal.topic.heat_value or Decimal(0), proposal)
+        )
+    merged.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    selected = merged[:limit]
+    deferred = merged[limit:]
+
+    selected_topic_ids: list[UUID] = []
+    for score, _heat, payload in selected:
+        if isinstance(payload, CreativeProposal):
+            proposal = payload
+            topic = proposal.topic
+            create_ai_opportunity(
+                db,
+                store_id=store_id,
+                proposal=proposal,
+                store_context_fingerprint=ctx.fingerprint,
+                algorithm_version=MATCHING_ALGORITHM_VERSION,
+                version=versions.get(topic.id, 0) + 1,
+                now=now,
+            )
+            outcome.created += 1
+            outcome.ai_created += 1
+            outcome.items.append(
+                {
+                    "topic_id": str(topic.id),
+                    "title": topic.title,
+                    "score": score,
+                    "status": "eligible",
+                    "source": "ai_creative",
+                    "reason": proposal.reason,
+                }
+            )
+            content_hash = topic_content_hash(
+                topic.title, topic.summary, topic.topic_tags_json
+            )
+            _upsert_state(
+                db, states, store_id, topic, content_hash, ctx.fingerprint, now
+            )
+            selected_topic_ids.append(topic.id)
+            continue
+
+        evaluation = payload
         topic = evaluation.topic
         version = versions.get(topic.id, 0) + 1
         db.add(
@@ -861,6 +993,7 @@ def match_store(
                 matching_algorithm_version=MATCHING_ALGORITHM_VERSION,
                 relevance_score=round(Decimal(str(evaluation.score)) * 100, 3),
                 match_method="rules",
+                match_source="rules",
                 matched_product_ids_json=evaluation.product_ids,
                 matched_offer_ids_json=evaluation.offer_ids,
                 matched_audience_profile_ids_json=evaluation.audience_ids,
@@ -878,23 +1011,27 @@ def match_store(
             )
         )
         outcome.created += 1
+        outcome.rule_created += 1
         outcome.items.append(
             {
                 "topic_id": str(topic.id),
                 "title": topic.title,
                 "score": evaluation.score,
                 "status": evaluation.status,
+                "source": "rules",
                 "reason": evaluation.reason,
             }
         )
         content_hash = topic_content_hash(topic.title, topic.summary, topic.topic_tags_json)
         _upsert_state(db, states, store_id, topic, content_hash, ctx.fingerprint, now)
+        selected_topic_ids.append(topic.id)
 
-    # 同事件落选、低于阈值、已给过当前上下文的条目也写状态，避免重复计算。
+    # 同事件落选、被丢弃、被模型排除的条目也写状态，避免重复计算与重复烧配额。
     handled_ids = {
-        *(item.topic.id for item in selected),
+        *selected_topic_ids,
         *duplicate_topic_ids,
         *discarded_topic_ids,
+        *ai_outcome.excluded_topic_ids,
     }
     for topic, content_hash in evaluated_topics.values():
         if topic.id in handled_ids:
@@ -923,6 +1060,8 @@ def reconcile_all_stores(
         "stores": len(store_ids),
         "evaluated": 0,
         "opportunities_created": 0,
+        "rule_opportunities_created": 0,
+        "ai_opportunities_created": 0,
         "store_context_recomputed": 0,
     }
     for store_id in store_ids:
@@ -931,6 +1070,15 @@ def reconcile_all_stores(
                 outcome = match_store(db, store_id)
             totals["evaluated"] += outcome.evaluated
             totals["opportunities_created"] += outcome.created
+            totals["rule_opportunities_created"] += outcome.rule_created
+            totals["ai_opportunities_created"] += outcome.ai_created
+            ai_errors = outcome.ai.get("errors") if outcome.ai else None
+            if isinstance(ai_errors, list) and ai_errors:
+                logger.warning(
+                    "hot topic AI creative errors for store %s: %s",
+                    store_id,
+                    [item.get("error_code") for item in ai_errors if isinstance(item, dict)],
+                )
             if outcome.store_context_changed:
                 totals["store_context_recomputed"] += 1
         except Exception:  # pragma: no cover - 单店失败不阻塞对账

@@ -194,7 +194,7 @@ def create_marketing_task(
                 StoreOpportunity.id == payload.opportunity_id,
                 StoreOpportunity.store_id == store_id,
                 StoreOpportunity.stale_at.is_(None),
-                StoreOpportunity.eligibility_status == "eligible",
+                StoreOpportunity.eligibility_status.in_(["eligible", "review_required"]),
                 HotTopic.evidence_status == "collected",
                 (StoreOpportunity.expires_at.is_(None))
                 | (StoreOpportunity.expires_at > now),

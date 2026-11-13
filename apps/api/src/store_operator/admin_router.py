@@ -974,6 +974,7 @@ def list_opportunity_matches(
     eligibility: Literal[
         "eligible", "review_required", "ineligible", "unassessed"
     ] | None = None,
+    match_source: Literal["rules", "ai_creative"] | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
@@ -984,6 +985,18 @@ def list_opportunity_matches(
         conditions.append(HotTopic.title.ilike(f"%{query.strip()[:120]}%"))
     if eligibility:
         conditions.append(StoreOpportunity.eligibility_status == eligibility)
+    source_rows = db.execute(
+        select(StoreOpportunity.match_source, func.count())
+        .select_from(StoreOpportunity)
+        .join(HotTopic, HotTopic.id == StoreOpportunity.hot_topic_id)
+        .where(*conditions, StoreOpportunity.stale_at.is_(None))
+        .group_by(StoreOpportunity.match_source)
+    ).all()
+    source_counts: dict[str, int] = {
+        str(row[0]): int(row[1]) for row in source_rows
+    }
+    if match_source:
+        conditions.append(StoreOpportunity.match_source == match_source)
     total = db.scalar(
         select(func.count())
         .select_from(StoreOpportunity)
@@ -1017,6 +1030,14 @@ def list_opportunity_matches(
                 ),
                 "match_method": opportunity.match_method,
                 "matching_algorithm_version": opportunity.matching_algorithm_version,
+                "match_source": opportunity.match_source,
+                "ai_creative": opportunity.ai_creative_json,
+                "ai_confidence": (
+                    str(opportunity.ai_confidence)
+                    if opportunity.ai_confidence is not None
+                    else None
+                ),
+                "ai_prompt_version": opportunity.ai_prompt_version,
                 "eligibility_status": opportunity.eligibility_status,
                 "reason_summary": opportunity.reason_summary,
                 "suggested_scenario": opportunity.suggested_scenario,
@@ -1034,6 +1055,10 @@ def list_opportunity_matches(
             for opportunity, topic, store in rows
         ],
         "total": int(total),
+        "source_counts": {
+            "rules": int(source_counts.get("rules", 0)),
+            "ai_creative": int(source_counts.get("ai_creative", 0)),
+        },
     }
 
 

@@ -98,6 +98,21 @@ def _consume_login_attempt(keys: tuple[str, str]) -> None:
         raise ApiError(429, "RATE_LIMITED", "Too many login attempts")
 
 
+def _default_active_store_id(db: Session, user_id: UUID) -> UUID | None:
+    """Return the first active store so login establishes store context immediately."""
+    return db.scalar(
+        select(StoreMembership.store_id)
+        .join(Store, Store.id == StoreMembership.store_id)
+        .where(
+            StoreMembership.user_id == user_id,
+            StoreMembership.status == "active",
+            Store.status == "active",
+        )
+        .order_by(Store.name, Store.id)
+        .limit(1)
+    )
+
+
 def issue_session(
     db: Session,
     request: Request,
@@ -174,7 +189,10 @@ def login(
                 503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
             ) from exc
         auth_session, raw_token, csrf_token, expires_at = issue_session(
-            db, request, user
+            db,
+            request,
+            user,
+            active_store_id=_default_active_store_id(db, user.id),
         )
         record_audit(
             db,

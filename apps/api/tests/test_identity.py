@@ -165,10 +165,11 @@ def test_login_cookie_csrf_and_me(identity_client, db_session, monkeypatch):
 
     me = identity_client.get("/api/v1/auth/me")
     assert me.status_code == 200
-    assert me.json()["active_store"] is None
+    assert me.json()["active_store"]["id"] == str(store.id)
 
     stores = identity_client.get("/api/v1/me/stores")
     assert stores.status_code == 200
+    assert stores.json()["active_store_id"] == str(store.id)
     assert stores.json()["items"] == [
         {"id": str(store.id), "name": "Store A", "role": "owner"}
     ]
@@ -288,6 +289,44 @@ def test_platform_admin_only_can_manage_members_and_last_owner_is_protected(
     )
     assert last_owner.status_code == 409
     assert last_owner.json()["error"]["code"] == "LAST_OWNER_REQUIRED"
+
+
+def test_admin_created_store_user_logs_in_with_store_context(
+    identity_client, db_session, monkeypatch
+):
+    fake_redis(monkeypatch)
+    admin = make_user(db_session, "creator-admin@example.com")
+    initial_owner = make_user(db_session, "initial-owner@example.com")
+    store = make_store(db_session, "Created Store", initial_owner)
+    db_session.add(
+        PlatformAdminGrant(
+            id=uuid4(), user_id=admin.id, status="active", reason_code="test"
+        )
+    )
+    db_session.flush()
+
+    login(identity_client, "creator-admin@example.com")
+    created = identity_client.post(
+        "/api/v1/admin/store-users",
+        json={
+            "store_id": str(store.id),
+            "email": "new-owner@example.com",
+            "password": "created-password-123",
+            "role": "owner",
+        },
+        headers={**ORIGIN, "X-CSRF-Token": csrf_for(identity_client)},
+    )
+    assert created.status_code == 201, created.text
+
+    identity_client.cookies.clear()
+    login(identity_client, "new-owner@example.com", "created-password-123")
+    me = identity_client.get("/api/v1/auth/me")
+    assert me.json()["active_store"]["id"] == str(store.id)
+    stores = identity_client.get("/api/v1/me/stores").json()
+    assert stores["active_store_id"] == str(store.id)
+    assert stores["items"] == [
+        {"id": str(store.id), "name": "Created Store", "role": "owner"}
+    ]
 
 
 def test_member_removal_takes_effect_on_the_next_request(

@@ -168,6 +168,7 @@ function Field({
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [stores, setStores] = useState<StoreMembership[]>([]);
+  const [storesReady, setStoresReady] = useState(false);
   const [storeId, setStoreId] = useState("");
   const [profile, setProfile] = useState<StoreProfile | null>(null);
   const [form, setForm] = useState<ProfileForm>(emptyForm);
@@ -193,19 +194,27 @@ export default function App() {
   const taskWorkspaceRoute = ["#ai", "#tasks", "#create", "#task"].includes(route);
 
   const loadStoreContext = useCallback(async () => {
+    setStoresReady(false);
     const response = await getStores();
+    setStores(response.items);
     if (!response.items.length) {
-      setStores([]);
       setStoreId("");
+      setStoresReady(true);
       return;
     }
     let activeId = response.active_store_id;
     if (!activeId || !response.items.some((store) => store.id === activeId)) {
       activeId = response.items[0].id;
-      await setActiveStore(activeId);
+      setStoreId(activeId);
+      try {
+        await setActiveStore(activeId);
+      } catch (reason) {
+        // Keep the locally selected store usable; surface the context error separately.
+        setError(errorMessage(reason));
+      }
     }
-    setStores(response.items);
     setStoreId(activeId);
+    setStoresReady(true);
   }, []);
 
   useEffect(() => {
@@ -358,12 +367,25 @@ export default function App() {
       clearCsrfToken();
       setUser(null);
       setStores([]);
+      setStoresReady(false);
       setStoreId("");
       setProfile(null);
       setPassword("");
       setNotice("");
     } catch (reason) {
       setError(errorMessage(reason));
+    }
+  }
+
+  async function retryStoreContext() {
+    setLoading(true);
+    setError("");
+    try {
+      await loadStoreContext();
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -395,6 +417,22 @@ export default function App() {
       </main>
     );
   }
+
+  const storeContextFallback = !stores.length ? (
+    storesReady ? (
+      <section className="empty-card">
+        <h2>当前账号尚未加入门店</h2>
+        <p>请联系门店所有者邀请你加入后，再维护门店经营资料。平台管理员账号不绑定门店，请从平台运营后台登录。</p>
+        <button className="text-button" type="button" onClick={() => void signOut()}>退出并切换账号</button>
+      </section>
+    ) : (
+      <section className="empty-card">
+        <h2>门店信息读取失败</h2>
+        <p>登录状态已建立，但未能读取门店归属，请重试。</p>
+        <button className="text-button" type="button" onClick={() => void retryStoreContext()}>重新读取</button>
+      </section>
+    )
+  ) : null;
 
   return (
     <div className="app-shell">
@@ -441,7 +479,7 @@ export default function App() {
           <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠、品牌规范、客群与经营、门店知识库、素材资产及营销任务控制。策略生成仍待接入；抖音账号 OAuth 页面已接入，真实应用凭据和账号授权验收仍待完成，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
-          {!stores.length ? <section className="empty-card"><h2>当前账号尚未加入门店</h2><p>请联系门店所有者邀请你加入后，再维护经营资料。</p></section> : taskWorkspaceRoute ? <MarketingTaskWorkspace storeId={storeId} /> : hotspotRoute ? <HotspotWorkspace storeId={storeId} /> : effectsRoute ? <EffectsWorkspace storeId={storeId} /> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : knowledgeRoute ? <KnowledgeWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : channelsRoute ? <ChannelAccountsWorkspace storeId={storeId} /> : <>
+          {!stores.length ? storeContextFallback : taskWorkspaceRoute ? <MarketingTaskWorkspace storeId={storeId} /> : hotspotRoute ? <HotspotWorkspace storeId={storeId} /> : effectsRoute ? <EffectsWorkspace storeId={storeId} /> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : knowledgeRoute ? <KnowledgeWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : channelsRoute ? <ChannelAccountsWorkspace storeId={storeId} /> : <>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STORE PROFILE</p>
@@ -457,13 +495,7 @@ export default function App() {
             </div>
           )}
           {notice && <div className="alert success" role="status">{notice}</div>}
-          {!stores.length ? (
-            <section className="empty-card">
-              <h2>当前账号尚未加入门店</h2>
-              <p>请联系门店所有者邀请你加入后，再维护门店经营资料。</p>
-              <button className="text-button" onClick={() => void signOut()}>退出并切换账号</button>
-            </section>
-          ) : profileLoading ? (
+          {!stores.length ? storeContextFallback : profileLoading ? (
             <div className="loading-card"><span className="spinner" />正在读取门店档案…</div>
           ) : (
             <form className="profile-form" onSubmit={saveProfile}>

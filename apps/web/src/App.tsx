@@ -552,7 +552,7 @@ export default function App() {
           </nav>
         </aside>
         <main className="content">
-          {!stores.length ? storeContextFallback : taskWorkspaceRoute ? <MarketingTaskWorkspace storeId={storeId} /> : hotspotRoute ? <HotspotWorkspace storeId={storeId} /> : effectsRoute ? <EffectsWorkspace storeId={storeId} /> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : knowledgeRoute ? <KnowledgeWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : channelsRoute ? <ChannelAccountsWorkspace storeId={storeId} /> : <>
+          {!stores.length ? storeContextFallback : taskWorkspaceRoute ? <MarketingTaskWorkspace storeId={storeId} storeName={stores.find((store) => store.id === storeId)?.name} /> : hotspotRoute ? <HotspotWorkspace storeId={storeId} /> : effectsRoute ? <EffectsWorkspace storeId={storeId} /> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : knowledgeRoute ? <KnowledgeWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : channelsRoute ? <ChannelAccountsWorkspace storeId={storeId} /> : <>
           <div className="page-heading">
             <div>
               <p className="eyebrow">STORE PROFILE</p>

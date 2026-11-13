@@ -9,11 +9,12 @@ import {
   createTaskArtifact, createTaskArtifactVersion, createTaskArtifactReview,
   getProducts, getStoreProfile, listMarketingTasks, recoverMarketingTaskStep,
   skipMarketingTaskStep, updateMarketingTaskRequirement, updateMarketingTaskStrategy,
+  getOpportunities,
   type BusinessFactReference, type ContentArtifact, type ArtifactVersionRecord,
   type MediaAsset, type MarketingTask, type MarketingTaskCreateInput,
   type MarketingTaskSummary, type MarketingTaskType, type TaskStep, type TaskStepKey,
   type ChannelContentRecord, type ChannelSpecRecord, type PublishPackageRecord,
-  type TaskBusinessFactSnapshot,
+  type TaskBusinessFactSnapshot, type OpportunityItem,
 } from "./api";
 
 const taskTypeLabels: Record<MarketingTaskType, string> = {
@@ -98,6 +99,12 @@ const readText = (record: Record<string, unknown>, key: string) => typeof record
 function safeJson(value: Record<string, unknown>): string { return JSON.stringify(value, null, 2); }
 interface FactOption extends BusinessFactReference { label: string; }
 interface DraftForm { goal: string; target_audience: string; core_message: string; constraints: string; }
+interface AiArtifactEntry {
+  taskId: string;
+  taskTitle: string;
+  artifact: ContentArtifact;
+  version: ArtifactVersionRecord;
+}
 
 function requirementForm(value: Record<string, unknown>): DraftForm {
   return {
@@ -125,9 +132,15 @@ function taskTypeOptions(type: MarketingTaskType) {
   return { includes_copy: true, includes_image: true };
 }
 
-export default function MarketingTaskWorkspace({ storeId }: { storeId: string }) {
+export default function MarketingTaskWorkspace({ storeId, storeName }: { storeId: string; storeName?: string }) {
   const [route, setRoute] = useState(window.location.hash || "#ai");
   const [items, setItems] = useState<MarketingTaskSummary[]>([]);
+  const [aiOpportunities, setAiOpportunities] = useState<OpportunityItem[]>([]);
+  const [aiOpportunitySource, setAiOpportunitySource] = useState<"available" | "unavailable">("available");
+  const [aiArtifacts, setAiArtifacts] = useState<AiArtifactEntry[]>([]);
+  const [aiImageUrls, setAiImageUrls] = useState<Record<string, string>>({});
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const [task, setTask] = useState<MarketingTask | null>(null);
   const [facts, setFacts] = useState<FactOption[]>([]);
   const [selectedFacts, setSelectedFacts] = useState<string[]>([]);
@@ -189,6 +202,47 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       setItems(response.items);
     } catch (reason) { setError(errorText(reason)); }
     finally { setLoading(false); }
+  }, [storeId]);
+
+  const loadAiHome = useCallback(async () => {
+    setAiLoading(true); setAiError("");
+    try {
+      const [taskResponse, opportunityResponse] = await Promise.all([
+        listMarketingTasks(storeId),
+        getOpportunities(storeId).catch(() => null),
+      ]);
+      setItems(taskResponse.items);
+      if (opportunityResponse) {
+        setAiOpportunities(opportunityResponse.items);
+        setAiOpportunitySource(opportunityResponse.source_status);
+      } else {
+        setAiOpportunitySource("unavailable");
+      }
+      const recentTasks = taskResponse.items.slice(0, 4);
+      const artifactResults = await Promise.allSettled(recentTasks.map(item => listTaskArtifacts(storeId, item.id)));
+      const entries: AiArtifactEntry[] = [];
+      artifactResults.forEach((result, index) => {
+        if (result.status !== "fulfilled") return;
+        const taskItem = recentTasks[index];
+        for (const artifact of result.value) {
+          const version = artifact.versions.find(item => item.id === artifact.current_version_id) ?? artifact.versions[artifact.versions.length - 1];
+          if (!version) continue;
+          entries.push({ taskId: taskItem.id, taskTitle: taskItem.title, artifact, version });
+        }
+      });
+      entries.sort((left, right) => new Date(right.version.created_at).getTime() - new Date(left.version.created_at).getTime());
+      const topEntries = entries.slice(0, 6);
+      setAiArtifacts(topEntries);
+      const imageEntries = topEntries.filter(entry => entry.artifact.artifact_type === "image");
+      const urlPairs = await Promise.all(imageEntries.map(async entry => {
+        try {
+          const info = await getArtifactVersionDownloadUrl(storeId, entry.taskId, entry.artifact.id, entry.version.id);
+          return [entry.version.id, info.url] as const;
+        } catch { return null; }
+      }));
+      setAiImageUrls(Object.fromEntries(urlPairs.filter((pair): pair is readonly [string, string] => Boolean(pair))));
+    } catch (reason) { setAiError(errorText(reason)); }
+    finally { setAiLoading(false); }
   }, [storeId]);
 
   const loadTask = useCallback(async () => {
@@ -377,6 +431,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     return () => window.removeEventListener("hashchange", onRoute);
   }, []);
   useEffect(() => {
+    if (route === "#ai") void loadAiHome();
     if (route === "#tasks") void loadTasks();
     if (route === "#task") {
       void loadTask(); void loadFacts();
@@ -408,7 +463,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       createKey.current = sessionStorage.getItem(key) ?? crypto.randomUUID();
       sessionStorage.setItem(key, createKey.current);
     }
-  }, [route, storeId, loadTasks, loadTask, loadFacts, loadContent]);
+  }, [route, storeId, loadTasks, loadAiHome, loadTask, loadFacts, loadContent]);
 
   const filteredItems = useMemo(() => filter === "all" ? items : items.filter(item => item.lifecycle_status === filter), [items, filter]);
   const stepProgress = task ? task.steps.filter(step => step.status === "succeeded" || step.status === "skipped").length : 0;
@@ -416,6 +471,21 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   function openTask(id: string) {
     sessionStorage.setItem(selectedTaskKey(storeId), id);
     window.location.hash = "#task";
+  }
+  function openTaskContent(entry: AiArtifactEntry) {
+    sessionStorage.setItem(taskTabStorageKey(entry.taskId), "content");
+    openTask(entry.taskId);
+  }
+  async function openAiArtifactPreview(entry: AiArtifactEntry) {
+    setAiError("");
+    try {
+      const info = await getArtifactVersionDownloadUrl(storeId, entry.taskId, entry.artifact.id, entry.version.id);
+      setPreviewImage({
+        url: info.url,
+        filename: info.filename,
+        label: `V${entry.version.version_no} · ${entry.taskTitle}`,
+      });
+    } catch (reason) { setAiError(`原图读取失败：${errorText(reason)}`); }
   }
   function selectTaskTab(key: TaskTabKey) {
     setTaskTab(key);
@@ -686,14 +756,151 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     finally { setSaving(false); }
   }
 
-  if (route === "#ai") return <section className="task-home">
-    <div className="page-heading"><div><p className="eyebrow">AI MARKETING</p><h1>AI 营销</h1><p className="muted">告诉 AI 你希望实现的经营目标，按需制作营销内容并由你确认关键事实和最终交付。</p></div></div>
-    <div className="task-home-grid">
-      <article className="task-home-card primary-card"><p className="eyebrow">START A TASK</p><h2>按需制作</h2><p>选择营销目标和内容范围，进入固定的需求、事实、策略、内容审核与交付流程。</p><button className="primary" type="button" onClick={() => { window.location.hash = "#create"; }}>开始制作</button></article>
-      <article className="task-home-card"><p className="eyebrow">OPPORTUNITY DISCOVERY</p><h2>发现营销机会</h2><p>热点来源和门店机会匹配仍在接入，当前不展示模拟热点或虚构推荐。</p><button className="secondary" type="button" disabled>数据源接入中</button></article>
-    </div>
-    <div className="task-home-footer"><span>任务由商家按需发起；热点不是必经步骤。</span><button className="text-button" type="button" onClick={() => { window.location.hash = "#tasks"; }}>查看营销任务</button></div>
-  </section>;
+  if (route === "#ai") {
+    const activeTasks = items.filter(item => ["draft", "active", "waiting_for_user", "blocked", "failed"].includes(item.lifecycle_status));
+    const waitingTasks = items.filter(item => item.lifecycle_status === "waiting_for_user");
+    const blockedStepCount = activeTasks.reduce((sum, item) => sum + item.blocked_steps_count, 0);
+    const eligibleOpportunities = aiOpportunities.filter(item => item.eligibility_status === "eligible" && !item.decision);
+    const recentTasks = items
+      .filter(item => item.lifecycle_status !== "archived")
+      .sort((left, right) => new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime())
+      .slice(0, 5);
+    const opportunityPreview = aiOpportunities.slice(0, 4);
+    const nextStep = blockedStepCount > 0
+      ? { title: `${blockedStepCount} 个步骤待恢复`, text: "阻塞步骤不会自动跳过，确认原因后可继续推进。", label: "查看任务", href: "#tasks" }
+      : waitingTasks.length > 0
+        ? { title: `${waitingTasks.length} 个任务待你处理`, text: "策略或内容已生成，等待你的确认后再继续。", label: "去处理", href: "#tasks" }
+        : activeTasks.length > 0
+          ? { title: `${activeTasks.length} 个任务进行中`, text: `最近更新：${recentTasks[0]?.title ?? "当前门店"}`, label: "查看进度", href: "#tasks" }
+          : { title: "从第一个营销任务开始", text: "描述目标后，按需求、事实、策略、内容与发布顺序推进。", label: "按需制作", href: "#create" };
+
+    return <section className="ai-home">
+      <div className="page-heading ai-page-head">
+        <div>
+          <p className="eyebrow">AI MARKETING WORKSPACE</p>
+          <h1>AI 营销</h1>
+          <p className="muted">从适合本店的机会开始，或直接描述经营目标按需制作。关键事实、内容与最终发布都由你确认。</p>
+        </div>
+        <div className="form-actions">
+          <button className="secondary" type="button" onClick={() => { window.location.hash = "#tasks"; }}>查看营销任务</button>
+          <button className="primary" type="button" onClick={() => { window.location.hash = "#create"; }}>新建营销任务</button>
+        </div>
+      </div>
+
+      {aiError && <div className="alert error" role="alert">{aiError}</div>}
+
+      <section className="ai-hero">
+        <div className="ai-hero-main">
+          <p className="eyebrow">START HERE</p>
+          <h2>今天想为门店推进哪件事？</h2>
+          <p>没有明确主题时，先看机会；已有目标时，直接按需制作。两种方式都会进入同一套确认流程，不会自动发布。</p>
+          <div className="ai-hero-actions">
+            <button className="btn-hero-primary" type="button" onClick={() => { window.location.hash = "#hotspots"; }}>发现营销机会 <span aria-hidden="true">↗</span></button>
+            <button className="btn-hero-ghost" type="button" onClick={() => { window.location.hash = "#create"; }}>按需制作</button>
+          </div>
+          <div className="ai-hero-tags">新品推广 · 到店引流 · 活动促销 · 品牌内容 · 清库存</div>
+        </div>
+        <aside className="ai-hero-side">
+          <span className="ai-hero-side-label">{storeName || "当前门店"} · 下一步</span>
+          <strong>{nextStep.title}</strong>
+          <p>{nextStep.text}</p>
+          <button className="btn-hero-side" type="button" onClick={() => { window.location.hash = nextStep.href; }}>{nextStep.label}<span aria-hidden="true"> →</span></button>
+        </aside>
+      </section>
+
+      <div className="ai-kpis">
+        <article className="ai-kpi"><span className="label">进行中任务</span><strong>{activeTasks.length}</strong><small>当前门店未结束的任务</small></article>
+        <article className="ai-kpi"><span className="label">待你处理</span><strong>{waitingTasks.length}</strong><small>等待商家确认或补充</small></article>
+        <article className="ai-kpi"><span className="label">阻塞步骤</span><strong>{blockedStepCount}</strong><small>需要恢复或调整后继续</small></article>
+        <article className="ai-kpi"><span className="label">可采纳机会</span><strong>{eligibleOpportunities.length}</strong><small>{aiOpportunitySource === "available" ? "已核验来源的机会" : "按需制作不受影响"}</small></article>
+      </div>
+
+      <div className="ai-columns">
+        <section className="ai-panel">
+          <div className="ai-panel-head">
+            <div><h2>最近任务</h2><p>按更新时间排序，点开后继续当前步骤。</p></div>
+            <button className="text-button" type="button" onClick={() => { window.location.hash = "#tasks"; }}>全部任务</button>
+          </div>
+          {aiLoading ? <div className="ai-empty"><p>正在读取任务…</p></div> : recentTasks.length === 0 ? <div className="ai-empty">
+            <strong>还没有营销任务</strong>
+            <p>描述本次想达成的经营目标，系统会生成可确认的需求与策略流程。</p>
+            <button className="secondary" type="button" onClick={() => { window.location.hash = "#create"; }}>创建第一个任务</button>
+          </div> : <div className="ai-task-list">
+            {recentTasks.map(item => <button className="ai-task-row" type="button" key={item.id} onClick={() => openTask(item.id)}>
+              <span className="ai-task-row-main"><strong>{item.title}</strong><small>{taskTypeLabels[item.task_type]} · 更新于 {new Date(item.updated_at).toLocaleDateString()}</small></span>
+              <span className="ai-task-row-meta"><span className={item.lifecycle_status === "blocked" || item.lifecycle_status === "failed" ? "status-chip danger" : item.lifecycle_status === "waiting_for_user" ? "status-chip warn" : "status-chip"}>{statusLabels[item.lifecycle_status]}</span><small>{item.pending_steps_count} 个待处理</small></span>
+            </button>)}
+          </div>}
+        </section>
+
+        <section className="ai-panel">
+          <div className="ai-panel-head">
+            <div><h2>本期营销机会</h2><p>只展示已核验来源并能匹配本店的机会。</p></div>
+            <button className="text-button" type="button" onClick={() => { window.location.hash = "#hotspots"; }}>机会列表</button>
+          </div>
+          {aiLoading ? <div className="ai-empty"><p>正在读取机会…</p></div> : opportunityPreview.length === 0 ? <div className="ai-empty">
+            <strong>暂无可采纳的营销机会</strong>
+            <p>{aiOpportunitySource === "available" ? "当前没有符合本店条件的机会。" : "当前没有已核验来源的有效机会。"}按需制作仍可直接开始。</p>
+            <button className="secondary" type="button" onClick={() => { window.location.hash = "#create"; }}>按需制作</button>
+          </div> : <div className="ai-task-list">
+            {opportunityPreview.map(item => <button className="ai-task-row" type="button" key={item.id} onClick={() => { window.location.hash = `#hotspot-detail:${item.id}`; }}>
+              <span className="ai-task-row-main"><strong>{item.title}</strong><small>{item.summary || item.reason_summary || "暂无来源摘要"}</small></span>
+              <span className="ai-task-row-meta"><span className={item.eligibility_status === "eligible" ? "status-chip confirmed" : "status-chip"}>{item.eligibility_status === "eligible" ? "可采纳" : item.eligibility_status === "review_required" ? "需核对" : "不适合"}</span>{item.relevance_score && <small>匹配 {Number(item.relevance_score).toFixed(0)}</small>}</span>
+            </button>)}
+          </div>}
+        </section>
+      </div>
+
+      <section className="ai-panel ai-artifacts-panel">
+        <div className="ai-panel-head">
+          <div><h2>最近产物</h2><p>来自最近更新的任务，展示当前版本的文案与图片；完整版本在任务「内容制作」中查看。</p></div>
+          <button className="text-button" type="button" onClick={() => { window.location.hash = "#tasks"; }}>按任务查看</button>
+        </div>
+        {aiLoading ? <div className="ai-empty"><p>正在读取最近产物…</p></div> : aiArtifacts.length === 0 ? <div className="ai-empty">
+          <strong>还没有内容产物</strong>
+          <p>创建任务并完成内容制作后，最新生成的文案与图片会显示在这里。</p>
+        </div> : <div className="ai-artifacts">
+          {aiArtifacts.map(entry => {
+            const content = entry.version.content_json || {};
+            const titleText = typeof content.title === "string" ? content.title : "";
+            const body = typeof content.body === "string" ? content.body : "";
+            const isImage = entry.artifact.artifact_type === "image";
+            const imageUrl = aiImageUrls[entry.version.id];
+            return <article className="ai-artifact-card" key={`${entry.artifact.id}-${entry.version.id}`}>
+              <div className="ai-artifact-top">
+                <span className={isImage ? "status-chip chip-image" : "status-chip chip-copy"}>{isImage ? "图片" : "文案"}</span>
+                <span className={`status-chip source-${entry.version.source_type}`}>{sourceTypeLabels[entry.version.source_type] ?? entry.version.source_type}</span>
+                <span className="ai-artifact-version">V{entry.version.version_no}</span>
+              </div>
+              {isImage ? <button className="ai-artifact-thumb" type="button" onClick={() => void openAiArtifactPreview(entry)} aria-label={`查看 ${entry.taskTitle} 的 V${entry.version.version_no} 原图`}>
+                {imageUrl ? <img src={imageUrl} alt={`${entry.taskTitle} V${entry.version.version_no} 产物`} /> : <span className="ai-artifact-thumb-placeholder">原图加载中</span>}
+              </button> : <div className="ai-artifact-copy">
+                <strong>{titleText || "未命名文案"}</strong>
+                <p>{body || "该版本暂无正文内容"}</p>
+              </div>}
+              <div className="ai-artifact-foot"><span>{entry.version.model_id || "模型未记录"}</span><span>{new Date(entry.version.created_at).toLocaleDateString()}</span></div>
+              <p className="ai-artifact-task">{entry.taskTitle}</p>
+              <button className="text-button" type="button" onClick={() => openTaskContent(entry)}>打开内容制作 →</button>
+            </article>;
+          })}
+        </div>}
+      </section>
+
+      {previewImage && <div className="artifact-preview-backdrop" role="dialog" aria-modal="true" aria-label="图片原图预览" onClick={() => setPreviewImage(null)}>
+        <div className="artifact-preview-dialog" onClick={event => event.stopPropagation()}>
+          <div className="artifact-preview-head">
+            <strong>{previewImage.label}</strong>
+            <div className="form-actions">
+              <button className="secondary" type="button" onClick={() => { const target = previewImage; void saveSignedUrlAsFile(target.url, target.filename).then(() => setImageNotice(`已下载 ${target.filename}`)).catch(reason => setAiError(`下载失败：${errorText(reason)}`)); }}>下载原图</button>
+              <button className="secondary" type="button" onClick={() => setPreviewImage(null)}>关闭</button>
+            </div>
+          </div>
+          <img src={previewImage.url} alt={`${previewImage.label} 原图`} />
+          <p className="muted">文件：{previewImage.filename}</p>
+        </div>
+      </div>}
+    </section>;
+  }
 
   if (isCreate) return <>
     <div className="page-heading"><div><p className="eyebrow">NEW MARKETING TASK</p><h1>按需制作</h1><p className="muted">先明确目标和内容范围，创建后再确认需求与经营事实。</p></div><button className="secondary" type="button" onClick={() => { window.location.hash = "#ai"; }}>返回</button></div>

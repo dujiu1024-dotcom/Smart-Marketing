@@ -5,7 +5,7 @@ import {
   freezePublishPackage, confirmPublishPackage, listChannelContents, listPublishPackages,
   listChannelSpecs, listTaskBusinessFacts,
   confirmMarketingTaskStrategy, createMarketingTask, getAudienceProfiles, getMediaAssets,
-  getBrandGuideline, getKnowledgeItems, getMarketingTask, listOffers, listTaskArtifacts,
+  getBrandGuideline, getArtifactVersionDownloadUrl, getKnowledgeItems, getMarketingTask, listOffers, listTaskArtifacts,
   createTaskArtifact, createTaskArtifactVersion, createTaskArtifactReview,
   getProducts, getStoreProfile, listMarketingTasks, recoverMarketingTaskStep,
   skipMarketingTaskStep, updateMarketingTaskRequirement, updateMarketingTaskStrategy,
@@ -54,6 +54,20 @@ const qualityDecisionLabels: Record<string, string> = {
 const severityLabels: Record<string, string> = {
   info: "提示", warning: "警告", error: "错误",
 };
+const sourceTypeLabels: Record<string, string> = {
+  ai_generated: "AI 生成", merchant_upload: "商家上传", manual_edit: "手工编辑",
+};
+const reviewLabels: Record<string, string> = {
+  approved: "审核通过", revision_requested: "需要修改", rejected: "已拒绝",
+};
+const latestReviewFor = (version: ArtifactVersionRecord) =>
+  version.reviews && version.reviews.length > 0 ? version.reviews[version.reviews.length - 1] : undefined;
+function formatBytes(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) return "";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
 const stepStatusLabel = (step: TaskStep): string =>
   step.status === "failed" && step.block_code ? "已阻塞" : statusLabels[step.status] ?? "状态未知";
 const blockSummary = (step: TaskStep): string => {
@@ -115,6 +129,11 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [copyHashtags, setCopyHashtags] = useState("");
   const [selectedImageAssetId, setSelectedImageAssetId] = useState("");
   const [reviewComment, setReviewComment] = useState("");
+  const [selectedVersionIds, setSelectedVersionIds] = useState<Record<string, string>>({});
+  const [imageFiles, setImageFiles] = useState<Record<string, { url?: string; filename?: string; loading?: boolean; error?: string }>>({});
+  const [previewImage, setPreviewImage] = useState<{ url: string; filename: string; label: string } | null>(null);
+  const [downloadingVersionId, setDownloadingVersionId] = useState("");
+  const [imageNotice, setImageNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [factsLoading, setFactsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -140,6 +159,8 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const createKey = useRef("");
   const contentMutationKey = useRef("");
   const copyFormTaskId = useRef("");
+  const imageRequests = useRef(new Set<string>());
+  const imageRetries = useRef<Record<string, number>>({});
   const strategyStep = task?.steps.find(step => step.step_key === "strategy_confirmation");
   const isCreate = route === "#create";
   const isDetail = route === "#task";
@@ -164,6 +185,11 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       setDraftDirty(false);
       setStrategyText(safeJson(response.strategy_draft));
       setStrategyDirty(false);
+      setSelectedVersionIds({});
+      setImageFiles({});
+      setPreviewImage(null);
+      setImageNotice("");
+      imageRetries.current = {};
     } catch (reason) { setError(errorText(reason)); setTask(null); }
     finally { setLoading(false); }
   }, [storeId]);
@@ -199,6 +225,102 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       )?.id || "");
     } catch (reason) { setError(errorText(reason)); }
   }, [storeId]);
+
+  const selectedVersionFor = (artifact: ContentArtifact): ArtifactVersionRecord | undefined =>
+    artifact.versions.find(version => version.id === selectedVersionIds[artifact.id])
+    ?? artifact.versions.find(version => version.id === artifact.current_version_id)
+    ?? artifact.versions[artifact.versions.length - 1];
+
+  const selectVersion = (artifact: ContentArtifact, version: ArtifactVersionRecord) => {
+    setSelectedVersionIds(current => ({ ...current, [artifact.id]: version.id }));
+    setImageNotice("");
+    if (artifact.artifact_type === "image" && !imageFiles[version.id]) void ensureImageFile(artifact, version);
+  };
+
+  async function ensureImageFile(artifact: ContentArtifact, version: ArtifactVersionRecord, force = false) {
+    if (!task || artifact.artifact_type !== "image") return;
+    if (imageRequests.current.has(version.id)) return;
+    if (force) setImageFiles(current => { const next = { ...current }; delete next[version.id]; return next; });
+    else if (imageFiles[version.id]) return;
+    imageRequests.current.add(version.id);
+    setImageFiles(current => ({ ...current, [version.id]: { ...current[version.id], loading: true, error: undefined } }));
+    try {
+      const info = await getArtifactVersionDownloadUrl(storeId, task.id, artifact.id, version.id);
+      setImageFiles(current => ({ ...current, [version.id]: { url: info.url, filename: info.filename } }));
+    } catch (reason) {
+      setImageFiles(current => ({ ...current, [version.id]: { error: errorText(reason) } }));
+    } finally {
+      imageRequests.current.delete(version.id);
+    }
+  }
+
+  function retryImageFile(artifact: ContentArtifact, version: ArtifactVersionRecord) {
+    const attempts = imageRetries.current[version.id] ?? 0;
+    if (attempts >= 2) {
+      setImageFiles(current => ({ ...current, [version.id]: { error: "图片加载失败，请点击「刷新产物」后重试。" } }));
+      return;
+    }
+    imageRetries.current[version.id] = attempts + 1;
+    void ensureImageFile(artifact, version, true);
+  }
+
+  async function saveSignedUrlAsFile(url: string, filename: string) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`文件读取失败（HTTP ${response.status}）`);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 15000);
+  }
+
+  async function downloadArtifactFile(artifact: ContentArtifact, version: ArtifactVersionRecord) {
+    if (!task || downloadingVersionId) return;
+    setDownloadingVersionId(version.id); setImageNotice(""); setError("");
+    try {
+      const info = await getArtifactVersionDownloadUrl(storeId, task.id, artifact.id, version.id);
+      await saveSignedUrlAsFile(info.url, info.filename);
+      setImageNotice(`已下载 ${info.filename}`);
+    } catch (reason) {
+      setError(`下载失败：${errorText(reason)}`);
+    } finally {
+      setDownloadingVersionId("");
+    }
+  }
+
+  async function openImagePreview(artifact: ContentArtifact, version: ArtifactVersionRecord) {
+    if (!task) return;
+    setImageNotice(""); setError("");
+    try {
+      const info = await getArtifactVersionDownloadUrl(storeId, task.id, artifact.id, version.id);
+      setPreviewImage({
+        url: info.url,
+        filename: info.filename,
+        label: `V${version.version_no} · ${sourceTypeLabels[version.source_type] ?? version.source_type}`,
+      });
+    } catch (reason) { setError(errorText(reason)); }
+  }
+
+  useEffect(() => {
+    if (!task) return;
+    for (const artifact of artifacts) {
+      if (artifact.artifact_type !== "image") continue;
+      const version = selectedVersionFor(artifact);
+      if (!version || imageFiles[version.id] || imageRequests.current.has(version.id)) continue;
+      void ensureImageFile(artifact, version);
+    }
+  }, [artifacts, selectedVersionIds, imageFiles, task]);
+
+  useEffect(() => {
+    if (!previewImage) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setPreviewImage(null); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewImage]);
 
   const loadFacts = useCallback(async () => {
     setFactsLoading(true);
@@ -369,6 +491,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       if (existing) await createTaskArtifactVersion(storeId, task.id, existing, version, mutationKey);
       else await createTaskArtifact(storeId, task.id, "copy", version, mutationKey);
       contentMutationKey.current = "";
+      setSelectedVersionIds({});
       await loadContent(task.id);
       setNotice(existing ? "文案新版本已保存，旧版本保留。" : "文案产物已创建。");
     } catch (reason) { setError(errorText(reason)); }
@@ -385,6 +508,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       if (existing) await createTaskArtifactVersion(storeId, task.id, existing, version, mutationKey);
       else await createTaskArtifact(storeId, task.id, "image", version, mutationKey);
       contentMutationKey.current = "";
+      setSelectedVersionIds({});
       await loadContent(task.id);
       setNotice(existing ? "图片产物新版本已关联，旧版本保留。" : "图片产物已关联到门店已授权素材。");
     } catch (reason) { setError(errorText(reason)); }
@@ -602,28 +726,77 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           <label className="field span-2"><span>选择已通过扫描且已确认使用权的图片素材</span><select value={selectedImageAssetId} onChange={event => setSelectedImageAssetId(event.target.value)}><option value="">请选择门店图片素材</option>{mediaAssets.filter(item => item.status === "ready" && item.usage_rights_status === "confirmed_allowed" && item.mime_type.startsWith("image/")).map(item => <option key={item.id} value={item.id}>{item.original_filename_sanitized || item.id} · {item.mime_type} · V{item.version_no}</option>)}</select></label>
         </div>
         <div className="form-footer"><p>图片产物只引用门店已授权素材，不复制或覆盖来源资产。</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || !selectedImageAssetId} onClick={() => void saveImageArtifact()}>关联图片版本</button></div></div>
+        {imageNotice && <div className="alert success" role="status">{imageNotice}</div>}
         {artifacts.length === 0 ? <p className="muted">尚无文案或图片产物。保存文案或关联图片后，这里会显示版本与审核状态。</p> : <div className="task-content-artifacts">{artifacts.map(artifact => {
           const current = artifact.versions.find(version => version.id === artifact.current_version_id);
-          const content = current?.content_json || {};
+          const selected = selectedVersionFor(artifact);
+          const isCurrent = Boolean(selected && selected.id === artifact.current_version_id);
+          const content = selected?.content_json || {};
           const body = typeof content.body === "string" ? content.body : "";
           const titleText = typeof content.title === "string" ? content.title : "";
+          const hashtags = Array.isArray(content.hashtags) ? content.hashtags.map(item => String(item)).filter(Boolean) : [];
+          const callToAction = typeof content.call_to_action === "string" ? content.call_to_action : typeof content.cta === "string" ? content.cta : "";
           const videoScript = content.video_script && typeof content.video_script === "object" && !Array.isArray(content.video_script) ? content.video_script as Record<string, unknown> : null;
           const storyboard = Array.isArray(videoScript?.storyboard) ? videoScript.storyboard : [];
-          const asset = current?.source_refs.find(ref => ref.type === "media_asset");
-          const reviews = current?.reviews || [];
+          const reviews = selected?.reviews || [];
           const latestReview = reviews[reviews.length - 1];
-          const reviewLabels: Record<string, string> = { approved: "审核通过", revision_requested: "需要修改", rejected: "已拒绝" };
-          return <article className="task-content-artifact" key={artifact.id}>
-            <div className="task-step-title"><strong>{artifact.artifact_type === "copy" ? "文案产物" : "图片产物"}</strong><span className="status-chip">{current ? `当前版本 V${current.version_no} · ${latestReview ? reviewLabels[latestReview.decision] : "待审核"}` : "无当前版本"}</span></div>
-            {current && artifact.artifact_type === "copy" && <div className="task-readonly-grid"><div><strong>{titleText || "未填写标题"}</strong><span>{body}</span></div></div>}
-            {current && videoScript && <div className="task-readonly-grid video-script-preview"><div><strong>视频脚本（仅文本）</strong><span>主题：{String(videoScript.theme || "未填写")}</span><span>口播脚本：{String(videoScript.spoken_script || "未填写")}</span><span>分镜：</span>{storyboard.map((shot, index) => <span key={index}>{typeof shot === "string" ? shot : JSON.stringify(shot)}</span>)}<span>拍摄指导：{String(videoScript.shooting_guidance || "未填写")}</span></div></div>}
-            {current && artifact.artifact_type === "image" && <p className="muted">已关联素材引用：{asset && typeof asset.id === "string" ? asset.id : current.content_hash}</p>}
-            <p className="muted">版本历史：{artifact.versions.map(version => `V${version.version_no}`).join(" · ")}</p>
-            {latestReview && <p className="muted">最近审核：{reviewLabels[latestReview.decision]} · {new Date(latestReview.created_at).toLocaleString()}{latestReview.comment ? ` · ${latestReview.comment}` : ""}</p>}
-            {current && !latestReview && <div className="task-step-actions">
-              <button className="text-button" type="button" disabled={saving} onClick={() => void reviewArtifact(artifact, current, "approved")}>审核通过</button>
-              <button className="text-button" type="button" disabled={saving || !reviewComment.trim()} onClick={() => void reviewArtifact(artifact, current, "revision_requested")}>要求修改</button>
-              <button className="text-button" type="button" disabled={saving} onClick={() => void reviewArtifact(artifact, current, "rejected")}>拒绝当前版本</button>
+          const fileState = selected ? imageFiles[selected.id] : undefined;
+          const imagePrompt = typeof content.image_prompt === "string" ? content.image_prompt : "";
+          const dimensions = typeof content.width === "number" && typeof content.height === "number" ? `${content.width}×${content.height}` : "";
+          const byteSize = formatBytes(content.byte_size);
+          const sha256 = typeof content.sha256 === "string" ? content.sha256 : selected?.content_hash || "";
+          return <article className="task-content-artifact artifact-card" key={artifact.id}>
+            <div className="task-step-title">
+              <strong>{artifact.artifact_type === "copy" ? "文案产物" : "图片产物"}</strong>
+              <span className="status-chip">{artifact.versions.length} 个版本</span>
+              {current ? <span className="status-chip confirmed">当前 V{current.version_no} · {latestReviewFor(current) ? reviewLabels[latestReviewFor(current)!.decision] : "待审核"}</span> : <span className="status-chip danger">无当前版本</span>}
+            </div>
+            <div className="artifact-version-row" role="group" aria-label={`${artifact.artifact_type === "copy" ? "文案" : "图片"}版本历史`}>
+              <span className="artifact-version-label">版本历史</span>
+              {artifact.versions.length === 0 ? <span className="muted">暂无版本</span> : artifact.versions.map(version => <button
+                key={version.id}
+                type="button"
+                className={`artifact-version-chip${selected?.id === version.id ? " active" : ""}`}
+                aria-pressed={selected?.id === version.id}
+                onClick={() => selectVersion(artifact, version)}
+              >V{version.version_no}{version.id === artifact.current_version_id ? <span className="artifact-version-current">当前</span> : null}</button>)}
+            </div>
+            {selected && <div className="artifact-version-detail" aria-live="polite">
+              <div className="artifact-version-meta">
+                <span className={`status-chip source-${selected.source_type}`}>{sourceTypeLabels[selected.source_type] ?? selected.source_type}</span>
+                <span>模型：{selected.model_id || "未记录"}</span>
+                <span>生成时间：{new Date(selected.created_at).toLocaleString()}</span>
+                {!isCurrent && <span className="artifact-readonly-note">历史版本 · 只读</span>}
+              </div>
+              {artifact.artifact_type === "copy" && <div className="artifact-copy">
+                <strong>{titleText || "未填写标题"}</strong>
+                <p className="artifact-copy-body">{body || "（无正文内容）"}</p>
+                {hashtags.length > 0 && <p className="artifact-meta-line">话题标签：{hashtags.map(tag => `#${tag.replace(/^#/, "")}`).join(" ")}</p>}
+                {callToAction && <p className="artifact-meta-line">CTA：{callToAction}</p>}
+              </div>}
+              {videoScript && <div className="task-readonly-grid video-script-preview"><div><strong>视频脚本（仅文本）</strong><span>主题：{String(videoScript.theme || "未填写")}</span><span>口播脚本：{String(videoScript.spoken_script || "未填写")}</span><span>分镜：</span>{storyboard.map((shot, index) => <span key={index}>{typeof shot === "string" ? shot : JSON.stringify(shot)}</span>)}<span>拍摄指导：{String(videoScript.shooting_guidance || "未填写")}</span></div></div>}
+              {artifact.artifact_type === "image" && <div className="artifact-image">
+                <button className="artifact-thumb" type="button" disabled={!fileState?.url} onClick={() => void openImagePreview(artifact, selected)} aria-label={`查看 V${selected.version_no} 原图`}>
+                  {fileState?.url ? <img src={fileState.url} alt={`${artifact.artifact_type === "image" ? "图片" : "文案"} V${selected.version_no} 缩略图`} onError={() => retryImageFile(artifact, selected)} /> : <span className="artifact-thumb-placeholder">{fileState?.error ? "图片加载失败" : "正在加载图片…"}</span>}
+                </button>
+                <div className="artifact-image-side">
+                  <div className="artifact-image-actions">
+                    <button className="secondary" type="button" disabled={!fileState?.url} onClick={() => void openImagePreview(artifact, selected)}>查看原图</button>
+                    <button className="secondary" type="button" disabled={downloadingVersionId === selected.id} onClick={() => void downloadArtifactFile(artifact, selected)}>{downloadingVersionId === selected.id ? "下载中…" : "下载原图"}</button>
+                  </div>
+                  {fileState?.error && <p className="alert error" role="alert">{fileState.error}</p>}
+                  <p className="muted">{dimensions ? `尺寸 ${dimensions}` : "尺寸未记录"}{byteSize ? ` · ${byteSize}` : ""}</p>
+                  {imagePrompt && <p className="artifact-prompt">生成提示词：{imagePrompt}</p>}
+                  {sha256 && <p className="muted artifact-hash">SHA-256：{sha256.slice(0, 16)}…</p>}
+                  <p className="muted">图片地址为短时签名链接，打开预览或下载时会重新获取。</p>
+                </div>
+              </div>}
+              {latestReview && <p className="muted">该版本审核：{reviewLabels[latestReview.decision]} · {new Date(latestReview.created_at).toLocaleString()}{latestReview.comment ? ` · ${latestReview.comment}` : ""}</p>}
+              {isCurrent && !latestReview && <div className="task-step-actions">
+                <button className="text-button" type="button" disabled={saving} onClick={() => void reviewArtifact(artifact, selected, "approved")}>审核通过</button>
+                <button className="text-button" type="button" disabled={saving || !reviewComment.trim()} onClick={() => void reviewArtifact(artifact, selected, "revision_requested")}>要求修改</button>
+                <button className="text-button" type="button" disabled={saving} onClick={() => void reviewArtifact(artifact, selected, "rejected")}>拒绝当前版本</button>
+              </div>}
             </div>}
           </article>;
         })}</div>}
@@ -663,6 +836,19 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
         <div className="task-step-list">{task.steps.map((step, index) => <article className="task-step" key={step.id}><div className="task-step-index">{index + 1}</div><div className="task-step-body"><div className="task-step-title"><strong>{stepLabels[step.step_key]}</strong><span className={step.status === "failed" || step.block_code ? "status-chip danger" : "status-chip"}>{stepStatusLabel(step)}</span><span className="task-applicability">{statusLabels[step.applicability]}</span></div>{step.block_code && <p className="task-block-reason">{step.block_code}{blockSummary(step) ? ` · ${blockSummary(step)}` : ""}</p>}{step.skip_reason && <p className="muted">跳过原因：{step.skip_reason}</p>}{step.output_refs.length > 0 && <p className="muted">已关联 {step.output_refs.length} 项输出</p>}<div className="task-step-actions">{["active","waiting_for_user"].includes(task.lifecycle_status) && step.applicability === "optional" && step.status === "pending" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "skip")}>记录跳过原因</button>}{["active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && ["failed","stale","waiting_for_user"].includes(step.status) && step.applicability !== "not_applicable" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "recover")}>恢复此步骤</button>}</div></div></article>)}</div>
       </section>
       <div className="task-danger-actions">{["draft","active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && <button className="secondary" type="button" disabled={saving} onClick={() => void taskAction("cancel")}>取消任务</button>}{["completed","cancelled"].includes(task.lifecycle_status) && <button className="secondary" type="button" disabled={saving} onClick={() => void taskAction("archive")}>归档任务</button>}</div>
+      {previewImage && <div className="artifact-preview-backdrop" role="dialog" aria-modal="true" aria-label="图片原图预览" onClick={() => setPreviewImage(null)}>
+        <div className="artifact-preview-dialog" onClick={event => event.stopPropagation()}>
+          <div className="artifact-preview-head">
+            <strong>{previewImage.label}</strong>
+            <div className="form-actions">
+              <button className="secondary" type="button" onClick={() => { const target = previewImage; void saveSignedUrlAsFile(target.url, target.filename).then(() => setImageNotice(`已下载 ${target.filename}`)).catch(reason => setError(`下载失败：${errorText(reason)}`)); }}>下载原图</button>
+              <button className="secondary" type="button" onClick={() => setPreviewImage(null)}>关闭</button>
+            </div>
+          </div>
+          <img src={previewImage.url} alt={`${previewImage.label} 原图`} />
+          <p className="muted">文件：{previewImage.filename}</p>
+        </div>
+      </div>}
     </>}
   </>;
 

@@ -855,6 +855,21 @@ export interface ContentReviewInput {
 export async function listTaskArtifacts(storeId: string, taskId: string): Promise<ContentArtifact[]> {
   return request(`/marketing-tasks/${encodeURIComponent(taskId)}/artifacts`, {}, storeId);
 }
+export interface ArtifactVersionFileUrl {
+  url: string;
+  filename: string;
+  mime_type: string;
+  expires_in: string;
+}
+export async function getArtifactVersionDownloadUrl(
+  storeId: string, taskId: string, artifactId: string, versionId: string,
+): Promise<ArtifactVersionFileUrl> {
+  return request(
+    `/marketing-tasks/${encodeURIComponent(taskId)}/artifacts/${encodeURIComponent(artifactId)}/versions/${encodeURIComponent(versionId)}/download-url`,
+    {},
+    storeId,
+  );
+}
 export async function createTaskArtifact(
   storeId: string, taskId: string, artifactType: "copy" | "image",
   version: ContentArtifactVersionInput, idempotencyKey: string = crypto.randomUUID(),

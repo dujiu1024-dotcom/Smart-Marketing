@@ -10,7 +10,7 @@ const api = vi.hoisted(() => ({
   createChannelContent: vi.fn(), runChannelContentQuality: vi.fn(), createQualityResolution: vi.fn(),
   freezePublishPackage: vi.fn(), confirmPublishPackage: vi.fn(), listChannelContents: vi.fn(),
   listPublishPackages: vi.fn(), listChannelSpecs: vi.fn(), listTaskBusinessFacts: vi.fn(),
-  getMediaAssets: vi.fn(), listTaskArtifacts: vi.fn(), getAudienceProfiles: vi.fn(), getBrandGuideline: vi.fn(),
+  getMediaAssets: vi.fn(), listTaskArtifacts: vi.fn(), getArtifactVersionDownloadUrl: vi.fn(), getAudienceProfiles: vi.fn(), getBrandGuideline: vi.fn(),
   getKnowledgeItems: vi.fn(), getMarketingTask: vi.fn(), listOffers: vi.fn(),
   getProducts: vi.fn(), getStoreProfile: vi.fn(), listMarketingTasks: vi.fn(),
   recoverMarketingTaskStep: vi.fn(), skipMarketingTaskStep: vi.fn(),

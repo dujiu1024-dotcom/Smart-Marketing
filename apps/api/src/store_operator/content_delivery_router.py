@@ -19,6 +19,7 @@ from store_operator.auth.dependencies import (
     require_store_context,
 )
 from store_operator.auth.errors import ApiError
+from store_operator.config import settings
 from store_operator.db import get_db
 from store_operator.domain.marketing_task import (
     InvalidTaskStepTransition,
@@ -38,6 +39,10 @@ from store_operator.models.marketing_task import (
     TaskStep,
 )
 from store_operator.models.store_knowledge import MediaAsset
+from store_operator.object_storage import (
+    ObjectStorageNotConfigured,
+    create_download_url,
+)
 
 router = APIRouter(prefix="/marketing-tasks", tags=["content-delivery"])
 
@@ -413,6 +418,121 @@ def list_task_artifacts(
         )
         result.append(_artifact_payload(artifact, list(versions), reviews))
     return result
+
+
+_IMAGE_EXTENSIONS = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "image/gif": "gif",
+}
+_EXTENSION_MIME = {
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "gif": "image/gif",
+}
+
+
+def _safe_download_stem(value: str) -> str:
+    cleaned = "".join(char for char in value if char.isalnum() or char in "-_ ")
+    return "_".join(cleaned.split())[:80] or "artifact"
+
+
+@router.get("/{task_id}/artifacts/{artifact_id}/versions/{version_id}/download-url")
+def get_artifact_version_download_url(
+    task_id: UUID,
+    artifact_id: UUID,
+    version_id: UUID,
+    context: Annotated[AuthContext, Depends(require_store_context)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, str]:
+    """Issue a short-lived read-only URL for a specific artifact version file."""
+    store_id = context.request_store_id
+    if store_id is None:
+        raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
+    task = db.scalar(
+        select(MarketingTask).where(
+            MarketingTask.id == task_id,
+            MarketingTask.store_id == store_id,
+        )
+    )
+    if task is None:
+        raise ApiError(404, "TASK_NOT_FOUND", "Marketing task not found")
+    artifact = db.scalar(
+        select(Artifact).where(
+            Artifact.id == artifact_id,
+            Artifact.task_id == task_id,
+            Artifact.store_id == store_id,
+        )
+    )
+    if artifact is None:
+        raise ApiError(404, "ARTIFACT_NOT_FOUND", "Artifact not found")
+    version = db.scalar(
+        select(ArtifactVersion).where(
+            ArtifactVersion.id == version_id,
+            ArtifactVersion.artifact_id == artifact_id,
+            ArtifactVersion.store_id == store_id,
+        )
+    )
+    if version is None:
+        raise ApiError(404, "ARTIFACT_VERSION_NOT_FOUND", "Artifact version not found")
+    object_key = version.content_ref
+    mime_type = None
+    if isinstance(version.content_json, dict):
+        stored_mime = version.content_json.get("mime_type")
+        if isinstance(stored_mime, str) and stored_mime:
+            mime_type = stored_mime
+    for reference in version.source_refs_json or []:
+        if reference.get("type") != "media_asset":
+            continue
+        asset_id = reference.get("id")
+        if not isinstance(asset_id, str):
+            continue
+        try:
+            parsed_asset_id = UUID(asset_id)
+        except ValueError:
+            continue
+        asset = db.scalar(
+            select(MediaAsset).where(
+                MediaAsset.id == parsed_asset_id,
+                MediaAsset.store_id == store_id,
+            )
+        )
+        if asset is not None:
+            object_key = object_key or asset.object_key
+            mime_type = mime_type or asset.mime_type
+            break
+    if not object_key:
+        raise ApiError(
+            404,
+            "ARTIFACT_FILE_NOT_FOUND",
+            "This artifact version has no downloadable file",
+        )
+    try:
+        url = create_download_url(object_key=object_key)
+    except ObjectStorageNotConfigured as exc:
+        raise ApiError(
+            503,
+            "OBJECT_STORAGE_UNAVAILABLE",
+            "Private object storage is not configured",
+        ) from exc
+    extension = ""
+    if "." in object_key.rsplit("/", 1)[-1]:
+        extension = object_key.rsplit(".", 1)[-1].lower()
+    mime_type = mime_type or _EXTENSION_MIME.get(extension)
+    extension = _IMAGE_EXTENSIONS.get(mime_type or "", extension) or "png"
+    filename = (
+        f"{_safe_download_stem(task.title)}-"
+        f"{artifact.artifact_type}-V{version.version_no}.{extension}"
+    )
+    return {
+        "url": url,
+        "filename": filename,
+        "mime_type": mime_type or "application/octet-stream",
+        "expires_in": str(settings.object_storage_download_ttl_seconds),
+    }
 
 
 @router.post("/{task_id}/artifacts/{artifact_id}/versions", status_code=201)

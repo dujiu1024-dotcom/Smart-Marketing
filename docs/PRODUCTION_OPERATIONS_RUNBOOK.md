@@ -56,9 +56,10 @@ From the checked-out release commit:
 \`\`\`bash
 uv sync --locked --directory apps/api
 uv run --locked --directory apps/api alembic upgrade head
-POSTGRES_PASSWORD="$POSTGRES_PASSWORD" docker compose -f infra/compose/docker-compose.yml up --build --detach --wait
-curl --fail --silent --show-error http://localhost:8000/health/live
-curl --fail --silent --show-error http://localhost:8000/health/ready
+# .env 位于仓库根目录，compose 文件在 infra/compose 下，必须显式指定 --env-file
+docker compose --env-file .env -f infra/compose/docker-compose.yml up --build --detach --wait
+curl --fail --silent --show-error http://localhost:8010/health/live
+curl --fail --silent --show-error http://localhost:8010/health/ready
 curl --fail --silent --show-error http://localhost:5173/ >/dev/null
 \`\`\`
 

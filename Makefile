@@ -1,14 +1,15 @@
 COMPOSE_FILE=infra/compose/docker-compose.yml
-.PHONY: up down logs web-install web-dev test build typecheck
+COMPOSE=docker compose --env-file .env -f $(COMPOSE_FILE)
+.PHONY: up down logs web-install web-dev test build typecheck seed-prompts
 
 up:
-	docker compose -f $(COMPOSE_FILE) up --build -d
+	$(COMPOSE) up --build -d
 
 down:
-	docker compose -f $(COMPOSE_FILE) down
+	$(COMPOSE) down
 
 logs:
-	docker compose -f $(COMPOSE_FILE) logs -f --tail=200
+	$(COMPOSE) logs -f --tail=200
 
 web-install:
 	pnpm install --frozen-lockfile
@@ -27,3 +28,6 @@ typecheck:
 
 build:
 	pnpm build
+
+seed-prompts:
+	$(COMPOSE) exec -T api python -m store_operator.cli seed-prompt-templates $(if $(PUBLISHER_EMAIL),--publisher-email $(PUBLISHER_EMAIL),)

@@ -11,10 +11,15 @@
 ```bash
 cp .env.example .env
 # 修改 .env 中 POSTGRES_PASSWORD，并同步 DATABASE_URL
-docker compose -f infra/compose/docker-compose.yml up --build -d
+# .env 必须保留在仓库根目录；compose 文件在 infra/compose 下，需显式指定 --env-file
+docker compose --env-file .env -f infra/compose/docker-compose.yml up --build -d
+# 首次启动或升级后执行数据库迁移
+docker compose --env-file .env -f infra/compose/docker-compose.yml exec api alembic upgrade head
 ```
 
-地址：Web http://localhost:5173；API http://localhost:8000；OpenAPI http://localhost:8000/api/v1/docs；PostgreSQL localhost:5432；Redis localhost:6379；SeaweedFS S3 localhost:8333。
+地址：Web http://localhost:5173；API http://localhost:8010；OpenAPI http://localhost:8010/api/v1/docs；PostgreSQL localhost:5432；Redis localhost:6379；SeaweedFS S3 localhost:8333。
+
+API 容器内部仍监听 8000，宿主机映射到 8010，避免与常见的本地 8000 服务冲突；如需改回 8000，调整 `infra/compose/docker-compose.yml` 中 `api.ports` 后重启。
 
 ## 本地运行 Web
 
@@ -33,10 +38,17 @@ uv run --locked uvicorn store_operator.main:app --reload --app-dir src
 
 ## 本地运行 Worker
 
+Worker 复用 API 的依赖与源码（与 `infra/containers/worker.Dockerfile` 一致），不能只执行 `apps/worker` 下的 `uv sync`，否则会缺少 `sqlalchemy` 等依赖。
+
 ```bash
-cd apps/worker
-uv sync --locked && uv run --locked celery -A store_operator_worker.celery_app:celery_app worker --loglevel=INFO --app-dir src
+cd apps/api && uv sync --locked --extra dev
+cd ../..
+set -a && source .env && set +a
+PYTHONPATH="$PWD/apps/api/src:$PWD/apps/worker/src" uv run --locked --directory apps/api \
+  celery -A store_operator_worker.celery_app:celery_app worker --loglevel=INFO
 ```
+
+`REDIS_URL`、`DATABASE_URL` 为必填环境变量；未设置时 Worker 启动会直接报错。
 
 ## 测试
 

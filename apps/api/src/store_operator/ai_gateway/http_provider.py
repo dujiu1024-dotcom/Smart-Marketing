@@ -26,6 +26,22 @@ from store_operator.ai_gateway.schemas import (
 )
 
 
+def validate_provider_base_url(base_url: str) -> None:
+    """Reject credentials, query strings and insecure remote provider endpoints."""
+    parsed = urlsplit(base_url)
+    if (
+        parsed.scheme not in {"https", "http"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("Provider base URL must be absolute and must not contain credentials")
+    if parsed.scheme != "https" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        raise ValueError("Non-local AI provider endpoints must use HTTPS")
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderEndpoints:
     """Paths for the versioned Store Operator provider wire contract."""
@@ -53,18 +69,7 @@ class HttpJsonTransport:
         client: httpx.AsyncClient | None = None,
         circuit_breaker: CircuitBreaker | None = None,
     ) -> None:
-        parsed = urlsplit(base_url)
-        if (
-            parsed.scheme not in {"https", "http"}
-            or not parsed.netloc
-            or parsed.username is not None
-            or parsed.password is not None
-            or parsed.query
-            or parsed.fragment
-        ):
-            raise ValueError("Provider base URL must be absolute and must not contain credentials")
-        if parsed.scheme != "https" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
-            raise ValueError("Non-local AI provider endpoints must use HTTPS")
+        validate_provider_base_url(base_url)
         if not api_key.strip():
             raise ValueError("Provider API key is required")
         if not 0 < timeout_seconds <= 300:
@@ -135,12 +140,11 @@ class HttpJsonTransport:
                 await client.aclose()
 
         if response.status_code == 429:
-            self._circuit_breaker.record_failure()
             raw_retry_after = response.headers.get("Retry-After")
             try:
-                retry_after = max(0.0, float(raw_retry_after)) if raw_retry_after else None
+                retry_after = max(0.0, float(raw_retry_after)) if raw_retry_after else 60.0
             except ValueError:
-                retry_after = None
+                retry_after = 60.0
             raise ProviderError(
                 ProviderErrorCode.RATE_LIMITED,
                 retryable=True,

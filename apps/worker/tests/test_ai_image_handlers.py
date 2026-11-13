@@ -104,10 +104,6 @@ def test_vision_inspection_fails_closed_for_high_or_unknown_severity(
                 ),
             )
 
-    class FakeClient:
-        async def aclose(self) -> None:
-            return None
-
     monkeypatch.setattr(
         ai_image_handlers,
         "render_published_prompt",
@@ -118,7 +114,6 @@ def test_vision_inspection_fails_closed_for_high_or_unknown_severity(
         "_load_executor",
         lambda *args, **kwargs: (
             FakeExecutor(),
-            FakeClient(),
             "vision-provider",
             "vision-model",
         ),

@@ -26,6 +26,11 @@ from store_operator.ai_gateway.protocols import (
     TextProvider,
     VisionProvider,
 )
+from store_operator.ai_gateway.rate_limits import (
+    estimate_text_tokens,
+    get_model_rate_limiter,
+    model_fallback_candidates,
+)
 from store_operator.ai_gateway.registry import ProviderRegistry
 from store_operator.ai_gateway.schemas import (
     ImageEditRequest,
@@ -204,20 +209,63 @@ class AIProviderExecutor:
         request: TextGenerateRequest,
         *,
         provider_id: str,
+        fallback_model_ids: tuple[str, ...] | None = None,
     ) -> TextGenerateResponse:
-        provider = cast(
-            TextProvider,
-            self._registry.resolve(
-                ProviderCapability.TEXT,
-                provider_id=provider_id,
-                model_id=request.model_id,
-            ),
+        candidates = (
+            fallback_model_ids
+            if fallback_model_ids is not None
+            else model_fallback_candidates(request.model_id, capability="text")
         )
-        return await self._execute(
-            capability=ProviderCapability.TEXT,
-            provider_id=provider_id,
-            request=request,
-            call=lambda: provider.generate(request),
+        model_ids = (request.model_id, *(
+            model_id for model_id in candidates if model_id != request.model_id
+        ))
+        limiter = get_model_rate_limiter()
+        last_error: ProviderError | None = None
+        for index, model_id in enumerate(model_ids):
+            candidate_request = (
+                request if model_id == request.model_id
+                else request.model_copy(update={"model_id": model_id})
+            )
+            tokens = estimate_text_tokens(
+                system_instruction=candidate_request.system_instruction,
+                user_input=candidate_request.user_input,
+                max_output_tokens=candidate_request.max_output_tokens,
+            )
+            try:
+                provider = cast(
+                    TextProvider,
+                    self._registry.resolve(
+                        ProviderCapability.TEXT,
+                        provider_id=provider_id,
+                        model_id=model_id,
+                    ),
+                )
+                lease = await limiter.acquire(model_id, tokens)
+                try:
+                    return await self._execute(
+                        capability=ProviderCapability.TEXT,
+                        provider_id=provider_id,
+                        request=candidate_request,
+                        call=lambda provider=provider, candidate_request=candidate_request: (
+                            provider.generate(candidate_request)
+                        ),
+                    )
+                finally:
+                    limiter.release(model_id, lease)
+            except ProviderError as exc:
+                if exc.code != ProviderErrorCode.RATE_LIMITED:
+                    raise
+                limiter.record_rate_limited(model_id, exc.retry_after_seconds)
+                last_error = exc
+                if index + 1 >= len(model_ids):
+                    raise
+        if last_error is not None:
+            raise last_error
+        raise ProviderError(
+            ProviderErrorCode.RATE_LIMITED,
+            retryable=True,
+            retry_after_seconds=60,
+            user_safe_summary="No AI text model is currently available.",
         )
 
     async def generate_image(
@@ -291,12 +339,28 @@ class AIProviderExecutor:
                 model_id=request.model_id,
             ),
         )
-        return await self._execute(
-            capability=ProviderCapability.VISION,
-            provider_id=provider_id,
-            request=request,
-            call=lambda: provider.inspect(request),
+        limiter = get_model_rate_limiter()
+        tokens = estimate_text_tokens(
+            system_instruction=(
+                request.inspection_criteria[0] if request.inspection_criteria else ""
+            ),
+            user_input=(
+                request.inspection_criteria[1]
+                if len(request.inspection_criteria) > 1
+                else ""
+            ),
+            max_output_tokens=1_500,
         )
+        lease = await limiter.acquire(request.model_id, tokens)
+        try:
+            return await self._execute(
+                capability=ProviderCapability.VISION,
+                provider_id=provider_id,
+                request=request,
+                call=lambda: provider.inspect(request),
+            )
+        finally:
+            limiter.release(request.model_id, lease)
 
     async def extract_ocr(
         self,

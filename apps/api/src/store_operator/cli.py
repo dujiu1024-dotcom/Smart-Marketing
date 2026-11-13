@@ -19,6 +19,7 @@ from store_operator.models.identity import (
     User,
 )
 from store_operator.models.job_runtime import Job, OutboxEvent
+from store_operator.prompt_seed import seed_prompt_templates
 
 
 def create_user(email: str) -> None:
@@ -199,6 +200,49 @@ def revoke_platform_admin(email: str, reason: str) -> None:
 
 
 
+def _resolve_seed_publisher(db: Session, email: str | None) -> UUID:
+    if email:
+        normalized = normalize_email(email)
+        user = db.scalar(
+            select(User).where(
+                User.email_normalized == normalized,
+                User.status == "active",
+            )
+        )
+        if user is None:
+            raise SystemExit("An active user is required as the prompt publisher")
+        return user.id
+    admin = db.scalar(
+        select(User)
+        .join(PlatformAdminGrant, PlatformAdminGrant.user_id == User.id)
+        .where(PlatformAdminGrant.status == "active", User.status == "active")
+        .order_by(User.created_at)
+    )
+    if admin is not None:
+        return admin.id
+    user = db.scalar(
+        select(User).where(User.status == "active").order_by(User.created_at)
+    )
+    if user is None:
+        raise SystemExit("Create an active user before seeding prompt templates")
+    return user.id
+
+
+def seed_published_prompt_templates(
+    *, publisher_email: str | None, industry_key: str
+) -> None:
+    with SessionLocal() as db:
+        publisher_user_id = _resolve_seed_publisher(db, publisher_email)
+        outcomes = seed_prompt_templates(
+            db,
+            publisher_user_id=publisher_user_id,
+            industry_key=industry_key,
+        )
+        db.commit()
+    for outcome in outcomes:
+        print(outcome)
+
+
 def replay_dead_letter_outbox_event(
     db: Session,
     *,
@@ -293,6 +337,10 @@ def main() -> None:
     replay.add_argument("--reason", required=True)
     replay.add_argument("--confirm-event-id", required=True)
 
+    seed = commands.add_parser("seed-prompt-templates")
+    seed.add_argument("--publisher-email")
+    seed.add_argument("--industry-key", default="general")
+
     args = parser.parse_args()
     if args.command == "create-user":
         create_user(args.email)
@@ -316,6 +364,11 @@ def main() -> None:
             )
             db.commit()
         print(f"Requeued dead Outbox event {event_id}.")
+    elif args.command == "seed-prompt-templates":
+        seed_published_prompt_templates(
+            publisher_email=args.publisher_email,
+            industry_key=args.industry_key,
+        )
 
 
 if __name__ == "__main__":

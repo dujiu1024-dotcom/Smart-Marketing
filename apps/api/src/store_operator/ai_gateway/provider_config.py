@@ -13,6 +13,10 @@ from store_operator.ai_gateway.http_provider import (
     HttpTextProvider,
     HttpVisionProvider,
 )
+from store_operator.ai_gateway.openai_compatible import (
+    OpenAiCompatibleProviderBundle,
+    OpenAiCompatibleTransport,
+)
 from store_operator.ai_gateway.registry import ProviderRegistry
 from store_operator.ai_gateway.schemas import ProviderCapability, ProviderDescriptor
 from store_operator.ai_gateway.secrets import ProviderSecretResolver
@@ -52,6 +56,9 @@ class HttpProviderEnvironmentConfig:
     timeout_seconds: float = 45
     circuit_failure_threshold: int = 5
     circuit_reset_timeout_seconds: float = 30
+    api_style: str = "store_operator"
+    disable_thinking: bool = False
+    disable_image_watermark: bool = False
 
     @classmethod
     def from_environment(
@@ -114,6 +121,20 @@ class HttpProviderEnvironmentConfig:
         display_name = values["DISPLAY_NAME"]
         if len(provider_id) > 80 or len(display_name) > 120:
             raise ValueError("AI provider identifier or display name exceeds its limit")
+        api_style = (environ.get(prefix + "API_STYLE", "store_operator").strip() or
+                     "store_operator")
+        if api_style not in {"store_operator", "openai_compatible"}:
+            raise ValueError(
+                "AI_PROVIDER_API_STYLE must be store_operator or openai_compatible"
+            )
+        disable_thinking = (
+            environ.get(prefix + "DISABLE_THINKING", "").strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
+        disable_image_watermark = (
+            environ.get(prefix + "DISABLE_IMAGE_WATERMARK", "").strip().lower()
+            in {"1", "true", "yes", "on"}
+        )
         return cls(
             provider_id=provider_id,
             display_name=display_name,
@@ -124,6 +145,9 @@ class HttpProviderEnvironmentConfig:
             timeout_seconds=timeout_seconds,
             circuit_failure_threshold=circuit_failure_threshold,
             circuit_reset_timeout_seconds=circuit_reset_timeout_seconds,
+            api_style=api_style,
+            disable_thinking=disable_thinking,
+            disable_image_watermark=disable_image_watermark,
         )
 
 
@@ -135,16 +159,32 @@ def build_http_provider_registry(
 ) -> ProviderRegistry:
     """Build a registry from explicit deployment config and an external Secret resolver."""
     api_key = secret_resolver.resolve_api_key(config.secret_ref)
-    transport = HttpJsonTransport(
-        base_url=config.base_url,
-        api_key=api_key,
-        timeout_seconds=config.timeout_seconds,
-        client=client,
-        circuit_breaker=CircuitBreaker(
-            failure_threshold=config.circuit_failure_threshold,
-            reset_timeout_seconds=config.circuit_reset_timeout_seconds,
-        ),
+    circuit_breaker = CircuitBreaker(
+        failure_threshold=config.circuit_failure_threshold,
+        reset_timeout_seconds=config.circuit_reset_timeout_seconds,
     )
+    if config.api_style == "openai_compatible":
+        bundle: object = OpenAiCompatibleProviderBundle(
+            OpenAiCompatibleTransport(
+                base_url=config.base_url,
+                api_key=api_key,
+                timeout_seconds=config.timeout_seconds,
+                client=client,
+                circuit_breaker=circuit_breaker,
+            ),
+            disable_thinking=config.disable_thinking,
+            watermark=not config.disable_image_watermark,
+        )
+    else:
+        bundle = HttpProviderBundle(
+            HttpJsonTransport(
+                base_url=config.base_url,
+                api_key=api_key,
+                timeout_seconds=config.timeout_seconds,
+                client=client,
+                circuit_breaker=circuit_breaker,
+            )
+        )
     descriptor = ProviderDescriptor(
         provider_id=config.provider_id,
         display_name=config.display_name,
@@ -154,5 +194,5 @@ def build_http_provider_registry(
         region=config.region,
     )
     registry = ProviderRegistry()
-    registry.register(descriptor, HttpProviderBundle(transport))
+    registry.register(descriptor, bundle)
     return registry

@@ -20,6 +20,7 @@ from store_operator.ai_gateway import (  # type: ignore[import-untyped]
     ProviderCallContext,
     ProviderCapability,
     VisionInspectRequest,
+    localized_failure_summary,
     render_published_prompt,
     validate_structured_output,
 )
@@ -307,27 +308,24 @@ def _vision_report(
     asset_object_key: str,
 ) -> dict[str, object]:
     system_instruction, user_input = render_published_prompt(version, variables)
-    executor, client, provider_id, model_id = _load_executor(
+    executor, provider_id, model_id = _load_executor(
         ProviderCapability.VISION, "AI_VISION_MODEL_ID"
     )
-    try:
-        request = VisionInspectRequest(
-            context=ProviderCallContext(
-                request_id=str(uuid4()),
-                store_id=task.store_id,
-                job_id=job.id,
-                attempt_id=context.attempt_id,
-                idempotency_key=_operation_idempotency_key(job, "vision-inspection"),
-                marketing_task_id=task.id,
-                prompt_version_id=version.id,
-            ),
-            model_id=model_id,
-            asset_object_key=asset_object_key,
-            inspection_criteria=(system_instruction, user_input),
-        )
-        response = asyncio.run(executor.inspect_image(request, provider_id=provider_id))
-    finally:
-        asyncio.run(client.aclose())
+    request = VisionInspectRequest(
+        context=ProviderCallContext(
+            request_id=str(uuid4()),
+            store_id=task.store_id,
+            job_id=job.id,
+            attempt_id=context.attempt_id,
+            idempotency_key=_operation_idempotency_key(job, "vision-inspection"),
+            marketing_task_id=task.id,
+            prompt_version_id=version.id,
+        ),
+        model_id=model_id,
+        asset_object_key=asset_object_key,
+        inspection_criteria=(system_instruction, user_input),
+    )
+    response = asyncio.run(executor.inspect_image(request, provider_id=provider_id))
 
     severity_rank = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
     severities = [
@@ -529,21 +527,18 @@ def _complete_image(
         )
         store_id = task.store_id
 
-    text_executor, text_client, text_provider_id, text_model_id = _load_executor()
-    try:
-        image_prompt_output = _call_text_provider(
-            context=context,
-            job=job,
-            task=task,
-            version=image_prompt_version,
-            variables=base_variables,
-            provider_id=text_provider_id,
-            model_id=text_model_id,
-            executor=text_executor,
-            idempotency_key=_operation_idempotency_key(job, "image-prompt"),
-        )
-    finally:
-        asyncio.run(text_client.aclose())
+    text_executor, text_provider_id, text_model_id = _load_executor()
+    image_prompt_output = _call_text_provider(
+        context=context,
+        job=job,
+        task=task,
+        version=image_prompt_version,
+        variables=base_variables,
+        provider_id=text_provider_id,
+        model_id=text_model_id,
+        executor=text_executor,
+        idempotency_key=_operation_idempotency_key(job, "image-prompt"),
+    )
 
     visual_prompt_value = image_prompt_output.get("prompt")
     negative_prompt_value = image_prompt_output.get("negative_prompt")
@@ -598,50 +593,47 @@ def _complete_image(
             "AI_IMAGE_OUTPUT_MIME_TYPE must be PNG, JPEG or WebP.",
         )
 
-    image_executor, image_client, image_provider_id, image_model_id = _load_executor(
+    image_executor, image_provider_id, image_model_id = _load_executor(
         ProviderCapability.IMAGE, "AI_IMAGE_MODEL_ID"
     )
-    try:
-        image_context = ProviderCallContext(
-            request_id=str(uuid4()),
-            store_id=store_id,
-            job_id=job.id,
-            attempt_id=context.attempt_id,
-            idempotency_key=_operation_idempotency_key(job, "image-generation"),
-            marketing_task_id=task_id,
-            prompt_version_id=image_version.id,
+    image_context = ProviderCallContext(
+        request_id=str(uuid4()),
+        store_id=store_id,
+        job_id=job.id,
+        attempt_id=context.attempt_id,
+        idempotency_key=_operation_idempotency_key(job, "image-generation"),
+        marketing_task_id=task_id,
+        prompt_version_id=image_version.id,
+    )
+    if source_asset is None:
+        image_request = ImageGenerateRequest(
+            context=image_context,
+            model_id=image_model_id,
+            prompt=provider_prompt,
+            width=width,
+            height=height,
+            output_mime_type=output_mime_type,
         )
-        if source_asset is None:
-            image_request = ImageGenerateRequest(
-                context=image_context,
-                model_id=image_model_id,
-                prompt=provider_prompt,
-                width=width,
-                height=height,
-                output_mime_type=output_mime_type,
+        image_result = asyncio.run(
+            image_executor.generate_image(
+                image_request, provider_id=image_provider_id
             )
-            image_result = asyncio.run(
-                image_executor.generate_image(
-                    image_request, provider_id=image_provider_id
-                )
+        )
+    else:
+        image_request = ImageEditRequest(
+            context=image_context,
+            model_id=image_model_id,
+            prompt=provider_prompt,
+            width=width,
+            height=height,
+            output_mime_type=output_mime_type,
+            source_asset_object_key=source_asset.object_key,
+        )
+        image_result = asyncio.run(
+            image_executor.edit_image(
+                image_request, provider_id=image_provider_id
             )
-        else:
-            image_request = ImageEditRequest(
-                context=image_context,
-                model_id=image_model_id,
-                prompt=provider_prompt,
-                width=width,
-                height=height,
-                output_mime_type=output_mime_type,
-                source_asset_object_key=source_asset.object_key,
-            )
-            image_result = asyncio.run(
-                image_executor.edit_image(
-                    image_request, provider_id=image_provider_id
-                )
-            )
-    finally:
-        asyncio.run(image_client.aclose())
+        )
 
     validate_structured_output(
         {
@@ -930,7 +922,18 @@ def _complete_image(
             ]
             step.blocked_by_json = []
             step.block_code = None if vision["passed"] else "VISION_ISSUES_FOUND"
-            step.block_detail_json = None if vision["passed"] else vision
+            step.block_detail_json = (
+                None
+                if vision["passed"]
+                else {
+                    "summary": localized_failure_summary(
+                        "VISION_ISSUES_FOUND",
+                        "Vision inspection found issues.",
+                    ),
+                    "report": vision.get("report"),
+                    "findings": vision.get("findings", []),
+                }
+            )
             db.add(
                 OutboxEvent(
                     aggregate_type="artifact_version",

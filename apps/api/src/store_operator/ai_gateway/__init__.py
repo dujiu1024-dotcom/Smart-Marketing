@@ -3,6 +3,7 @@ from store_operator.ai_gateway.errors import (
     ProviderError,
     ProviderErrorCode,
     SideEffectState,
+    localized_failure_summary,
 )
 from store_operator.ai_gateway.execution import AIProviderExecutor
 from store_operator.ai_gateway.http_provider import (
@@ -12,6 +13,14 @@ from store_operator.ai_gateway.http_provider import (
     HttpTextProvider,
     HttpVisionProvider,
     ProviderEndpoints,
+)
+from store_operator.ai_gateway.openai_compatible import (
+    OpenAiCompatibleImageProvider,
+    OpenAiCompatibleOCRProvider,
+    OpenAiCompatibleProviderBundle,
+    OpenAiCompatibleTextProvider,
+    OpenAiCompatibleTransport,
+    OpenAiCompatibleVisionProvider,
 )
 from store_operator.ai_gateway.prompt_contracts import (
     PROMPT_TASK_CONTRACTS,
@@ -70,6 +79,12 @@ __all__ = [
     "OCRProvider",
     "OCRRequest",
     "OCRResponse",
+    "OpenAiCompatibleImageProvider",
+    "OpenAiCompatibleOCRProvider",
+    "OpenAiCompatibleProviderBundle",
+    "OpenAiCompatibleTextProvider",
+    "OpenAiCompatibleTransport",
+    "OpenAiCompatibleVisionProvider",
     "PromptContractError",
     "PromptTaskContract",
     "PromptTaskType",
@@ -82,6 +97,7 @@ __all__ = [
     "ProviderErrorCode",
     "ProviderRegistry",
     "SideEffectState",
+    "localized_failure_summary",
     "TextGenerateRequest",
     "TextGenerateResponse",
     "TextProvider",

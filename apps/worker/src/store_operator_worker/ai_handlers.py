@@ -127,7 +127,7 @@ def _provider_secret_resolver(secret_ref: str) -> ProviderSecretResolver:
 def _load_executor(
     capability: ProviderCapability = ProviderCapability.TEXT,
     model_env_var: str = "AI_TEXT_MODEL_ID",
-) -> tuple[AIProviderExecutor, httpx.AsyncClient, str, str]:
+) -> tuple[AIProviderExecutor, str, str]:
     config = HttpProviderEnvironmentConfig.from_environment(os.environ)
     if config is None:
         raise _safe_error(
@@ -135,15 +135,14 @@ def _load_executor(
             "AI provider configuration is not available to the Worker.",
         )
     resolver = _provider_secret_resolver(config.secret_ref)
-    client = httpx.AsyncClient()
     try:
+        # No shared AsyncClient is injected: the transport creates and closes its
+        # client inside the same event loop as each asyncio.run() provider call.
         registry = build_http_provider_registry(
             config,
             secret_resolver=resolver,
-            client=client,
         )
     except (SecretStoreError, ValueError, httpx.HTTPError):
-        asyncio.run(client.aclose())
         raise _safe_error(
             "AI_PROVIDER_CONFIGURATION_INVALID",
             "AI provider configuration or Secret reference could not be resolved.",
@@ -153,7 +152,6 @@ def _load_executor(
     if not model_id and len(supported_models) == 1:
         model_id = supported_models[0]
     if not model_id or model_id not in supported_models:
-        asyncio.run(client.aclose())
         raise _safe_error(
             "AI_PROVIDER_MODEL_NOT_CONFIGURED",
             f"A supported {model_env_var} must be configured for {capability.value}.",
@@ -162,7 +160,7 @@ def _load_executor(
         registry=registry,
         session_context_factory=_session_factory().begin,
     )
-    return executor, client, config.provider_id, model_id
+    return executor, config.provider_id, model_id
 
 
 def _published_prompt(
@@ -458,15 +456,12 @@ def _complete_strategy(
         task_id = task.id
         store_id = task.store_id
 
-    executor, client, provider_id, model_id = _load_executor()
-    try:
-        output = _call_text_provider(
-            context=context, job=job, task=task, version=version,
-            variables=variables, provider_id=provider_id, model_id=model_id,
-            executor=executor,
-        )
-    finally:
-        asyncio.run(client.aclose())
+    executor, provider_id, model_id = _load_executor()
+    output = _call_text_provider(
+        context=context, job=job, task=task, version=version,
+        variables=variables, provider_id=provider_id, model_id=model_id,
+        executor=executor,
+    )
 
     context.check_control()
     with _session_factory().begin() as db:
@@ -683,66 +678,63 @@ def _complete_copy(
         )
         store_id = task.store_id
 
-    executor, client, provider_id, model_id = _load_executor()
-    try:
-        revision_output = _call_text_provider(
+    executor, provider_id, model_id = _load_executor()
+    revision_output = _call_text_provider(
+        context=context,
+        job=job,
+        task=task,
+        version=version,
+        variables=variables,
+        provider_id=provider_id,
+        model_id=model_id,
+        executor=executor,
+        idempotency_key=_operation_idempotency_key(
+            job, "copy-revision" if is_revision else "copy-generation"
+        ),
+    )
+    if is_revision and previous_copy is not None:
+        output = _merge_copy_revision(
+            previous_copy,
+            revision_output,
+            dict(generation_contract_version.output_schema_json),
+        )
+    else:
+        output = dict(revision_output)
+
+    if video_script_version is not None:
+        video_variables = _prompt_variables(
+            video_script_version,
+            task=task,
+            requirement=requirement,
+            strategy=strategy,
+            business_facts=business_facts,
+            extra_variables={
+                "copy": {
+                    key: value for key, value in output.items()
+                    if key != "video_script"
+                },
+                "marketing_copy": {
+                    key: value for key, value in output.items()
+                    if key != "video_script"
+                },
+                "copy_title": output.get("title", ""),
+                "copy_body": output.get("body", ""),
+                "revision_instruction": revision_instruction,
+                "previous_copy": previous_copy or {},
+            },
+        )
+        video_script = _call_text_provider(
             context=context,
             job=job,
             task=task,
-            version=version,
-            variables=variables,
+            version=video_script_version,
+            variables=video_variables,
             provider_id=provider_id,
             model_id=model_id,
             executor=executor,
-            idempotency_key=_operation_idempotency_key(
-                job, "copy-revision" if is_revision else "copy-generation"
-            ),
+            idempotency_key=_operation_idempotency_key(job, "video-script"),
         )
-        if is_revision and previous_copy is not None:
-            output = _merge_copy_revision(
-                previous_copy,
-                revision_output,
-                dict(generation_contract_version.output_schema_json),
-            )
-        else:
-            output = dict(revision_output)
-
-        if video_script_version is not None:
-            video_variables = _prompt_variables(
-                video_script_version,
-                task=task,
-                requirement=requirement,
-                strategy=strategy,
-                business_facts=business_facts,
-                extra_variables={
-                    "copy": {
-                        key: value for key, value in output.items()
-                        if key != "video_script"
-                    },
-                    "marketing_copy": {
-                        key: value for key, value in output.items()
-                        if key != "video_script"
-                    },
-                    "copy_title": output.get("title", ""),
-                    "copy_body": output.get("body", ""),
-                    "revision_instruction": revision_instruction,
-                    "previous_copy": previous_copy or {},
-                },
-            )
-            video_script = _call_text_provider(
-                context=context,
-                job=job,
-                task=task,
-                version=video_script_version,
-                variables=video_variables,
-                provider_id=provider_id,
-                model_id=model_id,
-                executor=executor,
-                idempotency_key=_operation_idempotency_key(job, "video-script"),
-            )
-            output["video_script"] = video_script
-    finally:
-        asyncio.run(client.aclose())
+        output["video_script"] = video_script
 
     context.check_control()
     canonical = json.dumps(
@@ -816,6 +808,18 @@ def _complete_copy(
                 ArtifactVersion.input_fingerprint == input_fingerprint,
             )
         )
+        invocation_prompt_capabilities = [(version.id, ProviderCapability.TEXT.value)]
+        if video_script_version is not None:
+            invocation_prompt_capabilities.append(
+                (video_script_version.id, ProviderCapability.TEXT.value)
+            )
+        invocation_refs = _ai_invocation_source_refs(
+            db,
+            store_id=store_id,
+            job_id=context.job_id,
+            attempt_id=context.attempt_id,
+            prompt_capabilities=tuple(invocation_prompt_capabilities),
+        )
         if artifact_version is None:
             latest_version = db.scalar(
                 select(ArtifactVersion.version_no).where(
@@ -842,6 +846,7 @@ def _complete_copy(
                     "type": "video_script_prompt_version",
                     "id": str(video_script_version.id),
                 })
+            source_refs.extend(invocation_refs)
             artifact_version = ArtifactVersion(
                 id=uuid4(),
                 store_id=store_id,
@@ -862,31 +867,6 @@ def _complete_copy(
             )
             db.add(artifact_version)
             db.flush()
-        invocation_prompt_capabilities = [(version.id, ProviderCapability.TEXT.value)]
-        if video_script_version is not None:
-            invocation_prompt_capabilities.append(
-                (video_script_version.id, ProviderCapability.TEXT.value)
-            )
-        invocation_refs = _ai_invocation_source_refs(
-            db,
-            store_id=store_id,
-            job_id=context.job_id,
-            attempt_id=context.attempt_id,
-            prompt_capabilities=tuple(invocation_prompt_capabilities),
-        )
-        existing_source_refs = list(artifact_version.source_refs_json or [])
-        existing_invocation_ids = {
-            item.get("id")
-            for item in existing_source_refs
-            if item.get("type") == "ai_invocation"
-        }
-        artifact_version.source_refs_json = [
-            *existing_source_refs,
-            *[
-                ref for ref in invocation_refs
-                if ref["id"] not in existing_invocation_ids
-            ],
-        ]
         artifact.current_version_id = artifact_version.id
         task.version += 1
         step.status = "waiting_for_user"

@@ -24,8 +24,16 @@ from store_operator.models.identity import (
     User,
 )
 
-SESSION_COOKIE_NAME = "__Host-ai_store_session"
-ADMIN_SESSION_COOKIE_NAME = "__Host-ai_store_admin_session"
+# `__Host-` cookies require the Secure attribute, which Safari rejects for
+# plain-HTTP local hosts. Keep the hardened name over HTTPS in production and
+# use an unprefixed cookie for local HTTP development.
+SESSION_COOKIE_SECURE = settings.environment == "production"
+SESSION_COOKIE_NAME = (
+    "__Host-ai_store_session" if SESSION_COOKIE_SECURE else "ai_store_session"
+)
+ADMIN_SESSION_COOKIE_NAME = (
+    "__Host-ai_store_admin_session" if SESSION_COOKIE_SECURE else "ai_store_admin_session"
+)
 STORE_BUSINESS_CAPABILITIES = frozenset({"store.business.use"})
 
 

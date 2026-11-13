@@ -10,7 +10,11 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from store_operator.auth.context import AuthContext
-from store_operator.auth.dependencies import require_store_context
+from store_operator.auth.dependencies import (
+    SESSION_COOKIE_NAME,
+    SESSION_COOKIE_SECURE,
+    require_store_context,
+)
 from store_operator.auth.security import hash_password, session_token_verifier
 from store_operator.config import settings
 from store_operator.main import app
@@ -156,8 +160,9 @@ def test_login_cookie_csrf_and_me(identity_client, db_session, monkeypatch):
     assert payload["user"]["id"] == str(user.id)
     assert payload["csrf_token"]
     cookie = response.headers["set-cookie"]
-    assert "__Host-ai_store_session=" in cookie
-    assert "Secure" in cookie
+    assert f"{SESSION_COOKIE_NAME}=" in cookie
+    assert ("Secure" in cookie) == SESSION_COOKIE_SECURE
+    assert SESSION_COOKIE_NAME.startswith("__Host-") == SESSION_COOKIE_SECURE
     assert "HttpOnly" in cookie
     assert "SameSite=lax" in cookie
     assert "Path=/" in cookie
@@ -228,7 +233,7 @@ def test_store_selector_is_request_scoped_and_never_authorizes_by_active_store(
     assert allowed.json()["store_id"] == str(store_a.id)
     assert allowed.json()["role"] == "owner"
 
-    raw_cookie = identity_client.cookies.get("__Host-ai_store_session")
+    raw_cookie = identity_client.cookies.get(SESSION_COOKIE_NAME)
     from store_operator.config import settings
 
     auth_session = db_session.scalar(
@@ -435,7 +440,7 @@ def test_expired_session_is_rejected_and_cookie_is_cleared(
     user = make_user(db_session, "expired@example.com")
     make_store(db_session, "Expired Store", user)
     login(identity_client, "expired@example.com")
-    raw_cookie = identity_client.cookies.get("__Host-ai_store_session")
+    raw_cookie = identity_client.cookies.get(SESSION_COOKIE_NAME)
     from store_operator.config import settings
 
     auth_session = db_session.scalar(
@@ -503,7 +508,7 @@ def test_password_change_rotates_current_session_and_revokes_other_sessions(
     other_client = TestClient(app, base_url="https://testserver")
     login(other_client, "password-change@example.com")
 
-    old_token = identity_client.cookies.get("__Host-ai_store_session")
+    old_token = identity_client.cookies.get(SESSION_COOKIE_NAME)
     assert old_token
     old_verifier = session_token_verifier(old_token, settings.session_token_pepper)
     active_session = db_session.scalar(

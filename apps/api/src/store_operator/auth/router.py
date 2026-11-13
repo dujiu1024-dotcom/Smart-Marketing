@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from store_operator.auth.audit import record_audit
 from store_operator.auth.dependencies import (
     SESSION_COOKIE_NAME,
+    SESSION_COOKIE_SECURE,
     AuthenticatedSession,
     get_current_session,
     require_csrf,
@@ -53,7 +54,7 @@ def _set_session_cookie(
         key=cookie_name,
         value=token,
         max_age=settings.session_absolute_timeout_seconds,
-        secure=True,
+        secure=SESSION_COOKIE_SECURE,
         httponly=True,
         samesite="lax",
         path="/",
@@ -64,7 +65,7 @@ def _clear_session_cookie(
     response: Response, cookie_name: str = SESSION_COOKIE_NAME
 ) -> None:
     response.delete_cookie(
-        cookie_name, path="/", secure=True, httponly=True, samesite="lax"
+        cookie_name, path="/", secure=SESSION_COOKIE_SECURE, httponly=True, samesite="lax"
     )
 
 

@@ -20,6 +20,7 @@ from sqlalchemy.orm import sessionmaker
 from store_operator.ai_gateway.errors import (  # type: ignore[import-untyped]
     ProviderError,
     SideEffectState,
+    localized_failure_summary,
 )
 from store_operator.channels.douyin import (  # type: ignore[import-untyped]
     DouyinApiError,
@@ -408,7 +409,10 @@ def execute_job(job_id: str) -> dict[str, str]:
                 lease_token=lease_token,
                 worker_id=WORKER_ID,
                 error_code="JOB_TIMEOUT",
-                error_summary="Job exceeded its configured execution timeout.",
+                error_summary=localized_failure_summary(
+                    "JOB_TIMEOUT",
+                    "Job exceeded its configured execution timeout.",
+                ),
                 retryable=False,
                 side_effect_state=SideEffectState.UNKNOWN,
             )
@@ -421,7 +425,10 @@ def execute_job(job_id: str) -> dict[str, str]:
                 lease_token=lease_token,
                 worker_id=WORKER_ID,
                 error_code=exc.code,
-                error_summary=exc.safe_summary,
+                error_summary=localized_failure_summary(
+                    exc.code,
+                    exc.safe_summary,
+                ),
                 retryable=exc.retryable,
                 side_effect_state=exc.side_effect_state,
                 retry_delay_seconds=exc.retry_delay_seconds,
@@ -435,13 +442,16 @@ def execute_job(job_id: str) -> dict[str, str]:
                 lease_token=lease_token,
                 worker_id=WORKER_ID,
                 error_code=exc.code.value,
-                error_summary=exc.user_safe_summary,
+                error_summary=localized_failure_summary(
+                    exc.code.value,
+                    exc.user_safe_summary,
+                ),
                 retryable=exc.retryable,
                 side_effect_state=exc.side_effect_state,
                 retry_delay_seconds=(
-                    max(0, ceil(exc.retry_after_seconds))
+                    max(60, ceil(exc.retry_after_seconds))
                     if exc.retry_after_seconds is not None
-                    else 30
+                    else 60
                 ),
             )
         return {"status": "failed", "reason": exc.code.value}
@@ -453,6 +463,7 @@ def execute_job(job_id: str) -> dict[str, str]:
                 "attempt_id": str(attempt_id),
                 "error_type": type(exc).__name__,
             },
+            exc_info=exc,
         )
         try:
             with SessionLocal.begin() as db:
@@ -462,8 +473,9 @@ def execute_job(job_id: str) -> dict[str, str]:
                     lease_token=lease_token,
                     worker_id=WORKER_ID,
                     error_code="WORKER_UNEXPECTED_ERROR",
-                    error_summary=(
-                        "Job failed unexpectedly; external side-effect state requires review."
+                    error_summary=localized_failure_summary(
+                        "WORKER_UNEXPECTED_ERROR",
+                        "Job failed unexpectedly; external side-effect state requires review.",
                     ),
                     retryable=False,
                     side_effect_state=SideEffectState.UNKNOWN,

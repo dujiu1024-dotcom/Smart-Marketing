@@ -279,9 +279,9 @@ export default function App() {
         await loadStoreContext();
       })
       .catch((reason: unknown) => {
-        if (active && !(reason instanceof ApiError && reason.status === 401)) {
-          setError(errorMessage(reason));
-        }
+        if (!active) return;
+        if (handleSessionError(reason)) return;
+        setError(errorMessage(reason));
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -331,6 +331,23 @@ export default function App() {
     setNotice("");
   }
 
+  function resetSessionState() {
+    clearCsrfToken();
+    setUser(null);
+    setStores([]);
+    setStoresReady(false);
+    setStoreId("");
+    setProfile(null);
+  }
+
+  function handleSessionError(reason: unknown): boolean {
+    if (reason instanceof ApiError && reason.status === 401) {
+      resetSessionState();
+      return true;
+    }
+    return false;
+  }
+
   async function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -340,6 +357,7 @@ export default function App() {
       setUser(currentUser);
       await loadStoreContext();
     } catch (reason) {
+      handleSessionError(reason);
       setError(errorMessage(reason));
     } finally {
       setLoading(false);
@@ -426,6 +444,7 @@ export default function App() {
     try {
       await loadStoreContext();
     } catch (reason) {
+      handleSessionError(reason);
       setError(errorMessage(reason));
     } finally {
       setLoading(false);

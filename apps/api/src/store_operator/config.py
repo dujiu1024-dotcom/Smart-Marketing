@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     session_idle_timeout_seconds: int = 3600
     session_absolute_timeout_seconds: int = 86400
     session_last_seen_update_seconds: int = 60
+    request_timeout_seconds: float = 30.0
     auth_login_max_attempts: int = 10
     auth_login_window_seconds: int = 900
     object_storage_endpoint_url: str | None = None
@@ -47,6 +48,8 @@ class Settings(BaseSettings):
             )
         if self.session_last_seen_update_seconds <= 0:
             raise ValueError("SESSION_LAST_SEEN_UPDATE_SECONDS must be positive")
+        if self.request_timeout_seconds <= 0:
+            raise ValueError("REQUEST_TIMEOUT_SECONDS must be positive")
         if self.auth_login_max_attempts <= 0 or self.auth_login_window_seconds <= 0:
             raise ValueError("Login rate-limit settings must be positive")
         if (

@@ -1,3 +1,4 @@
+import asyncio
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -86,7 +87,27 @@ async def request_id_logging_and_tracing_middleware(
             span.set_attribute("url.path", request.url.path)
             span.set_attribute("request.id", request_id)
             try:
-                response = await call_next(request)
+                response = await asyncio.wait_for(
+                    call_next(request), timeout=settings.request_timeout_seconds
+                )
+            except TimeoutError:
+                span.set_attribute("error.type", "RequestTimeout")
+                span.set_status(Status(StatusCode.ERROR))
+                span_context = span.get_span_context()
+                logger.error(
+                    "http.request.timeout",
+                    request_id=request_id,
+                    trace_id=f"{span_context.trace_id:032x}",
+                    method=request.method,
+                    path=request.url.path,
+                    duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+                )
+                response = _error_response(
+                    request,
+                    status_code=504,
+                    code="REQUEST_TIMEOUT",
+                    message="请求处理超时，请稍后重试",
+                )
             except Exception as exc:
                 span.set_attribute("error.type", type(exc).__name__)
                 span.set_status(Status(StatusCode.ERROR))

@@ -11,6 +11,10 @@ export class ApiError extends Error {
 
 let csrfToken = "";
 
+// The API enforces its own request deadline and answers with a 504; this client
+// timeout only covers traffic that never reaches it.
+const REQUEST_TIMEOUT_MS = 40_000;
+
 const ERROR_MESSAGES_ZH: Record<string, string> = {
   LAST_OWNER_REQUIRED: "门店至少需要保留一名启用中的所有者",
   STORE_USER_ALREADY_BOUND: "该账号已绑定其他门店，一个门店用户只能属于一家门店",
@@ -66,12 +70,29 @@ async function request<T>(
   if (method !== "GET" && csrfToken) {
     headers["X-CSRF-Token"] = csrfToken;
   }
-  const response = await fetch(`/api/v1${path}`, {
-    ...options,
-    method,
-    headers,
-    credentials: "include",
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`/api/v1${path}`, {
+      ...options,
+      method,
+      headers,
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } catch (reason) {
+    if (reason instanceof DOMException && reason.name === "AbortError") {
+      throw new ApiError(
+        0,
+        "REQUEST_TIMEOUT",
+        `请求超时（${Math.round(REQUEST_TIMEOUT_MS / 1000)} 秒内没有响应），请检查网络后重试。`,
+      );
+    }
+    throw new ApiError(0, "NETWORK_ERROR", "网络连接失败，请检查网络后重试。");
+  } finally {
+    clearTimeout(timeout);
+  }
   if (response.status === 204) {
     return undefined as T;
   }

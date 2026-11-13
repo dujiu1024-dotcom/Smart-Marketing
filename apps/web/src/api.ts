@@ -1,6 +1,9 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 const API_PREFIX = "/api/v1";
 const CSRF_KEY = "store-operator.csrf";
+// Backend answers slow requests with its own 504 before this deadline, so timeouts
+// surfaced here only mean the request never got a response at all.
+const REQUEST_TIMEOUT_MS = 40_000;
 
 const ERROR_MESSAGES_ZH: Record<string, string> = {
   LAST_OWNER_REQUIRED: "门店至少需要保留一名启用中的所有者",
@@ -221,6 +224,7 @@ async function request<T>(
   init: RequestInit = {},
   storeId?: string,
   allowCsrfRetry = true,
+  timeoutMs = REQUEST_TIMEOUT_MS,
 ): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) {
@@ -231,11 +235,28 @@ async function request<T>(
     const token = csrfToken();
     if (token) headers.set("X-CSRF-Token", token);
   }
-  const response = await fetch(endpoint(path), {
-    ...init,
-    headers,
-    credentials: "include",
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(endpoint(path), {
+      ...init,
+      headers,
+      credentials: "include",
+      signal: controller.signal,
+    });
+  } catch (reason) {
+    if (reason instanceof DOMException && reason.name === "AbortError") {
+      throw new ApiError(
+        `请求超时（${Math.round(timeoutMs / 1000)} 秒内没有响应），请检查网络后重试。`,
+        0,
+        "REQUEST_TIMEOUT",
+      );
+    }
+    throw new ApiError("网络连接失败，请检查网络后重试。", 0, "NETWORK_ERROR");
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as ApiErrorBody;
     if (
@@ -571,13 +592,26 @@ export async function createAssetUploadIntent(storeId: string, input: AssetUploa
   }, storeId);
 }
 export async function putAssetFile(upload: AssetUploadIntent, file: File): Promise<void> {
-  const response = await fetch(upload.upload_url, {
-    method: upload.method,
-    headers: upload.required_headers,
-    body: file,
-    credentials: "omit",
-    redirect: "error",
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
+  let response: Response;
+  try {
+    response = await fetch(upload.upload_url, {
+      method: upload.method,
+      headers: upload.required_headers,
+      body: file,
+      credentials: "omit",
+      redirect: "error",
+      signal: controller.signal,
+    });
+  } catch (reason) {
+    if (reason instanceof DOMException && reason.name === "AbortError") {
+      throw new ApiError("文件上传超时（120 秒），请检查网络后重试。", 0, "REQUEST_TIMEOUT");
+    }
+    throw new ApiError("文件上传失败，请检查网络后重试。", 0, "NETWORK_ERROR");
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) throw new ApiError("文件上传到私有对象存储失败，请重试。", response.status, "OBJECT_UPLOAD_FAILED");
 }
 export async function completeAssetUpload(storeId: string, intentId: string): Promise<{ asset: MediaAsset; status: string }> {

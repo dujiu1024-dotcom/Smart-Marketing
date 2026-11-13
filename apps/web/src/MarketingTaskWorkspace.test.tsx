@@ -68,8 +68,10 @@ describe("marketing task workspace", () => {
     sessionStorage.setItem(`store-operator.current-task-id.${storeId}`, task.id);
     window.location.hash = "#task";
     render(<MarketingTaskWorkspace storeId={storeId} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "渠道与质检" }));
     expect(await screen.findByText("渠道适配与质检")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "创建抖音适配快照" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("tab", { name: "发布确认" }));
     expect(screen.getByRole("heading", { name: "最终发布确认" })).toBeInTheDocument();
   });
   it("lists current-store tasks and opens the selected task", async () => {
@@ -77,6 +79,7 @@ describe("marketing task workspace", () => {
     expect(await screen.findByText("周末新品推广")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /周末新品推广/ }));
     await waitFor(() => expect(api.getMarketingTask).toHaveBeenCalledWith(storeId, "task-1"));
+    fireEvent.click(await screen.findByRole("tab", { name: "执行流程" }));
     expect(screen.getByText("固定执行流程")).toBeInTheDocument();
   });
   it("creates a task with a stable idempotency key and explicit scope", async () => {
@@ -130,6 +133,7 @@ describe("marketing task workspace", () => {
     sessionStorage.setItem(`store-operator.current-task-id.${storeId}`, task.id);
     window.location.hash = "#task";
     render(<MarketingTaskWorkspace storeId={storeId} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "内容制作" }));
     fireEvent.change(await screen.findByLabelText("文案标题"), { target: { value: "周末新品" } });
     fireEvent.change(screen.getByLabelText("文案正文"), { target: { value: "本周末到店体验新品。" } });
     fireEvent.click(screen.getByRole("button", { name: "保存文案版本" }));
@@ -157,6 +161,7 @@ describe("marketing task workspace", () => {
     sessionStorage.setItem(`store-operator.current-task-id.${storeId}`, task.id);
     window.location.hash = "#task";
     render(<MarketingTaskWorkspace storeId={storeId} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "内容制作" }));
     fireEvent.click(await screen.findByRole("button", { name: "审核通过" }));
     await waitFor(() => expect(api.createTaskArtifactReview).toHaveBeenCalledWith(
       storeId, task.id, artifact, artifact.versions[0],

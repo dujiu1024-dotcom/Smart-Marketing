@@ -35,6 +35,22 @@ const stepLabels: Record<TaskStepKey, string> = {
   final_confirmation: "最终发布确认",
   delivery: "发布与交付",
 };
+const taskTabs = [
+  { key: "requirement", label: "需求与事实" },
+  { key: "strategy", label: "营销策略" },
+  { key: "content", label: "内容制作" },
+  { key: "channel", label: "渠道与质检" },
+  { key: "publish", label: "发布确认" },
+  { key: "flow", label: "执行流程" },
+] as const;
+type TaskTabKey = (typeof taskTabs)[number]["key"];
+const isTaskTab = (value: string | null): value is TaskTabKey => taskTabs.some(tab => tab.key === value);
+const taskTabStorageKey = (taskId: string) => `store-operator.task-tab.${taskId}`;
+function defaultTaskTab(task: MarketingTask): TaskTabKey {
+  if (!task.current_requirement_snapshot_id) return "requirement";
+  if (!task.current_strategy_snapshot_id) return "strategy";
+  return "content";
+}
 const statusLabels: Record<string, string> = {
   draft: "草稿", active: "执行中", waiting_for_user: "待商家处理", blocked: "已阻塞",
   failed: "执行失败", completed: "已完成", cancelled: "已取消", archived: "已归档",
@@ -162,6 +178,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const imageRequests = useRef(new Set<string>());
   const imageRetries = useRef<Record<string, number>>({});
   const strategyStep = task?.steps.find(step => step.step_key === "strategy_confirmation");
+  const [taskTab, setTaskTab] = useState<TaskTabKey>("requirement");
   const isCreate = route === "#create";
   const isDetail = route === "#task";
 
@@ -180,6 +197,8 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     setLoading(true); setError("");
     try {
       const response = await getMarketingTask(storeId, id);
+      const storedTab = sessionStorage.getItem(taskTabStorageKey(response.id));
+      setTaskTab(isTaskTab(storedTab) ? storedTab : defaultTaskTab(response));
       setTask(response);
       setDraft(requirementForm(response.requirement_draft));
       setDraftDirty(false);
@@ -397,6 +416,10 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   function openTask(id: string) {
     sessionStorage.setItem(selectedTaskKey(storeId), id);
     window.location.hash = "#task";
+  }
+  function selectTaskTab(key: TaskTabKey) {
+    setTaskTab(key);
+    if (task) sessionStorage.setItem(taskTabStorageKey(task.id), key);
   }
   function updateDraft<K extends keyof DraftForm>(key: K, value: DraftForm[K]) {
     setDraft(current => ({ ...current, [key]: value })); setDraftDirty(true);
@@ -700,7 +723,11 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     {notice && <div className="alert success" role="status">{notice}</div>}
     {loading ? <div className="loading-card"><span className="spinner" />正在读取任务…</div> : !task ? <section className="empty-card"><h2>无法读取营销任务</h2><p>{error || "任务不存在，或当前门店无权访问。"}</p><button className="secondary" type="button" onClick={() => { window.location.hash = "#tasks"; }}>返回任务列表</button></section> : <>
       <section className="task-overview"><div><span className="eyebrow">{taskTypeLabels[task.task_type]}</span><h2>{task.title}</h2><p>任务版本 V{task.version} · 创建于 {new Date(task.created_at).toLocaleString()}</p></div><div className="task-overview-stats"><strong>{statusLabels[task.lifecycle_status]}</strong><span>{stepProgress}/10 步已完成</span><span>{task.blocked_steps_count} 个阻塞步骤</span></div></section>
-      <section className="task-panel"><div className="section-title"><div><h2>需求与经营事实</h2><p>确认后形成不可变需求快照；只允许选择当前门店已确认且仍有效的经营事实。</p></div><span className="status-chip">{task.current_requirement_snapshot_id ? "需求已确认" : "待确认"}</span></div>
+      <div className="task-tabs" role="tablist" aria-label="营销任务内容分块">
+        {taskTabs.map(tab => <button key={tab.key} type="button" role="tab" id={`task-tab-${tab.key}`} aria-controls={`task-tab-panel-${tab.key}`} aria-selected={taskTab === tab.key} className={taskTab === tab.key ? "active" : ""} onClick={() => selectTaskTab(tab.key)}>{tab.label}</button>)}
+      </div>
+      <div className="task-tab-panel" id={`task-tab-panel-${taskTab}`} role="tabpanel" aria-labelledby={`task-tab-${taskTab}`}>
+      {taskTab === "requirement" && <section className="task-panel"><div className="section-title"><div><h2>需求与经营事实</h2><p>确认后形成不可变需求快照；只允许选择当前门店已确认且仍有效的经营事实。</p></div><span className="status-chip">{task.current_requirement_snapshot_id ? "需求已确认" : "待确认"}</span></div>
         {task.current_requirement_snapshot_id ? <div className="task-readonly-grid">{Object.entries(task.requirement_draft).map(([key,value]) => <div key={key}><strong>{draftFieldLabels[key] ?? key}</strong><span>{typeof value === "string" ? value : JSON.stringify(value)}</span></div>)}</div> : <>
           <div className="form-grid"><Field label="经营目标" value={draft.goal} onChange={value => updateDraft("goal", value)} rows={2} /><Field label="目标客群" value={draft.target_audience} onChange={value => updateDraft("target_audience", value)} /><Field label="核心信息" value={draft.core_message} onChange={value => updateDraft("core_message", value)} /><Field label="限制条件" value={draft.constraints} onChange={value => updateDraft("constraints", value)} rows={2} /></div>
           <div className="task-facts"><div className="section-title"><div><h3>选择已确认的经营事实</h3><p>这些事实会冻结到本次任务快照，后续源资料变化不会静默改写历史。最多选择 50 项，当前已选 {selectedFacts.length} 项。</p></div><button className="text-button" type="button" onClick={() => void loadFacts()}>刷新资料</button></div>
@@ -708,14 +735,14 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           </div>
           <div className="form-footer"><p>{draftDirty ? "需求有未保存修改。" : "需求确认后将创建策略生成 Job。"}</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || !draftDirty} onClick={() => void saveRequirement()}>保存需求</button><button className="primary" type="button" disabled={saving || draftDirty || factsLoading || selectedFacts.length === 0 || !draft.goal.trim()} onClick={() => void confirmRequirement()}>确认需求与事实</button></div></div>
         </>}
-      </section>
-      <section className="task-panel"><div className="section-title"><div><h2>营销策略</h2><p>策略由异步执行生成；只有进入待商家处理状态后才可编辑和确认。</p></div><span className="status-chip">{task.current_strategy_snapshot_id ? "策略已确认" : strategyStep ? stepStatusLabel(strategyStep) : "待处理"}</span></div>
+      </section>}
+      {taskTab === "strategy" && <section className="task-panel"><div className="section-title"><div><h2>营销策略</h2><p>策略由异步执行生成；只有进入待商家处理状态后才可编辑和确认。</p></div><span className="status-chip">{task.current_strategy_snapshot_id ? "策略已确认" : strategyStep ? stepStatusLabel(strategyStep) : "待处理"}</span></div>
         {task.current_strategy_snapshot_id ? <pre className="task-json">{safeJson(task.strategy_draft)}</pre>
         : strategyStep?.status === "waiting_for_user" ? <><label className="field"><span>策略草稿（JSON）</span><textarea rows={8} value={strategyText} onChange={event => { setStrategyText(event.target.value); setStrategyDirty(true); }} /></label><div className="form-footer"><p>修改后必须先保存，再确认策略。</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || !strategyDirty} onClick={() => void saveStrategy()}>保存策略</button><button className="primary" type="button" disabled={saving || strategyDirty} onClick={() => void confirmStrategy()}>确认策略</button></div></div></>
         : <p className="muted">{task.current_requirement_snapshot_id ? "策略生成任务已提交，等待 Worker 返回可审核草稿。若执行失败，可在下方步骤中查看阻塞原因并恢复。" : "请先完成需求与经营事实确认。"}</p>}
-      </section>
-      <section className="task-panel">
-        <div className="section-title"><div><h2>文案与图片产物</h2><p>当前为商家手动编辑/已有素材关联路径；不会把未接入的 AI 生成伪装成真实结果。每次修改都会创建不可变新版本。</p></div><button className="text-button" type="button" onClick={() => task && void loadContent(task.id)}>刷新产物</button></div>
+      </section>}
+      {taskTab === "content" && <section className="task-panel">
+        <div className="section-title"><div><h2>文案与图片产物</h2><p>展示每个产物的全部版本；点版本号可查看该版本的完整文案或原图。历史版本只读，不会改动当前版本或审核状态。</p></div><button className="text-button" type="button" onClick={() => task && void loadContent(task.id)}>刷新产物</button></div>
         <div className="form-grid">
           <Field label="文案标题" value={copyTitle} onChange={setCopyTitle} placeholder="填写内容标题" />
           <Field label="话题标签（空格或逗号分隔）" value={copyHashtags} onChange={setCopyHashtags} placeholder="门店名称 周末活动" />
@@ -801,9 +828,8 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           </article>;
         })}</div>}
         <label className="field"><span>审核修改意见（要求修改时必填）</span><textarea rows={2} value={reviewComment} onChange={event => setReviewComment(event.target.value)} placeholder="明确指出需要调整的内容、位置和原因" /></label>
-      </section>
-
-      <section className="task-panel">
+      </section>}
+      {taskTab === "channel" && <section className="task-panel">
         <div className="section-title"><div><h2>渠道适配与质检</h2><p>仅使用已审核的当前版本；渠道规格未核验时明确阻断，不展示虚假的官方校验结果。</p></div><button className="text-button" type="button" disabled={saving} onClick={() => task && void loadContent(task.id)}>刷新渠道内容</button></div>
         {channelSpecs.map(spec => <div className="task-step-title" key={spec.id}><strong>{channelLabel(spec.channel_key)}</strong><span className={spec.current_version?.verification_status === "verified" ? "status-chip" : "status-chip danger"}>{spec.current_version?.verification_status === "verified" ? "规格已核验" : "规格待核验"}</span><span className="muted">{spec.current_version ? "V" + spec.current_version.spec_version : "暂无版本"}</span></div>)}
         <p className="muted">渠道适配使用当前已审核文案和图片版本。官方规格仍待核验时，服务端会拒绝创建内容快照。</p>
@@ -820,8 +846,8 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
             {report && (report.result === "pass" || (report.result === "needs_human" && resolution?.decision === "accepted")) && <button className="primary" type="button" disabled={saving || !taskFactSnapshots.some(fact => fact.confirmation_status === "confirmed")} onClick={() => void freezePackage(content, report)}>冻结为发布包（人工交付）</button>}
           </article>;
         })}</div>}
-      </section>
-      <section className="task-panel">
+      </section>}
+      {taskTab === "publish" && <section className="task-panel">
         <div className="section-title"><div><h2>最终发布确认</h2><p>发布包冻结后绑定完整内容与经营事实指纹；确认仅表示商家批准交付，不代表平台已发布。</p></div><button className="text-button" type="button" disabled={saving} onClick={() => task && void loadContent(task.id)}>刷新发布包</button></div>
         <div className="task-facts">{taskFactSnapshots.map(fact => <label className="task-fact-option" key={fact.id}><input type="checkbox" checked={selectedPackageFacts.includes(fact.id)} disabled={fact.confirmation_status !== "confirmed"} onChange={event => setSelectedPackageFacts(current => event.target.checked ? [...current, fact.id] : current.filter(id => id !== fact.id))} /><span>{fact.fact_key} · V{fact.version_no}</span><small>{fact.confirmation_status === "confirmed" ? "已确认" : "待确认"}</small></label>)}</div>
         <label className="field"><span>最终确认备注（可选）</span><textarea rows={2} value={confirmationNote} onChange={event => setConfirmationNote(event.target.value)} placeholder="补充本次交付确认说明" /></label>
@@ -831,10 +857,11 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           {pkg.items.map(item => <p className="muted" key={item.id}>{channelLabel(item.channel_key)} · {item.delivery_mode === "manual_handoff" ? "人工交付" : "官方 API"} · 内容 {item.channel_content_id.slice(0, 8)}…</p>)}
           {pkg.confirmation ? <p className="muted">确认时间：{new Date(pkg.confirmation.confirmed_at).toLocaleString()}</p> : <button className="primary" type="button" disabled={saving} onClick={() => void confirmPackage(pkg)}>确认该发布包</button>}
         </article>)}</div>}
-      </section>
-      <section className="task-panel"><div className="section-title"><div><h2>固定执行流程</h2><p>步骤状态由服务端状态机维护，必需审核节点不可跳过。</p></div><span className="status-chip">{stepProgress}/10 已完成</span></div>
+      </section>}
+      {taskTab === "flow" && <section className="task-panel"><div className="section-title"><div><h2>固定执行流程</h2><p>步骤状态由服务端状态机维护，必需审核节点不可跳过。</p></div><span className="status-chip">{stepProgress}/10 已完成</span></div>
         <div className="task-step-list">{task.steps.map((step, index) => <article className="task-step" key={step.id}><div className="task-step-index">{index + 1}</div><div className="task-step-body"><div className="task-step-title"><strong>{stepLabels[step.step_key]}</strong><span className={step.status === "failed" || step.block_code ? "status-chip danger" : "status-chip"}>{stepStatusLabel(step)}</span><span className="task-applicability">{statusLabels[step.applicability]}</span></div>{step.block_code && <p className="task-block-reason">{step.block_code}{blockSummary(step) ? ` · ${blockSummary(step)}` : ""}</p>}{step.skip_reason && <p className="muted">跳过原因：{step.skip_reason}</p>}{step.output_refs.length > 0 && <p className="muted">已关联 {step.output_refs.length} 项输出</p>}<div className="task-step-actions">{["active","waiting_for_user"].includes(task.lifecycle_status) && step.applicability === "optional" && step.status === "pending" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "skip")}>记录跳过原因</button>}{["active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && ["failed","stale","waiting_for_user"].includes(step.status) && step.applicability !== "not_applicable" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "recover")}>恢复此步骤</button>}</div></div></article>)}</div>
-      </section>
+      </section>}
+      </div>
       <div className="task-danger-actions">{["draft","active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && <button className="secondary" type="button" disabled={saving} onClick={() => void taskAction("cancel")}>取消任务</button>}{["completed","cancelled"].includes(task.lifecycle_status) && <button className="secondary" type="button" disabled={saving} onClick={() => void taskAction("archive")}>归档任务</button>}</div>
       {previewImage && <div className="artifact-preview-backdrop" role="dialog" aria-modal="true" aria-label="图片原图预览" onClick={() => setPreviewImage(null)}>
         <div className="artifact-preview-dialog" onClick={event => event.stopPropagation()}>

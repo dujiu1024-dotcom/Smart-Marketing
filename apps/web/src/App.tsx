@@ -192,6 +192,44 @@ export default function App() {
   const hotspotRoute = route === "#hotspots" || route.startsWith("#hotspot-detail:");
   const effectsRoute = route === "#effects";
   const taskWorkspaceRoute = ["#ai", "#tasks", "#create", "#task"].includes(route);
+  const navGroups = [
+    {
+      key: "workspace",
+      label: "工作空间",
+      items: [
+        { href: "#ai", label: "AI 营销", active: route === "#ai" },
+        { href: "#tasks", label: "营销任务", active: taskWorkspaceRoute && route !== "#ai" },
+        { href: "#hotspots", label: "发现营销机会", active: hotspotRoute },
+        { href: "#effects", label: "经营效果", active: effectsRoute },
+      ],
+    },
+    {
+      key: "profile",
+      label: "门店资料",
+      items: [
+        { href: "#store:profile", label: "门店档案", active: route === "#store:profile" },
+        { href: "#store:products", label: "商品与服务", active: productRoute },
+        { href: "#store:offers", label: "活动与优惠", active: offerRoute },
+        { href: "#store:brand", label: "品牌规范", active: brandRoute },
+        { href: "#store:audience", label: "客群与经营", active: audienceRoute },
+      ],
+    },
+    {
+      key: "assets",
+      label: "内容与渠道",
+      items: [
+        { href: "#store:knowledge", label: "门店知识库", active: knowledgeRoute },
+        { href: "#store:assets", label: "素材资产库", active: assetsRoute },
+        { href: "#store:channels", label: "渠道账号", active: channelsRoute },
+      ],
+    },
+  ];
+  const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>(() => {
+    if (knowledgeRoute || assetsRoute || channelsRoute) return { assets: true, profile: false, workspace: false };
+    if (route.startsWith("#store")) return { assets: false, profile: true, workspace: false };
+    return { assets: false, profile: false, workspace: true };
+  });
+  const activeNavGroupKey = navGroups.find((group) => group.items.some((item) => item.active))?.key;
 
   const loadStoreContext = useCallback(async () => {
     setStoresReady(false);
@@ -225,6 +263,11 @@ export default function App() {
     window.addEventListener("hashchange", onRouteChange);
     return () => window.removeEventListener("hashchange", onRouteChange);
   }, []);
+
+  useEffect(() => {
+    if (!activeNavGroupKey) return;
+    setOpenNavGroups((current) => (current[activeNavGroupKey] ? current : { ...current, [activeNavGroupKey]: true }));
+  }, [activeNavGroupKey]);
 
   useEffect(() => {
     let active = true;
@@ -461,22 +504,33 @@ export default function App() {
       <div className="workspace">
         {navOpen && <button className="nav-backdrop" type="button" aria-label="关闭导航菜单" onClick={() => setNavOpen(false)} />}
         <aside className={navOpen ? "sidebar open" : "sidebar"} onClick={(event) => { if ((event.target as HTMLElement).closest("a")) setNavOpen(false); }}>
-          <div className="side-label">门店工作台</div>
-          <a className={route === "#ai" ? "side-link active" : "side-link"} href="#ai">AI 营销</a>
-          <a className={["#tasks", "#create", "#task"].includes(route) ? "side-link active" : "side-link"} href="#tasks">营销任务</a>
-          <a className={hotspotRoute ? "side-link active" : "side-link"} href="#hotspots">发现营销机会</a>
-          <a className={effectsRoute ? "side-link active" : "side-link"} href="#effects">经营效果</a>
-          <div className="side-label spaced">门店资料</div>
-          <a className={productRoute || offerRoute || brandRoute || audienceRoute || knowledgeRoute || assetsRoute || channelsRoute || taskWorkspaceRoute || hotspotRoute || effectsRoute ? "side-link" : "side-link active"} href="#store:profile">门店档案</a>
-          <a className={productRoute ? "side-link active" : "side-link"} href="#store:products">商品与服务</a>
-          <a className={offerRoute ? "side-link active" : "side-link"} href="#store:offers">活动与优惠</a>
-          <a className={brandRoute ? "side-link active" : "side-link"} href="#store:brand">品牌规范</a>
-          <a className={audienceRoute ? "side-link active" : "side-link"} href="#store:audience">客群与经营</a>
-          
-          <a className={knowledgeRoute ? "side-link active" : "side-link"} href="#store:knowledge">门店知识库</a>
-          <a className={assetsRoute ? "side-link active" : "side-link"} href="#store:assets">素材资产库</a>
-          <a className={channelsRoute ? "side-link active" : "side-link"} href="#store:channels">渠道账号</a>
-          <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠、品牌规范、客群与经营、门店知识库、素材资产，以及营销任务的需求确认、策略生成与确认、文案与图片生成审核。内容质检、渠道适配与交付需先由平台管理员发布经官方来源核验的渠道规格后方可使用；抖音账号 OAuth 页面已接入，真实应用凭据与账号授权验收仍待完成，不使用演示数据冒充生产数据。</div>
+          <nav className="side-nav" aria-label="门店工作台导航">
+            {navGroups.map((group) => {
+              const expanded = Boolean(openNavGroups[group.key]);
+              const groupActive = group.items.some((item) => item.active);
+              return (
+                <div className="side-group" key={group.key}>
+                  <button
+                    className={groupActive ? "side-group-toggle active" : "side-group-toggle"}
+                    type="button"
+                    aria-expanded={expanded}
+                    aria-controls={`nav-group-${group.key}`}
+                    onClick={() => setOpenNavGroups((current) => ({ ...current, [group.key]: !current[group.key] }))}
+                  >
+                    <span>{group.label}</span>
+                    <span className="side-chevron" aria-hidden="true" />
+                  </button>
+                  {expanded && (
+                    <div className="side-group-items" id={`nav-group-${group.key}`}>
+                      {group.items.map((item) => (
+                        <a key={item.href} className={item.active ? "side-link active" : "side-link"} href={item.href}>{item.label}</a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
         </aside>
         <main className="content">
           {!stores.length ? storeContextFallback : taskWorkspaceRoute ? <MarketingTaskWorkspace storeId={storeId} /> : hotspotRoute ? <HotspotWorkspace storeId={storeId} /> : effectsRoute ? <EffectsWorkspace storeId={storeId} /> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : knowledgeRoute ? <KnowledgeWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : channelsRoute ? <ChannelAccountsWorkspace storeId={storeId} /> : <>

@@ -20,7 +20,10 @@ from starlette.responses import Response
 
 from store_operator.admin_router import router as admin_router
 from store_operator.application.system_info import get_system_info
-from store_operator.auth.dependencies import SESSION_COOKIE_NAME
+from store_operator.auth.dependencies import (
+    ADMIN_SESSION_COOKIE_NAME,
+    SESSION_COOKIE_NAME,
+)
 from store_operator.auth.errors import ApiError
 from store_operator.auth.router import router as auth_router
 from store_operator.channel_douyin_router import router as channel_douyin_router
@@ -157,6 +160,14 @@ async def http_exception_handler(
     if getattr(request.state, "clear_session_cookie", False):
         response.delete_cookie(
             SESSION_COOKIE_NAME, path="/", secure=True, httponly=True, samesite="lax"
+        )
+    if getattr(request.state, "clear_admin_session_cookie", False):
+        response.delete_cookie(
+            ADMIN_SESSION_COOKIE_NAME,
+            path="/",
+            secure=True,
+            httponly=True,
+            samesite="lax",
         )
     return response
 

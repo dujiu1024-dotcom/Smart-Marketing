@@ -1,7 +1,7 @@
 import hmac
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from redis.exceptions import RedisError
@@ -46,9 +46,11 @@ from store_operator.models.identity import AuthSession, Store, StoreMembership, 
 router = APIRouter(tags=["identity"])
 
 
-def _set_session_cookie(response: Response, token: str) -> None:
+def _set_session_cookie(
+    response: Response, token: str, cookie_name: str = SESSION_COOKIE_NAME
+) -> None:
     response.set_cookie(
-        key=SESSION_COOKIE_NAME,
+        key=cookie_name,
         value=token,
         max_age=settings.session_absolute_timeout_seconds,
         secure=True,
@@ -58,9 +60,11 @@ def _set_session_cookie(response: Response, token: str) -> None:
     )
 
 
-def _clear_session_cookie(response: Response) -> None:
+def _clear_session_cookie(
+    response: Response, cookie_name: str = SESSION_COOKIE_NAME
+) -> None:
     response.delete_cookie(
-        SESSION_COOKIE_NAME, path="/", secure=True, httponly=True, samesite="lax"
+        cookie_name, path="/", secure=True, httponly=True, samesite="lax"
     )
 
 
@@ -92,6 +96,40 @@ def _consume_login_attempt(keys: tuple[str, str]) -> None:
     )
     if any(int(value) > settings.auth_login_max_attempts for value in counts):
         raise ApiError(429, "RATE_LIMITED", "Too many login attempts")
+
+
+def issue_session(
+    db: Session,
+    request: Request,
+    user: User,
+    *,
+    active_store_id: UUID | None = None,
+) -> tuple[AuthSession, str, str, datetime]:
+    now = datetime.now(UTC)
+    raw_token = random_token()
+    csrf_token = random_token()
+    expires_at = now + timedelta(seconds=settings.session_absolute_timeout_seconds)
+    auth_session = AuthSession(
+        id=uuid4(),
+        user_id=user.id,
+        token_hash=session_token_verifier(raw_token, settings.session_token_pepper),
+        csrf_token_hash=csrf_token_verifier(csrf_token),
+        auth_version=user.auth_version,
+        active_store_id=active_store_id,
+        created_at=now,
+        last_seen_at=now,
+        idle_expires_at=min(
+            now + timedelta(seconds=settings.session_idle_timeout_seconds), expires_at
+        ),
+        expires_at=expires_at,
+        ip_fingerprint=fingerprint(
+            request.client.host if request.client else "unknown",
+            settings.session_token_pepper,
+        ),
+        user_agent=request.headers.get("user-agent", "")[:512] or None,
+    )
+    db.add(auth_session)
+    return auth_session, raw_token, csrf_token, expires_at
 
 
 @router.post("/auth/login", response_model=LoginResponse)
@@ -135,29 +173,9 @@ def login(
             raise ApiError(
                 503, "AUTHORIZATION_UNAVAILABLE", "Authorization service unavailable"
             ) from exc
-        now = datetime.now(UTC)
-        raw_token = random_token()
-        csrf_token = random_token()
-        expires_at = now + timedelta(seconds=settings.session_absolute_timeout_seconds)
-        auth_session = AuthSession(
-            id=uuid4(),
-            user_id=user.id,
-            token_hash=session_token_verifier(raw_token, settings.session_token_pepper),
-            csrf_token_hash=csrf_token_verifier(csrf_token),
-            auth_version=user.auth_version,
-            created_at=now,
-            last_seen_at=now,
-            idle_expires_at=min(
-                now + timedelta(seconds=settings.session_idle_timeout_seconds), expires_at
-            ),
-            expires_at=expires_at,
-            ip_fingerprint=fingerprint(
-                request.client.host if request.client else "unknown",
-                settings.session_token_pepper,
-            ),
-            user_agent=request.headers.get("user-agent", "")[:512] or None,
+        auth_session, raw_token, csrf_token, expires_at = issue_session(
+            db, request, user
         )
-        db.add(auth_session)
         record_audit(
             db,
             request,

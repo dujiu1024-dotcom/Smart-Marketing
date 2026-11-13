@@ -25,6 +25,7 @@ from store_operator.models.identity import (
 )
 
 SESSION_COOKIE_NAME = "__Host-ai_store_session"
+ADMIN_SESSION_COOKIE_NAME = "__Host-ai_store_admin_session"
 STORE_BUSINESS_CAPABILITIES = frozenset({"store.business.use"})
 
 
@@ -50,11 +51,14 @@ def validate_browser_origin(request: Request) -> None:
         raise ApiError(403, "CSRF_INVALID", "Request origin is not allowed")
 
 
-def get_current_session(
+def _load_session(
     request: Request,
-    db: Annotated[Session, Depends(get_db)],
+    db: Session,
+    *,
+    cookie_name: str,
+    clear_flag: str,
 ) -> AuthenticatedSession:
-    raw_token = request.cookies.get(SESSION_COOKIE_NAME)
+    raw_token = request.cookies.get(cookie_name)
     if not raw_token:
         raise ApiError(401, "UNAUTHENTICATED", "Unauthenticated")
 
@@ -62,7 +66,7 @@ def get_current_session(
     try:
         auth_session = db.scalar(select(AuthSession).where(AuthSession.token_hash == verifier))
         if auth_session is None or auth_session.revoked_at is not None:
-            request.state.clear_session_cookie = True
+            setattr(request.state, clear_flag, True)
             raise ApiError(401, "UNAUTHENTICATED", "Unauthenticated")
         user = db.get(User, auth_session.user_id)
         now = datetime.now(UTC)
@@ -77,7 +81,7 @@ def get_current_session(
                 auth_session.revoked_at = now
                 auth_session.revoke_reason = "expired_or_invalidated"
                 db.commit()
-            request.state.clear_session_cookie = True
+            setattr(request.state, clear_flag, True)
             raise ApiError(401, "UNAUTHENTICATED", "Unauthenticated")
 
         if auth_session.last_seen_at <= now - timedelta(
@@ -99,10 +103,50 @@ def get_current_session(
         ) from exc
 
 
-def require_csrf(
+def get_current_session(
     request: Request,
-    auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> AuthenticatedSession:
+    return _load_session(
+        request,
+        db,
+        cookie_name=SESSION_COOKIE_NAME,
+        clear_flag="clear_session_cookie",
+    )
+
+
+def get_admin_session(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> AuthenticatedSession:
+    return _load_session(
+        request,
+        db,
+        cookie_name=ADMIN_SESSION_COOKIE_NAME,
+        clear_flag="clear_admin_session_cookie",
+    )
+
+
+def get_platform_admin_session(
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> AuthenticatedSession:
+    if request.cookies.get(ADMIN_SESSION_COOKIE_NAME):
+        return _load_session(
+            request,
+            db,
+            cookie_name=ADMIN_SESSION_COOKIE_NAME,
+            clear_flag="clear_admin_session_cookie",
+        )
+    return _load_session(
+        request,
+        db,
+        cookie_name=SESSION_COOKIE_NAME,
+        clear_flag="clear_session_cookie",
+    )
+
+
+def _validate_csrf_token(request: Request, auth: AuthenticatedSession) -> None:
     validate_browser_origin(request)
     supplied = request.headers.get("x-csrf-token")
     if not supplied:
@@ -110,6 +154,21 @@ def require_csrf(
     supplied_hash = csrf_token_verifier(supplied)
     if not hmac.compare_digest(supplied_hash, auth.session.csrf_token_hash):
         raise ApiError(403, "CSRF_INVALID", "CSRF token is invalid")
+
+
+def require_csrf(
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
+) -> AuthenticatedSession:
+    _validate_csrf_token(request, auth)
+    return auth
+
+
+def require_admin_csrf(
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(get_admin_session)],
+) -> AuthenticatedSession:
+    _validate_csrf_token(request, auth)
     return auth
 
 
@@ -172,8 +231,24 @@ def require_store_context(
 
 def require_platform_admin(
     request: Request,
-    auth: Annotated[AuthenticatedSession, Depends(get_current_session)],
+    auth: Annotated[AuthenticatedSession, Depends(get_platform_admin_session)],
     db: Annotated[Session, Depends(get_db)],
+) -> AuthenticatedSession:
+    return _require_active_grant(request, db, auth)
+
+
+def require_admin_platform_admin(
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(get_admin_session)],
+    db: Annotated[Session, Depends(get_db)],
+) -> AuthenticatedSession:
+    return _require_active_grant(request, db, auth)
+
+
+def _require_active_grant(
+    request: Request,
+    db: Session,
+    auth: AuthenticatedSession,
 ) -> AuthenticatedSession:
     try:
         grant = db.scalar(
@@ -199,4 +274,12 @@ def require_platform_admin(
         )
         db.commit()
         raise ApiError(403, "FORBIDDEN", "Forbidden")
+    return auth
+
+
+def require_platform_admin_csrf(
+    request: Request,
+    auth: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+) -> AuthenticatedSession:
+    _validate_csrf_token(request, auth)
     return auth

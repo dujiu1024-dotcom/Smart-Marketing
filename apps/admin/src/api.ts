@@ -37,6 +37,14 @@ const ERROR_MESSAGES_ZH: Record<string, string> = {
   CHANNEL_SPEC_NOT_FOUND: "渠道规格不存在或未启用",
   CHANNEL_SPEC_SOURCE_REQUIRED: "请提供该渠道官方 HTTPS 来源后再发布规格",
   STALE_CHANNEL_SPEC_VERSION: "渠道规格已更新，请刷新后重试",
+  SOURCE_HOST_NOT_ALLOWED:
+    "端点地址或条款地址的域名不在允许白名单内，或不是 HTTPS 地址；请先确认该域名已被平台加入白名单",
+  SOURCE_TERMS_REQUIRED: "启用前必须填写允许用途并登记条款 URL",
+  SOURCE_TERMS_MISSING: "来源缺少条款 URL 或允许用途，无法用于采集",
+  SOURCE_ENABLED_LOCKED: "来源处于启用状态，请先停用后再修改地址或条款",
+  SOURCE_KEY_EXISTS: "来源标识已存在，请更换来源标识",
+  SOURCE_FEED_INVALID: "热榜端点返回的内容无法识别，请确认选择的是公开热榜 JSON 地址",
+  SOURCE_FETCH_FAILED: "采集时无法访问来源端点，请检查地址是否可访问后重试",
   REQUEST_FAILED: "请求失败，请稍后重试",
 };
 
@@ -170,10 +178,28 @@ export interface OpportunitySource {
   source_type: string;
   source_url: string;
   terms_url: string | null;
+  permitted_use?: string | null;
+  attribution_template?: string | null;
   enabled: boolean;
   health_status: string;
   last_success_at: string | null;
   last_failure_at: string | null;
+}
+
+export interface OpportunitySourcePreset {
+  key: string;
+  display_name: string;
+  source_url: string;
+}
+
+export interface OpportunitySourceInput {
+  source_key: string;
+  display_name: string;
+  source_type: "rss" | "public_feed";
+  source_url: string;
+  terms_url: string;
+  permitted_use: string;
+  attribution_template?: string | null;
 }
 
 export interface HotTopicRow {
@@ -291,9 +317,31 @@ export const api = {
     ),
   opportunitySources: () =>
     request<{ items: OpportunitySource[] }>("/admin/opportunity-sources"),
+  opportunitySourcePresets: () =>
+    request<{ items: OpportunitySourcePreset[]; allowed_hosts: string[] }>(
+      "/admin/opportunity-sources/presets",
+    ),
+  createOpportunitySource: (payload: OpportunitySourceInput) =>
+    request<{ id: string; source_key: string; enabled: boolean; message?: string }>(
+      "/admin/opportunity-sources",
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+  updateOpportunitySource: (
+    sourceId: string,
+    payload: Partial<Omit<OpportunitySourceInput, "source_key" | "source_type">>,
+  ) =>
+    request<OpportunitySource>(`/admin/opportunity-sources/${sourceId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   enableOpportunitySource: (sourceId: string) =>
     request<{ id: string; enabled: boolean }>(
       `/admin/opportunity-sources/${sourceId}/enable`,
+      { method: "POST" },
+    ),
+  disableOpportunitySource: (sourceId: string) =>
+    request<{ id: string; enabled: boolean }>(
+      `/admin/opportunity-sources/${sourceId}/disable`,
       { method: "POST" },
     ),
   hotTopics: (params: { query?: string; status?: string; limit?: number; offset?: number }) =>

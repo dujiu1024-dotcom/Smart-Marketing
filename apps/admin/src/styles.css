@@ -481,6 +481,18 @@ p {
   font-weight: 500;
 }
 
+.checkbox-field {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.5;
+}
+
+.checkbox-field input {
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+
 .field .input,
 .field .select {
   width: 100%;
@@ -596,6 +608,8 @@ p {
 .modal {
   width: 100%;
   max-width: 460px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   background: #ffffff;
   border-radius: 14px;
   padding: 24px;

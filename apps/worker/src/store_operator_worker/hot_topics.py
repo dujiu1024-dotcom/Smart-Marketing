@@ -6,6 +6,7 @@ from typing import Any, cast
 import hashlib
 import html
 import ipaddress
+import json
 import re
 import socket
 import xml.etree.ElementTree as ET
@@ -221,6 +222,60 @@ def _parse_feed(payload: bytes) -> list[dict[str, object]]:
     return items
 
 
+def _parse_public_feed(payload: bytes) -> list[dict[str, object]]:
+    """解析公开热榜 JSON（复用 Easel hotlist-apis.md 约定的字段语义）。"""
+    if len(payload) > MAX_FEED_BYTES:
+        raise JobExecutionError(
+            "SOURCE_FEED_TOO_LARGE", "Feed exceeded the configured size limit.",
+            retryable=False,
+        )
+    try:
+        document = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise JobExecutionError(
+            "SOURCE_FEED_INVALID", "Public feed JSON could not be parsed.", retryable=False
+        ) from exc
+    rows: object = document
+    if isinstance(document, dict):
+        rows = document.get("data", document.get("items", document.get("list", [])))
+        if isinstance(rows, dict):
+            rows = rows.get("list", rows.get("items", rows.get("data", [])))
+    if not isinstance(rows, list):
+        raise JobExecutionError(
+            "SOURCE_FEED_INVALID", "Public feed JSON has no item list.", retryable=False
+        )
+    items: list[dict[str, object]] = []
+    for row in rows[:MAX_FEED_ITEMS]:
+        if not isinstance(row, dict):
+            continue
+        title = str(row.get("title") or row.get("name") or row.get("word") or "").strip()
+        link = str(row.get("url") or row.get("link") or "").strip()
+        if not title:
+            continue
+        heat = row.get("hot") or row.get("hot_value") or row.get("heat")
+        items.append(
+            {
+                "id": str(row.get("id") or link or title),
+                "title": title,
+                "link": link,
+                "summary": str(row.get("desc") or row.get("summary") or "")[:5000],
+                "published_at": None,
+                "region": row.get("region") or row.get("area"),
+                "heat_value": str(heat) if heat is not None else None,
+                "heat_unit": row.get("hot_unit") or row.get("unit"),
+                "topic_tags": [],
+            }
+        )
+    if rows and not items:
+        # 结构能解析但字段无法识别时按失败处理，避免把异常响应吞成空结果。
+        raise JobExecutionError(
+            "SOURCE_FEED_INVALID",
+            "Public feed JSON did not contain recognizable entries.",
+            retryable=False,
+        )
+    return items
+
+
 def _tokens(value: str) -> set[str]:
     normalized = value.lower()
     words = set(re.findall(r"[a-z0-9]{2,}", normalized))
@@ -301,19 +356,27 @@ def _brand_risk_flags(topic_text: str, brand: BrandGuideline | None) -> list[str
 
 
 def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> int:
+    # 来源准入：条款与用途未登记时直接拒绝，不发起任何请求。
+    if not (source.terms_url or "").strip() or not (source.permitted_use or "").strip():
+        raise JobExecutionError(
+            "SOURCE_TERMS_MISSING",
+            "Source usage terms are not registered.",
+            retryable=False,
+        )
     feed_url, feed_ip = _safe_https_url(source.source_url, allowed)
-    terms_url, _ = _safe_https_url(source.terms_url or "", allowed)
-    if not source.permitted_use or not terms_url:
-        raise JobExecutionError("SOURCE_TERMS_MISSING", "Source usage terms are not registered.", retryable=False)
+    _safe_https_url(source.terms_url, allowed)
+    is_public_feed = getattr(source, "source_type", "rss") == "public_feed"
     try:
         transport = httpx.HTTPTransport()
         cast(Any, transport)._pool._network_backend = _PinnedSyncBackend(
             (urlsplit(feed_url).hostname or "").lower(), feed_ip
         )
-        headers = {
-            "User-Agent": USER_AGENT,
-            "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml",
-        }
+        accept = (
+            "application/json"
+            if is_public_feed
+            else "application/rss+xml, application/atom+xml, application/xml, text/xml"
+        )
+        headers = {"User-Agent": USER_AGENT, "Accept": accept}
         with httpx.Client(
             transport=transport,
             timeout=HTTP_TIMEOUT,
@@ -332,7 +395,12 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
                             retryable=False,
                         )
                     chunks.append(chunk)
-                entries = _parse_feed(b"".join(chunks))
+                raw_payload = b"".join(chunks)
+                entries = (
+                    _parse_public_feed(raw_payload)
+                    if is_public_feed
+                    else _parse_feed(raw_payload)
+                )
     except JobExecutionError:
         raise
     except (httpx.HTTPError, OSError) as exc:
@@ -357,8 +425,10 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
             or not link_host
             or parsed_link.username
             or parsed_link.password
-            or link_host not in allowed
         ):
+            continue
+        # 热榜条目链接只做展示，不发起请求；来源域名白名单约束的是采集目标。
+        if not is_public_feed and link_host not in allowed:
             continue
         summary = str(entry.get("summary") or "")[:5000]
         fingerprint = hashlib.sha256(f"{link}|{title}".encode()).hexdigest()

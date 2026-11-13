@@ -1045,7 +1045,7 @@ def collect_opportunities(
     sources = db.scalars(
         select(HotTopicSource).where(
             HotTopicSource.enabled.is_(True),
-            HotTopicSource.source_type == "rss",
+            HotTopicSource.source_type.in_(("rss", "public_feed")),
             HotTopicSource.terms_url.is_not(None),
             HotTopicSource.permitted_use.is_not(None),
         )

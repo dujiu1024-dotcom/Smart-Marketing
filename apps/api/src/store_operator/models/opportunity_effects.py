@@ -202,15 +202,25 @@ class MetricObservation(Base):
             name="fk_metric_observations_task_same_store",
             ondelete="RESTRICT",
         ),
+        ForeignKeyConstraint(
+            ["store_id", "channel_account_id"],
+            ["channel_accounts.store_id", "channel_accounts.id"],
+            name="fk_metric_observations_channel_account_same_store",
+            ondelete="RESTRICT",
+        ),
         CheckConstraint("integrity_status IN ('complete', 'partial', 'anomalous', 'unknown')",
             name="integrity_status"),
-        CheckConstraint("authenticity_status IN ('official_api', 'verified_import', 'merchant_reported', 'demo_sample')", name="authenticity_status"),  # noqa: E501
+        CheckConstraint("authenticity_status IN ('official_api', 'verified_import', 'merchant_reported', 'merchant_authorized_scrape', 'demo_sample')", name="authenticity_status"),  # noqa: E501
         CheckConstraint("sync_status IN ('current', 'delayed', 'failed', 'unavailable')",
             name="sync_status"),
+        CheckConstraint("observation_scope IN ('work', 'account', 'store')",
+            name="observation_scope"),
         CheckConstraint("value_numeric IS NULL OR value_numeric >= 0", name="value_nonnegative"),
         CheckConstraint("period_end IS NULL OR period_start IS NULL OR period_end > period_start", name="period_valid"),  # noqa: E501
         Index("ix_metric_observations_store_collected", "store_id", "collected_at"),
         Index("ix_metric_observations_store_metric_period", "store_id", "metric_key", "period_end"),
+        Index("ix_metric_observations_store_account_scope", "store_id",
+            "channel_account_id", "observation_scope"),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -233,7 +243,7 @@ class MetricObservation(Base):
     source_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     definition_version: Mapped[int] = mapped_column(Integer, nullable=False)
     integrity_status: Mapped[str] = mapped_column(String(16), default="unknown", nullable=False)
-    authenticity_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    authenticity_status: Mapped[str] = mapped_column(String(32), nullable=False)
     sync_status: Mapped[str] = mapped_column(String(16), default="current", nullable=False)
     deduplication_key: Mapped[str] = mapped_column(String(64), nullable=False)
     supersedes_observation_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True),
@@ -242,6 +252,8 @@ class MetricObservation(Base):
         ForeignKey("metric_import_batches.id", ondelete="RESTRICT"))
     published_work_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
     marketing_task_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    channel_account_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True))
+    observation_scope: Mapped[str] = mapped_column(String(16), default="store", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         server_default=func.now(), nullable=False)
 
@@ -597,5 +609,61 @@ class DataSourceCapabilitySnapshot(Base):
     )
     checked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MetricSyncCursor(Base):
+    """按门店账号与观测范围持久化的指标同步游标与最近同步状态。"""
+
+    __tablename__ = "metric_sync_cursors"
+    __table_args__ = (
+        UniqueConstraint(
+            "store_id",
+            "channel_account_id",
+            "scope",
+            name="uq_metric_sync_cursors_store_account_scope",
+        ),
+        ForeignKeyConstraint(
+            ["store_id", "channel_account_id"],
+            ["channel_accounts.store_id", "channel_accounts.id"],
+            name="fk_metric_sync_cursors_channel_account_same_store",
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("scope IN ('work', 'account', 'store')", name="scope"),
+        CheckConstraint(
+            "status IN ('idle', 'running', 'succeeded', 'failed', 'login_required', "
+            "'unsupported', 'unavailable')",
+            name="status",
+        ),
+        CheckConstraint("cursor_version >= 1", name="cursor_version_positive"),
+        CheckConstraint("consecutive_failures >= 0", name="consecutive_failures_nonnegative"),
+        Index(
+            "ix_metric_sync_cursors_store_account",
+            "store_id",
+            "channel_account_id",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("stores.id", ondelete="RESTRICT"), nullable=False
+    )
+    channel_account_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    scope: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_system: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="idle", nullable=False)
+    cursor_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    cursor_json: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict, nullable=False)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(String(100))
+    last_error_summary: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 

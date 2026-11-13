@@ -123,7 +123,7 @@ export default function KnowledgeWorkspace({ storeId }: { storeId: string }) {
   }
   return <>
     <div className="page-heading"><div><p className="eyebrow">STORE KNOWLEDGE</p><h1>门店知识库</h1><p className="muted">沉淀门店已核实的经营说明、服务规则和品牌事实，为 AI 营销提供可追溯依据。</p></div>{!editing ? <button className="primary" type="button" onClick={() => { window.location.hash = "#store-editor:knowledge:new"; }}>新增知识</button> : <button className="secondary" type="button" onClick={() => { window.location.hash = "#store:knowledge"; }}>返回列表</button>}</div>
-    {error && <div className="alert error" role="alert">{error}{error.includes("VERSION_CONFLICT") && <button className="text-button" onClick={() => void reload()}>重新加载</button>}</div>}
+    {error && <div className="alert error" role="alert">{error}{error.includes("VERSION_CONFLICT") && <button className="text-button" onClick={() => void reload()}>重新加载最新版本</button>}</div>}
     {notice && <div className="alert success" role="status">{notice}</div>}
     {editing ? <form className="profile-form" onSubmit={save}>
       <section className="form-card"><div className="section-title"><div><h2>{selected ? "编辑知识资料" : "新增知识资料"}</h2><p>只记录可核实的门店事实；未确认的信息不得作为 AI 对外宣传依据。</p></div></div><div className="form-grid">

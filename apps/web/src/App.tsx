@@ -476,7 +476,7 @@ export default function App() {
           <a className={knowledgeRoute ? "side-link active" : "side-link"} href="#store:knowledge">门店知识库</a>
           <a className={assetsRoute ? "side-link active" : "side-link"} href="#store:assets">素材资产库</a>
           <a className={channelsRoute ? "side-link active" : "side-link"} href="#store:channels">渠道账号</a>
-          <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠、品牌规范、客群与经营、门店知识库、素材资产及营销任务控制。策略生成仍待接入；抖音账号 OAuth 页面已接入，真实应用凭据和账号授权验收仍待完成，不使用演示数据冒充生产数据。</div>
+          <div className="sidebar-foot">当前已接入真实门店档案、商品与服务、活动与优惠、品牌规范、客群与经营、门店知识库、素材资产，以及营销任务的需求确认、策略生成与确认、文案与图片生成审核。内容质检、渠道适配与交付需先由平台管理员发布经官方来源核验的渠道规格后方可使用；抖音账号 OAuth 页面已接入，真实应用凭据与账号授权验收仍待完成，不使用演示数据冒充生产数据。</div>
         </aside>
         <main className="content">
           {!stores.length ? storeContextFallback : taskWorkspaceRoute ? <MarketingTaskWorkspace storeId={storeId} /> : hotspotRoute ? <HotspotWorkspace storeId={storeId} /> : effectsRoute ? <EffectsWorkspace storeId={storeId} /> : productRoute ? <ProductWorkspace storeId={storeId} /> : offerRoute ? <OfferWorkspace storeId={storeId} /> : brandRoute ? <BrandGuidelineWorkspace storeId={storeId} /> : audienceRoute ? <AudienceWorkspace storeId={storeId} /> : knowledgeRoute ? <KnowledgeWorkspace storeId={storeId} /> : assetsRoute ? <MediaAssetsWorkspace storeId={storeId} /> : channelsRoute ? <ChannelAccountsWorkspace storeId={storeId} /> : <>
@@ -491,7 +491,7 @@ export default function App() {
           {error && (
             <div className="alert error" role="alert">
               <span>{error}</span>
-              {error.includes("changed") || error.includes("冲突") ? <button className="text-button" onClick={() => void reloadProfile()}>重新加载</button> : null}
+              {error.includes("VERSION_CONFLICT") || error.includes("changed") ? <button className="text-button" onClick={() => void reloadProfile()}>重新加载最新版本</button> : null}
             </div>
           )}
           {notice && <div className="alert success" role="status">{notice}</div>}

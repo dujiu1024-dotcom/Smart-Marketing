@@ -77,7 +77,7 @@ export default function AudienceWorkspace({storeId}:{storeId:string}) {
     <div className="page-heading"><div><p className="eyebrow">AUDIENCE & OPERATIONS</p><h1>客群与经营</h1><p className="muted">记录真实客群、消费场景、购买动机与常见异议，保留样本来源和置信信息。</p></div>
       {!editing&&<button className="primary" type="button" onClick={()=>{window.location.hash="#store-editor:audience:new";}}>新增客群</button>}
       {editing&&<button className="secondary" type="button" onClick={()=>{window.location.hash="#store:audience";}}>返回列表</button>}</div>
-    {error&&<div className="alert error" role="alert">{error}{error.includes("VERSION_CONFLICT")&&<button className="text-button" onClick={()=>void reload()}>重新加载</button>}</div>}
+    {error&&<div className="alert error" role="alert">{error}{error.includes("VERSION_CONFLICT")&&<button className="text-button" onClick={()=>void reload()}>重新加载最新版本</button>}</div>}
     {notice&&<div className="alert success" role="status">{notice}</div>}
     {editing?<form className="profile-form" onSubmit={save}>
       <section className="form-card"><div className="section-title"><div><h2>{selected?"编辑客群":"新增客群"}</h2><p>客群描述应来自经营观察或调研；不要把推测写成已验证事实。</p></div></div>

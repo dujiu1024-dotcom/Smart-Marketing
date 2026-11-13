@@ -208,7 +208,7 @@ export default function ProductWorkspace({ storeId }: { storeId: string }) {
         {!editing && <button className="primary" type="button" onClick={() => { window.location.hash = "#store-editor:product:new"; }}>新增商品 / 服务</button>}
         {editing && <button className="secondary" type="button" onClick={() => { window.location.hash = "#store:products"; }}>返回列表</button>}
       </div>
-      {error && <div className="alert error" role="alert">{error}{error.includes("VERSION_CONFLICT") || error.includes("changed") ? <button className="text-button" onClick={() => void reload()}>重新加载</button> : null}</div>}
+      {error && <div className="alert error" role="alert">{error}{error.includes("VERSION_CONFLICT") || error.includes("changed") ? <button className="text-button" onClick={() => void reload()}>重新加载最新版本</button> : null}</div>}
       {notice && <div className="alert success" role="status">{notice}</div>}
       {editing ? (
         <form className="profile-form" onSubmit={save}>

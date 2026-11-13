@@ -30,6 +30,9 @@ const ERROR_MESSAGES_ZH: Record<string, string> = {
 };
 
 function localizeErrorMessage(code: string, message: string): string {
+  if (code.includes("VERSION_CONFLICT")) {
+    return `数据已被其他成员更新，当前页面内容已过期，请重新加载最新版本后再修改（错误码：${code}）`;
+  }
   if (ERROR_MESSAGES_ZH[code]) return ERROR_MESSAGES_ZH[code];
   if (/[\u4e00-\u9fff]/.test(message)) return message;
   if (!/[A-Za-z]{3,}/.test(message)) return message;

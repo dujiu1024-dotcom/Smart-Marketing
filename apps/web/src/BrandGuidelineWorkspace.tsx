@@ -199,7 +199,7 @@ export default function BrandGuidelineWorkspace({ storeId }: { storeId: string }
   return (
     <>
       <div className="page-heading"><div><p className="eyebrow">BRAND GUIDELINE</p><h1>品牌规范</h1><p className="muted">维护品牌定位、表达边界和视觉规范，让 AI 的内容产出保持品牌一致。</p></div>{guideline && <div className="version-chip">V{guideline.current_version} · {guideline.fact_status === "confirmed" ? "已确认" : "待确认"}</div>}</div>
-      {error && <div className="alert error" role="alert">{error}{(error.includes("changed") || error.includes("冲突")) && <button className="text-button" onClick={() => void reload()}>重新加载</button>}</div>}
+      {error && <div className="alert error" role="alert">{error}{(error.includes("VERSION_CONFLICT") || error.includes("changed")) && <button className="text-button" onClick={() => void reload()}>重新加载最新版本</button>}</div>}
       {notice && <div className="alert success" role="status">{notice}</div>}
       {loading ? <div className="loading-card"><span className="spinner" />正在读取品牌规范…</div> : (
         <form className="profile-form" onSubmit={save}>

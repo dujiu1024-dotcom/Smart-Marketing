@@ -96,17 +96,19 @@ export default function StoresPage({ onViewUsers }: { onViewUsers: (storeId: str
             <tbody>
               {list.data.items.map((store) => (
                 <tr key={store.id}>
-                  <td>
+                  <td className="cell-store">
                     <strong>{store.name}</strong>
-                    <div className="muted mono">{store.id}</div>
+                    <div className="muted mono cell-clamp">{store.id}</div>
                   </td>
                   <td>
                     <StatusPill status={store.status} />
                   </td>
-                  <td className="muted">{store.timezone}</td>
-                  <td>{store.member_count}</td>
-                  <td className="muted">{store.owners.join("、") || "—"}</td>
-                  <td className="muted">{formatTime(store.created_at)}</td>
+                  <td className="cell-nowrap muted">{store.timezone}</td>
+                  <td className="cell-num">{store.member_count}</td>
+                  <td className="muted cell-clamp" title={store.owners.join("、") || undefined}>
+                    {store.owners.join("、") || "—"}
+                  </td>
+                  <td className="cell-time muted">{formatTime(store.created_at)}</td>
                   <td className="right actions-cell">
                     <button className="link-button" type="button" onClick={() => onViewUsers(store.id)}>
                       门店用户

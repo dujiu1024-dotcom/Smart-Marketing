@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import type {
+  AdminJob,
+  MatchRow,
   OpportunitySource,
   OpportunitySourceInput,
   OpportunitySourcePreset,
@@ -11,9 +13,155 @@ import {
   NoticeBanner,
   PageHeader,
   StatusPill,
+  dash,
+  formatHeat,
+  formatScore,
   formatTime,
   useAsyncData,
 } from "./ui";
+
+interface MatchReason {
+  categories: string;
+  words: string[];
+  audience: string;
+  region: string;
+  brand: string;
+  score: string | null;
+  reviewNotes: string[];
+}
+
+function parseMatchReason(value: string | null | undefined): MatchReason {
+  const text = value ?? "";
+  const section = (label: string) => {
+    const match = text.match(new RegExp(`${label}：([^；。]*)`));
+    return match?.[1]?.trim() ?? "";
+  };
+  const categories = section("命中品类")
+    .replace(/（[^）]*）/g, "")
+    .trim();
+  const words = section("命中内容词")
+    .split("、")
+    .map((item) => item.trim())
+    .filter((item) => item && item !== "无");
+  const audienceRaw = section("命中客群/场景词");
+  const regionRaw = section("地域");
+  const scoreMatch = text.match(/加权得分\s*([\d.]+)/);
+  const reviewRaw = text.match(/未达可采纳原因：([^。]*)/)?.[1] ?? "";
+  let region = "无地域证据";
+  if (regionRaw.includes("一致")) {
+    const city = regionRaw.match(/「([^」]+)」/)?.[1];
+    region = city ? `一致（${city}）` : "一致";
+  } else if (regionRaw.includes("不一致")) {
+    region = "不匹配";
+  } else if (regionRaw.includes("未登记")) {
+    region = "门店未登记";
+  }
+  return {
+    categories: categories || "无",
+    words,
+    audience: audienceRaw === "无" ? "" : audienceRaw,
+    region,
+    brand: text.includes("品牌禁用词") ? "风险" : "安全",
+    score: scoreMatch?.[1] ?? null,
+    reviewNotes: reviewRaw
+      .split("；")
+      .map((item) => item.trim())
+      .filter((item) => item && !item.startsWith("加权得分低于")),
+  };
+}
+
+const REVIEW_NOTE_LABELS: Record<string, string> = {
+  "仅命中父品类，未命中门店细分品类": "仅父品类",
+  未命中门店品类: "未命中品类",
+  地域明确不匹配: "地域不匹配",
+  命中品牌禁用词: "品牌风险",
+  "门店行业标签未能从业态/商品推断，交由 AI 创意重算判断": "行业待确认",
+};
+
+function shortReviewNote(note: string): string {
+  return REVIEW_NOTE_LABELS[note] ?? note;
+}
+
+function MatchReasonCell({ value }: { value: string | null | undefined }) {
+  if (!value) return <span className="muted">—</span>;
+  const reason = parseMatchReason(value);
+  const conclusion = `命中 ${reason.categories}，地域${reason.region} | ${
+    reason.words.length ? `${reason.words.length} 个内容词` : "无内容词"
+  }`;
+  const labels = [
+    `品类 ${reason.categories}`,
+    `客群 ${reason.audience || "无"}`,
+    `地域 ${reason.region}`,
+    `品牌 ${reason.brand}`,
+    ...reason.reviewNotes.map((note) => `需复核 ${shortReviewNote(note)}`),
+  ].join(" · ");
+  return (
+    <div className="reason-cell">
+      <div className="reason-conclusion" title={conclusion}>
+        {conclusion}
+      </div>
+      <div className="reason-labels" title={labels}>
+        {labels}
+      </div>
+      <details className="reason-details">
+        <summary>查看计算依据</summary>
+        <div className="reason-full">
+          {reason.score ? <div>加权得分 {reason.score}</div> : null}
+          {reason.words.length ? <div>命中内容词：{reason.words.join("、")}</div> : null}
+          <div>{value}</div>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function AiCreativeCell({ item }: { item: MatchRow }) {
+  const ai = item.ai_creative;
+  if (!ai) return <MatchReasonCell value={item.reason_summary} />;
+  const offer = ai.offer;
+  const confidence = item.ai_confidence
+    ? Number(item.ai_confidence).toFixed(2)
+    : null;
+  const labels = [
+    ai.target_audience ? `客群 ${ai.target_audience}` : null,
+    offer?.discount_rule ? `机制 ${offer.discount_rule}` : null,
+    confidence ? `置信度 ${confidence}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const offerText = [
+    offer?.audience_condition,
+    offer?.mechanic,
+    offer?.discount_rule,
+  ]
+    .filter(Boolean)
+    .join("，");
+  return (
+    <div className="reason-cell">
+      <div className="reason-conclusion" title={ai.theme ?? undefined}>
+        {dash(ai.theme)}
+      </div>
+      <div className="reason-labels" title={labels}>
+        {labels}
+      </div>
+      <details className="reason-details">
+        <summary>查看创意依据</summary>
+        <div className="reason-full">
+          {ai.play ? <div>玩法：{ai.play}</div> : null}
+          {offerText ? <div>优惠机制：{offerText}</div> : null}
+          {ai.borrow_logic ? <div>借势逻辑：{ai.borrow_logic}</div> : null}
+          {ai.channels?.length ? <div>建议渠道：{ai.channels.join("、")}</div> : null}
+          {ai.risk_notes?.length ? (
+            <div>风险提示：{ai.risk_notes.join("；")}</div>
+          ) : null}
+          {item.ai_prompt_version ? (
+            <div>Prompt 版本：{item.ai_prompt_version}</div>
+          ) : null}
+        </div>
+      </details>
+    </div>
+  );
+}
 
 function hostOf(value: string): string | null {
   try {
@@ -28,7 +176,9 @@ export default function HotspotPage() {
   const [tab, setTab] = useState<"matches" | "topics">("matches");
   const [storeFilter, setStoreFilter] = useState("");
   const [eligibility, setEligibility] = useState("");
+  const [matchSource, setMatchSource] = useState("");
   const [search, setSearch] = useState("");
+  const [topicPage, setTopicPage] = useState(1);
   const [collectOpen, setCollectOpen] = useState(false);
   const [sourceDialog, setSourceDialog] = useState<
     { mode: "create" } | { mode: "edit"; source: OpportunitySource } | null
@@ -36,6 +186,11 @@ export default function HotspotPage() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [collectionJobs, setCollectionJobs] = useState<
+    { jobId: string; storeName: string; job: AdminJob | null; error?: string }[]
+  >([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const finalized = useRef(false);
 
   const stores = useAsyncData(() => api.stores({ limit: 200 }), []);
   const sources = useAsyncData(() => api.opportunitySources(), []);
@@ -45,14 +200,68 @@ export default function HotspotPage() {
       api.matches({
         store_id: storeFilter || undefined,
         eligibility: eligibility || undefined,
+        match_source: matchSource || undefined,
         limit: 200,
       }),
-    [storeFilter, eligibility],
+    [storeFilter, eligibility, matchSource],
   );
   const topics = useAsyncData(
-    () => api.hotTopics({ query: search || undefined, limit: 200 }),
-    [search],
+    () =>
+      api.hotTopics({
+        query: search || undefined,
+        limit: 20,
+        offset: (topicPage - 1) * 20,
+      }),
+    [search, topicPage],
   );
+
+  useEffect(() => {
+    if (collectionJobs.length === 0) return;
+    const terminal = new Set(["succeeded", "failed", "cancelled", "needs_human"]);
+    const allDone = collectionJobs.every(
+      (item) => item.job && terminal.has(item.job.status),
+    );
+    if (allDone) {
+      if (!finalized.current) {
+        finalized.current = true;
+        const inserted = collectionJobs.reduce(
+          (sum, item) => sum + (item.job?.topics_inserted ?? 0),
+          0,
+        );
+        const created = collectionJobs.reduce(
+          (sum, item) => sum + (item.job?.opportunities_created ?? 0),
+          0,
+        );
+        const failed = collectionJobs.filter(
+          (item) => item.job?.status === "failed",
+        ).length;
+        setNotice(
+          `采集完成：新增热点 ${inserted} 条，生成机会 ${created} 条` +
+            (failed ? `，${failed} 个门店作业失败，请查看原因。` : "。"),
+        );
+        topics.reload();
+        matches.reload();
+      }
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      const next = await Promise.all(
+        collectionJobs.map(async (item) => {
+          if (item.job && terminal.has(item.job.status)) return item;
+          try {
+            return { ...item, job: await api.job(item.jobId), error: undefined };
+          } catch (reason) {
+            return {
+              ...item,
+              error: reason instanceof ApiError ? reason.message : "状态读取失败",
+            };
+          }
+        }),
+      );
+      setCollectionJobs(next);
+    }, 2000);
+    return () => window.clearTimeout(timer);
+  }, [collectionJobs]);
 
   async function enableSource(sourceId: string, displayName: string) {
     setBusy(sourceId);
@@ -82,6 +291,11 @@ export default function HotspotPage() {
     }
   }
 
+  const matchItems = matches.data?.items ?? [];
+  const storeIds = new Set(matchItems.map((item) => item.store.id));
+  const singleStore = storeIds.size === 1 ? matchItems[0].store : null;
+  const visibleMatches = matchItems.filter((item) => showHistory || !item.stale_at);
+
   return (
     <section>
       <PageHeader
@@ -95,6 +309,101 @@ export default function HotspotPage() {
       />
       {error ? <ErrorBanner message={error} /> : null}
       {notice ? <NoticeBanner message={notice} /> : null}
+
+      {collectionJobs.length > 0 ? (
+        <div className="panel">
+          <div className="panel-head">
+            <h2>本次采集进度</h2>
+            <div className="toolbar">
+              <span className="muted">每 2 秒刷新，作业结束后自动停止。</span>
+              <button
+                className="button ghost"
+                type="button"
+                onClick={() => setCollectionJobs([])}
+              >
+                收起
+              </button>
+            </div>
+          </div>
+          <div className="table-scroll">
+            <table className="table compact cards">
+              <thead>
+                <tr>
+                  <th>门店</th>
+                  <th>状态</th>
+                  <th>进度</th>
+                  <th>创建时间</th>
+                  <th>来源结果</th>
+                </tr>
+              </thead>
+              <tbody>
+                {collectionJobs.map((item) => {
+                  const job = item.job;
+                  const progress = job?.progress_total
+                    ? `${job.progress_current ?? 0}/${job.progress_total}`
+                    : "—";
+                  return (
+                    <tr key={item.jobId}>
+                      <td data-label="门店">{job?.store_name || item.storeName || item.jobId}</td>
+                      <td data-label="状态">
+                        <StatusPill status={job?.status ?? "queued"} />
+                        {job?.error_code ? (
+                          <div className="muted">
+                            {job.error_code}：{job.error_summary}
+                          </div>
+                        ) : null}
+                        {item.error ? <div className="muted">{item.error}</div> : null}
+                      </td>
+                      <td data-label="进度" className="cell-num">{progress}</td>
+                      <td data-label="创建时间" className="cell-time">{formatTime(job?.created_at)}</td>
+                      <td data-label="来源结果">
+                        {(job?.source_results?.length ?? 0) +
+                          (job?.source_failures?.length ?? 0) >
+                        0 ? (
+                          <div className="collect-sources">
+                            {job?.source_results?.map((source) => (
+                              <span
+                                key={`ok-${source.source_key}`}
+                                className="pill pill-succeeded"
+                              >
+                                {source.source_key} 抓取 {source.entries ?? 0} 条 / 新增{" "}
+                                {source.inserted ?? 0}
+                              </span>
+                            ))}
+                            {job?.source_failures?.map((failure) => (
+                              <span
+                                key={`fail-${failure.source_key ?? failure.error_code}`}
+                                className="pill pill-failed"
+                                title={failure.summary}
+                              >
+                                {failure.source_key ?? "来源"} {failure.error_code}
+                              </span>
+                            ))}
+                          </div>
+                        ) : job?.status === "queued" ? (
+                          <span className="muted">等待开始</span>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                        {job?.source_failures?.length ? (
+                          <div className="muted">
+                            {job.source_failures
+                              .map(
+                                (failure) =>
+                                  `${failure.source_key ?? "来源"}：${failure.error_code} ${failure.summary}`,
+                              )
+                              .join("；")}
+                          </div>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       <div className="panel">
         <div className="panel-head">
@@ -118,7 +427,8 @@ export default function HotspotPage() {
           </EmptyState>
         ) : null}
         {sources.data && sources.data.items.length > 0 ? (
-          <table className="table compact">
+          <div className="table-scroll">
+            <table className="table compact cards">
             <thead>
               <tr>
                 <th>来源</th>
@@ -132,25 +442,32 @@ export default function HotspotPage() {
             <tbody>
               {sources.data.items.map((source) => (
                 <tr key={source.id}>
-                  <td>
+                  <td data-label="来源">
                     <strong>{source.display_name}</strong>
                     <div className="muted mono">{source.source_key}</div>
                   </td>
-                  <td className="muted">
+                  <td data-label="类型" className="muted">
                     {source.source_type === "rss"
                       ? "RSS 订阅"
                       : source.source_type === "public_feed"
                         ? "公开热榜"
                         : "其他来源"}
                   </td>
-                  <td>
+                  <td data-label="健康状态">
                     <StatusPill status={source.health_status} />
+                    {source.last_error_code ? (
+                      <div className="muted mono" title={source.last_error_summary ?? undefined}>
+                        {source.last_error_code}
+                      </div>
+                    ) : null}
                   </td>
-                  <td>
+                  <td data-label="状态">
                     <StatusPill status={source.enabled ? "active" : "suspended"} />
                   </td>
-                  <td className="muted">{formatTime(source.last_success_at)}</td>
-                  <td className="right">
+                  <td data-label="最近成功" className="cell-time muted">
+                    {formatTime(source.last_success_at)}
+                  </td>
+                  <td data-label="操作" className="right">
                     <button
                       className="link-button"
                       type="button"
@@ -176,7 +493,8 @@ export default function HotspotPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         ) : null}
       </div>
 
@@ -223,50 +541,100 @@ export default function HotspotPage() {
               <option value="ineligible">不适用</option>
               <option value="unassessed">未评估</option>
             </select>
-            <span className="toolbar-meta">共 {matches.data?.total ?? 0} 条匹配</span>
+            <select
+              className="select"
+              value={matchSource}
+              onChange={(event) => setMatchSource(event.target.value)}
+            >
+              <option value="">全部来源</option>
+              <option value="rules">规则命中</option>
+              <option value="ai_creative">AI 创意</option>
+            </select>
+            <span className="toolbar-meta">
+              共 {visibleMatches.length} 条匹配 · 规则命中{" "}
+              {matches.data?.source_counts?.rules ?? 0} 条 · AI 创意{" "}
+              {matches.data?.source_counts?.ai_creative ?? 0} 条
+              {showHistory && matchItems.length !== visibleMatches.length
+                ? `（历史 ${matchItems.length - visibleMatches.length} 条）`
+                : ""}
+            </span>
+            <label className="toolbar-check">
+              <input
+                type="checkbox"
+                checked={showHistory}
+                onChange={(event) => setShowHistory(event.target.checked)}
+              />
+              显示历史版本
+            </label>
+            {singleStore ? (
+              <span className="toolbar-meta">当前门店：{singleStore.name}</span>
+            ) : null}
           </div>
           {matches.error ? <ErrorBanner message={matches.error} /> : null}
           {matches.loading && !matches.data ? <div className="loading">读取匹配结果…</div> : null}
-          {matches.data && matches.data.items.length === 0 ? (
+          {matches.data && visibleMatches.length === 0 ? (
             <EmptyState>
               暂无匹配结果。确认热点来源已启用并完成采集后，匹配结果会按门店下发并记录在这里。
             </EmptyState>
           ) : null}
-          {matches.data && matches.data.items.length > 0 ? (
+          {matches.data && visibleMatches.length > 0 ? (
             <div className="panel table-panel">
-              <table className="table">
+              <table className="table cards matches-table">
                 <thead>
                   <tr>
-                    <th>门店</th>
+                    {singleStore ? null : <th>门店</th>}
                     <th>热点</th>
-                    <th>相关度</th>
+                    <th className="cell-num">相关度</th>
                     <th>匹配状态</th>
                     <th>匹配说明</th>
-                    <th>匹配时间</th>
+                    <th className="cell-time">匹配时间</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {matches.data.items.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <strong>{item.store.name}</strong>
-                        <div>
-                          <StatusPill status={item.store.status} />
-                        </div>
-                      </td>
-                      <td>
-                        <a href={item.canonical_url} target="_blank" rel="noreferrer">
+                  {visibleMatches.map((item) => (
+                    <tr key={item.id} className={item.stale_at ? "row-stale" : undefined}>
+                      {singleStore ? null : (
+                        <td data-label="门店" className="cell-store">
+                          <strong>{item.store.name}</strong>
+                          {item.store.status !== "active" ? (
+                            <div>
+                              <StatusPill status={item.store.status} />
+                            </div>
+                          ) : null}
+                        </td>
+                      )}
+                      <td data-label="热点" className="cell-title">
+                        <a
+                          href={item.canonical_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={item.title}
+                        >
                           {item.title}
                         </a>
-                        <div className="muted">{item.suggested_scenario ?? "—"}</div>
+                        <div className="muted">{dash(item.suggested_scenario)}</div>
                       </td>
-                      <td>{item.relevance_score ?? "—"}</td>
-                      <td>
+                      <td data-label="相关度" className="cell-num">
+                        {formatScore(item.relevance_score)}
+                      </td>
+                      <td data-label="匹配状态" className="cell-nowrap">
                         <StatusPill status={item.eligibility_status} />
-                        <div className="muted">算法 v{item.matching_algorithm_version}</div>
+                        {item.stale_at ? <span className="pill">历史</span> : null}
+                        <div className="muted">
+                          算法 v{item.matching_algorithm_version}
+                          {item.match_source === "ai_creative" ? " · AI 创意" : ""}
+                        </div>
                       </td>
-                      <td className="wrap muted">{item.reason_summary ?? "—"}</td>
-                      <td className="muted">{formatTime(item.matched_at)}</td>
+                      <td data-label="匹配说明">
+                        {item.match_source === "ai_creative" ? (
+                          <AiCreativeCell item={item} />
+                        ) : (
+                          <MatchReasonCell value={item.reason_summary} />
+                        )}
+                      </td>
+                      <td data-label="匹配时间" className="cell-time muted">
+                        {formatTime(item.matched_at)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -281,9 +649,34 @@ export default function HotspotPage() {
               className="input"
               placeholder="搜索热点标题"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setTopicPage(1);
+              }}
             />
-            <span className="toolbar-meta">共 {topics.data?.total ?? 0} 条热点</span>
+            <span className="toolbar-meta">
+              共 {topics.data?.total ?? 0} 条热点 · 第 {topicPage} /{" "}
+              {Math.max(1, topics.data?.total_pages ?? 0)} 页
+            </span>
+            <button
+              className="button ghost"
+              type="button"
+              disabled={topicPage <= 1 || topics.loading}
+              onClick={() => setTopicPage((page) => Math.max(1, page - 1))}
+            >
+              上一页
+            </button>
+            <button
+              className="button ghost"
+              type="button"
+              disabled={
+                topics.loading ||
+                topicPage >= Math.max(1, topics.data?.total_pages ?? 0)
+              }
+              onClick={() => setTopicPage((page) => page + 1)}
+            >
+              下一页
+            </button>
           </div>
           {topics.error ? <ErrorBanner message={topics.error} /> : null}
           {topics.loading && !topics.data ? <div className="loading">读取热点…</div> : null}
@@ -292,35 +685,46 @@ export default function HotspotPage() {
           ) : null}
           {topics.data && topics.data.items.length > 0 ? (
             <div className="panel table-panel">
-              <table className="table">
+              <table className="table cards topics-table">
                 <thead>
                   <tr>
                     <th>标题</th>
                     <th>来源</th>
-                    <th>热度</th>
+                    <th className="cell-num">热度</th>
                     <th>核验状态</th>
-                    <th>发现时间</th>
-                    <th>过期时间</th>
+                    <th className="cell-time">发现时间</th>
+                    <th className="cell-time">过期时间</th>
                   </tr>
                 </thead>
                 <tbody>
                   {topics.data.items.map((topic) => (
                     <tr key={topic.id}>
-                      <td>
-                        <a href={topic.canonical_url} target="_blank" rel="noreferrer">
+                      <td data-label="标题" className="cell-title">
+                        <a
+                          href={topic.canonical_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={topic.title}
+                        >
                           {topic.title}
                         </a>
-                        <div className="muted">{topic.region ?? "—"}</div>
+                        <div className="muted">{dash(topic.region)}</div>
                       </td>
-                      <td className="muted">{topic.source.display_name}</td>
-                      <td>
-                        {topic.heat_value ?? "—"} {topic.heat_unit ?? ""}
+                      <td data-label="来源" className="cell-nowrap muted">
+                        {topic.source.display_name}
                       </td>
-                      <td>
+                      <td data-label="热度" className="cell-num">
+                        {formatHeat(topic.heat_value, topic.heat_unit)}
+                      </td>
+                      <td data-label="核验状态" className="cell-nowrap">
                         <StatusPill status={topic.evidence_status} />
                       </td>
-                      <td className="muted">{formatTime(topic.discovered_at)}</td>
-                      <td className="muted">{formatTime(topic.expires_at)}</td>
+                      <td data-label="发现时间" className="cell-time muted">
+                        {formatTime(topic.discovered_at)}
+                      </td>
+                      <td data-label="过期时间" className="cell-time muted">
+                        {formatTime(topic.expires_at)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -353,14 +757,19 @@ export default function HotspotPage() {
             const result = await api.collect(storeIds, crypto.randomUUID());
             if (result.message) {
               setNotice(result.message);
-            } else {
-              setNotice(
-                `已为 ${result.items.length} 家门店创建采集作业，可在门店匹配结果中查看本次下发。`,
-              );
+              setCollectOpen(false);
+              return;
             }
+            finalized.current = false;
+            setNotice("");
+            setCollectionJobs(
+              result.items.map((item) => ({
+                jobId: item.job_id,
+                storeName: item.store_name,
+                job: null,
+              })),
+            );
             setCollectOpen(false);
-            matches.reload();
-            topics.reload();
           }}
         />
       ) : null}
@@ -389,6 +798,7 @@ function SourceDialog({
     source?.source_type === "public_feed" ? "public_feed" : "rss",
   );
   const [sourceUrl, setSourceUrl] = useState(source?.source_url ?? "");
+  const [fallbackUrl, setFallbackUrl] = useState(source?.fallback_url ?? "");
   const [termsUrl, setTermsUrl] = useState(source?.terms_url ?? "");
   const [permittedUse, setPermittedUse] = useState(source?.permitted_use ?? "");
   const [attribution, setAttribution] = useState(source?.attribution_template ?? "");
@@ -406,6 +816,7 @@ function SourceDialog({
     setSourceKey(`60s-${preset.key}`);
     setDisplayName(preset.display_name);
     setSourceUrl(preset.source_url);
+    setFallbackUrl(preset.fallback_url ?? "");
   }
 
   function validate(): string {
@@ -421,6 +832,15 @@ function SourceDialog({
     }
     if (allowedHosts.length > 0 && !allowedHosts.includes(feedHost)) {
       return `来源地址域名 ${feedHost} 不在允许白名单内，当前允许：${allowedHosts.join("、")}。请先让平台在服务端白名单中加入该域名。`;
+    }
+    if (fallbackUrl.trim()) {
+      const fallbackHost = hostOf(fallbackUrl);
+      if (!fallbackHost) {
+        return "备用地址必须是完整的 HTTPS 地址，例如 https://example.com/feed.json。";
+      }
+      if (allowedHosts.length > 0 && !allowedHosts.includes(fallbackHost)) {
+        return `备用地址域名 ${fallbackHost} 不在允许白名单内，当前允许：${allowedHosts.join("、")}。`;
+      }
     }
     if (!termsUrl.trim()) {
       return "请填写使用条款 URL，未登记条款的来源不能启用，也不能参与采集。";
@@ -456,6 +876,7 @@ function SourceDialog({
             display_name: displayName.trim(),
             source_type: sourceType,
             source_url: sourceUrl.trim(),
+            fallback_url: fallbackUrl.trim() || null,
             terms_url: termsUrl.trim(),
             permitted_use: permittedUse.trim(),
             attribution_template: attribution.trim() || null,
@@ -473,6 +894,7 @@ function SourceDialog({
               await api.updateOpportunitySource(sourceId, {
                 display_name: payload.display_name,
                 source_url: payload.source_url,
+                fallback_url: payload.fallback_url ?? "",
                 terms_url: payload.terms_url,
                 permitted_use: payload.permitted_use,
                 attribution_template: payload.attribution_template,
@@ -500,7 +922,7 @@ function SourceDialog({
         <h2>{mode === "create" ? "新增热点来源" : "编辑热点来源"}</h2>
         <p className="muted">
           来源登记后默认禁用。仅公开、条款已登记且域名在白名单内的来源可启用；公开热榜预设复用
-          Easel 的 60s 热榜端点清单。
+          Easel 的多源热榜端点（xxapi 主源、60s 备用）。
         </p>
         {mode === "create" ? (
           <label className="field">
@@ -554,6 +976,15 @@ function SourceDialog({
             placeholder="https://"
             required
             onChange={(event) => setSourceUrl(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>备用地址（可选，主地址失败时自动切换）</span>
+          <input
+            className="input"
+            value={fallbackUrl}
+            placeholder="https://"
+            onChange={(event) => setFallbackUrl(event.target.value)}
           />
         </label>
         <label className="field">

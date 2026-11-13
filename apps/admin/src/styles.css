@@ -297,6 +297,16 @@ p {
   overflow-x: auto;
 }
 
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table-scroll > .table,
+.table-panel > .table {
+  min-width: 640px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -334,6 +344,151 @@ p {
 
 .table .right {
   text-align: right;
+}
+
+.cell-title {
+  min-width: 300px;
+  max-width: 520px;
+}
+
+.cell-title a {
+  display: inline-block;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.cell-store {
+  white-space: nowrap;
+}
+
+.cell-nowrap {
+  white-space: nowrap;
+}
+
+.cell-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cell-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  max-width: 320px;
+  word-break: break-word;
+}
+
+.reason-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 440px;
+}
+
+.reason-conclusion {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #334155;
+}
+
+.reason-labels {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+@media (max-width: 760px) {
+  .reason-labels {
+    white-space: normal;
+  }
+}
+
+.reason-details summary {
+  width: max-content;
+  cursor: pointer;
+  font-size: 11px;
+  color: #2563eb;
+}
+
+.toolbar-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.row-stale {
+  opacity: 0.68;
+}
+
+.reason-full {
+  margin-top: 6px;
+  max-height: 140px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+@media (max-width: 760px) {
+  .table.cards {
+    min-width: 0;
+  }
+
+  .table.cards thead {
+    display: none;
+  }
+
+  .table.cards tbody tr {
+    display: block;
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .table.cards tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .table.cards td {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 3px 0;
+    border: none;
+  }
+
+  .table.cards td::before {
+    content: attr(data-label);
+    flex: 0 0 56px;
+    color: #94a3b8;
+    font-size: 11px;
+    line-height: 1.7;
+    white-space: nowrap;
+  }
+
+  .table.cards .cell-title,
+  .table.cards .reason-cell,
+  .table.cards .cell-clamp {
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 .actions-cell {
@@ -509,6 +664,12 @@ p {
   background: #f1f5f9;
   color: #475569;
   white-space: nowrap;
+}
+
+.collect-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .pill-active,

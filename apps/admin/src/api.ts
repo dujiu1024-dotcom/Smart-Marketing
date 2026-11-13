@@ -177,6 +177,7 @@ export interface OpportunitySource {
   display_name: string;
   source_type: string;
   source_url: string;
+  fallback_url?: string | null;
   terms_url: string | null;
   permitted_use?: string | null;
   attribution_template?: string | null;
@@ -184,12 +185,15 @@ export interface OpportunitySource {
   health_status: string;
   last_success_at: string | null;
   last_failure_at: string | null;
+  last_error_code?: string | null;
+  last_error_summary?: string | null;
 }
 
 export interface OpportunitySourcePreset {
   key: string;
   display_name: string;
   source_url: string;
+  fallback_url: string | null;
 }
 
 export interface OpportunitySourceInput {
@@ -197,6 +201,7 @@ export interface OpportunitySourceInput {
   display_name: string;
   source_type: "rss" | "public_feed";
   source_url: string;
+  fallback_url?: string | null;
   terms_url: string;
   permitted_use: string;
   attribution_template?: string | null;
@@ -219,6 +224,23 @@ export interface HotTopicRow {
   source: { id: string; source_key: string; display_name: string; enabled: boolean };
 }
 
+export interface AiCreative {
+  excluded?: boolean;
+  exclude_reason?: string | null;
+  theme?: string;
+  play?: string;
+  offer?: {
+    audience_condition?: string;
+    mechanic?: string;
+    discount_rule?: string;
+  };
+  target_audience?: string;
+  borrow_logic?: string;
+  risk_notes?: string[];
+  channels?: string[];
+  confidence?: number;
+}
+
 export interface MatchRow {
   id: string;
   store: { id: string; name: string; status: string };
@@ -227,6 +249,10 @@ export interface MatchRow {
   relevance_score: string | null;
   match_method: string;
   matching_algorithm_version: number;
+  match_source: "rules" | "ai_creative";
+  ai_creative: AiCreative | null;
+  ai_confidence: string | null;
+  ai_prompt_version: string | null;
   eligibility_status: string;
   reason_summary: string | null;
   suggested_scenario: string | null;
@@ -236,6 +262,45 @@ export interface MatchRow {
   expires_at: string | null;
   stale_at: string | null;
   hot_topic: { id: string; evidence_status: string; published_at: string | null };
+}
+
+export interface AdminJob {
+  id: string;
+  job_type: string;
+  status: string;
+  store_id: string | null;
+  store_name: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  progress_current: number | null;
+  progress_total: number | null;
+  error_code: string | null;
+  error_summary: string | null;
+  created_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  topics_inserted: number | null;
+  opportunities_created: number | null;
+  source_results: {
+    source_key: string;
+    entries?: number;
+    inserted?: number;
+    fallback_used?: boolean;
+    attempts?: { url: string; error_code: string; summary: string }[];
+  }[];
+  source_failures: { source_key?: string; error_code: string; summary: string }[];
+  match?: {
+    opportunities_created?: number;
+    rule_opportunities_created?: number;
+    ai_opportunities_created?: number;
+    ai_creative?: {
+      candidates?: number;
+      model_calls?: number;
+      cache_hits?: number;
+      excluded?: number;
+      errors?: { error_code: string; summary: string }[];
+    };
+  };
 }
 
 export interface DispatchRow {
@@ -257,6 +322,9 @@ export interface DispatchRow {
 interface ListResponse<T> {
   items: T[];
   total: number;
+  page?: number;
+  page_size?: number;
+  total_pages?: number;
 }
 
 export const api = {
@@ -350,9 +418,13 @@ export const api = {
     store_id?: string;
     query?: string;
     eligibility?: string;
+    match_source?: string;
     limit?: number;
     offset?: number;
-  }) => request<ListResponse<MatchRow>>(`/admin/opportunities${toQuery(params)}`),
+  }) =>
+    request<
+      ListResponse<MatchRow> & { source_counts?: { rules: number; ai_creative: number } }
+    >(`/admin/opportunities${toQuery(params)}`),
   collect: (storeIds: string[] | null, idempotencyKey: string) =>
     request<{ status: string; items: { store_name: string; job_id: string }[]; message?: string }>(
       "/admin/opportunities/collect",
@@ -362,6 +434,7 @@ export const api = {
         headers: { "Idempotency-Key": idempotencyKey },
       },
     ),
+  job: (jobId: string) => request<AdminJob>(`/admin/jobs/${jobId}`),
   dispatches: (params: {
     store_id?: string;
     status?: string;

@@ -119,10 +119,12 @@ export default function UsersPage({ initialStoreId }: { initialStoreId: string }
             <tbody>
               {users.data.items.map((user) => (
                 <tr key={user.membership_id}>
-                  <td>
+                  <td className="cell-clamp" title={user.email}>
                     <strong>{user.email}</strong>
                   </td>
-                  <td>{user.store.name}</td>
+                  <td className="cell-clamp" title={user.store.name}>
+                    {user.store.name}
+                  </td>
                   <td>
                     <select
                       className="select small"
@@ -139,7 +141,7 @@ export default function UsersPage({ initialStoreId }: { initialStoreId: string }
                   <td>
                     <StatusPill status={user.status} />
                   </td>
-                  <td className="muted">{formatTime(user.joined_at ?? user.created_at)}</td>
+                  <td className="cell-time muted">{formatTime(user.joined_at ?? user.created_at)}</td>
                   <td className="right actions-cell">
                     <button className="link-button" type="button" onClick={() => setResetting(user)}>
                       重置密码

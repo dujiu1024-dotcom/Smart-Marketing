@@ -84,24 +84,27 @@ export default function DispatchesPage() {
             <tbody>
               {dispatches.data.items.map((item) => (
                 <tr key={item.id}>
-                  <td>
+                  <td className="cell-store">
                     <strong>{item.store.name}</strong>
-                    <div className="muted mono">{item.id}</div>
+                    <div className="muted mono cell-clamp">{item.id}</div>
                   </td>
                   <td>{item.channel_key ? (item.channel_key === "douyin" ? "抖音" : "其他渠道") : "—"}</td>
                   <td>
                     <StatusPill status={item.status} />
                   </td>
-                  <td>{item.attempt_count}</td>
-                  <td className="muted">{item.platform_item_id ?? "—"}</td>
-                  <td className="wrap muted">
-                    {item.last_error_summary ?? "—"}
-                    {item.last_error_code ? (
-                      <div className="mono">{item.last_error_code}</div>
-                    ) : null}
+                  <td className="cell-num">{item.attempt_count}</td>
+                  <td className="muted mono cell-clamp">{item.platform_item_id ?? "—"}</td>
+                  <td>
+                    {item.last_error_summary || item.last_error_code ? (
+                      <div className="cell-clamp muted" title={item.last_error_summary ?? undefined}>
+                        {item.last_error_summary ?? item.last_error_code}
+                      </div>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
                   </td>
-                  <td className="muted">{formatTime(item.created_at)}</td>
-                  <td className="muted">{formatTime(item.published_at)}</td>
+                  <td className="cell-time muted">{formatTime(item.created_at)}</td>
+                  <td className="cell-time muted">{formatTime(item.published_at)}</td>
                 </tr>
               ))}
             </tbody>

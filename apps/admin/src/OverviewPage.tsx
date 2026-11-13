@@ -100,12 +100,20 @@ export default function OverviewPage({
                   <tbody>
                     {recent.data.items.map((item) => (
                       <tr key={item.id}>
-                        <td>{item.store.name}</td>
-                        <td>{item.channel_key ?? "—"}</td>
+                        <td className="cell-clamp" title={item.store.name}>
+                          {item.store.name}
+                        </td>
+                        <td className="cell-nowrap">
+                          {item.channel_key
+                            ? item.channel_key === "douyin"
+                              ? "抖音"
+                              : item.channel_key
+                            : "—"}
+                        </td>
                         <td>
                           <StatusPill status={item.status} />
                         </td>
-                        <td className="muted">{formatTime(item.updated_at)}</td>
+                        <td className="cell-time muted">{formatTime(item.updated_at)}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -40,7 +40,35 @@ export function formatTime(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN", { hour12: false });
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+export function formatScore(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const score = Number(value);
+  if (!Number.isFinite(score)) return String(value);
+  return `${Math.round(score)} 分`;
+}
+
+export function formatHeat(
+  value: string | number | null | undefined,
+  unit?: string | null,
+): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return unit ? `${value} ${unit}` : String(value);
+  const formatted = Number.isInteger(numeric)
+    ? numeric.toLocaleString("zh-CN")
+    : numeric.toLocaleString("zh-CN", { maximumFractionDigits: 1 });
+  return unit ? `${formatted} ${unit}` : formatted;
+}
+
+export function dash(value: string | null | undefined): string {
+  return value && value.trim() ? value : "—";
 }
 
 const STATUS_LABELS: Record<string, string> = {

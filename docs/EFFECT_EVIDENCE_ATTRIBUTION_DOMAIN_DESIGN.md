@@ -4,6 +4,7 @@
 > 产品基线：PRODUCT_DESIGN.md v1.8
 > Demo 基线：#effects、#account-ops、#account-register
 > 日期：2026-11-11
+> 更新：2026-11-13 增补 §8.2 复用边界与 D-01 决策引用（映射真源：`docs/FRAMEWORK_SELECTION_AND_REUSE.md` §2.3–§2.4）
 > 状态：领域设计提案；待产品/技术评审冻结。不是生产实现、不是正式 OpenAPI、不是已接入真实数据源的声明。
 
 ## 1. 目标与边界
@@ -65,7 +66,7 @@
 - `channel_key TEXT NOT NULL`
 - `external_work_id TEXT NULL`、`external_work_url TEXT NULL`
 - `publish_operation_id UUID NULL`、`publish_package_id UUID NULL`、`publish_package_item_id UUID NULL`
-- `marketing_task_id UUID NULL`（复合 FK 到 #7 同店 MarketingTask）
+- `marketing_task_id UUID NULL`（复合 FK 到 #7 同店 MarketingTask；**代码字段名为 `task_id`**，本文旧称 `marketing_task_id` 已按代码对齐）
 - `registration_source TEXT`：system_publish_readback / official_account_sync / merchant_manual
 - `ownership_status TEXT`：pending_verification / verified_system_publish / verified_official_account / merchant_confirmed / rejected
 - `ownership_method TEXT NULL`、`ownership_evidence_id UUID NULL`
@@ -119,6 +120,7 @@
 字段建议：
 
 - `id, store_id, published_work_id NULL, channel_account_id NULL, marketing_task_id NULL`
+- `observation_scope`：`work` / `account` / `store`；分别表示作品级、账号级、门店级观测口径
 - `metric_definition_id, metric_key, metric_tier`
 - `value_numeric NUMERIC(20,6) NULL`、`value_text TEXT NULL`（仅在经评审的非数值指标需要时）
 - `unit, currency CHAR(3) NULL`
@@ -131,9 +133,10 @@
 
 状态建议：
 - integrity_status：complete / partial / anomalous / unknown
-- authenticity_status：official_api / verified_import / merchant_reported / demo_sample
+- authenticity_status：official_api / verified_import / merchant_reported / merchant_authorized_scrape / demo_sample
 - sync_status：current / delayed / failed / unavailable
 - 对生产正式分析只允许 official_api 或通过来源核验的 verified_import；merchant_reported 单独标注，demo_sample 永远不进入生产聚合。
+- **`merchant_authorized_scrape`（商家授权抓取）定义（单一真源）**：在商家本人账号、本人明确授权、可撤回的前提下，通过已登录浏览器读取创作者中心展示的本人可见数据所得观测。它与 `official_api` 严格区分：不来自平台官方接口、不具备官方口径效力、不得进入「已核验官方数据」汇总；与 `merchant_reported` 的区别在于数据由系统按采集时间自动取得，而非商家手工录入。授权撤回、账号失效或遇到登录墙时，观测停止追加并标记授权异常，不伪造历史补齐。授权边界见 `docs/FRAMEWORK_SELECTION_AND_REUSE.md` §2.4，产品条款见 `docs/PRODUCT_DESIGN.md` §18.4。
 
 规则：
 - 观察记录 append-only；纠错通过新记录 + supersedes_observation_id，不 UPDATE 覆盖历史值。
@@ -303,6 +306,12 @@ Job 命令需包含 source/channel account ID、时间窗口、cursor、schema v
 
 当前核验结论：`support_status=pending_verification`。尚未检查本项目应用控制台实际 Scope、应用审核资质、真实 OAuth 授权用户、配额或 API 响应；不创建同步 Job，不展示真实指标。后续 #12 应把指标读取能力作为独立 Capability 申请与验收，#13 只消费 #12 输出的能力快照和已脱敏观测证据。
 
+### 8.2 实现复用边界（真源引用）
+
+- 解析、匹配、聚合、走势、归因口径和前端展示**优先复用 Easel 本地实现**，不以“架构不同”为由重写；逐项映射见 `docs/FRAMEWORK_SELECTION_AND_REUSE.md` §2.3（唯一真源，本文不复制表格）。
+- 采集通道（Easel 依赖已登录浏览器读取创作者中心）已在同文件 §2.4 决策为 D-01 路径 A「商家授权抓取」，按该节授权边界改造后复用；官方 API 仍为各渠道首选通道。
+- 复用不改变本域的 `authenticity_status`、归属核验和归因证据门禁；抓取所得数据固定标记为 `merchant_authorized_scrape`，不得标记为 `official_api`。
+
 ## 9. 安全、隐私与审计
 
 - 全部查询先由 #5 构造 AuthorizedStoreContext；任何 client-supplied store_id 都不是授权事实。
@@ -354,7 +363,7 @@ Job 命令需包含 source/channel account ID、时间窗口、cursor、schema v
 1. **Slice A — 领域/契约冻结**：确认实体、证据等级、指标层级、归因表述、Demo 页面和 API/Job 边界；完成评审记录。
 2. **Slice B — 只读作品归属基础**：消费 #12 的 ChannelAccount/PublishOperation/官方读回结果；实现 PublishedWork 与 WorkOwnershipEvidence；人工登记先待核验。
 3. **Slice C — 指标定义与观测存储**：MetricDefinition、MetricObservation、幂等去重、观察窗口、数据来源能力快照。
-4. **Slice D — 只读同步与展示**：仅在某渠道指标 API 权限通过后实现真实只读同步；没有权限时展示 unsupported/pending 状态和数据接入说明。
+4. **Slice D — 只读同步与展示**：官方指标 API 权限通过后优先走官方只读同步；未取得权限时按 §2.4 D-01 路径 A 提供「商家授权抓取」只读同步（固定真实性档 `merchant_authorized_scrape`），并展示 unsupported/pending 状态与数据接入说明。同步的解析、匹配、聚合、走势与展示优先复用 Easel 组件（`docs/FRAMEWORK_SELECTION_AND_REUSE.md` §2.3），不得以重写替代可复用实现。
 5. **Slice E — 经营结果证据与归因**：在真实、合法经营数据源明确后接入；先做描述性统计，再按证据强度提供有限归因。
 6. **Slice F — 经验沉淀**：将已验证洞察作为后续按需制作的建议输入，不自动创建营销任务，不自动改写门店画像。
 
@@ -396,4 +405,4 @@ The first complete code slice for opportunity handoff, published-work ownership 
 - The overview emits evidence-bounded insights and next-step suggestions only from verified metric trends; suggestions are operational checks, not causal claims. With no verified metrics, the workspace shows an explicit empty state.
 - The UI adds an independent `#effects` workspace and distinguishes content performance, intent and business outcomes, with verified trends, conversion rates, per-work performance comparisons, evidence-bounded insights, data-quality counts, automatic readback registration and reconciliation, capability snapshots and evidence/attribution status.
 
-**Current limits:** official channel metric-read adapters and verified business-outcome import adapters are not yet implemented, so no production outcome can be formally attributed yet. Per-source expected-latency SLAs, late-arrival reconciliation and the full EFF-01..EFF-30 suite remain. Douyin publishing/readback does not imply metric-read permission. No production metric source or business outcome is claimed.
+**Current limits:** official channel metric-read adapters and verified business-outcome import adapters are not yet implemented, so no production outcome can be formally attributed yet. Per-source expected-latency SLAs, late-arrival reconciliation and the full EFF-01..EFF-30 suite remain. Douyin publishing/readback does not imply metric-read permission. No production metric source or business outcome is claimed. Adapter implementation follows §8.2: parsing, matching, aggregation and presentation reuse Easel first; the collection channel follows D-01 path A (merchant-authorized scrape), recorded with the dedicated authenticity tier.

@@ -16,7 +16,7 @@
 - 不把热点设为每个营销任务的必经步骤。
 - 不把模型摘要、推测热度或演示数据伪装为原始来源事实。
 - 不复制 #6 的 Store/Product/Offer/Audience/Brand 事实，不复制 #7 的 MarketingTask/StrategySnapshot，不复制 #9 的 Job/Outbox。
-- 不采集需要登录、绕过验证码、绕过访问限制或违反来源条款的数据。
+- 不采集需要登录、绕过验证码、绕过访问限制或违反来源条款的数据。D-01 已决策为路径 A（商家授权抓取），该路径只适用于**商家本人账号的账号/作品指标**，不适用于公共热点采集；热点采集仍只允许公开来源、条款已登记且域名在白名单内的通道。决策与边界见 `docs/FRAMEWORK_SELECTION_AND_REUSE.md` §2.4，真实性档定义见 `docs/EFFECT_EVIDENCE_ATTRIBUTION_DOMAIN_DESIGN.md` §4.4。
 - 不因采纳热点自动创建任务；采纳仅作为用户意图与策略输入。
 
 ## 2. Demo 页面与交互映射
@@ -57,6 +57,11 @@
 - last_success_at、last_failure_at、health_status、created_at、updated_at
 
 来源配置由平台运营侧维护；来源授权/条款和速率限制必须在启用前人工核实。不得将门店用户提交的任意 URL 直接作为服务端抓取目标。
+
+**来源类型与多源支持：**
+- `rss`：RSS / Atom 订阅，解析 `channel/item` 或 Atom `entry`。
+- `public_feed`：公开热榜 JSON。复用 Easel 的热榜端点清单（Easel 仓库 `skills/shared/hotlist-apis.md` 的 60s API，如 `weibo`、`zhihu`、`douyin`、`baidu`、`bili`、`toutiao`、`rednote` 等）；后台登记表单以预设下拉提供这些端点，但仍必须通过 `terms_url` 登记、允许域名白名单与启用准入，不得绕过。
+- 两类来源共用同一套采集、去重、过期与匹配流程；热榜条目的外部链接仅展示、不服务端请求，域名白名单约束的是采集目标本身。
 
 ### 4.2 HotTopic（跨门店共享的公共热点事实）
 
@@ -105,7 +110,7 @@
 ### 5.1 采集流程
 
 1. Job Runtime 按来源调度或响应手动刷新命令。
-2. Source Adapter 访问已批准来源，执行 SSRF 防护、DNS/IP 校验、重定向限制、响应大小限制、超时和速率限制。
+2. Source Adapter 访问已批准来源，执行 SSRF 防护、DNS/IP 校验、重定向限制、响应大小限制、超时和速率限制；来源清单与响应解析实现优先复用 Easel（`docs/FRAMEWORK_SELECTION_AND_REUSE.md` §2.3），来源准入规则不变。
 3. 将响应解析为统一 SourceEvidence/HotTopic 输入；保留 source_item_id、canonical_url、published_at 与原始来源证据。
 4. 以 source_id + source_item_id 建立来源级幂等；无稳定 ID 时使用规范化 URL + 内容指纹。
 5. 执行标题规范化和相似事件候选合并；不因标题相似而覆盖来源证据。

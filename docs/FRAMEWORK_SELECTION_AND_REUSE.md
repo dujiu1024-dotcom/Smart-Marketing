@@ -1,10 +1,10 @@
 # AI 门店运营官 — 开源框架选型与复用建议
 
-> 文档版本：1.1  
-> 日期：2026-11-10  
+> 文档版本：1.2  
+> 日期：2026-11-13  
 > 适用产品基线：`docs/PRODUCT_DESIGN.md` v1.8  
 > 目标仓库：`dujiu1024-dotcom/Smart-Marketing`  
-> 研究范围：Smart-Marketing 与 IterWave Content Ops 两个自有仓库，以及相关开源框架  
+> 研究范围：Smart-Marketing、IterWave Content Ops、本地 Easel 参考实现，以及相关开源框架  
 > 状态：技术选型建议，尚非已实施架构
 
 ## 1. 结论摘要
@@ -12,6 +12,8 @@
 **建议采用“自有确定性业务状态机 + FastAPI 服务层 + React 前端 + 独立媒体/渠道适配器”的轻量架构。首期不引入 n8n 和 ComfyUI；LangGraph 也不是必选项，满足复杂执行编排条件后再引入。**
 
 不建议把产品整体改造成 Dify、n8n 或其他通用 Agent 平台。AI 门店运营官的差异化不在于提供一个可视化工作流编辑器，而在于：商家用一句话提出经营目标，系统能可靠地完成策略、文案、图片、渠道适配、质检、人工确认与发布准备，并在数据可用后验证经营结果。
+
+**复用优先级：本地 Easel 实现 > IterWave 派生实现 > 自研。** 凡是与平台登录态无关的解析、匹配、聚合、走势、归因口径和前端展示，一律复用 Easel 现有实现，不以“架构不同”为由重写。依赖已登录浏览器读取创作者中心的采集通道已在 §2.4 D-01 决策为路径 A（商家授权抓取），按该节授权边界改造后复用。逐项映射见 §2.3。
 
 ### 1.1 推荐技术决策\n\n本项目是固定业务流程的 AI 产品，不是让用户自由搭建流程的自动化平台。技术选型以“业务状态由自有代码控制、AI 只处理需要智能判断的环节、媒体能力通过适配器接入”为原则。图像生成是产品必需能力，但 ComfyUI 不是必需组件；同理，营销流程需要可靠状态管理，但不代表首期必须引入 LangGraph。
 
@@ -23,14 +25,14 @@
 | 核心业务流程 | 自有 Python 业务状态机/服务层 | **首期必选** | 固定流程由产品自身掌控，业务状态、规则、审核门控和幂等逻辑必须确定、可测试、可审计 |\n| AI 子流程编排 | 普通 Python 函数；复杂时评估 LangGraph | **按需引入** | 首期不为固定流程额外增加 Agent runtime；出现复杂分支、checkpoint、长时运行和人工中断恢复需求时再引入 |
 | Agent 单元 | LangGraph 节点内封装模型/工具；必要时评估 PydanticAI | 组合 | 先保持一个执行框架，避免两套 Agent runtime 争夺状态 |
 | 图像生成与编辑 | 统一 Image Provider Adapter + 云端图像模型 API | **首期必需能力；不需要 ComfyUI** | 产品必须具备生图/改图，但不需要先自建节点式工作流引擎；保持 Provider 可替换 |
-| 浏览器自动化 | Playwright | 沿用并收紧边界 | 可用于 E2E、只读采集、平台草稿准备；真实发布须遵循授权与人工确认边界 |
+| 浏览器自动化 | Playwright | 沿用并收紧边界 | 可用于 E2E、平台草稿准备与商家授权只读采集（D-01 路径 A 已决策，边界见 §2.4）；真实发布须遵循授权与人工确认边界 |
 | 任务调度/队列 | 现有 APScheduler 仅用于单实例轻量调度；生产评估持久化队列/工作流引擎 | 分阶段 | 不能将单进程调度器误当作可靠分布式任务系统 |
 | 数据库 | MVP 可延续 SQLite；多门店生产优先 PostgreSQL | 分阶段 | 生产需要事务、并发、权限隔离、审计与迁移管理 |
 | 文件/素材 | 对象存储 + 元数据数据库 | 生产必需 | 原图、生成版本、渠道内容包需要可追溯、不可覆盖 |
 | 自动化集成 | 自有后端服务/API Adapter | **首期不引入 n8n** | 当前是固定、受控的产品流程；直接由后端调用外部 API，避免额外工作流配置、状态同步和运维面 |
 | 可视化 AI 平台 | Dify（可选实验/提示词原型） | 不作为核心 runtime | 与自有业务流程重复，且需单独评估其附加许可证条件 |
 
-## 2. 两个自有仓库的可复用资产
+## 2. 自有仓库与本地参考实现的可复用资产
 
 ### 2.1 Smart-Marketing
 
@@ -74,6 +76,46 @@
 - 其“人工确认发布”边界与本产品 v1.8 一致；自动化应优先做到草稿准备、状态回读和证据留存。
 - SQLite、单进程 APScheduler 和单 worker 约束只适合当前部署规模，不能直接视为多租户生产方案。
 - IterWave 现有平台适配代码包含基于 Easel 的派生代码，复用时必须保留 Apache-2.0 的 LICENSE/NOTICE 归属要求，并逐文件核验来源。
+
+### 2.3 Easel 事件采集与指标能力复用映射（真源）
+
+> Easel 参考实现（Apache-2.0，来源仓库 Easel，本文引用其仓库根相对路径）。本节是 Easel → 门店运营复用映射的**唯一真源**，其它文档只引用、不复制正文。
+> 判定原则：**能复用就不要自己写。** 凡是不依赖平台登录态/页面自动化的解析、匹配、聚合、走势、口径和展示逻辑，一律直接复用或改造后复用；依赖登录态读取创作者中心的采集通道按 §2.4 D-01 路径 A 的授权边界改造后复用。
+
+| Easel 模块/文件 | 门店对应能力位置 | 复用方式 | 理由与落地动作 |
+|---|---|---|---|
+| 发布事件底座 `skills/builtin/skill-publish-log/SKILL.md`、`scripts/log.py`（entries 字段、原子写、id 自增、record/query/stat） | `PublishedWork`（`apps/api/src/store_operator/models/opportunity_effects.py` L286-L358）+ Worker 发布读回登记（`apps/worker/src/store_operator_worker/tasks.py` L985-L1028） | 改造后复用 | 字段语义与记录/查询/统计逻辑可直接搬；仅把 JSON 原子写换成 PostgreSQL 仓储。落地：entries → PublishedWork 字段映射，log.py 的过滤/聚合函数移植为领域服务，不直接读写 `outputs/_analytics`。 |
+| 指标时序快照 `skills/builtin/skill-data-tracker/SKILL.md`、`scripts/track.py`（snapshots schema、增长率/移动平均/里程碑外推/生命周期分类） | `MetricObservation`（同文件 L188-L246）+ 趋势与周期聚合 API（`GET /effects/overview`） | 直接复用代码 | 纯计算逻辑，无平台依赖。落地：track.py 的 trend/lifecycle 计算函数搬入 effects 聚合服务；snapshot 字段映射为 `metric_key` 观测，保留 `period_timezone`。 |
+| `skills/shared/scripts/account_stats.py` 解析层：`parse_num`、`num_by_label`、`metrics_with_vs`、`growth_windows`、平台字段别名表 L32-L120 | 指标解析与口径映射（`MetricDefinition` L155-L185 + 采集入库） | 直接复用代码 | 平台字段别名、数值/单位解析、环比计算与登录态无关。落地：解析函数直接复用，字段口径写入 `MetricDefinition.definition`。 |
+| `skills/shared/scripts/account_stats.py` 抓取层（`_scrape`、`_xhs_*` 等 Playwright 登录态）、`weixin_mp_stats.py` | 渠道数据采集 Adapter（#12） | 改造后复用（D-01 路径 A） | D-01 已决策为路径 A：仅读取商家本人账号、本人授权、可撤回的可见数据，产物统一标「商家授权抓取」真实性档，不得标 `official_api`；频控、只读、不绕过验证码、不访问他人数据，边界见 §2.4。 |
+| `skills/shared/scripts/platform_readback.py` 匹配与四档结果：`find_published_work`（标题前缀 + 时间窗）、`ReadbackResult` 的 `verified/unverified/login_required/readback_error` | `PublishedWork` 归属核验 + `WorkOwnershipEvidence`（L361 起）+ Worker 抖音发布读回（`apps/worker/src/store_operator_worker/tasks.py` L940-L1060） | 改造后复用 | 匹配算法与结果语义与页面无关，可整体搬；读取通道按 §2.4 D-01 路径 A 的授权边界。落地：`find_published_work` 与四档枚举移植为共享模块，官方 API 读回结果映射到同一枚举。 |
+| Analytics 聚合与走势 `web/app.py` `/api/analytics/history` L5254-L5337（series 按 profile/title 归拢、CTR、零点击判定） | `GET /effects/overview` 聚合、作品级趋势 | 改造后复用 | 聚合公式与阈值直接复用，数据源从 JSON 扫描换成 `MetricObservation` SQL 聚合。落地：CTR/zero-click 口径保留，前端字段对齐。 |
+| 前端走势展示 `web/frontend/src/components/AnalyticsPage.tsx`（Sparkline、CTR、零点击告警） | `apps/web/src/EffectsWorkspace.tsx` 指标区 | 直接复用代码 | 同为 React + TypeScript，组件可直接移植。落地：Sparkline 与告警文案搬入，接口字段按 effects overview 适配。 |
+| 热榜清单与解析 `skills/shared/hotlist-apis.md`（60s API v2：微博/抖音/知乎/头条/小红书/百度）、`skill-trending-topics` 等 | `HotTopicSource`（L28-L52）+ Worker `apps/worker/src/store_operator_worker/hot_topics.py` | 改造后复用 | 端点清单与响应解析可复用；来源准入、`terms_url`/`permitted_use`、主机 allowlist 保持不变。落地：以 `source_type=public_feed` 接入，先登记条款再启用。 |
+| 归因分析口径 `skills/builtin/skill-publish-analytics/SKILL.md`（时段/标签/类型/增长四维）、`references/follower-log-schema.md` | `AttributionEvidence`（L462 起）+ 趋势/转化 API | 改造后复用 | 统计维度与粉丝时序字段映射可复用；结论必须通过门店证据门禁，不得把相关性写成因果。落地：四维口径落到归因服务，字段映射表作为账号级 `MetricDefinition` 口径。 |
+| 发布事件转发 `skills/shared/scripts/calendar_ops.py` `_forward_publish_log` L116-L180 | 发布成功 → 作品/观测写入 | 改造后复用 | 触发点与幂等思路可复用，但不沿用 best-effort 文件追加。落地：改为 Outbox/Job 触发，失败可重试、可审计。 |
+
+### 2.4 D-01 决策记录：商家授权抓取（路径 A，已决策）
+
+**决策：** 采用路径 A。允许在**商家本人账号、本人明确授权**的前提下，复用 Easel 的采集方式读取创作者中心可见数据；同时按本域证据模型修订 `docs/PRODUCT_DESIGN.md` §18.4 的反抓取条款，并新增 `merchant_authorized_scrape`（商家授权抓取）真实性档。该档定义唯一真源为 `docs/EFFECT_EVIDENCE_ATTRIBUTION_DOMAIN_DESIGN.md` §4.4，本文不复制正文。
+
+原冲突事实（保留备查）：Easel 的账号/作品数据采集依赖已登录浏览器访问创作者中心（`account_stats.py`、`weixin_mp_stats.py`、`platform_readback.py` 的页面内 fetch / XHR 截获）；门店原条款 `docs/PRODUCT_DESIGN.md` §18.4 明确「禁止通过模拟登录、爬虫、绕过验证码或非授权抓取来补齐数据」。
+
+| 路径 | 做法 | 结论 |
+|---|---|---|
+| A. 商家授权抓取（已采用） | 复用 `account_stats.py` / `platform_readback.py` 解析与匹配层；抓取层仅读取商家本人已登录账号的可见数据 | 必须同时落地条款修订与真实性档；数据不得标 `official_api` |
+| B. 官方 API + 其余全复用 | 采集通道走官方 OAuth/API 或受控导入 | 保留为各渠道的首选通道；取得官方 scope 后优先切换，解析、匹配、聚合、走势、归因与展示继续复用 |
+
+**路径 A 的硬边界（代码与条款共同约束）：**
+
+1. **仅限商家本人账号**：采集目标必须绑定本店已连接、由商家本人授权的渠道账号；不得读取他人账号、竞品账号或任何非授权主体数据。
+2. **仅限本人授权且可撤回**：采集前必须存在该账号的有效授权记录；商家撤回授权或账号失效后，同步任务必须停止并标记为授权异常，不得继续采集。
+3. **只读、不写平台**：只读取创作者中心展示的本人数据，不代商家发布、评论、点赞、关注或修改任何平台内容。
+4. **不得绕过验证码或访问限制**：遇到验证码、风控拦截、登录墙时记录 `login_required` 并停止，不得自动破解、绕过或使用非授权凭据。
+5. **频控与可追溯**：按账号与范围做频率限制；每次同步保留采集时间、来源账号、范围、结果四档（verified/unverified/login_required/readback_error）与错误码，证据快照脱敏。
+6. **不得冒充官方**：抓取所得观测的真实性档固定为 `merchant_authorized_scrape`，不与 `official_api` 混同，不进入「已核验官方数据」聚合口径。
+
+**决策人/触发条件：** 产品 + 法务；本决策已由产品侧确认（2026-11-13）。后续若某渠道取得官方 API 权限，按路径 B 优先切换通道，复用映射不变。
 
 ## 3. 候选开源框架比较
 
@@ -139,7 +181,7 @@ Dify 的可视化 Workflow、模型管理、RAG 和 Prompt IDE 很适合快速�
 Playwright 已在 IterWave 使用，建议继续复用，但严格拆分用途：
 
 1. 自动化测试：完整覆盖商家端核心流程、刷新恢复、审核、上传和发布门控。
-2. 只读采集：在目标平台规则与授权允许时采集公开或账号可见数据。
+2. 只读采集：按 §2.4 D-01 路径 A 的授权边界，仅采集商家本人已授权账号的可见数据；产物标记 `merchant_authorized_scrape`。
 3. 草稿准备：在平台允许且账号授权有效的前提下，辅助填写内容、上传素材、保存草稿。
 4. 最终发布：由商家确认；未经明确授权与产品规则允许，不得自动点击最终发布。
 
@@ -302,11 +344,11 @@ Playwright 已在 IterWave 使用，建议继续复用，但严格拆分用途�
 **当前最合理的技术组合：**
 
 - 产品：保留 Smart-Marketing 的自有交互和 v1.8 业务规则。
-- 后端：从 IterWave 抽取 FastAPI、Pydantic、migration、worker、Playwright、图像处理实践。
+- 后端：优先复用 Easel 的解析、匹配、聚合、归因与展示实现（§2.3）；再从 IterWave 抽取 FastAPI、Pydantic、migration、worker、图像处理实践；采集通道按 §2.4 D-01 路径 A。
 - AI：引入 LangGraph，作为营销执行流程的编排 runtime。
 - 图片：抽象 Provider Adapter，先接一个真实服务，再按成本/效果扩展 ComfyUI 或其他模型。
 - 数据：先把业务状态、审核版本、执行 checkpoint 和素材元数据分开设计；生产数据库优先 PostgreSQL。
 - 外部自动化：首期不引入 n8n；未来仅用于外围 SaaS 集成、事件路由和通知，不进入核心业务状态机。
-- 效果闭环：独立建设数据采集、证据与归因能力，不把内容曝光等同于经营增长。
+- 效果闭环：复用 Easel 的指标观测、走势与归因实现，独立建设数据采集、证据与归因能力（采集通道按 D-01 路径 A）；不把内容曝光等同于经营增长。
 
 这条路线既能最大化复用现有代码，也能避免把产品做成通用低代码平台或 ERP。选型原则是：**固定流程用自有代码控制；智能判断交给模型；图像能力通过 Provider 接入；只有复杂度真实出现时才增加编排框架。先做出一条可以真实执行、可以暂停恢复、可以审计、可以由商家控制的营销链路，再扩展技术组件。**

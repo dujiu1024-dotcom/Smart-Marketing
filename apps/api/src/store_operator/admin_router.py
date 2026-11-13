@@ -912,7 +912,7 @@ def list_hot_topics(
     evidence_status: Literal[
         "collected", "partial", "failed", "unverified", "expired"
     ] | None = Query(default=None, alias="status"),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
     conditions: list[ColumnElement[bool]] = []
@@ -959,6 +959,9 @@ def list_hot_topics(
             for topic, source in rows
         ],
         "total": int(total),
+        "page": offset // limit + 1,
+        "page_size": limit,
+        "total_pages": (int(total) + limit - 1) // limit,
     }
 
 
@@ -1116,6 +1119,44 @@ def collect_opportunities(
         "status": created[0]["status"] if len(created) == 1 else "queued",
         "items": created,
         "source_count": len(sources),
+    }
+
+
+@router.get("/jobs/{job_id}")
+def get_job_status(
+    job_id: UUID,
+    _admin: Annotated[AuthenticatedSession, Depends(require_platform_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict[str, object]:
+    job = db.get(Job, job_id)
+    if job is None:
+        raise ApiError(404, "RESOURCE_NOT_FOUND", "Job not found")
+    store_name = (
+        db.scalar(select(Store.name).where(Store.id == job.store_id))
+        if job.store_id
+        else None
+    )
+    result = job.result_ref or {}
+    return {
+        "id": str(job.id),
+        "job_type": job.job_type,
+        "status": job.status,
+        "store_id": str(job.store_id) if job.store_id else None,
+        "store_name": store_name,
+        "attempt_count": job.attempt_count,
+        "max_attempts": job.max_attempts,
+        "progress_current": job.progress_current,
+        "progress_total": job.progress_total,
+        "error_code": job.error_code,
+        "error_summary": job.error_summary,
+        "created_at": _iso(job.created_at),
+        "started_at": _iso(job.started_at),
+        "finished_at": _iso(job.finished_at),
+        "topics_inserted": result.get("topics_inserted"),
+        "opportunities_created": result.get("opportunities_created"),
+        "source_results": result.get("source_results") or [],
+        "source_failures": result.get("source_failures") or [],
+        "match": result.get("match") or {},
     }
 
 

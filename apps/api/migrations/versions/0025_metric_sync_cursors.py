@@ -59,10 +59,29 @@ def upgrade() -> None:
         "metric_observations",
         ["store_id", "channel_account_id", "observation_scope"],
     )
-    op.drop_constraint(
-        "ck_metric_observations_authenticity_status",
-        "metric_observations",
-        type_="check",
+    # 0018 的约束名已经带表名前缀，命名约定又补了一层前缀，实际名称被截断。
+    # 按列语义查找并删除，避免依赖具体截断后的约束名。
+    op.execute(
+        sa.text(
+            """
+            DO $$
+            DECLARE constraint_name text;
+            BEGIN
+                FOR constraint_name IN
+                    SELECT conname
+                    FROM pg_constraint
+                    WHERE conrelid = 'metric_observations'::regclass
+                      AND contype = 'c'
+                      AND pg_get_constraintdef(oid) LIKE '%authenticity_status%'
+                LOOP
+                    EXECUTE format(
+                        'ALTER TABLE metric_observations DROP CONSTRAINT %I',
+                        constraint_name
+                    );
+                END LOOP;
+            END $$;
+            """
+        )
     )
     # merchant_authorized_scrape 为 26 字符，原 varchar(24) 需扩容。
     op.alter_column(

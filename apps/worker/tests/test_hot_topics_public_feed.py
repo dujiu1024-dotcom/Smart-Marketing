@@ -37,6 +37,9 @@ def test_parse_public_feed_supports_common_response_shapes():
     wrapped = b'{"code": 0, "data": [{"title": "D", "link": "https://example.com/d"}]}'
     assert _parse_public_feed(wrapped)[0]["id"] == "https://example.com/d"
 
+    string_rows = b'{"code": 200, "data": ["E", "F"]}'
+    assert [item["title"] for item in _parse_public_feed(string_rows)] == ["E", "F"]
+
 
 def test_parse_public_feed_rejects_invalid_or_unrecognized_payload():
     with pytest.raises(JobExecutionError) as invalid_json:

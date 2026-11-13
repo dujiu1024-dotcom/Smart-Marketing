@@ -39,6 +39,7 @@ class HotTopicSource(Base):
     display_name: Mapped[str] = mapped_column(String(160), nullable=False)
     source_type: Mapped[str] = mapped_column(String(32), nullable=False)
     source_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    fallback_url: Mapped[str | None] = mapped_column(String(2048))
     terms_url: Mapped[str | None] = mapped_column(String(2048))
     permitted_use: Mapped[str | None] = mapped_column(Text)
     attribution_template: Mapped[str | None] = mapped_column(String(500))
@@ -46,6 +47,8 @@ class HotTopicSource(Base):
     health_status: Mapped[str] = mapped_column(String(24), default="unknown", nullable=False)
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error_code: Mapped[str | None] = mapped_column(String(64))
+    last_error_summary: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
@@ -80,13 +83,83 @@ class HotTopic(Base):
     topic_tags_json: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     heat_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
     heat_unit: Mapped[str | None] = mapped_column(String(80))
+    first_heat_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    last_heat_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    heat_sample_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
     evidence_status: Mapped[str] = mapped_column(String(24), default="unverified", nullable=False)
     content_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    # 标题+摘要+标签的内容哈希，用于增量匹配判断热点内容是否变化。
+    content_hash: Mapped[str] = mapped_column(
+        String(64), default="", server_default="", nullable=False
+    )
     normalization_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
         server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class HotTopicHeatSample(Base):
+    __tablename__ = "hot_topic_heat_samples"
+    __table_args__ = (
+        Index("ix_hot_topic_heat_samples_topic_observed", "hot_topic_id", "observed_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    hot_topic_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("hot_topics.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    heat_value: Mapped[Decimal] = mapped_column(Numeric(20, 6), nullable=False)
+
+
+class HotTopicRetentionRun(Base):
+    __tablename__ = "hot_topic_retention_runs"
+    __table_args__ = (
+        CheckConstraint("status IN ('succeeded', 'failed')", name="status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    scanned: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    deleted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    retired: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    kept: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    deleted_stale: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    deleted_trend: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    error_summary: Mapped[str | None] = mapped_column(String(500))
+
+
+class HotTopicMatchState(Base):
+    """增量匹配状态：记录某门店已按哪版热点内容与门店上下文评估过。"""
+
+    __tablename__ = "hot_topic_match_state"
+    __table_args__ = (
+        Index("ix_hot_topic_match_state_store_context", "store_id", "store_context_hash"),
+        CheckConstraint("match_version > 0", name="match_version_positive"),
+    )
+
+    store_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("stores.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    hot_topic_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("hot_topics.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    topic_content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    store_context_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    match_version: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class StoreOpportunity(Base):

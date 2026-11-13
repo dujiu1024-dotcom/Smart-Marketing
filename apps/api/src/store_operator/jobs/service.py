@@ -145,7 +145,11 @@ def create_job(
         scope_type = "system"
         scope_id = SYSTEM_SCOPE_ID
     else:
-        if actor_type not in {"user", "platform_admin"} or actor_user_id is None:
+        # 定时采集等系统任务可以创建“门店作用域”的 Job，但仍要求无用户主体。
+        if actor_type == "system":
+            if actor_user_id is not None:
+                raise ValueError("System store-scoped jobs must not have a user ID")
+        elif actor_type not in {"user", "platform_admin"} or actor_user_id is None:
             raise ValueError("Store-scoped jobs require an authenticated user actor")
         scope_type = "store"
         scope_id = store_id
@@ -431,7 +435,9 @@ def claim_job(
                 error_code="STORE_NOT_ACTIVE",
             )
             return None
-        if job.created_by_user_id is not None:
+        # 门店成员的授权校验只约束门店用户发起的任务；平台管理员任务由平台权限授权，
+        # 不应因为管理员不是该门店成员而被取消。
+        if job.created_by_user_id is not None and job.actor_type != "platform_admin":
             active_membership = db.scalar(
                 select(StoreMembership)
                 .where(

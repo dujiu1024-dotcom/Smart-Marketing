@@ -7,26 +7,32 @@ from uuid import uuid4
 
 import httpcore
 import httpx
+import pytest
 
 from store_operator_worker.handlers import (
     JobExecutionContext,
+    JobExecutionError,
     clear_job_handlers_for_testing,
     resolve_job_handler,
 )
+from store_operator_worker.hot_topic_matching import (
+    event_key,
+    infer_store_categories,
+    topic_content_hash,
+)
 from store_operator_worker.hot_topics import (
     MAX_FEED_BYTES,
-    _brand_guideline_text,
-    _brand_risk_flags,
     _collect_source,
-    _match_score,
     _parse_feed,
     _PinnedSyncBackend,
-    _region_matches,
     _safe_https_url,
-    _store_profile_text,
-    _tokens,
     register_hot_topic_handlers,
 )
+
+
+@pytest.fixture(autouse=True)
+def _no_retry_delay(monkeypatch):
+    monkeypatch.setattr("store_operator_worker.hot_topics.RETRY_DELAY_SECONDS", 0)
 
 
 def test_parse_rss_feed_preserves_source_url_and_published_timestamp():
@@ -62,62 +68,33 @@ def test_parse_atom_feed_uses_alternate_link_and_updated_date():
     assert items[0]["published_at"] == datetime(2026, 11, 11, 10, 0, tzinfo=UTC)
 
 
-def test_chinese_bigram_matching_is_deterministic_and_bounded():
-    assert _tokens("春季新品饮品") >= {"春季", "季新", "新品", "品饮"}
-    assert _match_score("春季新品饮品", "春季新品饮品") == 1.0
-    assert 0.0 < _match_score("春季新品饮品", "春季饮品上新") < 1.0
+def test_event_key_normalizes_titles_for_cross_source_dedupe():
+    assert event_key("上海咖啡节开幕！") == event_key("上海咖啡节开幕")
+    assert event_key("#生椰拿铁回归#") == event_key("生椰拿铁回归")
+    assert event_key("上海咖啡节开幕") != event_key("北京咖啡节开幕")
 
 
-def test_store_profile_matching_uses_industry_and_service_region():
+def test_topic_content_hash_changes_only_when_content_changes():
+    first = topic_content_hash("生椰拿铁回归", "上海门店新品", [])
+    assert first == topic_content_hash("生椰拿铁回归", "上海门店新品", [])
+    assert first != topic_content_hash("生椰拿铁回归", "北京门店新品", [])
+
+
+def test_store_categories_are_inferred_from_business_type_and_products():
     profile = SimpleNamespace(
-        display_name="Tokyo Coffee",
-        business_type="咖啡馆",
         industry_category="餐饮",
-        introduction="主打手冲咖啡和季节限定饮品",
-        service_radius="门店周边三公里",
-        region="东京都",
-        province="东京都",
-        city="涩谷区",
-        district="神南",
-        service_capabilities_json=["堂食", "外带"],
+        business_type="精品咖啡馆",
+        introduction="社区咖啡店",
     )
-    text = _store_profile_text(profile)
-    assert "餐饮" in text
-    assert "涩谷区" in text
-    assert _match_score("涩谷区季节限定饮品", text) > 0
-
-
-def test_region_matching_uses_province_city_and_district_not_only_region():
-    profile = SimpleNamespace(
-        region="日本",
-        province="东京都",
-        city="涩谷区",
-        district="神南",
-    )
-    assert _region_matches("涩谷区", profile) is True
-    assert _region_matches("大阪府", profile) is False
-    assert _region_matches("关东地区", SimpleNamespace(
-        region=None, province=None, city=None, district=None
-    )) is None
-
-
-def test_brand_guideline_prohibited_phrases_raise_review_risk():
-    brand = SimpleNamespace(
-        brand_story="坚持真实原料",
-        positioning="社区精品咖啡",
-        differentiators="当季烘焙",
-        tone_of_voice="克制、真诚",
-        visual_style="自然光",
-        core_values_json=["真实"],
-        common_phrases_json=["每日现磨"],
-        cta_preferences_json=["到店体验"],
-        prohibited_phrases_json=["保证治愈", "绝对有效"],
-    )
-    assert "社区精品咖啡" in _brand_guideline_text(brand)
-    assert _brand_risk_flags("新品介绍中包含保证治愈", brand) == [
-        "brand_prohibited_phrase"
-    ]
-    assert _brand_risk_flags("季节限定饮品上新", brand) == []
+    product = SimpleNamespace(category="咖啡饮品", name="生椰拿铁")
+    categories = infer_store_categories(profile, [product], [])
+    assert "咖啡" in categories
+    assert "餐饮" in categories
+    assert infer_store_categories(
+        SimpleNamespace(industry_category=None, business_type=None, introduction=None),
+        [SimpleNamespace(category=None, name="商品A")],
+        [],
+    ) == {}
 
 
 def test_safe_https_url_returns_the_validated_public_address(monkeypatch):
@@ -223,16 +200,22 @@ def _fake_public_dns(monkeypatch):
     )
 
 
-def _fake_source():
-    return SimpleNamespace(
-        id="source-1",
-        source_url="https://feeds.example.test/rss",
-        terms_url="https://feeds.example.test/terms",
-        permitted_use="Public feed permitted for editorial discovery",
-        health_status="unknown",
-        last_success_at=None,
-        last_failure_at=None,
-    )
+def _fake_source(**overrides):
+    base = {
+        "id": "source-1",
+        "source_key": "test-source",
+        "source_url": "https://feeds.example.test/rss",
+        "fallback_url": None,
+        "terms_url": "https://feeds.example.test/terms",
+        "permitted_use": "Public feed permitted for editorial discovery",
+        "health_status": "unknown",
+        "last_success_at": None,
+        "last_failure_at": None,
+        "last_error_code": None,
+        "last_error_summary": None,
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
 
 
 def test_collect_source_rejects_oversized_stream_before_buffering(monkeypatch):
@@ -260,7 +243,7 @@ def test_collect_source_maps_non_2xx_to_retryable_fetch_error(monkeypatch):
     try:
         _collect_source(_FakeDatabase(), _fake_source(), {"feeds.example.test"})
     except JobExecutionError as exc:
-        assert exc.code == "SOURCE_FETCH_FAILED"
+        assert exc.code == "SOURCE_HTTP_5XX"
         assert exc.retryable is True
     else:
         raise AssertionError("non-2xx feed response must fail")
@@ -277,6 +260,9 @@ def test_collect_source_deduplicates_existing_topic_and_marks_source_healthy(mon
     _FakeClient.response = _FakeResponse([payload])
     monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _FakeClient)
     existing = SimpleNamespace(
+        title="Local spring drink trend",
+        summary="Seasonal drink launch",
+        topic_tags_json=[],
         last_seen_at=None,
         expires_at=datetime.now(UTC) + timedelta(days=1),
         evidence_status="collected",
@@ -284,9 +270,9 @@ def test_collect_source_deduplicates_existing_topic_and_marks_source_healthy(mon
     db = _FakeDatabase(existing=existing)
     source = _fake_source()
 
-    inserted = _collect_source(db, source, {"feeds.example.test"})
+    result = _collect_source(db, source, {"feeds.example.test"})
 
-    assert inserted == 0
+    assert result["inserted"] == 0
     assert db.added == []
     assert existing.last_seen_at is not None
     assert source.health_status == "healthy"
@@ -317,10 +303,62 @@ def test_collect_source_maps_timeout_to_retryable_fetch_error(monkeypatch):
     try:
         _collect_source(_FakeDatabase(), _fake_source(), {"feeds.example.test"})
     except JobExecutionError as exc:
-        assert exc.code == "SOURCE_FETCH_FAILED"
+        assert exc.code == "SOURCE_TIMEOUT"
         assert exc.retryable is True
     else:
         raise AssertionError("feed timeout must be retryable")
+
+
+def test_collect_source_switches_to_fallback_when_primary_is_rate_limited(monkeypatch):
+    _fake_public_dns(monkeypatch)
+    payload = b'{"data": [{"title": "Fallback topic", "url": "https://feeds.example.test/t/1"}]}'
+
+    class _PerUrlClient(_FakeClient):
+        def stream(self, method, url):
+            if "primary" in url:
+                return _FakeResponse([], status_code=429)
+            return _FakeResponse([payload])
+
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _PerUrlClient)
+    source = _fake_source(
+        source_type="public_feed",
+        source_url="https://feeds.example.test/primary",
+        fallback_url="https://feeds.example.test/fallback",
+    )
+
+    result = _collect_source(_FakeDatabase(), source, {"feeds.example.test"})
+
+    assert result["fallback_used"] is True
+    assert result["used_url"] == "https://feeds.example.test/fallback"
+    assert result["inserted"] == 1
+    # 429 属于可重试错误：主端点会重试一次，再切换备用端点。
+    assert [item["url"] for item in result["attempts"]] == [
+        "https://feeds.example.test/primary",
+        "https://feeds.example.test/primary",
+    ]
+    assert {item["error_code"] for item in result["attempts"]} == {"SOURCE_RATE_LIMITED"}
+    assert source.health_status == "healthy"
+    assert source.last_error_code is None
+
+
+def test_collect_source_reports_both_endpoint_failures(monkeypatch):
+    _fake_public_dns(monkeypatch)
+
+    class _AllFailClient(_FakeClient):
+        def stream(self, method, url):
+            return _FakeResponse([], status_code=404)
+
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _AllFailClient)
+    source = _fake_source(
+        source_type="public_feed",
+        source_url="https://feeds.example.test/primary",
+        fallback_url="https://feeds.example.test/fallback",
+    )
+
+    with pytest.raises(JobExecutionError) as excinfo:
+        _collect_source(_FakeDatabase(), source, {"feeds.example.test"})
+    assert excinfo.value.code == "SOURCE_HTTP_4XX"
+    assert excinfo.value.retryable is False
 
 
 def test_collect_source_marks_reseen_expired_topic_as_expired(monkeypatch):
@@ -333,6 +371,9 @@ def test_collect_source_marks_reseen_expired_topic_as_expired(monkeypatch):
     _FakeClient.response = _FakeResponse([payload])
     monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _FakeClient)
     existing = SimpleNamespace(
+        title="Expired seasonal topic",
+        summary=None,
+        topic_tags_json=[],
         last_seen_at=None,
         expires_at=datetime.now(UTC) - timedelta(days=1),
         evidence_status="collected",
@@ -341,8 +382,35 @@ def test_collect_source_marks_reseen_expired_topic_as_expired(monkeypatch):
 
     _collect_source(db, _fake_source(), {"feeds.example.test"})
 
-    assert existing.evidence_status == "expired"
+    # 仍被采集到就应回到热点池，并刷新保留期，而不是按旧 expires_at 直接过期。
+    assert existing.evidence_status == "collected"
     assert existing.last_seen_at is not None
+    assert existing.expires_at > datetime.now(UTC)
+
+
+def test_collect_source_records_heat_sample_for_new_topic(monkeypatch):
+    from store_operator.models import HotTopicHeatSample
+
+    _fake_public_dns(monkeypatch)
+    payload = (
+        b'{"data": [{"title": "Rising topic", "url": "https://feeds.example.test/t/heat",'
+        b' "hot_value": "2.3\xe4\xb8\x87"}]}'
+    )
+    _FakeClient.response = _FakeResponse([payload])
+    monkeypatch.setattr("store_operator_worker.hot_topics.httpx.Client", _FakeClient)
+    db = _FakeDatabase()
+
+    result = _collect_source(
+        db, _fake_source(source_type="public_feed"), {"feeds.example.test"}
+    )
+
+    topic = next(item for item in db.added if item.__class__.__name__ == "HotTopic")
+    samples = [item for item in db.added if isinstance(item, HotTopicHeatSample)]
+    assert result["inserted"] == 1
+    assert topic.first_heat_value == topic.last_heat_value == 23000
+    assert topic.heat_sample_count == 1
+    assert len(samples) == 1
+    assert samples[0].heat_value == 23000
 
 
 def test_collection_handler_marks_source_failed_and_preserves_retryability(monkeypatch):
@@ -391,11 +459,12 @@ def test_collection_handler_marks_source_failed_and_preserves_retryability(monke
         try:
             handler(context, {"schema_version": 1, "source_ids": [str(source.id)]})
         except JobExecutionError as exc:
-            assert exc.code == "SOURCE_FETCH_FAILED"
+            assert exc.code == "ALL_SOURCES_FAILED"
             assert exc.retryable is True
         else:
-            raise AssertionError("source fetch timeout must bubble up as retryable job failure")
+            raise AssertionError("all-source failure must bubble up as retryable job failure")
         assert source.health_status == "failed"
         assert source.last_failure_at is not None
+        assert source.last_error_code == "SOURCE_TIMEOUT"
     finally:
         clear_job_handlers_for_testing()

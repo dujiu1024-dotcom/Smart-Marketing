@@ -1,16 +1,18 @@
 # ruff: noqa: I001
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Any, cast
+
 import hashlib
 import html
 import ipaddress
 import json
 import re
 import socket
+import time
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from email.utils import parsedate_to_datetime
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
@@ -20,27 +22,28 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from store_operator.effects.easel_parsing import parse_num  # type: ignore[import-untyped]
 from store_operator.models import (  # type: ignore[import-untyped]
-    AudienceProfile,
-    BrandGuideline,
     HotTopic,
+    HotTopicHeatSample,
     HotTopicSource,
-    Offer,
-    Product,
-    StoreOpportunity,
-    StoreProfile,
 )
 from store_operator_worker.handlers import (
     JobExecutionContext,
     JobExecutionError,
     register_job_handler,
 )
+from store_operator_worker.hot_topic_matching import match_store, topic_content_hash
 
 MAX_FEED_BYTES = 2_000_000
-MATCHING_ALGORITHM_VERSION = 2
 MAX_FEED_ITEMS = 200
 HTTP_TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 USER_AGENT = "AI-Store-Operator-HotTopicCollector/1.0"
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+)
+RETRY_DELAY_SECONDS = 0.5
 
 
 def _allowed_hosts() -> set[str]:
@@ -240,25 +243,85 @@ def _parse_public_feed(payload: bytes) -> list[dict[str, object]]:
         rows = document.get("data", document.get("items", document.get("list", [])))
         if isinstance(rows, dict):
             rows = rows.get("list", rows.get("items", rows.get("data", [])))
+        code = document.get("code")
+        if (
+            code is not None
+            and str(code) not in {"0", "200"}
+            and not rows
+        ):
+            message = str(document.get("msg") or document.get("message") or "")[:200]
+            auth_related = str(code) in {"401", "403", "980401"}
+            raise JobExecutionError(
+                "SOURCE_AUTH_REQUIRED" if auth_related else "SOURCE_API_ERROR",
+                f"Feed API returned code {code}: {message}".strip(),
+                retryable=False,
+            )
     if not isinstance(rows, list):
         raise JobExecutionError(
             "SOURCE_FEED_INVALID", "Public feed JSON has no item list.", retryable=False
         )
     items: list[dict[str, object]] = []
     for row in rows[:MAX_FEED_ITEMS]:
+        if isinstance(row, str):
+            # 部分热榜（如 B 站）只返回标题字符串数组。
+            title = row.strip()
+            if not title:
+                continue
+            items.append(
+                {
+                    "id": title,
+                    "title": title,
+                    "link": "",
+                    "summary": "",
+                    "published_at": None,
+                    "region": None,
+                    "heat_value": None,
+                    "heat_unit": None,
+                    "topic_tags": [],
+                }
+            )
+            continue
         if not isinstance(row, dict):
             continue
-        title = str(row.get("title") or row.get("name") or row.get("word") or "").strip()
-        link = str(row.get("url") or row.get("link") or "").strip()
+        # 知乎热榜把内容放在 target 下；头条使用首字母大写的 Title/Url/ClusterId。
+        target = row.get("target") if isinstance(row.get("target"), dict) else row
+        title = str(
+            target.get("title")
+            or target.get("name")
+            or target.get("word")
+            or row.get("Title")
+            or ""
+        ).strip()
+        link = str(
+            target.get("url") or target.get("link") or row.get("Url") or row.get("url") or ""
+        ).strip()
         if not title:
             continue
-        heat = row.get("hot") or row.get("hot_value") or row.get("heat")
+        heat = (
+            row.get("HotValue")
+            or row.get("hot")
+            or row.get("hot_value")
+            or row.get("heat")
+        )
+        summary = (
+            target.get("excerpt")
+            or target.get("detail_text")
+            or row.get("desc")
+            or row.get("summary")
+            or ""
+        )
         items.append(
             {
-                "id": str(row.get("id") or link or title),
+                "id": str(
+                    row.get("ClusterId")
+                    or target.get("id")
+                    or row.get("id")
+                    or link
+                    or title
+                ),
                 "title": title,
                 "link": link,
-                "summary": str(row.get("desc") or row.get("summary") or "")[:5000],
+                "summary": str(summary)[:5000],
                 "published_at": None,
                 "region": row.get("region") or row.get("area"),
                 "heat_value": str(heat) if heat is not None else None,
@@ -276,86 +339,106 @@ def _parse_public_feed(payload: bytes) -> list[dict[str, object]]:
     return items
 
 
-def _tokens(value: str) -> set[str]:
-    normalized = value.lower()
-    words = set(re.findall(r"[a-z0-9]{2,}", normalized))
-    chinese = re.findall(r"[\u4e00-\u9fff]", normalized)
-    words.update(chinese[index] + chinese[index + 1] for index in range(len(chinese) - 1))
-    return words
-
-
-def _match_score(topic_text: str, fact_text: str) -> float:
-    topic_tokens = _tokens(topic_text)
-    fact_tokens = _tokens(fact_text)
-    if not topic_tokens or not fact_tokens:
-        return 0.0
-    return len(topic_tokens & fact_tokens) / len(topic_tokens | fact_tokens)
-
-
-def _store_profile_text(profile: StoreProfile) -> str:
-    values = [
-        profile.display_name,
-        profile.business_type or "",
-        profile.industry_category or "",
-        profile.introduction or "",
-        profile.service_radius or "",
-        profile.region or "",
-        profile.province or "",
-        profile.city or "",
-        profile.district or "",
-        *(profile.service_capabilities_json or []),
-    ]
-    return " ".join(value for value in values if value)
-
-
-def _brand_guideline_text(brand: BrandGuideline | None) -> str:
-    if brand is None:
-        return ""
-    values = [
-        brand.brand_story or "",
-        brand.positioning or "",
-        brand.differentiators or "",
-        brand.tone_of_voice or "",
-        brand.visual_style or "",
-        *(brand.core_values_json or []),
-        *(brand.common_phrases_json or []),
-        *(brand.cta_preferences_json or []),
-    ]
-    return " ".join(value for value in values if value)
-
-
-def _region_matches(topic_region: str | None, profile: StoreProfile) -> bool | None:
-    if not topic_region:
-        return None
-    profile_regions = [
-        profile.region,
-        profile.province,
-        profile.city,
-        profile.district,
-    ]
-    profile_tokens = set().union(
-        *(_tokens(value) for value in profile_regions if value and value.strip())
+def _http_error(status_code: int) -> tuple[str, str, bool]:
+    if status_code == 429:
+        return (
+            "SOURCE_RATE_LIMITED",
+            "Feed endpoint rejected the request with HTTP 429 (rate limited).",
+            True,
+        )
+    if 400 <= status_code < 500:
+        return (
+            "SOURCE_HTTP_4XX",
+            f"Feed endpoint returned HTTP {status_code}.",
+            False,
+        )
+    return (
+        "SOURCE_HTTP_5XX",
+        f"Feed endpoint returned HTTP {status_code}.",
+        True,
     )
-    if not profile_tokens:
-        return None
-    return bool(_tokens(topic_region) & profile_tokens)
 
 
-def _brand_risk_flags(topic_text: str, brand: BrandGuideline | None) -> list[str]:
-    if brand is None:
-        return []
-    normalized = topic_text.lower()
-    prohibited = [
-        phrase.strip()
-        for phrase in (brand.prohibited_phrases_json or [])
-        if isinstance(phrase, str) and phrase.strip()
-    ]
-    return ["brand_prohibited_phrase"] if any(
-        phrase.lower() in normalized for phrase in prohibited
-    ) else []
+def _request_headers(url: str, is_public_feed: bool) -> dict[str, str]:
+    """部分站点会按 UA/Referer 拦截匿名请求，按实际域名补齐最小必要请求头。"""
+    host = (urlsplit(url).hostname or "").lower()
+    accept = (
+        "application/json, text/plain, */*"
+        if is_public_feed
+        else "application/rss+xml, application/atom+xml, application/xml, text/xml"
+    )
+    headers = {"User-Agent": USER_AGENT, "Accept": accept}
+    if host == "toutiao.com" or host.endswith(".toutiao.com"):
+        headers.update(
+            {
+                "User-Agent": BROWSER_USER_AGENT,
+                "Referer": "https://www.toutiao.com/",
+            }
+        )
+    elif host == "zhihu.com" or host.endswith(".zhihu.com"):
+        headers.update(
+            {
+                "User-Agent": BROWSER_USER_AGENT,
+                "Referer": "https://www.zhihu.com/hot",
+            }
+        )
+    return headers
 
 
-def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> int:
+def _fetch_entries(url: str, allowed: set[str], is_public_feed: bool) -> list[dict[str, object]]:
+    """请求单个端点并解析条目；失败时必须抛出带错误码的 JobExecutionError。"""
+    feed_url, feed_ip = _safe_https_url(url, allowed)
+    headers = _request_headers(url, is_public_feed)
+    try:
+        transport = httpx.HTTPTransport()
+        cast(Any, transport)._pool._network_backend = _PinnedSyncBackend(
+            (urlsplit(feed_url).hostname or "").lower(), feed_ip
+        )
+        with httpx.Client(
+            transport=transport,
+            timeout=HTTP_TIMEOUT,
+            follow_redirects=False,
+            headers=headers,
+        ) as client, client.stream("GET", feed_url) as response:
+            if response.status_code >= 400:
+                code, summary, retryable = _http_error(response.status_code)
+                raise JobExecutionError(code, summary, retryable=retryable)
+            chunks: list[bytes] = []
+            total_bytes = 0
+            for chunk in response.iter_bytes():
+                total_bytes += len(chunk)
+                if total_bytes > MAX_FEED_BYTES:
+                    raise JobExecutionError(
+                        "SOURCE_FEED_TOO_LARGE",
+                        "Feed exceeded the configured size limit.",
+                        retryable=False,
+                    )
+                chunks.append(chunk)
+            raw_payload = b"".join(chunks)
+    except JobExecutionError:
+        raise
+    except httpx.TimeoutException as exc:
+        raise JobExecutionError(
+            "SOURCE_TIMEOUT", "Feed request timed out.", retryable=True
+        ) from exc
+    except (httpx.HTTPError, OSError) as exc:
+        raise JobExecutionError(
+            "SOURCE_FETCH_FAILED",
+            f"Feed request failed ({type(exc).__name__}).",
+            retryable=True,
+        ) from exc
+    entries = _parse_public_feed(raw_payload) if is_public_feed else _parse_feed(raw_payload)
+    if not entries:
+        # 200 但无条目不能吞成“采集成功但 0 条”，否则后台看不到真实错因。
+        raise JobExecutionError(
+            "SOURCE_EMPTY_RESPONSE",
+            "Feed returned no recognizable entries.",
+            retryable=True,
+        )
+    return entries
+
+
+def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> dict[str, object]:
     # 来源准入：条款与用途未登记时直接拒绝，不发起任何请求。
     if not (source.terms_url or "").strip() or not (source.permitted_use or "").strip():
         raise JobExecutionError(
@@ -363,61 +446,51 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
             "Source usage terms are not registered.",
             retryable=False,
         )
-    feed_url, feed_ip = _safe_https_url(source.source_url, allowed)
     _safe_https_url(source.terms_url, allowed)
     is_public_feed = getattr(source, "source_type", "rss") == "public_feed"
-    try:
-        transport = httpx.HTTPTransport()
-        cast(Any, transport)._pool._network_backend = _PinnedSyncBackend(
-            (urlsplit(feed_url).hostname or "").lower(), feed_ip
-        )
-        accept = (
-            "application/json"
-            if is_public_feed
-            else "application/rss+xml, application/atom+xml, application/xml, text/xml"
-        )
-        headers = {"User-Agent": USER_AGENT, "Accept": accept}
-        with httpx.Client(
-            transport=transport,
-            timeout=HTTP_TIMEOUT,
-            follow_redirects=False,
-            headers=headers,
-        ) as client, client.stream("GET", feed_url) as response:
-                response.raise_for_status()
-                chunks: list[bytes] = []
-                total_bytes = 0
-                for chunk in response.iter_bytes():
-                    total_bytes += len(chunk)
-                    if total_bytes > MAX_FEED_BYTES:
-                        raise JobExecutionError(
-                            "SOURCE_FEED_TOO_LARGE",
-                            "Feed exceeded the configured size limit.",
-                            retryable=False,
-                        )
-                    chunks.append(chunk)
-                raw_payload = b"".join(chunks)
-                entries = (
-                    _parse_public_feed(raw_payload)
-                    if is_public_feed
-                    else _parse_feed(raw_payload)
+    candidate_urls = [source.source_url]
+    fallback = (getattr(source, "fallback_url", None) or "").strip()
+    if fallback:
+        candidate_urls.append(fallback)
+
+    entries: list[dict[str, object]] | None = None
+    attempts: list[dict[str, object]] = []
+    last_error: JobExecutionError | None = None
+    used_url = source.source_url
+    for candidate in candidate_urls:
+        # 429/超时/5xx 属于可重试错误，单端点最多再试一次；4xx 直接切换备用端点。
+        for retry_index in range(2):
+            try:
+                entries = _fetch_entries(candidate, allowed, is_public_feed)
+                used_url = candidate
+                break
+            except JobExecutionError as exc:
+                attempts.append(
+                    {"url": candidate, "error_code": exc.code, "summary": exc.safe_summary}
                 )
-    except JobExecutionError:
-        raise
-    except (httpx.HTTPError, OSError) as exc:
-        raise JobExecutionError(
-            "SOURCE_FETCH_FAILED",
-            "Feed request failed; retry according to the source policy.",
-            retryable=True,
-        ) from exc
+                last_error = exc
+                if not exc.retryable or retry_index == 1:
+                    break
+                time.sleep(RETRY_DELAY_SECONDS)
+        if entries is not None:
+            break
+    if entries is None:
+        assert last_error is not None
+        raise last_error
 
     now = datetime.now(UTC)
     inserted = 0
     for entry in entries:
         title = str(entry.get("title") or "").strip()
         link = str(entry.get("link") or "").strip()
-        item_id = str(entry.get("id") or link).strip()
-        if not title or not link or not item_id:
+        item_id = str(entry.get("id") or link or title).strip()
+        if not title or not item_id:
             continue
+        if not link:
+            # 部分公开热榜（如抖音）只给词条不给链接；用来源端点作为可回溯地址。
+            if not is_public_feed:
+                continue
+            link = source.source_url
         parsed_link = urlsplit(link)
         link_host = (parsed_link.hostname or "").lower()
         if (
@@ -432,146 +505,63 @@ def _collect_source(db: Session, source: HotTopicSource, allowed: set[str]) -> i
             continue
         summary = str(entry.get("summary") or "")[:5000]
         fingerprint = hashlib.sha256(f"{link}|{title}".encode()).hexdigest()
+        heat_number = parse_num(entry.get("heat_value"))
+        heat_value = Decimal(heat_number) if heat_number is not None else None
         existing = db.scalar(select(HotTopic).where(
             HotTopic.source_id == source.id,
             (HotTopic.source_item_id == item_id) | (HotTopic.content_fingerprint == fingerprint),
         ).with_for_update())
         if existing:
             existing.last_seen_at = now
-            if existing.expires_at and existing.expires_at <= now:
-                existing.evidence_status = "expired"
+            # 仍在采集到的热点刷新保留期，避免被保留策略按旧 expires_at 判过期。
+            existing.expires_at = now + timedelta(days=3)
+            if existing.evidence_status == "expired":
+                existing.evidence_status = "collected"
+            # 内容未变时哈希保持一致，增量匹配才能跳过；变了则下一轮重算。
+            existing.content_hash = topic_content_hash(
+                existing.title, existing.summary, existing.topic_tags_json
+            )
+            if heat_value is not None:
+                existing.heat_value = heat_value
+                existing.last_heat_value = heat_value
+                if existing.first_heat_value is None:
+                    existing.first_heat_value = heat_value
+                existing.heat_sample_count = (existing.heat_sample_count or 0) + 1
+                db.add(HotTopicHeatSample(id=uuid4(), hot_topic_id=existing.id,
+                    observed_at=now, heat_value=heat_value))
             continue
         published = entry.get("published_at")
         published_at = published if isinstance(published, datetime) else None
-        db.add(HotTopic(id=uuid4(), source_id=source.id, source_item_id=item_id,
+        topic_id = uuid4()
+        db.add(HotTopic(id=topic_id, source_id=source.id, source_item_id=item_id,
             canonical_url=link, title=title[:500], summary=summary, raw_excerpt=None,
             published_at=published_at, discovered_at=now, last_seen_at=now,
             expires_at=(published_at or now) + timedelta(days=3),
+            region=str(entry.get("region") or "")[:120] or None,
+            heat_value=heat_value,
+            heat_unit=str(entry.get("heat_unit") or "")[:80] or None,
+            first_heat_value=heat_value, last_heat_value=heat_value,
+            heat_sample_count=1 if heat_value is not None else 0,
             evidence_status="collected", content_fingerprint=fingerprint,
+            content_hash=topic_content_hash(title, summary, []),
             normalization_version=1, industry_tags_json=[], topic_tags_json=[]))
+        if heat_value is not None:
+            db.add(HotTopicHeatSample(id=uuid4(), hot_topic_id=topic_id,
+                observed_at=now, heat_value=heat_value))
         inserted += 1
     source.health_status = "healthy"
     source.last_success_at = now
     source.last_failure_at = None
+    source.last_error_code = None
+    source.last_error_summary = None
     db.flush()
-    return inserted
-
-
-def _match_store(db: Session, store_id: UUID, topics: Sequence[HotTopic], context: JobExecutionContext) -> int:
-    profile = db.scalar(select(StoreProfile).where(StoreProfile.store_id == store_id,
-        StoreProfile.fact_status == "confirmed"))
-    products = db.scalars(select(Product).where(Product.store_id == store_id,
-        Product.fact_status == "confirmed", Product.availability_status.in_(["available", "limited", "seasonal"]))).all()
-    offers = db.scalars(select(Offer).where(Offer.store_id == store_id,
-        Offer.fact_status == "confirmed", Offer.status == "active")).all()
-    audiences = db.scalars(select(AudienceProfile).where(AudienceProfile.store_id == store_id,
-        AudienceProfile.fact_status == "confirmed")).all()
-    brand = db.scalar(select(BrandGuideline).where(
-        BrandGuideline.store_id == store_id,
-        BrandGuideline.fact_status == "confirmed",
-    ))
-    if profile is None or (not products and not offers and not audiences):
-        return 0
-    context_parts = [str(profile.current_version), f"matcher:{MATCHING_ALGORITHM_VERSION}"]
-    if brand is not None:
-        context_parts.append(f"brand:{brand.id}:{brand.current_version}")
-    context_parts.extend(f"p:{item.id}:{item.current_version}" for item in products)
-    context_parts.extend(f"o:{item.id}:{item.current_version}" for item in offers)
-    context_parts.extend(f"a:{item.id}:{item.current_version}" for item in audiences)
-    context_fingerprint = hashlib.sha256("|".join(sorted(context_parts)).encode("utf-8")).hexdigest()
-    created = 0
-    for topic in topics:
-        context.check_control()
-        if topic.evidence_status != "collected" or (topic.expires_at and topic.expires_at <= datetime.now(UTC)):
-            continue
-        topic_text = " ".join(
-            [topic.title, topic.summary or "", *topic.topic_tags_json, *topic.industry_tags_json]
-        )
-        profile_text = _store_profile_text(profile)
-        region_text = " ".join(
-            value
-            for value in (
-                profile.region,
-                profile.province,
-                profile.city,
-                profile.district,
-            )
-            if value
-        )
-        brand_text = _brand_guideline_text(brand)
-        profile_score = _match_score(topic_text, profile_text)
-        region_score = _match_score(topic.region or "", region_text)
-        brand_score = _match_score(topic_text, brand_text)
-        risk_flags = _brand_risk_flags(topic_text, brand)
-        region_match = _region_matches(topic.region, profile)
-        if region_match is False:
-            risk_flags.append("region_mismatch")
-        product_scores = []
-        for product in products:
-            product_text = " ".join([product.name, product.category or "", product.description or "",
-                *(product.key_selling_points_json or [])])
-            score = _match_score(topic_text, product_text)
-            if score >= 0.08:
-                product_scores.append((score, product))
-        offer_scores = []
-        for offer in offers:
-            offer_text = " ".join([offer.title, offer.offer_type, str(offer.terms_json), str(offer.eligibility_rules_json)])
-            score = _match_score(topic_text, offer_text)
-            if score >= 0.08:
-                offer_scores.append((score, offer))
-        audience_scores = []
-        for audience in audiences:
-            audience_text = " ".join([audience.name, audience.audience_description or "",
-                *(audience.consumption_scenarios_json or []), *(audience.consumption_periods_json or []),
-                *(audience.purchase_motivations_json or []), *(audience.common_objections_json or [])])
-            score = _match_score(topic_text, audience_text)
-            if score >= 0.08:
-                audience_scores.append((score, audience))
-        if not product_scores and not offer_scores and not audience_scores:
-            continue
-        score = max(
-            [value for value, _ in product_scores]
-            + [value for value, _ in offer_scores]
-            + [value for value, _ in audience_scores]
-            + [profile_score * 0.8, region_score * 0.6, brand_score * 0.5]
-        )
-        latest = db.scalar(select(StoreOpportunity).where(
-            StoreOpportunity.store_id == store_id, StoreOpportunity.hot_topic_id == topic.id)
-            .order_by(StoreOpportunity.matching_version.desc()).limit(1).with_for_update())
-        if latest and latest.store_context_fingerprint == context_fingerprint:
-            continue
-        if latest:
-            latest.stale_at = datetime.now(UTC)
-        version = (latest.matching_version + 1) if latest else 1
-        status = (
-            "eligible"
-            if score >= 0.12 and product_scores and not risk_flags
-            else "review_required"
-        )
-        product_ids = [str(item.id) for _, item in sorted(product_scores, key=lambda pair: pair[0], reverse=True)[:5]]
-        offer_ids = [str(item.id) for _, item in sorted(offer_scores, key=lambda pair: pair[0], reverse=True)[:5]]
-        audience_ids = [str(item.id) for _, item in sorted(audience_scores, key=lambda pair: pair[0], reverse=True)[:5]]
-        best_product = max(product_scores, key=lambda pair: pair[0])[1] if product_scores else None
-        best_offer = max(offer_scores, key=lambda pair: pair[0])[1] if offer_scores else None
-        db.add(StoreOpportunity(id=uuid4(), store_id=store_id, hot_topic_id=topic.id,
-            store_context_fingerprint=context_fingerprint, matching_version=version,
-            matching_algorithm_version=MATCHING_ALGORITHM_VERSION,
-            relevance_score=round(score * 100, 3), match_method="rules",
-            matched_product_ids_json=product_ids, matched_offer_ids_json=offer_ids,
-            matched_audience_profile_ids_json=audience_ids, suggested_scenario=(best_offer.title if best_offer else None),
-            content_angle=(f"围绕{best_product.name}回应当前话题" if best_product else None),
-            reason_summary=(
-                f"门店资料文本相关度 {profile_score:.2f}，区域文本相关度 {region_score:.2f}，"
-                f"品牌规范文本相关度 {brand_score:.2f}；"
-                f"区域匹配："
-                f"{'匹配' if region_match is True else '不匹配' if region_match is False else '未提供区域证据'}；"
-                "该分值仅代表文本相关性，不代表趋势热度或经营效果。"
-            ),
-            risk_flags_json=risk_flags, eligibility_status=status, matched_at=datetime.now(UTC),
-            expires_at=topic.expires_at))
-        created += 1
-    db.flush()
-    return created
+    return {
+        "used_url": used_url,
+        "fallback_used": used_url != source.source_url,
+        "attempts": attempts,
+        "entries": len(entries),
+        "inserted": inserted,
+    }
 
 
 def register_hot_topic_handlers(session_factory: sessionmaker[Session]) -> None:
@@ -592,28 +582,78 @@ def register_hot_topic_handlers(session_factory: sessionmaker[Session]) -> None:
         if not allowed:
             raise JobExecutionError("SOURCE_ALLOWLIST_EMPTY", "No approved public feed hosts are configured.", retryable=False)
         inserted_total = 0
-        matched_total = 0
+        source_results: list[dict[str, object]] = []
+        source_failures: list[dict[str, object]] = []
         for index, source_id in enumerate(source_ids, start=1):
             context.check_control()
-            try:
-                with session_factory.begin() as db:
-                    source = db.scalar(select(HotTopicSource).where(
-                        HotTopicSource.id == source_id, HotTopicSource.enabled.is_(True)).with_for_update())
-                    if source is None:
-                        continue
-                    inserted_total += _collect_source(db, source, allowed)
-                    topics = db.scalars(select(HotTopic).where(
-                        HotTopic.source_id == source.id, HotTopic.evidence_status == "collected",
-                        (HotTopic.expires_at.is_(None)) | (HotTopic.expires_at > datetime.now(UTC)))
-                        .order_by(HotTopic.published_at.desc().nullslast()).limit(MAX_FEED_ITEMS)).all()
-                    matched_total += _match_store(db, context.store_id, topics, context)
-            except JobExecutionError:
-                with session_factory.begin() as db:
-                    failed_source = db.scalar(select(HotTopicSource).where(HotTopicSource.id == source_id).with_for_update())
-                    if failed_source is not None:
-                        failed_source.health_status = "failed"
-                        failed_source.last_failure_at = datetime.now(UTC)
-                raise
+            with session_factory.begin() as db:
+                source = db.scalar(select(HotTopicSource).where(
+                    HotTopicSource.id == source_id).with_for_update())
+                if source is None:
+                    source_failures.append({
+                        "source_id": str(source_id),
+                        "error_code": "SOURCE_NOT_FOUND",
+                        "summary": "Source no longer exists.",
+                        "retryable": False,
+                    })
+                elif not source.enabled:
+                    source_failures.append({
+                        "source_id": str(source_id),
+                        "source_key": source.source_key,
+                        "error_code": "SOURCE_DISABLED",
+                        "summary": "Source is disabled.",
+                        "retryable": False,
+                    })
+                else:
+                    try:
+                        collected = _collect_source(db, source, allowed)
+                    except JobExecutionError as exc:
+                        # 单源失败写回来源健康与错误码，不拖垮整个 Job。
+                        source.health_status = "failed"
+                        source.last_failure_at = datetime.now(UTC)
+                        source.last_error_code = exc.code
+                        source.last_error_summary = exc.safe_summary[:500]
+                        source_failures.append({
+                            "source_id": str(source_id),
+                            "source_key": source.source_key,
+                            "error_code": exc.code,
+                            "summary": exc.safe_summary,
+                            "retryable": exc.retryable,
+                        })
+                    else:
+                        inserted_total += int(cast(int, collected["inserted"]))
+                        source_results.append({
+                            "source_id": str(source_id),
+                            "source_key": source.source_key,
+                            **collected,
+                        })
             context.update_progress(current=index, total=len(source_ids))
-        return {"sources_processed": len(source_ids), "topics_inserted": inserted_total,
-            "opportunities_created": matched_total, "store_id": str(context.store_id)}
+        if source_ids and not source_results:
+            first = source_failures[0]
+            raise JobExecutionError(
+                "ALL_SOURCES_FAILED",
+                (
+                    f"All {len(source_ids)} hot-topic sources failed; "
+                    f"first error {first['error_code']}: {first['summary']}"
+                )[:500],
+                retryable=any(bool(item.get("retryable")) for item in source_failures),
+            )
+        # 全部来源采集完成后再统一匹配，才能按事件跨源去重并做每店限额。
+        with session_factory.begin() as db:
+            outcome = match_store(
+                db,
+                context.store_id,
+                job_id=context.job_id,
+                attempt_id=context.attempt_id,
+            )
+        return {
+            "sources_processed": len(source_ids),
+            "sources_succeeded": len(source_results),
+            "sources_failed": len(source_failures),
+            "source_results": source_results,
+            "source_failures": source_failures,
+            "topics_inserted": inserted_total,
+            "opportunities_created": outcome.created,
+            "match": outcome.as_dict(),
+            "store_id": str(context.store_id),
+        }

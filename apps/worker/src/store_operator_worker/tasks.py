@@ -79,6 +79,7 @@ from store_operator_worker.handlers import (
     resolve_job_handler,
 )
 from store_operator_worker.hot_topics import register_hot_topic_handlers
+from store_operator_worker.metric_sync import register_metric_sync_handlers
 from store_operator_worker.media_scanner import (
     MalwareDetected,
     image_dimensions,
@@ -97,6 +98,7 @@ SessionLocal = sessionmaker(
 )
 
 register_hot_topic_handlers(SessionLocal)
+register_metric_sync_handlers(SessionLocal)
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
 LEASE_SECONDS = int(os.environ.get("WORKER_LEASE_SECONDS", "90"))
 if LEASE_SECONDS < 3:

@@ -88,7 +88,7 @@ describe("effects workspace", () => {
     });
     render(<EffectsWorkspace storeId="store-1" />);
     expect(await screen.findByText("按作品查看内容表现")).toBeInTheDocument();
-    expect(screen.getByText(/douyin · douyin-post-001/)).toBeInTheDocument();
+    expect(screen.getByText(/抖音 · douyin-post-001/)).toBeInTheDocument();
     expect(screen.getByText(/环比 50.00%/)).toBeInTheDocument();
     expect(screen.getByText(/关联任务：task-1/)).toBeInTheDocument();
     expect(screen.getByText(/复核作品主题和发布时间/)).toBeInTheDocument();

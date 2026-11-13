@@ -41,6 +41,25 @@ const statusLabels: Record<string, string> = {
   pending: "待处理", running: "执行中", succeeded: "已完成", skipped: "已跳过", stale: "需重新检查",
   required: "必需", optional: "可选", not_applicable: "不适用",
 };
+const draftFieldLabels: Record<string, string> = {
+  goal: "经营目标", target_audience: "目标客群", core_message: "核心信息", constraints: "约束条件",
+};
+const channelLabel = (key: string): string => key === "douyin" ? "抖音" : key;
+const qualityResultLabels: Record<string, string> = {
+  pass: "通过", needs_human: "待人工复核", fail: "未通过",
+};
+const qualityDecisionLabels: Record<string, string> = {
+  accepted: "接受", rejected: "拒绝",
+};
+const severityLabels: Record<string, string> = {
+  info: "提示", warning: "警告", error: "错误",
+};
+const stepStatusLabel = (step: TaskStep): string =>
+  step.status === "failed" && step.block_code ? "已阻塞" : statusLabels[step.status] ?? "状态未知";
+const blockSummary = (step: TaskStep): string => {
+  const summary = step.block_detail?.["summary"];
+  return typeof summary === "string" ? summary : "";
+};
 const errorText = (error: unknown) => error instanceof Error ? error.message : "请求失败，请稍后重试。";
 const selectedTaskKey = (storeId: string) => `store-operator.current-task-id.${storeId}`;
 const createTaskKey = (storeId: string) => `store-operator.task-create.${storeId}`;
@@ -120,6 +139,8 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
   const [strategyDirty, setStrategyDirty] = useState(false);
   const createKey = useRef("");
   const contentMutationKey = useRef("");
+  const copyFormTaskId = useRef("");
+  const strategyStep = task?.steps.find(step => step.step_key === "strategy_confirmation");
   const isCreate = route === "#create";
   const isDetail = route === "#task";
 
@@ -163,6 +184,15 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       setPublishPackages(packageItems);
       setChannelSpecs(specs);
       setTaskFactSnapshots(factItems);
+      if (copyFormTaskId.current !== taskId) {
+        const copyArtifact = contentItems.find(item => item.artifact_type === "copy");
+        const currentCopy = copyArtifact?.versions.find(item => item.id === copyArtifact.current_version_id);
+        const copyContent = currentCopy?.content_json || {};
+        setCopyTitle(typeof copyContent.title === "string" ? copyContent.title : "");
+        setCopyBody(typeof copyContent.body === "string" ? copyContent.body : "");
+        setCopyHashtags(Array.isArray(copyContent.hashtags) ? copyContent.hashtags.join(" ") : "");
+        copyFormTaskId.current = taskId;
+      }
       setSelectedPackageFacts(current => current.length ? current : factItems.filter(fact => fact.confirmation_status === "confirmed").map(fact => fact.id));
       setSelectedImageAssetId(current => current || assetItems.items.find(item =>
         item.status === "ready" && item.usage_rights_status === "confirmed_allowed" && item.mime_type.startsWith("image/")
@@ -474,6 +504,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       contentMutationKey.current = "";
       setReviewComment("");
       await loadContent(task.id);
+      if (decision === "approved") await loadTask();
       setNotice(decision === "approved" ? "当前产物版本已审核通过。" : decision === "revision_requested" ? "已记录修改意见，请创建新版本后重新审核。" : "当前产物版本已标记为拒绝。");
     } catch (reason) { setError(errorText(reason)); }
     finally { setSaving(false); }
@@ -546,7 +577,7 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
     {loading ? <div className="loading-card"><span className="spinner" />正在读取任务…</div> : !task ? <section className="empty-card"><h2>无法读取营销任务</h2><p>{error || "任务不存在，或当前门店无权访问。"}</p><button className="secondary" type="button" onClick={() => { window.location.hash = "#tasks"; }}>返回任务列表</button></section> : <>
       <section className="task-overview"><div><span className="eyebrow">{taskTypeLabels[task.task_type]}</span><h2>{task.title}</h2><p>任务版本 V{task.version} · 创建于 {new Date(task.created_at).toLocaleString()}</p></div><div className="task-overview-stats"><strong>{statusLabels[task.lifecycle_status]}</strong><span>{stepProgress}/10 步已完成</span><span>{task.blocked_steps_count} 个阻塞步骤</span></div></section>
       <section className="task-panel"><div className="section-title"><div><h2>需求与经营事实</h2><p>确认后形成不可变需求快照；只允许选择当前门店已确认且仍有效的经营事实。</p></div><span className="status-chip">{task.current_requirement_snapshot_id ? "需求已确认" : "待确认"}</span></div>
-        {task.current_requirement_snapshot_id ? <div className="task-readonly-grid">{Object.entries(task.requirement_draft).map(([key,value]) => <div key={key}><strong>{key}</strong><span>{typeof value === "string" ? value : JSON.stringify(value)}</span></div>)}</div> : <>
+        {task.current_requirement_snapshot_id ? <div className="task-readonly-grid">{Object.entries(task.requirement_draft).map(([key,value]) => <div key={key}><strong>{draftFieldLabels[key] ?? key}</strong><span>{typeof value === "string" ? value : JSON.stringify(value)}</span></div>)}</div> : <>
           <div className="form-grid"><Field label="经营目标" value={draft.goal} onChange={value => updateDraft("goal", value)} rows={2} /><Field label="目标客群" value={draft.target_audience} onChange={value => updateDraft("target_audience", value)} /><Field label="核心信息" value={draft.core_message} onChange={value => updateDraft("core_message", value)} /><Field label="限制条件" value={draft.constraints} onChange={value => updateDraft("constraints", value)} rows={2} /></div>
           <div className="task-facts"><div className="section-title"><div><h3>选择已确认的经营事实</h3><p>这些事实会冻结到本次任务快照，后续源资料变化不会静默改写历史。最多选择 50 项，当前已选 {selectedFacts.length} 项。</p></div><button className="text-button" type="button" onClick={() => void loadFacts()}>刷新资料</button></div>
             {factsLoading ? <p className="muted">正在读取门店已确认资料…</p> : facts.length === 0 ? <p className="alert error">当前门店没有可用的已确认事实。请先到门店资料中完善并确认档案、商品、活动、客群、品牌或知识。</p> : facts.map(fact => <label className="task-fact-option" key={fact.fact_key}><input type="checkbox" checked={selectedFacts.includes(fact.fact_key)} disabled={!selectedFacts.includes(fact.fact_key) && selectedFacts.length >= 50} onChange={event => setSelectedFacts(current => event.target.checked ? [...current, fact.fact_key] : current.filter(value => value !== fact.fact_key))} /><span>{fact.label}</span><small>V{fact.expected_version_no}</small></label>)}
@@ -554,9 +585,9 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
           <div className="form-footer"><p>{draftDirty ? "需求有未保存修改。" : "需求确认后将创建策略生成 Job。"}</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || !draftDirty} onClick={() => void saveRequirement()}>保存需求</button><button className="primary" type="button" disabled={saving || draftDirty || factsLoading || selectedFacts.length === 0 || !draft.goal.trim()} onClick={() => void confirmRequirement()}>确认需求与事实</button></div></div>
         </>}
       </section>
-      <section className="task-panel"><div className="section-title"><div><h2>营销策略</h2><p>策略由异步执行生成；只有进入待商家处理状态后才可编辑和确认。</p></div><span className="status-chip">{task.current_strategy_snapshot_id ? "策略已确认" : statusLabels[task.steps.find(step => step.step_key === "strategy_confirmation")?.status || "pending"]}</span></div>
+      <section className="task-panel"><div className="section-title"><div><h2>营销策略</h2><p>策略由异步执行生成；只有进入待商家处理状态后才可编辑和确认。</p></div><span className="status-chip">{task.current_strategy_snapshot_id ? "策略已确认" : strategyStep ? stepStatusLabel(strategyStep) : "待处理"}</span></div>
         {task.current_strategy_snapshot_id ? <pre className="task-json">{safeJson(task.strategy_draft)}</pre>
-        : task.steps.find(step => step.step_key === "strategy_confirmation")?.status === "waiting_for_user" ? <><label className="field"><span>策略草稿（JSON）</span><textarea rows={8} value={strategyText} onChange={event => { setStrategyText(event.target.value); setStrategyDirty(true); }} /></label><div className="form-footer"><p>修改后必须先保存，再确认策略。</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || !strategyDirty} onClick={() => void saveStrategy()}>保存策略</button><button className="primary" type="button" disabled={saving || strategyDirty} onClick={() => void confirmStrategy()}>确认策略</button></div></div></>
+        : strategyStep?.status === "waiting_for_user" ? <><label className="field"><span>策略草稿（JSON）</span><textarea rows={8} value={strategyText} onChange={event => { setStrategyText(event.target.value); setStrategyDirty(true); }} /></label><div className="form-footer"><p>修改后必须先保存，再确认策略。</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || !strategyDirty} onClick={() => void saveStrategy()}>保存策略</button><button className="primary" type="button" disabled={saving || strategyDirty} onClick={() => void confirmStrategy()}>确认策略</button></div></div></>
         : <p className="muted">{task.current_requirement_snapshot_id ? "策略生成任务已提交，等待 Worker 返回可审核草稿。若执行失败，可在下方步骤中查看阻塞原因并恢复。" : "请先完成需求与经营事实确认。"}</p>}
       </section>
       <section className="task-panel">
@@ -601,17 +632,17 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
 
       <section className="task-panel">
         <div className="section-title"><div><h2>渠道适配与质检</h2><p>仅使用已审核的当前版本；渠道规格未核验时明确阻断，不展示虚假的官方校验结果。</p></div><button className="text-button" type="button" disabled={saving} onClick={() => task && void loadContent(task.id)}>刷新渠道内容</button></div>
-        {channelSpecs.map(spec => <div className="task-step-title" key={spec.id}><strong>{spec.channel_key === "douyin" ? "抖音" : spec.channel_key}</strong><span className={spec.current_version?.verification_status === "verified" ? "status-chip" : "status-chip danger"}>{spec.current_version?.verification_status === "verified" ? "规格已核验" : "规格待核验"}</span><span className="muted">{spec.current_version ? "V" + spec.current_version.spec_version : "暂无版本"}</span></div>)}
+        {channelSpecs.map(spec => <div className="task-step-title" key={spec.id}><strong>{channelLabel(spec.channel_key)}</strong><span className={spec.current_version?.verification_status === "verified" ? "status-chip" : "status-chip danger"}>{spec.current_version?.verification_status === "verified" ? "规格已核验" : "规格待核验"}</span><span className="muted">{spec.current_version ? "V" + spec.current_version.spec_version : "暂无版本"}</span></div>)}
         <p className="muted">渠道适配使用当前已审核文案和图片版本。官方规格仍待核验时，服务端会拒绝创建内容快照。</p>
         <div className="form-footer"><p>首期渠道适配目前支持抖音图文结构；AI 自动适配尚未接入。</p><div className="form-actions"><button className="primary" type="button" disabled={saving || !channelSpecs.some(spec => spec.channel_key === "douyin" && spec.current_version?.verification_status === "verified")} onClick={() => void createChannelDraft()}>创建抖音适配快照</button></div></div>
         {channelContents.length === 0 ? <p className="muted">尚无渠道内容快照。完成文案审核并核验渠道规格后，可创建适配内容。</p> : <div className="task-content-artifacts">{channelContents.map(content => {
           const report = content.quality_reports[content.quality_reports.length - 1];
           const resolution = report?.resolutions[report.resolutions.length - 1];
           return <article className="task-content-artifact" key={content.id}>
-            <div className="task-step-title"><strong>{content.channel_key} · 渠道内容</strong><span className={content.status === "ready" ? "status-chip" : "status-chip danger"}>{content.status === "ready" ? "可质检" : content.status === "stale" ? "内容已过期" : "内容阻断"}</span></div>
+            <div className="task-step-title"><strong>{channelLabel(content.channel_key)} · 渠道内容</strong><span className={content.status === "ready" ? "status-chip" : "status-chip danger"}>{content.status === "ready" ? "可质检" : content.status === "stale" ? "内容已过期" : "内容阻断"}</span></div>
             <p className="muted">内容指纹：{content.input_fingerprint.slice(0, 16)}… · 图片 {content.image_version_ids.length} 张</p>
-            <div className="form-footer"><p>{report ? "最新质检：" + report.result + (resolution ? " · 人工决议：" + resolution.decision : "") : "尚无质检报告"}</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || content.status !== "ready"} onClick={() => void runQuality(content)}>运行结构质检</button></div></div>
-            {report && <div className="muted"><p>规则版本：{report.rule_version} · {report.issues.length} 项问题</p>{report.issues.map((issue, index) => <p key={index}>{String(issue.code || "QUALITY_ISSUE")} · {String(issue.severity || "info")}</p>)}</div>}
+            <div className="form-footer"><p>{report ? "最新质检：" + (qualityResultLabels[report.result] ?? "结果未知") + (resolution ? " · 人工决议：" + (qualityDecisionLabels[resolution.decision] ?? "决议未知") : "") : "尚无质检报告"}</p><div className="form-actions"><button className="secondary" type="button" disabled={saving || content.status !== "ready"} onClick={() => void runQuality(content)}>运行结构质检</button></div></div>
+            {report && <div className="muted"><p>规则版本：{report.rule_version} · {report.issues.length} 项问题</p>{report.issues.map((issue, index) => <p key={index}>{String(issue.code || "QUALITY_ISSUE")} · {severityLabels[String(issue.severity ?? "info")] ?? "提示"}</p>)}</div>}
             {report?.result === "needs_human" && !resolution && <><label className="field"><span>人工复核理由</span><textarea rows={2} value={qualityResolutionReason} onChange={event => setQualityResolutionReason(event.target.value)} placeholder="说明已核对哪些经营事实及为何接受该质检提示" /></label><button className="secondary" type="button" disabled={saving || qualityResolutionReason.trim().length < 8} onClick={() => void acceptQuality(report)}>接受人工复核结果</button></>}
             {report && (report.result === "pass" || (report.result === "needs_human" && resolution?.decision === "accepted")) && <button className="primary" type="button" disabled={saving || !taskFactSnapshots.some(fact => fact.confirmation_status === "confirmed")} onClick={() => void freezePackage(content, report)}>冻结为发布包（人工交付）</button>}
           </article>;
@@ -619,17 +650,17 @@ export default function MarketingTaskWorkspace({ storeId }: { storeId: string })
       </section>
       <section className="task-panel">
         <div className="section-title"><div><h2>最终发布确认</h2><p>发布包冻结后绑定完整内容与经营事实指纹；确认仅表示商家批准交付，不代表平台已发布。</p></div><button className="text-button" type="button" disabled={saving} onClick={() => task && void loadContent(task.id)}>刷新发布包</button></div>
-        <div className="task-facts">{taskFactSnapshots.map(fact => <label className="task-fact-option" key={fact.id}><input type="checkbox" checked={selectedPackageFacts.includes(fact.id)} disabled={fact.confirmation_status !== "confirmed"} onChange={event => setSelectedPackageFacts(current => event.target.checked ? [...current, fact.id] : current.filter(id => id !== fact.id))} /><span>{fact.fact_key} · V{fact.version_no}</span><small>{fact.confirmation_status === "confirmed" ? "已确认" : fact.confirmation_status}</small></label>)}</div>
+        <div className="task-facts">{taskFactSnapshots.map(fact => <label className="task-fact-option" key={fact.id}><input type="checkbox" checked={selectedPackageFacts.includes(fact.id)} disabled={fact.confirmation_status !== "confirmed"} onChange={event => setSelectedPackageFacts(current => event.target.checked ? [...current, fact.id] : current.filter(id => id !== fact.id))} /><span>{fact.fact_key} · V{fact.version_no}</span><small>{fact.confirmation_status === "confirmed" ? "已确认" : "待确认"}</small></label>)}</div>
         <label className="field"><span>最终确认备注（可选）</span><textarea rows={2} value={confirmationNote} onChange={event => setConfirmationNote(event.target.value)} placeholder="补充本次交付确认说明" /></label>
         {publishPackages.length === 0 ? <p className="muted">尚无冻结发布包。完成渠道内容质检并选择已确认经营事实后，可生成发布包。</p> : <div className="task-content-artifacts">{publishPackages.map(pkg => <article className="task-content-artifact" key={pkg.id}>
           <div className="task-step-title"><strong>发布包 V{pkg.package_version}</strong><span className={pkg.confirmation ? "status-chip" : "status-chip danger"}>{pkg.confirmation ? "已确认" : "待最终确认"}</span></div>
           <p className="muted">指纹：{pkg.package_fingerprint} · 渠道数：{pkg.items.length} · 冻结时间：{new Date(pkg.frozen_at).toLocaleString()}</p>
-          {pkg.items.map(item => <p className="muted" key={item.id}>{item.channel_key} · {item.delivery_mode === "manual_handoff" ? "人工交付" : "官方 API"} · 内容 {item.channel_content_id.slice(0, 8)}…</p>)}
+          {pkg.items.map(item => <p className="muted" key={item.id}>{channelLabel(item.channel_key)} · {item.delivery_mode === "manual_handoff" ? "人工交付" : "官方 API"} · 内容 {item.channel_content_id.slice(0, 8)}…</p>)}
           {pkg.confirmation ? <p className="muted">确认时间：{new Date(pkg.confirmation.confirmed_at).toLocaleString()}</p> : <button className="primary" type="button" disabled={saving} onClick={() => void confirmPackage(pkg)}>确认该发布包</button>}
         </article>)}</div>}
       </section>
       <section className="task-panel"><div className="section-title"><div><h2>固定执行流程</h2><p>步骤状态由服务端状态机维护，必需审核节点不可跳过。</p></div><span className="status-chip">{stepProgress}/10 已完成</span></div>
-        <div className="task-step-list">{task.steps.map((step, index) => <article className="task-step" key={step.id}><div className="task-step-index">{index + 1}</div><div className="task-step-body"><div className="task-step-title"><strong>{stepLabels[step.step_key]}</strong><span className={step.status === "failed" || step.block_code ? "status-chip danger" : "status-chip"}>{statusLabels[step.status]}</span><span className="task-applicability">{statusLabels[step.applicability]}</span></div>{step.block_code && <p className="task-block-reason">{step.block_code}{step.block_detail ? ` · ${JSON.stringify(step.block_detail)}` : ""}</p>}{step.skip_reason && <p className="muted">跳过原因：{step.skip_reason}</p>}{step.output_refs.length > 0 && <p className="muted">已关联 {step.output_refs.length} 项输出</p>}<div className="task-step-actions">{["active","waiting_for_user"].includes(task.lifecycle_status) && step.applicability === "optional" && step.status === "pending" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "skip")}>记录跳过原因</button>}{["active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && ["failed","stale","waiting_for_user"].includes(step.status) && step.applicability !== "not_applicable" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "recover")}>恢复此步骤</button>}</div></div></article>)}</div>
+        <div className="task-step-list">{task.steps.map((step, index) => <article className="task-step" key={step.id}><div className="task-step-index">{index + 1}</div><div className="task-step-body"><div className="task-step-title"><strong>{stepLabels[step.step_key]}</strong><span className={step.status === "failed" || step.block_code ? "status-chip danger" : "status-chip"}>{stepStatusLabel(step)}</span><span className="task-applicability">{statusLabels[step.applicability]}</span></div>{step.block_code && <p className="task-block-reason">{step.block_code}{blockSummary(step) ? ` · ${blockSummary(step)}` : ""}</p>}{step.skip_reason && <p className="muted">跳过原因：{step.skip_reason}</p>}{step.output_refs.length > 0 && <p className="muted">已关联 {step.output_refs.length} 项输出</p>}<div className="task-step-actions">{["active","waiting_for_user"].includes(task.lifecycle_status) && step.applicability === "optional" && step.status === "pending" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "skip")}>记录跳过原因</button>}{["active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && ["failed","stale","waiting_for_user"].includes(step.status) && step.applicability !== "not_applicable" && <button className="text-button" type="button" disabled={saving} onClick={() => void stepAction(step, "recover")}>恢复此步骤</button>}</div></div></article>)}</div>
       </section>
       <div className="task-danger-actions">{["draft","active","waiting_for_user","blocked","failed"].includes(task.lifecycle_status) && <button className="secondary" type="button" disabled={saving} onClick={() => void taskAction("cancel")}>取消任务</button>}{["completed","cancelled"].includes(task.lifecycle_status) && <button className="secondary" type="button" disabled={saving} onClick={() => void taskAction("archive")}>归档任务</button>}</div>
     </>}

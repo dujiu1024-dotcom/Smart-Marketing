@@ -180,6 +180,7 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [route, setRoute] = useState(window.location.hash || "#store:profile");
+  const [navOpen, setNavOpen] = useState(false);
   const productRoute = route === "#store:products" || route.startsWith("#store-editor:product:");
   const offerRoute = route === "#store:offers" || route.startsWith("#store-editor:offer:");
   const brandRoute = route === "#store:brand";
@@ -208,7 +209,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onRouteChange = () => setRoute(window.location.hash || "#store:profile");
+    const onRouteChange = () => {
+      setRoute(window.location.hash || "#store:profile");
+      setNavOpen(false);
+    };
     window.addEventListener("hashchange", onRouteChange);
     return () => window.removeEventListener("hashchange", onRouteChange);
   }, []);
@@ -287,17 +291,6 @@ export default function App() {
       setError(errorMessage(reason));
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function changeStore(nextStoreId: string) {
-    setError("");
-    setNotice("");
-    try {
-      await setActiveStore(nextStoreId);
-      setStoreId(nextStoreId);
-    } catch (reason) {
-      setError(errorMessage(reason));
     }
   }
 
@@ -406,22 +399,30 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
+        <button
+          className="nav-toggle"
+          type="button"
+          aria-label={navOpen ? "关闭导航菜单" : "打开导航菜单"}
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen((current) => !current)}
+        >
+          <span className="nav-toggle-bars" aria-hidden="true" />
+        </button>
         <div className="brand-line"><span className="brand-mark">AI</span><strong>AI 门店运营官</strong></div>
         <div className="top-actions">
           {stores.length > 0 && (
-            <label className="store-picker">
+            <span className="store-picker static">
               <span>当前门店</span>
-              <select value={storeId} onChange={(event) => void changeStore(event.target.value)}>
-                {stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
-              </select>
-            </label>
+              <strong>{stores.find((store) => store.id === storeId)?.name ?? stores[0].name}</strong>
+            </span>
           )}
           <span className="user-email">{user.email}</span>
           <button className="quiet-button" type="button" onClick={() => void signOut()}>退出</button>
         </div>
       </header>
       <div className="workspace">
-        <aside className="sidebar">
+        {navOpen && <button className="nav-backdrop" type="button" aria-label="关闭导航菜单" onClick={() => setNavOpen(false)} />}
+        <aside className={navOpen ? "sidebar open" : "sidebar"} onClick={(event) => { if ((event.target as HTMLElement).closest("a")) setNavOpen(false); }}>
           <div className="side-label">门店工作台</div>
           <a className={route === "#ai" ? "side-link active" : "side-link"} href="#ai">AI 营销</a>
           <a className={["#tasks", "#create", "#task"].includes(route) ? "side-link active" : "side-link"} href="#tasks">营销任务</a>
@@ -460,6 +461,7 @@ export default function App() {
             <section className="empty-card">
               <h2>当前账号尚未加入门店</h2>
               <p>请联系门店所有者邀请你加入后，再维护门店经营资料。</p>
+              <button className="text-button" onClick={() => void signOut()}>退出并切换账号</button>
             </section>
           ) : profileLoading ? (
             <div className="loading-card"><span className="spinner" />正在读取门店档案…</div>

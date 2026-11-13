@@ -2,6 +2,37 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 const API_PREFIX = "/api/v1";
 const CSRF_KEY = "store-operator.csrf";
 
+const ERROR_MESSAGES_ZH: Record<string, string> = {
+  LAST_OWNER_REQUIRED: "门店至少需要保留一名启用中的所有者",
+  STORE_USER_ALREADY_BOUND: "该账号已绑定其他门店，一个门店用户只能属于一家门店",
+  EMAIL_ALREADY_EXISTS: "该邮箱已被使用，请更换邮箱或直接管理已有账号",
+  RATE_LIMITED: "登录尝试过于频繁，请稍后再试",
+  INVALID_CREDENTIALS: "邮箱或密码不正确",
+  PLATFORM_ADMIN_REQUIRED: "该账号不是平台管理员",
+  CSRF_INVALID: "页面安全令牌已失效，请刷新页面后重试",
+  UNAUTHENTICATED: "登录状态已失效，请重新登录",
+  FORBIDDEN: "没有权限执行该操作",
+  STORE_NOT_FOUND: "门店不存在或已被删除",
+  STORE_NOT_ACTIVE: "门店当前未启用，无法执行该操作",
+  STORE_CONTEXT_REQUIRED: "请先选择门店后再操作",
+  RESOURCE_NOT_FOUND: "数据不存在或已被删除",
+  VALIDATION_ERROR: "提交内容不合法，请检查后重试",
+  MEMBERSHIP_REINVITE_REQUIRED: "该成员需要重新邀请后才能启用",
+  IDEMPOTENCY_KEY_REUSED: "重复提交已被拦截，请刷新后重试",
+  AUTHORIZATION_UNAVAILABLE: "服务暂时不可用，请稍后重试",
+  CHANNEL_NOT_CONFIGURED: "抖音渠道尚未配置，请联系平台管理员完成应用授权配置",
+  SECRET_STORE_UNAVAILABLE: "渠道密钥服务暂不可用，请联系平台管理员",
+  MEDIA_ASSET_NOT_USABLE: "图片素材不可用，请确认素材已完成扫描且使用权已确认",
+  REQUEST_FAILED: "请求失败，请稍后重试",
+};
+
+function localizeErrorMessage(code: string, message: string): string {
+  if (ERROR_MESSAGES_ZH[code]) return ERROR_MESSAGES_ZH[code];
+  if (/[\u4e00-\u9fff]/.test(message)) return message;
+  if (!/[A-Za-z]{3,}/.test(message)) return message;
+  return `请求失败，请稍后重试（错误码：${code}）`;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -189,6 +220,7 @@ async function request<T>(
   path: string,
   init: RequestInit = {},
   storeId?: string,
+  allowCsrfRetry = true,
 ): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) {
@@ -206,8 +238,20 @@ async function request<T>(
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as ApiErrorBody;
+    if (
+      allowCsrfRetry &&
+      response.status === 403 &&
+      body.error?.code === "CSRF_INVALID" &&
+      path !== "/auth/csrf"
+    ) {
+      await refreshCsrfToken();
+      return request<T>(path, init, storeId, false);
+    }
     throw new ApiError(
-      body.error?.message ?? body.detail ?? "请求失败，请稍后重试",
+      localizeErrorMessage(
+        body.error?.code ?? "REQUEST_FAILED",
+        body.error?.message ?? body.detail ?? "请求失败，请稍后重试",
+      ),
       response.status,
       body.error?.code ?? "REQUEST_FAILED",
     );

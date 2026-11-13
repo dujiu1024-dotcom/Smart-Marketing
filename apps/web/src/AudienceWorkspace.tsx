@@ -70,6 +70,8 @@ export default function AudienceWorkspace({storeId}:{storeId:string}) {
     catch(reason){setError(message(reason));}finally{setSaving(false);}
   }
   const segmentLabel:Record<AudienceProfile["segment_type"],string>={core:"核心客群",secondary:"次要客群",seasonal:"季节客群",scenario:"场景客群"};
+  const sourceTypeZh:Record<string,string>={merchant_observation:"商家观察",survey:"顾客调研",pos:"POS 数据",official_document:"官方资料",merchant_upload:"商家上传",manual_edit:"人工编辑",ai_generated:"AI 生成"};
+  const sourceTypeLabel=(value:string|null|undefined)=>!value?"来源未记录":sourceTypeZh[value]??(/[A-Za-z]/.test(value)?"其他来源":value);
   if(editing && !route.endsWith(":new") && listLoaded && !items.some(item=>item.id===route.slice("#store-editor:audience:".length))) return <section className="empty-card"><h2>无法读取客群</h2><p>{error || "客群记录不存在，或当前门店无权访问。"}</p><button className="secondary" type="button" onClick={()=>{window.location.hash="#store:audience";}}>返回客群列表</button></section>;
   return <>
     <div className="page-heading"><div><p className="eyebrow">AUDIENCE & OPERATIONS</p><h1>客群与经营</h1><p className="muted">记录真实客群、消费场景、购买动机与常见异议，保留样本来源和置信信息。</p></div>
@@ -105,8 +107,8 @@ export default function AudienceWorkspace({storeId}:{storeId:string}) {
     :items.length===0?<section className="empty-card"><h2>还没有客群资料</h2><p>先记录核心客群及其消费场景、购买动机和常见异议；没有数据的字段保持空白。</p><button className="primary" onClick={()=>{window.location.hash="#store-editor:audience:new";}}>添加第一类客群</button></section>
     :<section className="catalog-list"><div className="catalog-summary"><span>共 {total} 类客群</span><button className="text-button" onClick={()=>void reload()}>刷新</button></div>
       {items.map(item=><article className="catalog-item" key={item.id}>
-        <div className="catalog-item-main"><div><h2>{item.name}</h2><p>{segmentLabel[item.segment_type]} · {item.source_type||"来源未记录"}</p></div><span className={item.fact_status==="confirmed"?"status-chip confirmed":"status-chip"}>{item.fact_status==="confirmed"?"事实已确认":"待确认"}</span></div>
-        <div className="catalog-meta"><span>{item.sample_size===null?"样本量未填写":`样本 ${item.sample_size}`}</span><span>{item.confidence_level?({high:"高置信",medium:"中置信",low:"低置信"} as Record<string,string>)[item.confidence_level]??item.confidence_level:"未评估置信度"}</span><span>V{item.current_version}</span></div>
+        <div className="catalog-item-main"><div><h2>{item.name}</h2><p>{segmentLabel[item.segment_type]} · {sourceTypeLabel(item.source_type)}</p></div><span className={item.fact_status==="confirmed"?"status-chip confirmed":"status-chip"}>{item.fact_status==="confirmed"?"事实已确认":"待确认"}</span></div>
+        <div className="catalog-meta"><span>{item.sample_size===null?"样本量未填写":`样本 ${item.sample_size}`}</span><span>{item.confidence_level?({high:"高置信",medium:"中置信",low:"低置信"} as Record<string,string>)[item.confidence_level]??"未评估置信度":"未评估置信度"}</span><span>V{item.current_version}</span></div>
         <div className="catalog-actions"><button className="secondary" onClick={()=>{window.location.hash=`#store-editor:audience:${item.id}`;}}>编辑</button>{item.fact_status!=="confirmed"&&<button className="secondary" disabled={saving} onClick={()=>void confirm(item)}>确认事实</button>}<button className="secondary" disabled={saving} onClick={()=>void remove(item)}>删除</button></div>
       </article>)}
     </section>}

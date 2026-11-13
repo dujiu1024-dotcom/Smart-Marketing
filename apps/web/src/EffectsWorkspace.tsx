@@ -4,6 +4,24 @@ import { createMetricObservation, getEffectsOverview, getMetricDefinitions, getM
   type BusinessOutcomeEvidenceRecord, type AttributionEvidenceRecord, type DataSourceCapabilitySnapshotRecord, type PublishReadbackCandidate } from "./api";
 
 const tierLabels = { content_performance: "内容表现", intent: "互动意向", business_outcome: "经营结果" } as const;
+const statusZh: Record<string, string> = {
+  active: "已生效", verified: "已核验", unverified: "未核验", pending: "待处理", failed: "失败",
+  complete: "完整", incomplete: "不完整", anomalous: "异常", merchant_reported: "商家报告",
+  available: "可用", unavailable: "不可用", accumulating: "积累中", window_unknown: "统计窗口未知",
+  verified_system_publish: "系统发布已核验", verified_platform_api: "平台接口已核验",
+  merchant_declared: "商家自行申报", revoked: "已撤销",
+};
+const outcomeTypeZh: Record<string, string> = {
+  orders: "订单数", revenue: "营业额", redemptions: "优惠核销", store_visits: "到店人数", leads: "咨询线索",
+};
+const attributionMethodZh: Record<string, string> = {
+  direct_code: "专属码归因", platform_reported: "平台回传归因",
+};
+const evidenceStrengthZh: Record<string, string> = {
+  strong: "强证据", medium: "中等证据",
+};
+const zhStatus = (value: string) => statusZh[value] ?? "状态未知";
+const channelLabel = (key: string) => key === "douyin" ? "抖音" : key;
 const errorText = (error: unknown) => error instanceof Error ? error.message : "请求失败，请稍后重试。";
 
 function chartPoints(points: Array<{ value: string }>): string {
@@ -178,7 +196,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         <div className="section-title"><div><h2>指标趋势与周期对比</h2><p>仅对完整、当前且已核验的数据进行聚合；周期长度不一致或样本不足时不计算环比。</p></div></div>
         {(overview?.trends ?? []).length ? <div className="catalog-list">
           {overview?.trends.map(trend => <div className="catalog-item" key={trend.metric_key + trend.source_system + (trend.channel_key ?? "") + trend.definition_version}>
-            <div className="catalog-item-main"><div><h3>{trend.display_name}</h3><p>{trend.metric_key} · {trend.source_system}{trend.channel_key ? ` · ${trend.channel_key}` : ""} · 口径 v{trend.definition_version}</p></div>
+            <div className="catalog-item-main"><div><h3>{trend.display_name}</h3><p>{trend.metric_key} · {trend.source_system}{trend.channel_key ? ` · ${channelLabel(trend.channel_key)}` : ""} · 口径 v{trend.definition_version}</p></div>
               <span className="status-chip">{trend.comparison.status === "available" ? `环比 ${trend.comparison.change_percent}%` : "样本不足"}</span></div>
             <div className="catalog-meta">{trend.points.map(point => <span key={point.period_end}>{new Date(point.period_start).toLocaleDateString()} – {new Date(point.period_end).toLocaleDateString()}：{point.value}（n={point.sample_count}）</span>)}</div>
             {trend.points.length > 1 && <svg className="metric-trend-chart" width="100%" height="120" viewBox="0 0 600 120" role="img" aria-label={`${trend.display_name}趋势图`}>
@@ -189,7 +207,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         <div className="catalog-list">
           <h3>数据洞察与下一次优化建议</h3>
           {(overview?.insights ?? []).length > 0 ? overview?.insights.map(item => <div className="catalog-item" key={item.metric_key + item.source_system + (item.channel_key ?? "")}>
-            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.source_system}{item.channel_key ? ` · ${item.channel_key}` : ""} · 样本数 {item.sample_count}</p></div>
+            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.source_system}{item.channel_key ? ` · ${channelLabel(item.channel_key)}` : ""} · 样本数 {item.sample_count}</p></div>
               <span className="status-chip">{item.comparison_status === "available" ? "趋势可比较" : item.comparison_status === "zero_baseline" ? "零基线" : "样本不足"}</span></div>
             <p className="catalog-description">{item.observation}</p>
             <p className="catalog-description">下一步：{item.next_action}</p>
@@ -198,14 +216,14 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         <div className="catalog-list">
           <h3>互动转化率</h3>
           {(overview?.conversion_rates ?? []).length > 0 ? overview?.conversion_rates.map(item => <div className="catalog-item" key={item.metric_key + item.source_system + (item.channel_key ?? "") + item.numerator_definition_version + item.denominator_definition_version + item.period_end}>
-            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.numerator_value} / {item.denominator_value} · {item.source_system}{item.channel_key ? ` · ${item.channel_key}` : ""} · 口径 v{item.numerator_definition_version}/{item.denominator_definition_version} · {new Date(item.period_start).toLocaleDateString()}–{new Date(item.period_end).toLocaleDateString()}</p></div>
+            <div className="catalog-item-main"><div><strong>{item.display_name}</strong><p>{item.numerator_value} / {item.denominator_value} · {item.source_system}{item.channel_key ? ` · ${channelLabel(item.channel_key)}` : ""} · 口径 v{item.numerator_definition_version}/{item.denominator_definition_version} · {new Date(item.period_start).toLocaleDateString()}–{new Date(item.period_end).toLocaleDateString()}</p></div>
               <span className="status-chip">{item.status === "available" ? `${item.value_percent}%` : "分母为 0，不计算"}</span></div>
           </div>) : <p className="muted">缺少同周期、同口径的已核验分子与分母数据，暂不计算转化率。</p>}
         </div>
         {(overview?.content_performance ?? []).length > 0 && <div className="catalog-list">
           <h3>按作品查看内容表现</h3>
           {overview?.content_performance.map(work => <div className="catalog-item" key={work.published_work_id + work.metric_key + work.source_system + work.definition_version}>
-            <div className="catalog-item-main"><div><strong>{work.display_name}</strong><p>{work.channel_key} · {work.external_work_id} · {work.source_system} · 口径 v{work.definition_version}</p></div>
+            <div className="catalog-item-main"><div><strong>{work.display_name}</strong><p>{channelLabel(work.channel_key)} · {work.external_work_id} · {work.source_system} · 口径 v{work.definition_version}</p></div>
               <span className="status-chip">{work.comparison.status === "available" ? `环比 ${work.comparison.change_percent}%` : "样本不足"}</span></div>
             <p className="catalog-description">关联任务：{work.marketing_task_id ?? "未关联"} · {work.points.map(point => `${new Date(point.period_start).toLocaleDateString()}–${new Date(point.period_end).toLocaleDateString()}：${point.value}`).join("；")}</p>
             {work.points.length > 1 && <svg className="metric-trend-chart" viewBox="0 0 600 120" role="img" aria-label={`${work.display_name}作品表现趋势图`}>
@@ -224,7 +242,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         </div>
         <div className="catalog-list">
           {publishReadbacks.map(item => <div className="catalog-item" key={item.publish_operation_id}>
-            <div className="catalog-item-main"><div><h3>{item.channel_key} · {item.external_work_id}</h3><p>营销任务：{item.marketing_task_id}</p></div><span className="status-chip">已读回待登记</span></div>
+            <div className="catalog-item-main"><div><h3>{channelLabel(item.channel_key)} · {item.external_work_id}</h3><p>营销任务：{item.marketing_task_id}</p></div><span className="status-chip">已读回待登记</span></div>
             <p className="catalog-description">读回时间：{new Date(item.readback_at).toLocaleString()}</p>
             <button className="secondary" onClick={async () => {
               try {
@@ -244,7 +262,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         </div>
         <div className="catalog-list">
           {capabilities.map(item => <div className="catalog-item" key={item.id}>
-            <div className="catalog-item-main"><div><h3>{item.channel_key} · {item.capability_key}</h3><p>能力快照 v{item.snapshot_version}</p></div><span className="status-chip">{item.status}</span></div>
+            <div className="catalog-item-main"><div><h3>{channelLabel(item.channel_key)} · {item.capability_key}</h3><p>能力快照 v{item.snapshot_version}</p></div><span className="status-chip">{zhStatus(item.status)}</span></div>
             <p className="catalog-description">检查时间：{new Date(item.checked_at).toLocaleString()} · 已授权范围：{item.granted_scopes.join(", ") || "无"}</p>
             {item.reason && <p className="catalog-description">{item.reason}</p>}
           </div>)}
@@ -252,7 +270,7 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         </div>
         <div className="catalog-list">
           {publishedWorks.map(work => <div className="catalog-item" key={work.id}>
-            <div className="catalog-item-main"><div><h3>{work.title ?? work.external_work_id}</h3><p>{work.channel_key} · {work.external_work_id}</p></div><span className="status-chip">{work.ownership_status}</span></div>
+            <div className="catalog-item-main"><div><h3>{work.title ?? work.external_work_id}</h3><p>{channelLabel(work.channel_key)} · {work.external_work_id}</p></div><span className="status-chip">{zhStatus(work.ownership_status)}</span></div>
             <p className="catalog-description">{work.verified_at ? `核验时间：${new Date(work.verified_at).toLocaleString()}` : "尚未核验作品归属"}{work.task_id ? ` · 营销任务：${work.task_id}` : ""}</p>
           </div>)}
           {!publishedWorks.length && <p className="muted">暂无已读回或已登记的作品。</p>}
@@ -275,13 +293,13 @@ export default function EffectsWorkspace({ storeId }: { storeId: string }) {
         </form>
         <div className="catalog-list">
           {businessOutcomes.map(outcome => <div className="catalog-item" key={outcome.id}>
-            <div className="catalog-item-main"><div><h3>{outcome.outcome_type} · {outcome.value_numeric}{outcome.currency ? ` ${outcome.currency}` : ""}</h3><p>{outcome.source_system} · {new Date(outcome.occurred_at).toLocaleString()}</p></div><span className="status-chip">{outcome.authenticity_status} / {outcome.integrity_status}</span></div>
+            <div className="catalog-item-main"><div><h3>{outcomeTypeZh[outcome.outcome_type] ?? "经营结果"} · {outcome.value_numeric}{outcome.currency ? ` ${outcome.currency}` : ""}</h3><p>{outcome.source_system} · {new Date(outcome.occurred_at).toLocaleString()}</p></div><span className="status-chip">{zhStatus(outcome.authenticity_status)} / {zhStatus(outcome.integrity_status)}</span></div>
           </div>)}
           {!businessOutcomes.length && <p className="muted">暂无经营结果证据；没有真实证据时不计算 ROI。</p>}
         </div>
         {attributions.length > 0 && <div className="catalog-list">{attributions.map(item => <div className="catalog-item" key={item.id}>
           <p>营销任务 {item.marketing_task_id} · 作品 {item.published_work_id} · 经营结果 {item.outcome_evidence_id} · 版本 v{item.attribution_version}</p>
-          <p className="catalog-description">{item.attribution_method} · {item.evidence_strength} · 分摊 {item.allocation_percent}% · {item.status}</p>
+          <p className="catalog-description">{attributionMethodZh[item.attribution_method] ?? "归因方式未知"} · {evidenceStrengthZh[item.evidence_strength] ?? "证据强度未知"} · 分摊 {item.allocation_percent}% · {zhStatus(item.status)}</p>
           {item.supersedes_attribution_id && <p className="catalog-description">替代归因：{item.supersedes_attribution_id}</p>}{item.reversal_reason && <p className="catalog-description">撤销原因：{item.reversal_reason} · {item.reversed_at ? new Date(item.reversed_at).toLocaleString() : ""}</p>}
           {item.status === "active" && <div className="form-actions">
             <input aria-label={`撤销归因原因 ${item.id}`} value={attributionReversalReason} onChange={event => setAttributionReversalReason(event.target.value)} placeholder="填写撤销原因（至少 8 个字）" />

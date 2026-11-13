@@ -13,6 +13,14 @@ interface FormState {
   expires_at: string;
 }
 const empty: FormState = { title: "", category: "经营说明", content_text: "", content_ref: "", content_hash: "", source_type: "merchant_observation", source_ref: "", effective_at: "", expires_at: "" };
+const sourceTypeZh: Record<string, string> = {
+  merchant_observation: "商家观察", survey: "顾客调研", pos: "POS 数据", official_document: "官方资料",
+  merchant_upload: "商家上传", manual_edit: "人工编辑", ai_generated: "AI 生成",
+};
+const sourceTypeLabel = (value: string | null | undefined): string => {
+  if (!value) return "来源未记录";
+  return sourceTypeZh[value] ?? (/[A-Za-z]/.test(value) ? "其他来源" : value);
+};
 const message = (error: unknown) => error instanceof Error ? error.message : "请求失败，请稍后重试。";
 function normalizeDate(value: string): string | null {
   const text = value.trim();
@@ -139,7 +147,7 @@ export default function KnowledgeWorkspace({ storeId }: { storeId: string }) {
     </form> : loading ? <div className="loading-card"><span className="spinner" />正在读取门店知识…</div>
     : items.length === 0 ? <section className="empty-card"><h2>知识库还是空的</h2><p>可以先记录服务流程、营业规则、产品知识或门店常见问题。没有可靠来源的信息不要作为已确认事实。</p><button className="primary" type="button" onClick={() => { window.location.hash = "#store-editor:knowledge:new"; }}>添加第一条知识</button></section>
     : <section className="catalog-list"><div className="catalog-summary"><span>共 {total} 条知识</span><button className="text-button" onClick={() => void reload()}>刷新</button></div>
-      {items.map(item => <article className="catalog-item" key={item.id}><div className="catalog-item-main"><div><h2>{item.title}</h2><p>{item.category} · {item.source_type || "来源未记录"}</p></div><span className={item.fact_status === "confirmed" ? "status-chip confirmed" : "status-chip"}>{item.fact_status === "confirmed" ? "事实已确认" : "待确认"}</span></div>
+      {items.map(item => <article className="catalog-item" key={item.id}><div className="catalog-item-main"><div><h2>{item.title}</h2><p>{item.category} · {sourceTypeLabel(item.source_type)}</p></div><span className={item.fact_status === "confirmed" ? "status-chip confirmed" : "status-chip"}>{item.fact_status === "confirmed" ? "事实已确认" : "待确认"}</span></div>
         <p className="catalog-description">{item.content_text || item.content_ref}</p><div className="catalog-meta"><span>V{item.current_version}</span><span>{item.expires_at ? `失效：${new Date(item.expires_at).toLocaleString()}` : "未设置失效时间"}</span></div>
         <div className="catalog-actions"><button className="secondary" type="button" onClick={() => { window.location.hash = `#store-editor:knowledge:${item.id}`; }}>编辑</button>{item.fact_status !== "confirmed" && <button className="secondary" type="button" disabled={saving} onClick={() => void confirm(item)}>确认事实</button>}<button className="secondary" type="button" disabled={saving} onClick={() => void remove(item)}>删除</button></div>
       </article>)}

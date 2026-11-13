@@ -5,6 +5,10 @@ import {
 } from "./api";
 
 type OfferType = "discount_percent" | "discount_amount" | "fixed_price" | "buy_x_get_y" | "gift" | "threshold_discount";
+const offerTypeLabels: Record<string, string> = {
+  discount_percent: "折扣比例", discount_amount: "立减金额", fixed_price: "优惠固定价",
+  buy_x_get_y: "买 X 赠 Y", gift: "赠品活动", threshold_discount: "满额优惠",
+};
 interface OfferForm {
   title: string;
   offer_type: OfferType;
@@ -229,7 +233,7 @@ export default function OfferWorkspace({ storeId }: { storeId: string }) {
       <section className="empty-card"><h2>还没有活动或优惠</h2><p>添加真实活动规则和适用范围，保存后由门店成员核对并确认。</p><button className="primary" type="button" onClick={() => open("new")}>创建第一项活动</button></section> :
       <section className="form-card"><div className="section-title"><div><h2>活动与优惠清单</h2><p>共 {items.length} 项</p></div></div><div className="product-list">
         {items.map((item) => <button className="product-row" type="button" key={item.id} onClick={() => open(item.id)}>
-          <span className="product-main"><strong>{item.title}</strong><small>{item.offer_type} · {item.starts_at ? item.starts_at : "未设开始时间"} – {item.ends_at ? item.ends_at : "未设结束时间"}</small></span>
+          <span className="product-main"><strong>{item.title}</strong><small>{offerTypeLabels[item.offer_type] ?? "优惠类型未知"} · {item.starts_at ? item.starts_at : "未设开始时间"} – {item.ends_at ? item.ends_at : "未设结束时间"}</small></span>
           <span className="product-meta">{({draft:"草稿",active:"生效中",paused:"已暂停",expired:"已过期",archived:"已归档"})[item.status]}</span>
           <span className={item.fact_status === "confirmed" ? "fact-status confirmed" : "fact-status pending"}>{item.fact_status === "confirmed" ? "已确认" : "待确认"}</span><span>›</span>
         </button>)}

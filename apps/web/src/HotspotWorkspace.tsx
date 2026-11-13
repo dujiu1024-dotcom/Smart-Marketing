@@ -90,7 +90,7 @@ export default function HotspotWorkspace({ storeId }: { storeId: string }) {
       {loading ? <div className="loading-card"><span className="spinner" />正在读取机会…</div> : detail ? <>
         <article className="form-card">
           <div className="section-title"><div><h2>{String(detail.title ?? "未命名机会")}</h2><p>{String(detail.summary ?? "暂无来源摘要")}</p></div><span className="status-chip">{labels[String(match.eligibility_status)] ?? "状态未知"}</span></div>
-          <div className="catalog-meta"><span>来源证据：{String(source.evidence_status ?? "未知")}</span><span>发布时间：{source.published_at ? new Date(String(source.published_at)).toLocaleString() : "未提供"}</span><span>采集时间：{source.discovered_at ? new Date(String(source.discovered_at)).toLocaleString() : "未知"}</span></div>
+          <div className="catalog-meta"><span>来源证据：{source.evidence_status === "collected" ? "已采集" : source.evidence_status === "partial" ? "证据不完整" : "待核验"}</span><span>发布时间：{source.published_at ? new Date(String(source.published_at)).toLocaleString() : "未提供"}</span><span>采集时间：{source.discovered_at ? new Date(String(source.discovered_at)).toLocaleString() : "未知"}</span></div>
           {typeof source.url === "string" && <p className="opportunity-source"><a href={source.url} target="_blank" rel="noreferrer">查看原始来源</a></p>}
         </article>
         <article className="form-card">

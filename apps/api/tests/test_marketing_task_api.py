@@ -138,6 +138,8 @@ def test_create_marketing_task_initializes_fixed_steps_and_event(
     assert steps["copy_production_review"]["applicability"] == "required"
     assert steps["image_production_review"]["status"] == "skipped"
     assert steps["image_production_review"]["applicability"] == "not_applicable"
+    assert steps["image_production_review"]["skip_reason"] == "该任务未包含图片制作，此步骤不适用"
+    assert steps["delivery"]["skip_reason"] == "本任务未勾选对外发布/交付，此步骤不适用"
     assert steps["opportunity_decision"]["status"] == "skipped"
     assert steps["channel_adaptation"]["status"] == "skipped"
     assert steps["quality_check"]["status"] == "skipped"

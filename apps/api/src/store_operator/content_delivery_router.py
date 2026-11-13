@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
@@ -19,10 +20,23 @@ from store_operator.auth.dependencies import (
 )
 from store_operator.auth.errors import ApiError
 from store_operator.db import get_db
+from store_operator.domain.marketing_task import (
+    InvalidTaskStepTransition,
+    StepApplicability,
+    TaskStepStatus,
+    ensure_step_transition,
+)
 from store_operator.idempotency import begin_idempotency, complete_idempotency
+from store_operator.jobs.service import JobIdempotencyConflict, create_job
 from store_operator.models.content_delivery import Artifact, ArtifactVersion, ReviewRecord
 from store_operator.models.job_runtime import OutboxEvent
-from store_operator.models.marketing_task import MarketingTask
+from store_operator.models.marketing_task import (
+    MarketingTask,
+    RequirementSnapshot,
+    StrategySnapshot,
+    TaskEvent,
+    TaskStep,
+)
 from store_operator.models.store_knowledge import MediaAsset
 
 router = APIRouter(prefix="/marketing-tasks", tags=["content-delivery"])
@@ -516,6 +530,303 @@ def create_artifact_version(
     return response
 
 
+_REVIEW_STEP_KEYS = {
+    "copy": "copy_production_review",
+    "image": "image_production_review",
+}
+
+
+def _advance_review_step_after_approval(
+    db: Session,
+    *,
+    store_id: UUID,
+    task_id: UUID,
+    artifact: Artifact,
+    artifact_version: ArtifactVersion,
+    actor_user_id: UUID,
+) -> None:
+    """Complete the matching production step once its current version is approved."""
+    step_key = _REVIEW_STEP_KEYS.get(artifact.artifact_type)
+    if step_key is None:
+        return
+    task = db.scalar(
+        select(MarketingTask)
+        .where(MarketingTask.id == task_id, MarketingTask.store_id == store_id)
+        .with_for_update()
+    )
+    if task is None:
+        return
+    step = db.scalar(
+        select(TaskStep)
+        .where(
+            TaskStep.store_id == store_id,
+            TaskStep.task_id == task_id,
+            TaskStep.step_key == step_key,
+        )
+        .with_for_update()
+    )
+    if step is None:
+        return
+    applicability = StepApplicability(step.applicability)
+    if applicability is StepApplicability.NOT_APPLICABLE:
+        return
+    current = TaskStepStatus(step.status)
+    if current is TaskStepStatus.SUCCEEDED or current is TaskStepStatus.SKIPPED:
+        return
+    # A running step belongs to an in-flight Worker job; that job owns the transition.
+    if current is TaskStepStatus.RUNNING:
+        return
+    chain: tuple[TaskStepStatus, ...]
+    if current is TaskStepStatus.PENDING:
+        chain = (TaskStepStatus.RUNNING, TaskStepStatus.SUCCEEDED)
+    elif current is TaskStepStatus.WAITING_FOR_USER:
+        chain = (TaskStepStatus.RUNNING, TaskStepStatus.SUCCEEDED)
+    elif current is TaskStepStatus.FAILED:
+        chain = (TaskStepStatus.RUNNING, TaskStepStatus.SUCCEEDED)
+    elif current is TaskStepStatus.STALE:
+        chain = (
+            TaskStepStatus.PENDING,
+            TaskStepStatus.RUNNING,
+            TaskStepStatus.SUCCEEDED,
+        )
+    else:
+        return
+    try:
+        for target in chain:
+            ensure_step_transition(
+                current,
+                target,
+                applicability=applicability,
+            )
+            current = target
+    except InvalidTaskStepTransition:
+        return
+
+    now = datetime.now(UTC)
+    step.status = TaskStepStatus.SUCCEEDED.value
+    step.version += 1
+    step.started_at = step.started_at or now
+    step.finished_at = now
+    step.output_refs_json = [
+        ref
+        for ref in (step.output_refs_json or [])
+        if not (
+            isinstance(ref, dict)
+            and ref.get("type") == "artifact_version"
+            and ref.get("artifact_version_id") == str(artifact_version.id)
+        )
+    ] + [
+        {
+            "type": "artifact_version",
+            "artifact_id": str(artifact.id),
+            "artifact_version_id": str(artifact_version.id),
+        }
+    ]
+    step.blocked_by_json = []
+    step.block_code = None
+    step.block_detail_json = None
+    step.skip_reason = None
+    if task.lifecycle_status in {"blocked", "waiting_for_user"}:
+        task.lifecycle_status = "active"
+    task.version += 1
+    db.add(
+        TaskEvent(
+            id=uuid4(),
+            store_id=store_id,
+            task_id=task_id,
+            event_type="task_step.completed",
+            aggregate_version=task.version,
+            actor_type="user",
+            actor_user_id=actor_user_id,
+            payload_json={
+                "step_key": step_key,
+                "artifact_id": str(artifact.id),
+                "artifact_version_id": str(artifact_version.id),
+                "source": "merchant_review",
+            },
+        )
+    )
+
+
+def _dispatch_image_revision_job(
+    db: Session,
+    *,
+    store_id: UUID,
+    task_id: UUID,
+    artifact_version: ArtifactVersion,
+    instruction: str,
+    actor_user_id: UUID,
+) -> UUID:
+    """Move the image step back to running and enqueue a real regeneration job."""
+    task = db.scalar(
+        select(MarketingTask)
+        .where(MarketingTask.id == task_id, MarketingTask.store_id == store_id)
+        .with_for_update()
+    )
+    if task is None:
+        raise ApiError(404, "TASK_NOT_FOUND", "Marketing task not found")
+    if (
+        task.current_requirement_snapshot_id is None
+        or task.current_strategy_snapshot_id is None
+    ):
+        raise ApiError(
+            409,
+            "IMAGE_REVISION_SNAPSHOTS_REQUIRED",
+            "请先确认需求与策略，再要求修改图片",
+        )
+    requirement = db.scalar(
+        select(RequirementSnapshot).where(
+            RequirementSnapshot.id == task.current_requirement_snapshot_id,
+            RequirementSnapshot.store_id == store_id,
+            RequirementSnapshot.task_id == task.id,
+        )
+    )
+    strategy = db.scalar(
+        select(StrategySnapshot).where(
+            StrategySnapshot.id == task.current_strategy_snapshot_id,
+            StrategySnapshot.store_id == store_id,
+            StrategySnapshot.task_id == task.id,
+        )
+    )
+    if requirement is None or strategy is None:
+        raise ApiError(
+            409,
+            "IMAGE_REVISION_SNAPSHOT_UNAVAILABLE",
+            "当前确认的需求或策略快照不可用，请重新确认后再试",
+        )
+    step = db.scalar(
+        select(TaskStep)
+        .where(
+            TaskStep.store_id == store_id,
+            TaskStep.task_id == task_id,
+            TaskStep.step_key == "image_production_review",
+        )
+        .with_for_update()
+    )
+    if step is None:
+        raise ApiError(404, "IMAGE_STEP_NOT_FOUND", "Image production step not found")
+    applicability = StepApplicability(step.applicability)
+    if applicability is StepApplicability.NOT_APPLICABLE:
+        raise ApiError(
+            409,
+            "IMAGE_REVISION_NOT_APPLICABLE",
+            "该任务未包含图片制作，无法要求修改图片",
+        )
+    current = TaskStepStatus(step.status)
+    if current is TaskStepStatus.RUNNING:
+        raise ApiError(
+            409,
+            "IMAGE_REVISION_IN_FLIGHT",
+            "图片正在重新生成，请等待完成后再操作",
+        )
+    if current in {TaskStepStatus.SUCCEEDED, TaskStepStatus.SKIPPED}:
+        raise ApiError(
+            409,
+            "IMAGE_REVISION_STEP_CLOSED",
+            "图片步骤已完成，不能再次要求修改",
+        )
+    chain: tuple[TaskStepStatus, ...]
+    if current in {TaskStepStatus.PENDING, TaskStepStatus.WAITING_FOR_USER}:
+        chain = (TaskStepStatus.RUNNING,)
+    elif current is TaskStepStatus.FAILED:
+        chain = (TaskStepStatus.RUNNING,)
+    elif current is TaskStepStatus.STALE:
+        chain = (TaskStepStatus.PENDING, TaskStepStatus.RUNNING)
+    else:
+        raise ApiError(
+            409,
+            "IMAGE_REVISION_STATE_CONFLICT",
+            "当前步骤状态不支持要求修改，请刷新后重试",
+        )
+    try:
+        for target in chain:
+            ensure_step_transition(
+                current,
+                target,
+                applicability=applicability,
+            )
+            current = target
+    except InvalidTaskStepTransition as exc:
+        raise ApiError(
+            409,
+            "IMAGE_REVISION_STATE_CONFLICT",
+            "当前步骤状态不支持要求修改，请刷新后重试",
+        ) from exc
+
+    now = datetime.now(UTC)
+    step.status = TaskStepStatus.RUNNING.value
+    step.version += 1
+    step.started_at = now
+    step.finished_at = None
+    step.input_fingerprint = strategy.content_fingerprint
+    step.blocked_by_json = []
+    step.block_code = None
+    step.block_detail_json = None
+    step.skip_reason = None
+    if task.lifecycle_status in {"draft", "active", "waiting_for_user", "blocked"}:
+        task.lifecycle_status = "active"
+    task.version += 1
+    db.add(
+        TaskEvent(
+            id=uuid4(),
+            store_id=store_id,
+            task_id=task_id,
+            event_type="task_step.revision_requested",
+            aggregate_version=task.version,
+            actor_type="user",
+            actor_user_id=actor_user_id,
+            payload_json={
+                "step_key": "image_production_review",
+                "artifact_version_id": str(artifact_version.id),
+                "instruction": " ".join(instruction.split())[:500],
+            },
+        )
+    )
+    source_asset_id = next(
+        (
+            str(ref["id"])
+            for ref in (artifact_version.source_refs_json or [])
+            if isinstance(ref, dict)
+            and ref.get("type") == "source_media_asset"
+            and isinstance(ref.get("id"), str)
+        ),
+        None,
+    )
+    job_payload: dict[str, object] = {
+        "schema_version": 1,
+        "marketing_task_id": str(task.id),
+        "requirement_snapshot_id": str(requirement.id),
+        "strategy_snapshot_id": str(strategy.id),
+        "step_key": "image_production_review",
+        "strategy_fingerprint": strategy.content_fingerprint,
+        "revision_instruction": instruction,
+    }
+    if source_asset_id is not None:
+        job_payload["source_media_asset_id"] = source_asset_id
+    try:
+        job = create_job(
+            db,
+            job_type="marketing_task.generate_image",
+            payload_ref=job_payload,
+            idempotency_key=(
+                f"marketing-task:{task.id}:image-revision:{artifact_version.id}"
+            ),
+            store_id=store_id,
+            actor_type="user",
+            actor_user_id=actor_user_id,
+            marketing_task_id=task.id,
+            max_attempts=3,
+            timeout_seconds=900,
+        )
+    except JobIdempotencyConflict as exc:
+        raise ApiError(
+            409,
+            "IMAGE_REVISION_JOB_CONFLICT",
+            "该图片版本已提交过修改，请刷新后查看最新状态",
+        ) from exc
+    return job.id
+
+
 @router.post("/{task_id}/artifacts/{artifact_id}/versions/{version_id}/reviews", status_code=201)
 def create_review_record(
     task_id: UUID,
@@ -601,8 +912,8 @@ def create_review_record(
                 409,
                 "VISION_INSPECTION_REQUIRED",
                 (
-                    "AI-generated images require a passing vision inspection and "
-                    "merchant review before approval"
+                    "AI 生成的图片需先通过视觉质检才能审核通过"
+                    "（错误码：VISION_INSPECTION_REQUIRED）"
                 ),
             )
     latest = db.scalar(
@@ -633,6 +944,30 @@ def create_review_record(
     )
     db.add(review)
     db.flush()
+    image_revision_job_id: str | None = None
+    if payload.decision == "approved":
+        _advance_review_step_after_approval(
+            db,
+            store_id=store_id,
+            task_id=task_id,
+            artifact=artifact,
+            artifact_version=version,
+            actor_user_id=auth.user.id,
+        )
+    elif (
+        payload.decision == "revision_requested"
+        and artifact.artifact_type == "image"
+    ):
+        image_revision_job_id = str(
+            _dispatch_image_revision_job(
+                db,
+                store_id=store_id,
+                task_id=task_id,
+                artifact_version=version,
+                instruction=review.comment or "请按审核意见调整画面",
+                actor_user_id=auth.user.id,
+            )
+        )
     response: dict[str, object] = {
         "id": str(review.id),
         "artifact_id": str(artifact_id),
@@ -642,6 +977,7 @@ def create_review_record(
         "comment": review.comment,
         "target": review.target_json,
         "created_at": review.created_at.isoformat(),
+        "image_revision_job_id": image_revision_job_id,
     }
     complete_idempotency(
         idempotency,

@@ -13,8 +13,18 @@ from sqlalchemy.orm import Session
 from store_operator.ai_gateway.errors import SideEffectState
 from store_operator.models.identity import Store, StoreMembership
 from store_operator.models.job_runtime import Job, JobAttempt, JobEvent, OutboxEvent
+from store_operator.models.marketing_task import MarketingTask, TaskStep
 
 SYSTEM_SCOPE_ID = UUID("00000000-0000-0000-0000-000000000001")
+
+_TASK_STEP_BY_JOB_TYPE = {
+    "marketing_task.generate_strategy": "strategy_confirmation",
+    "marketing_task.generate_copy": "copy_production_review",
+    "marketing_task.generate_image": "image_production_review",
+    "content.quality_check": "quality_check",
+    "douyin.publish_image_text": "delivery",
+}
+
 
 
 class JobIdempotencyConflict(Exception):
@@ -327,6 +337,13 @@ def recover_expired_jobs(
         job.lease_token = None
         job.lease_expires_at = None
         job.heartbeat_at = None
+        _block_task_step_for_job(
+            db,
+            job,
+            error_code="WORKER_LEASE_EXPIRED",
+            error_summary=job.error_summary,
+            now=current_time,
+        )
         db.add(
             JobEvent(
                 job_id=job.id,
@@ -599,6 +616,49 @@ def complete_job(
     return job
 
 
+def _block_task_step_for_job(
+    db: Session,
+    job: Job,
+    *,
+    error_code: str,
+    error_summary: str,
+    now: datetime,
+) -> None:
+    """Surface a terminal job failure as an actionable blocked task step."""
+    if job.marketing_task_id is None or job.store_id is None:
+        return
+    step_key = _TASK_STEP_BY_JOB_TYPE.get(job.job_type)
+    if step_key is None:
+        return
+    step = db.scalar(
+        select(TaskStep)
+        .where(
+            TaskStep.store_id == job.store_id,
+            TaskStep.task_id == job.marketing_task_id,
+            TaskStep.step_key == step_key,
+        )
+        .with_for_update()
+    )
+    if step is None or step.status not in {"pending", "running"}:
+        return
+    step.status = "failed"
+    step.block_code = error_code[:60]
+    step.block_detail_json = {
+        "code": error_code,
+        "summary": " ".join(error_summary.split())[:500],
+        "job_id": str(job.id),
+    }
+    step.finished_at = now
+    step.version += 1
+    task = db.get(MarketingTask, job.marketing_task_id)
+    if task is not None and task.lifecycle_status in {
+        "draft",
+        "active",
+        "waiting_for_user",
+    }:
+        task.lifecycle_status = "blocked"
+
+
 def fail_job(
     db: Session,
     *,
@@ -663,6 +723,15 @@ def fail_job(
         job.status = "failed"
         job.finished_at = current_time
         event_type = "job.failed"
+
+    if job.status in {"failed", "needs_human"}:
+        _block_task_step_for_job(
+            db,
+            job,
+            error_code=error_code,
+            error_summary=safe_summary,
+            now=current_time,
+        )
 
     _clear_lease(job)
     _append_event(

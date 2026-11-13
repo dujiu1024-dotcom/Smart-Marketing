@@ -1,7 +1,7 @@
 import hashlib
 import json
 from datetime import UTC, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import delete, update
@@ -11,11 +11,15 @@ from sqlalchemy.orm import Session
 from store_operator.auth.security import hash_password
 from store_operator.models import (
     ArtifactVersion,
+    Job,
+    MarketingTask,
     MediaAsset,
     OutboxEvent,
+    RequirementSnapshot,
     ReviewRecord,
     Store,
     StoreMembership,
+    StrategySnapshot,
     User,
 )
 
@@ -85,6 +89,21 @@ def task_payload() -> dict[str, object]:
         "task_options": {
             "includes_copy": True,
             "includes_image": False,
+            "opportunity_applicable": False,
+            "selected_channel_keys": [],
+            "requires_external_delivery": False,
+        },
+    }
+
+
+def image_task_payload() -> dict[str, object]:
+    return {
+        "task_type": "full_marketing",
+        "title": "Content image API test",
+        "requirement_draft": {"goal": "Create an approved store image"},
+        "task_options": {
+            "includes_copy": True,
+            "includes_image": True,
             "opportunity_applicable": False,
             "selected_channel_keys": [],
             "requires_external_delivery": False,
@@ -192,6 +211,23 @@ def test_artifact_versions_and_reviews_are_version_bound(
     )
     assert approved.status_code == 201, approved.text
     assert approved.json()["decision"] == "approved"
+
+    detail = identity_client.get(
+        f"/api/v1/marketing-tasks/{task_id}",
+        headers={**ORIGIN, "X-Store-ID": str(store.id)},
+    )
+    assert detail.status_code == 200, detail.text
+    copy_step = next(
+        step
+        for step in detail.json()["steps"]
+        if step["step_key"] == "copy_production_review"
+    )
+    assert copy_step["status"] == "succeeded"
+    assert copy_step["output_refs"] == [{
+        "type": "artifact_version",
+        "artifact_id": artifact_id,
+        "artifact_version_id": second_version_id,
+    }]
 
     with pytest.raises(DBAPIError):
         with db_session.begin_nested():
@@ -449,3 +485,179 @@ def test_artifact_version_id_substitution_across_stores_is_rejected(
     assert db_session.query(OutboxEvent).filter(
         OutboxEvent.event_type == "content.review_recorded"
     ).count() == outbox_count
+
+
+def _image_review_fixture(
+    identity_client, db_session: Session, monkeypatch, email: str
+):
+    import store_operator.auth.router as auth_router
+
+    monkeypatch.setattr(auth_router, "redis_client", FakeRedis())
+    user = create_user(db_session, email)
+    store = create_store(db_session, user)
+    login = identity_client.post(
+        "/api/v1/auth/login",
+        json={"email": email, "password": "test-password-123"},
+        headers=ORIGIN,
+    )
+    assert login.status_code == 200, login.text
+    headers = {
+        **ORIGIN,
+        "X-CSRF-Token": login.json()["csrf_token"],
+        "X-Store-ID": str(store.id),
+    }
+    task = identity_client.post(
+        "/api/v1/marketing-tasks",
+        headers={**headers, "Idempotency-Key": f"{email}-image-task"},
+        json=image_task_payload(),
+    )
+    assert task.status_code == 201, task.text
+    task_id = task.json()["id"]
+    media = MediaAsset(
+        id=uuid4(),
+        store_id=store.id,
+        object_key=f"stores/{store.id}/media/{email}.png",
+        sha256="c" * 64,
+        mime_type="image/png",
+        byte_size=2048,
+        asset_type="product_image",
+        source_type="merchant_upload",
+        usage_rights_status="confirmed_allowed",
+        status="ready",
+        created_by_user_id=user.id,
+    )
+    db_session.add(media)
+    db_session.flush()
+    artifact = identity_client.post(
+        f"/api/v1/marketing-tasks/{task_id}/artifacts",
+        headers={**headers, "Idempotency-Key": f"{email}-image-artifact"},
+        json={
+            "artifact_type": "image",
+            "version": {
+                "source_type": "merchant_upload",
+                "media_asset_id": str(media.id),
+            },
+        },
+    )
+    assert artifact.status_code == 201, artifact.text
+    return (
+        user,
+        store,
+        headers,
+        task_id,
+        artifact.json()["id"],
+        artifact.json()["current_version_id"],
+    )
+
+
+def test_image_approval_completes_image_production_step(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    _, _, headers, task_id, artifact_id, version_id = _image_review_fixture(
+        identity_client, db_session, monkeypatch, "content-image-approve@example.com"
+    )
+
+    approved = identity_client.post(
+        (
+            f"/api/v1/marketing-tasks/{task_id}/artifacts/"
+            f"{artifact_id}/versions/{version_id}/reviews"
+        ),
+        headers={**headers, "Idempotency-Key": "image-approve"},
+        json={"expected_version": 1, "review_type": "image", "decision": "approved"},
+    )
+    assert approved.status_code == 201, approved.text
+    detail = identity_client.get(
+        f"/api/v1/marketing-tasks/{task_id}",
+        headers={**ORIGIN, "X-Store-ID": headers["X-Store-ID"]},
+    )
+    assert detail.status_code == 200, detail.text
+    image_step = next(
+        step
+        for step in detail.json()["steps"]
+        if step["step_key"] == "image_production_review"
+    )
+    assert image_step["status"] == "succeeded"
+    assert image_step["block_code"] is None
+    assert image_step["output_refs"] == [{
+        "type": "artifact_version",
+        "artifact_id": artifact_id,
+        "artifact_version_id": version_id,
+    }]
+
+
+def test_image_revision_request_dispatches_regeneration_job(
+    identity_client, db_session: Session, monkeypatch
+) -> None:
+    (
+        user,
+        store,
+        headers,
+        task_id,
+        artifact_id,
+        version_id,
+    ) = _image_review_fixture(
+        identity_client, db_session, monkeypatch, "content-image-revise@example.com"
+    )
+    task_row = db_session.get(MarketingTask, UUID(task_id))
+    requirement = RequirementSnapshot(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task_row.id,
+        snapshot_no=1,
+        payload_json={"requirement": {"goal": "Image revision"}},
+        content_fingerprint="a" * 64,
+        confirmed_by_user_id=user.id,
+        confirmed_at=datetime.now(UTC),
+    )
+    db_session.add(requirement)
+    db_session.flush()
+    strategy = StrategySnapshot(
+        id=uuid4(),
+        store_id=store.id,
+        task_id=task_row.id,
+        requirement_snapshot_id=requirement.id,
+        snapshot_no=1,
+        payload_json={"strategy": {"strategy_summary": "Image revision"}},
+        content_fingerprint="b" * 64,
+        confirmed_by_user_id=user.id,
+        confirmed_at=datetime.now(UTC),
+    )
+    db_session.add(strategy)
+    db_session.flush()
+    task_row.current_requirement_snapshot_id = requirement.id
+    task_row.current_strategy_snapshot_id = strategy.id
+    db_session.commit()
+
+    revision = identity_client.post(
+        (
+            f"/api/v1/marketing-tasks/{task_id}/artifacts/"
+            f"{artifact_id}/versions/{version_id}/reviews"
+        ),
+        headers={**headers, "Idempotency-Key": "image-revision"},
+        json={
+            "expected_version": 1,
+            "review_type": "image",
+            "decision": "revision_requested",
+            "comment": "请去掉右下角水印并调整构图",
+        },
+    )
+    assert revision.status_code == 201, revision.text
+    job_id = revision.json()["image_revision_job_id"]
+    assert isinstance(job_id, str) and job_id
+
+    db_session.expire_all()
+    job = db_session.get(Job, UUID(job_id))
+    assert job is not None
+    assert job.job_type == "marketing_task.generate_image"
+    assert job.marketing_task_id == task_row.id
+    assert job.payload_ref["revision_instruction"] == "请去掉右下角水印并调整构图"
+    detail = identity_client.get(
+        f"/api/v1/marketing-tasks/{task_id}",
+        headers={**ORIGIN, "X-Store-ID": headers["X-Store-ID"]},
+    )
+    image_step = next(
+        step
+        for step in detail.json()["steps"]
+        if step["step_key"] == "image_production_review"
+    )
+    assert image_step["status"] == "running"

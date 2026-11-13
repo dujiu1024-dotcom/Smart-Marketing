@@ -76,6 +76,22 @@ _BLOCKED_STEP_STATUSES = {
 _STEP_ORDER = {step.value: index for index, step in enumerate(TaskStepKey)}
 
 
+def _not_applicable_reason(step_key: TaskStepKey) -> str:
+    if step_key is TaskStepKey.COPY_PRODUCTION_REVIEW:
+        return "该任务未包含文案制作，此步骤不适用"
+    if step_key is TaskStepKey.IMAGE_PRODUCTION_REVIEW:
+        return "该任务未包含图片制作，此步骤不适用"
+    if step_key is TaskStepKey.OPPORTUNITY_DECISION:
+        return "该任务类型不需要营销机会判断，此步骤不适用"
+    if step_key is TaskStepKey.CHANNEL_ADAPTATION:
+        return "该任务未选择适配渠道，此步骤不适用"
+    if step_key in {TaskStepKey.FINAL_CONFIRMATION, TaskStepKey.DELIVERY}:
+        return "本任务未勾选对外发布/交付，此步骤不适用"
+    if step_key is TaskStepKey.QUALITY_CHECK:
+        return "该任务类型无需内容质检，此步骤不适用"
+    return "该步骤不适用于当前任务范围"
+
+
 def _require_store_id(context: AuthContext) -> UUID:
     if context.request_store_id is None:
         raise ApiError(400, "STORE_CONTEXT_REQUIRED", "Store context is required")
@@ -282,9 +298,7 @@ def create_marketing_task(
             output_refs_json=[],
             blocked_by_json=[],
             skip_reason=(
-                f"Not applicable to {payload.task_type.value} task scope"
-                if not_applicable
-                else None
+                _not_applicable_reason(step_key) if not_applicable else None
             ),
             skipped_at=now if not_applicable else None,
         )
@@ -596,7 +610,7 @@ def update_requirement_draft(
             )
 
         if new_applicability is StepApplicability.NOT_APPLICABLE:
-            reason = f"Not applicable to {validated.task_type.value} task scope"
+            reason = _not_applicable_reason(TaskStepKey(step.step_key))
             if current_status is TaskStepStatus.PENDING:
                 _ensure_step_transition(
                     current_status,
@@ -1471,8 +1485,52 @@ def recover_marketing_task(
         idempotency_record_id=idempotency_record.id if idempotency_record else None,
     )
     db.add(decision)
+    strategy_job_id: str | None = None
     image_job_id: str | None = None
     copy_job_id: str | None = None
+    if (
+        payload.step_key is TaskStepKey.STRATEGY_CONFIRMATION
+        and target_step_status is TaskStepStatus.RUNNING
+    ):
+        requirement_snapshot = (
+            db.get(RequirementSnapshot, task.current_requirement_snapshot_id)
+            if task.current_requirement_snapshot_id is not None
+            else None
+        )
+        if requirement_snapshot is None:
+            raise ApiError(
+                409,
+                "STRATEGY_INPUT_UNAVAILABLE",
+                "Strategy recovery requires a confirmed requirement snapshot",
+            )
+        step.input_fingerprint = requirement_snapshot.content_fingerprint
+        try:
+            strategy_job = create_job(
+                db,
+                job_type="marketing_task.generate_strategy",
+                payload_ref={
+                    "schema_version": 1,
+                    "marketing_task_id": str(task.id),
+                    "requirement_snapshot_id": str(requirement_snapshot.id),
+                    "requirement_fingerprint": requirement_snapshot.content_fingerprint,
+                },
+                idempotency_key=(
+                    f"marketing-task:{task.id}:strategy-recovery:{step.version}"
+                ),
+                store_id=store_id,
+                actor_type="user",
+                actor_user_id=auth.user.id,
+                marketing_task_id=task.id,
+                max_attempts=3,
+                timeout_seconds=600,
+            )
+        except JobIdempotencyConflict as exc:
+            raise ApiError(
+                409,
+                "STRATEGY_RECOVERY_JOB_CONFLICT",
+                "A retry job already exists for this strategy step version",
+            ) from exc
+        strategy_job_id = str(strategy_job.id)
     if (
         payload.step_key is TaskStepKey.IMAGE_PRODUCTION_REVIEW
         and target_step_status is TaskStepStatus.RUNNING
@@ -1669,6 +1727,7 @@ def recover_marketing_task(
             "decision_id": str(decision.id),
             "from_status": current_step_status.value,
             "to_status": target_step_status.value,
+            "strategy_job_id": strategy_job_id,
             "image_job_id": image_job_id,
             "copy_job_id": copy_job_id,
         },
@@ -1676,6 +1735,7 @@ def recover_marketing_task(
         audit_metadata={
             "step_key": payload.step_key.value,
             "decision_id": str(decision.id),
+            "strategy_job_id": strategy_job_id,
             "image_job_id": image_job_id,
             "copy_job_id": copy_job_id,
         },
